@@ -1,0 +1,742 @@
+/* ==========================================================================
+   Guardian Dashboard Responsive Design - Unified CSS
+   Immunicare Vaccination Management System
+
+   This file consolidates all Guardian Dashboard responsive styles into a single,
+   standardized CSS file. It provides consistent spacing, breakpoints, and
+   responsive utilities across all Guardian Dashboard components.
+
+   Version: 1.0
+   Date: March 3, 2026
+
+   BREAKPOINTS (matching Tailwind CSS defaults):
+   - xs: < 640px (extra small - old phones)
+   - sm: 640px - 767px (small phones / large phones)
+   - md: 768px - 1023px (tablets)
+   - lg: 1024px - 1279px (small desktop / large tablets landscape)
+   - xl: 1280px+ (desktop)
+
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Guardian Dashboard Page Wrapper
+   -------------------------------------------------------------------------- */
+.guardian-page-wrapper {
+  min-height: 100vh;
+  background-color: var(--color-bg-secondary, #f9fafb);
+  transition: background-color 0.2s ease;
+}
+
+.dark .guardian-page-wrapper {
+  background-color: var(--color-gray-900, #111827);
+}
+
+/* --------------------------------------------------------------------------
+   Guardian Dashboard Header
+   Standardized header spacing across all pages
+   -------------------------------------------------------------------------- */
+.guardian-dashboard-header {
+  background-color: var(--color-bg-primary, #ffffff);
+  border-bottom: 1px solid var(--color-border-light, #e5e7eb);
+  padding: 0.75rem 0.75rem; /* 12px - xs */
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+@media (min-width: 640px) {
+  .guardian-dashboard-header {
+    padding: 0.75rem 1rem; /* 16px - sm */
+  }
+}
+
+@media (min-width: 768px) {
+  .guardian-dashboard-header {
+    padding: 0.75rem 1.25rem; /* 20px - md */
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-dashboard-header {
+    padding: 0.75rem 1.5rem; /* 24px - lg */
+  }
+}
+
+.dark .guardian-dashboard-header {
+  background-color: var(--color-gray-800, #1f2937);
+  border-bottom-color: var(--color-gray-700, #374151);
+}
+
+/* --------------------------------------------------------------------------
+   Guardian Page Content
+   Standardized content spacing
+   -------------------------------------------------------------------------- */
+.guardian-page-content {
+  padding: 1rem 0.75rem; /* 16px 12px - xs */
+}
+
+@media (min-width: 640px) {
+  .guardian-page-content {
+    padding: 1.25rem 1rem; /* 20px 16px - sm */
+  }
+}
+
+@media (min-width: 768px) {
+  .guardian-page-content {
+    padding: 1.25rem 1.25rem; /* 20px - md */
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-page-content {
+    padding: 1.5rem 1.5rem; /* 24px - lg */
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Guardian Main Content Area
+   Used in GuardianLayout
+   -------------------------------------------------------------------------- */
+.guardian-content-area {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+@media (min-width: 640px) {
+  .guardian-content-area {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 1.25rem;
+    padding-bottom: 1.25rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .guardian-content-area {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-content-area {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Guardian Layout Wrapper
+   -------------------------------------------------------------------------- */
+.guardian-layout-wrapper {
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-color: var(--color-bg-secondary, #f9fafb);
+}
+
+.dark .guardian-layout-wrapper {
+  background-color: var(--color-gray-900, #111827);
+}
+
+.guardian-dashboard {
+  min-height: 100vh;
+  background-color: var(--color-bg-secondary, #f9fafb);
+  transition: background-color 0.2s ease;
+}
+
+.dark .guardian-dashboard {
+  background-color: var(--color-gray-900, #111827);
+}
+
+/* --------------------------------------------------------------------------
+   Guardian Main Content
+   Includes sidebar offset for desktop
+   -------------------------------------------------------------------------- */
+.guardian-main-content {
+  flex: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  transition: margin-left 0.3s ease;
+}
+
+@media (min-width: 1024px) {
+  .guardian-main-content {
+    margin-left: 280px; /* Sidebar width */
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Guardian Children Grid
+   -------------------------------------------------------------------------- */
+.guardian-children-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem; /* 16px */
+}
+
+@media (min-width: 640px) {
+  .guardian-children-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem; /* 20px */
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-children-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem; /* 24px */
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Guardian Child Card
+   -------------------------------------------------------------------------- */
+.guardian-child-card {
+  border-radius: 0.75rem;
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.guardian-child-card:hover {
+  transform: scale(1.02);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.guardian-child-card .p-6 {
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .guardian-child-card .p-6 {
+    padding: 1.25rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-child-card .p-6 {
+    padding: 1.5rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Guardian Child Actions
+   Button group styling within child cards
+   -------------------------------------------------------------------------- */
+.guardian-child-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@media (min-width: 640px) {
+  .guardian-child-actions {
+    padding: 1rem 1.25rem;
+    gap: 0.75rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Guardian Quick Action Button
+   -------------------------------------------------------------------------- */
+.guardian-quick-action-btn {
+  min-height: 80px;
+  padding: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+@media (min-width: 640px) {
+  .guardian-quick-action-btn {
+    min-height: 100px;
+    padding: 1rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-quick-action-btn {
+    min-height: 120px;
+    padding: 1.25rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Guardian Appointments Layout
+   Two-column layout with calendar and sidebar
+   -------------------------------------------------------------------------- */
+.guardian-appointments-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 1024px) {
+  .guardian-appointments-layout {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Guardian Calendar Wrapper
+   -------------------------------------------------------------------------- */
+.guardian-calendar-wrapper-expanded {
+  width: 100%;
+}
+
+/* --------------------------------------------------------------------------
+   Guardian Appointments Sidebar
+   -------------------------------------------------------------------------- */
+.guardian-appointments-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .guardian-appointments-sidebar {
+    gap: 1.25rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .guardian-appointments-sidebar {
+    gap: 1.5rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Guardian Selected Date Card
+   -------------------------------------------------------------------------- */
+.guardian-selected-date-card {
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .guardian-selected-date-card {
+    padding: 1.25rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Guardian Upcoming Appointments Card
+   -------------------------------------------------------------------------- */
+.guardian-upcoming-appointments-card {
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .guardian-upcoming-appointments-card {
+    padding: 1.25rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Guardian Appointment History Card
+   -------------------------------------------------------------------------- */
+.guardian-appointment-history-card {
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .guardian-appointment-history-card {
+    padding: 1.25rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Guardian Appointment Card
+   Individual appointment item
+   -------------------------------------------------------------------------- */
+.guardian-appointment-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background-color: var(--color-bg-primary, #ffffff);
+  border: 1px solid var(--color-border-light, #e5e7eb);
+  border-radius: 0.75rem;
+  transition: box-shadow 0.2s ease;
+}
+
+@media (min-width: 640px) {
+  .guardian-appointment-card {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+  }
+}
+
+.dark .guardian-appointment-card {
+  background-color: var(--color-gray-800, #1f2937);
+  border-color: var(--color-gray-700, #374151);
+}
+
+.guardian-appointment-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* --------------------------------------------------------------------------
+   Guardian Form Actions
+   Button groups in forms
+   -------------------------------------------------------------------------- */
+.guardian-form-actions {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .guardian-form-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+    gap: 0.75rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Responsive Spacing Utilities
+   -------------------------------------------------------------------------- */
+
+/* Horizontal padding utilities */
+.guardian-px-xs { padding-left: 0.75rem; padding-right: 0.75rem; }
+.guardian-px-sm { padding-left: 1rem; padding-right: 1rem; }
+.guardian-px-md { padding-left: 1.25rem; padding-right: 1.25rem; }
+.guardian-px-lg { padding-left: 1.5rem; padding-right: 1.5rem; }
+.guardian-px-xl { padding-left: 2rem; padding-right: 2rem; }
+
+/* Vertical padding utilities */
+.guardian-py-xs { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.guardian-py-sm { padding-top: 1rem; padding-bottom: 1rem; }
+.guardian-py-md { padding-top: 1.25rem; padding-bottom: 1.25rem; }
+.guardian-py-lg { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+.guardian-py-xl { padding-top: 2rem; padding-bottom: 2rem; }
+
+/* Margin utilities */
+.guardian-mx-xs { margin-left: 0.75rem; margin-right: 0.75rem; }
+.guardian-mx-sm { margin-left: 1rem; margin-right: 1rem; }
+.guardian-mx-md { margin-left: 1.25rem; margin-right: 1.25rem; }
+.guardian-mx-lg { margin-left: 1.5rem; margin-right: 1.5rem; }
+
+/* Gap utilities */
+.guardian-gap-xs { gap: 0.5rem; }
+.guardian-gap-sm { gap: 0.75rem; }
+.guardian-gap-md { gap: 1rem; }
+.guardian-gap-lg { gap: 1.5rem; }
+
+/* Space between utilities */
+.guardian-space-y-xs > * + * { margin-top: 0.75rem; }
+.guardian-space-y-sm > * + * { margin-top: 1rem; }
+.guardian-space-y-md > * + * { margin-top: 1.25rem; }
+.guardian-space-y-lg > * + * { margin-top: 1.5rem; }
+
+/* --------------------------------------------------------------------------
+   Touch Target Utilities
+   WCAG 2.5.5 compliance - minimum 44x44px
+   -------------------------------------------------------------------------- */
+.guardian-touch-target {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.guardian-touch-target-sm {
+  min-height: 36px;
+  min-width: 36px;
+}
+
+.guardian-touch-target-full {
+  min-height: 44px;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --------------------------------------------------------------------------
+   Responsive Grid Utilities
+   -------------------------------------------------------------------------- */
+.guardian-grid-cols-1 {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+  .guardian-grid-cols-2-sm {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) {
+  .guardian-grid-cols-2-md {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .guardian-grid-cols-3-md {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-grid-cols-2-lg {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .guardian-grid-cols-3-lg {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .guardian-grid-cols-4-lg {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Responsive Display Utilities
+   -------------------------------------------------------------------------- */
+.guardian-hidden { display: none; }
+
+@media (min-width: 640px) {
+  .guardian-show-sm { display: block; }
+}
+
+@media (min-width: 768px) {
+  .guardian-show-md { display: block; }
+}
+
+@media (min-width: 1024px) {
+  .guardian-show-lg { display: block; }
+}
+
+@media (max-width: 639px) {
+  .guardian-hide-sm { display: none; }
+}
+
+@media (max-width: 767px) {
+  .guardian-hide-md { display: none; }
+}
+
+@media (max-width: 1023px) {
+  .guardian-hide-lg { display: none; }
+}
+
+/* --------------------------------------------------------------------------
+   Responsive Text Utilities
+   -------------------------------------------------------------------------- */
+.guardian-text-xs { font-size: 0.75rem; line-height: 1rem; }
+.guardian-text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+.guardian-text-base { font-size: 1rem; line-height: 1.5rem; }
+.guardian-text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+.guardian-text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+.guardian-text-2xl { font-size: 1.5rem; line-height: 2rem; }
+
+@media (min-width: 640px) {
+  .guardian-sm-text-xs { font-size: 0.75rem; line-height: 1rem; }
+  .guardian-sm-text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+  .guardian-sm-text-base { font-size: 1rem; line-height: 1.5rem; }
+  .guardian-sm-text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+}
+
+@media (min-width: 768px) {
+  .guardian-md-text-xs { font-size: 0.75rem; line-height: 1rem; }
+  .guardian-md-text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+  .guardian-md-text-base { font-size: 1rem; line-height: 1.5rem; }
+  .guardian-md-text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+  .guardian-md-text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+}
+
+@media (min-width: 1024px) {
+  .guardian-lg-text-xs { font-size: 0.75rem; line-height: 1rem; }
+  .guardian-lg-text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+  .guardian-lg-text-base { font-size: 1rem; line-height: 1.5rem; }
+  .guardian-lg-text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+  .guardian-lg-text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+  .guardian-lg-text-2xl { font-size: 1.5rem; line-height: 2rem; }
+}
+
+/* --------------------------------------------------------------------------
+   Modal Responsive Styles
+   -------------------------------------------------------------------------- */
+.guardian-modal-content {
+  padding: 1rem;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+@media (min-width: 640px) {
+  .guardian-modal-content {
+    padding: 1.5rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .guardian-modal-content {
+    padding: 2rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Card Responsive Styles
+   -------------------------------------------------------------------------- */
+.guardian-card {
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background-color: var(--color-bg-primary, #ffffff);
+  border: 1px solid var(--color-border-light, #e5e7eb);
+  transition: box-shadow 0.2s ease;
+}
+
+@media (min-width: 640px) {
+  .guardian-card {
+    padding: 1.25rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-card {
+    padding: 1.5rem;
+  }
+}
+
+.dark .guardian-card {
+  background-color: var(--color-gray-800, #1f2937);
+  border-color: var(--color-gray-700, #374151);
+}
+
+.guardian-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* --------------------------------------------------------------------------
+   Safe Area Support
+   For iOS devices with notches
+   -------------------------------------------------------------------------- */
+@supports (padding: env(safe-area-inset-bottom, 0px)) {
+  .guardian-safe-area-bottom {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .guardian-safe-area-bottom-lg {
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .guardian-safe-area-bottom-xl {
+    padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Transition Utilities
+   -------------------------------------------------------------------------- */
+.guardian-transition {
+  transition: all 0.2s ease;
+}
+
+.guardian-transition-slow {
+  transition: all 0.3s ease;
+}
+
+.guardian-transition-fast {
+  transition: all 0.15s ease;
+}
+
+/* --------------------------------------------------------------------------
+   Focus Ring Utilities
+   -------------------------------------------------------------------------- */
+.guardian-focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+}
+
+.guardian-focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+}
+
+/* --------------------------------------------------------------------------
+   Scrollbar Styling for Mobile
+   -------------------------------------------------------------------------- */
+.mobile-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.mobile-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mobile-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+}
+
+.mobile-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.7);
+}
+
+/* Firefox */
+.mobile-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+/* --------------------------------------------------------------------------
+   Print Styles
+   -------------------------------------------------------------------------- */
+@media print {
+  .guardian-page-wrapper,
+  .guardian-dashboard-header,
+  .guardian-main-content {
+    background: white !important;
+    color: black !important;
+  }
+
+  .guardian-dashboard-header {
+    position: static;
+  }
+
+  .guardian-main-content {
+    margin-left: 0 !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Reduced Motion Support
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .guardian-transition,
+  .guardian-transition-slow,
+  .guardian-transition-fast,
+  .guardian-child-card,
+  .guardian-quick-action-btn,
+  .guardian-appointment-card {
+    transition: none;
+  }
+
+  .guardian-child-card:hover {
+    transform: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   High Contrast Mode Support
+   -------------------------------------------------------------------------- */
+@media (prefers-contrast: high) {
+  .guardian-card,
+  .guardian-child-card,
+  .guardian-appointment-card,
+  .guardian-dashboard-header {
+    border-width: 2px;
+    border-color: #000;
+  }
+
+  .dark .guardian-card,
+  .dark .guardian-child-card,
+  .dark .guardian-appointment-card,
+  .dark .guardian-dashboard-header {
+    border-color: #fff;
+  }
+}

@@ -1,0 +1,36 @@
+/* ==========================================================================
+   Guardian Dashboard Utility Classes
+   Additional utility classes for Guardian Dashboard components
+   These classes complement design-tokens.css
+   ========================================================================== */
+
+/* Appointment Date Badge */
+.appointment-date-badge {
+  background-color: var(--color-warning-50);
+  color: var(--color-warning-600);
+}
+
+.dark .appointment-date-badge {
+  background-color: rgba(217, 119, 6, 0.2);
+  color: var(--color-warning-400);
+}
+
+/* Appointment Status Badge */
+.appointment-status-badge {
+  background-color: var(--color-warning-50);
+  color: var(--color-warning-600);
+}
+
+.dark .appointment-status-badge {
+  background-color: rgba(217, 119, 6, 0.2);
+  color: var(--color-warning-400);
+}
+
+/* Child Card Header */
+.child-card-header {
+  background: linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%);
+}
+
+.dark .child-card-header {
+  background: linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-700) 100%);
+}

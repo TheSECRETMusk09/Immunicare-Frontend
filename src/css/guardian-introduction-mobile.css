@@ -1,0 +1,783 @@
+/* ==========================================================================
+   Guardian Introduction Page - Mobile Optimization
+   Immunicare Vaccination Management System
+
+   This file provides enhanced mobile responsiveness for the GuardianIntroduction
+   component, ensuring optimal viewing and interaction on mobile devices.
+   ========================================================================== */
+
+/* ==========================================================================
+   Base Mobile Styles (< 768px)
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Main container - ensure full width and proper spacing */
+  .guardian-intro-container {
+    width: 100%;
+    overflow-x: hidden;
+    padding: 0;
+    margin: 0;
+  }
+
+  /* Header optimizations */
+  .guardian-intro-header {
+    padding: 0.75rem 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .guardian-intro-logo {
+    width: 32px;
+    height: 32px;
+  }
+
+  .guardian-intro-brand {
+    font-size: 1.125rem;
+    font-weight: 700;
+  }
+
+  /* Mobile menu button */
+  .guardian-intro-menu-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .guardian-intro-menu-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  /* Hero section - stack vertically on mobile */
+  .guardian-intro-hero {
+    padding: 1.5rem 1rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .guardian-intro-hero-content {
+    order: 2;
+  }
+
+  .guardian-intro-hero-image {
+    order: 1;
+  }
+
+  .guardian-intro-hero h1 {
+    font-size: 1.75rem;
+    line-height: 1.2;
+    margin-bottom: 1rem;
+    font-weight: 700;
+  }
+
+  .guardian-intro-hero p {
+    font-size: 1rem;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+    color: #4b5563;
+  }
+
+  /* Hero image - full width with proper aspect ratio */
+  .guardian-intro-hero img {
+    max-height: 250px;
+    width: 100%;
+    object-fit: cover;
+    border-radius: 1rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Trust badge */
+  .guardian-intro-trust-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #fef2f2;
+    border-radius: 9999px;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    color: #dc2626;
+    font-weight: 600;
+  }
+
+  .guardian-intro-trust-badge .pulse-dot {
+    width: 8px;
+    height: 8px;
+    background: #dc2626;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* CTA Buttons - full width on mobile */
+  .guardian-intro-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .guardian-intro-buttons button,
+  .guardian-intro-buttons a button {
+    width: 100%;
+    min-height: 52px;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 0.75rem;
+    padding: 0.875rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  /* Primary button - red */
+  .guardian-intro-btn-primary {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+  }
+
+  .guardian-intro-btn-primary:hover {
+    background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%);
+    box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
+    transform: translateY(-1px);
+  }
+
+  .guardian-intro-btn-primary:active {
+    transform: translateY(0);
+  }
+
+  /* Secondary button - white */
+  .guardian-intro-btn-secondary {
+    background: white;
+    color: #1f2937;
+    border: 2px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+
+  .guardian-intro-btn-secondary:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+  }
+
+  .guardian-intro-btn-secondary:active {
+    transform: translateY(0);
+  }
+
+  /* Feature badges */
+  .guardian-intro-features {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+
+  .guardian-intro-feature {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+  }
+
+  .guardian-intro-feature-icon {
+    width: 40px;
+    height: 40px;
+    background: #f3f4f6;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* About section */
+  .guardian-intro-about {
+    padding: 2rem 1rem;
+    background: #f9fafb;
+  }
+
+  .guardian-intro-section-header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .guardian-intro-section-header h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    color: #111827;
+  }
+
+  .guardian-intro-section-header p {
+    font-size: 0.9375rem;
+    color: #6b7280;
+    line-height: 1.6;
+  }
+
+  /* About cards - stack vertically */
+  .guardian-intro-about article {
+    background: white;
+    border-radius: 1rem;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .guardian-intro-about img {
+    height: 180px;
+    width: 100%;
+    object-fit: cover;
+  }
+
+  .guardian-intro-about-content {
+    padding: 1.25rem;
+  }
+
+  .guardian-intro-about h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: #111827;
+  }
+
+  .guardian-intro-about p {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: #4b5563;
+    margin-bottom: 1rem;
+  }
+
+  .guardian-intro-about ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .guardian-intro-about li {
+    font-size: 0.875rem;
+    color: #4b5563;
+    padding: 0.375rem 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .guardian-intro-about li::before {
+    content: "•";
+    color: #dc2626;
+    font-weight: bold;
+  }
+
+  /* Info box */
+  .guardian-intro-info-box {
+    background: white;
+    border-radius: 1rem;
+    padding: 1.25rem;
+    margin-top: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+  }
+
+  .guardian-intro-info-box h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: #111827;
+  }
+
+  .guardian-intro-info-box p {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: #4b5563;
+    margin-bottom: 0.5rem;
+  }
+
+  .guardian-intro-info-box cite {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    font-style: italic;
+  }
+
+  /* Resources section */
+  .guardian-intro-resources {
+    padding: 2rem 1rem;
+    background: #f9fafb;
+  }
+
+  .guardian-intro-resources-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+
+  .guardian-intro-resource-card {
+    background: white;
+    border-radius: 1rem;
+    padding: 1.25rem;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+  }
+
+  .guardian-intro-resource-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+  }
+
+  .guardian-intro-resource-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 0.75rem;
+  }
+
+  .guardian-intro-resource-card h3 {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #111827;
+  }
+
+  .guardian-intro-resource-card p {
+    font-size: 0.8125rem;
+    color: #6b7280;
+    margin-bottom: 0.75rem;
+    display: none; /* Hide description on small screens */
+  }
+
+  .guardian-intro-resource-link {
+    font-size: 0.875rem;
+    color: #dc2626;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  /* CTA section */
+  .guardian-intro-cta {
+    padding: 2rem 1rem;
+    text-align: center;
+  }
+
+  .guardian-intro-cta-box {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    border-radius: 1rem;
+    padding: 2rem 1.5rem;
+    color: white;
+  }
+
+  .guardian-intro-cta h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+  }
+
+  .guardian-intro-cta p {
+    font-size: 1rem;
+    opacity: 0.9;
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+  }
+
+  .guardian-intro-cta-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .guardian-intro-cta-btn-white {
+    background: white;
+    color: #dc2626;
+    border: none;
+    padding: 0.875rem 1.5rem;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .guardian-intro-cta-btn-white:hover {
+    background: #f3f4f6;
+    transform: translateY(-1px);
+  }
+
+  .guardian-intro-cta-btn-outline {
+    background: transparent;
+    color: white;
+    border: 2px solid white;
+    padding: 0.875rem 1.5rem;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .guardian-intro-cta-btn-outline:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Footer */
+  .guardian-intro-footer {
+    background: #111827;
+    color: #9ca3af;
+    padding: 2rem 1rem;
+  }
+
+  .guardian-intro-footer-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .guardian-intro-footer-brand {
+    text-align: center;
+  }
+
+  .guardian-intro-footer-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .guardian-intro-footer-logo-icon {
+    width: 40px;
+    height: 40px;
+    background: #dc2626;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 1.25rem;
+  }
+
+  .guardian-intro-footer-logo-text {
+    color: white;
+    font-weight: 700;
+    font-size: 1.25rem;
+  }
+
+  .guardian-intro-footer-brand p {
+    font-size: 0.875rem;
+    line-height: 1.5;
+    margin-bottom: 1rem;
+  }
+
+  .guardian-intro-footer-social {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+  }
+
+  .guardian-intro-footer-social a {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9ca3af;
+    transition: color 0.2s ease;
+  }
+
+  .guardian-intro-footer-social a:hover {
+    color: white;
+  }
+
+  .guardian-intro-footer h4 {
+    color: white;
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .guardian-intro-footer-links {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .guardian-intro-footer-links li {
+    margin-bottom: 0.75rem;
+  }
+
+  .guardian-intro-footer-links a,
+  .guardian-intro-footer-links button {
+    color: #9ca3af;
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: color 0.2s ease;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  .guardian-intro-footer-links a:hover,
+  .guardian-intro-footer-links button:hover {
+    color: white;
+  }
+
+  /* Collapsible contact section on mobile */
+  .guardian-intro-footer-contact-collapsible {
+    border-top: 1px solid #374151;
+    padding-top: 1rem;
+  }
+
+  .guardian-intro-footer-contact-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: none;
+    border: none;
+    color: white;
+    font-weight: 600;
+    font-size: 1rem;
+    padding: 0.75rem 0;
+    cursor: pointer;
+    min-height: 44px;
+  }
+
+  .guardian-intro-footer-contact-content {
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+
+  .guardian-intro-footer-contact-content.collapsed {
+    max-height: 0;
+    opacity: 0;
+  }
+
+  .guardian-intro-footer-contact-content.expanded {
+    max-height: 200px;
+    opacity: 1;
+  }
+
+  .guardian-intro-footer-contact-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    font-size: 0.875rem;
+    min-height: 44px;
+  }
+
+  .guardian-intro-footer-contact-item svg {
+    flex-shrink: 0;
+  }
+
+  /* Copyright */
+  .guardian-intro-footer-copyright {
+    border-top: 1px solid #374151;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    text-align: center;
+    font-size: 0.875rem;
+  }
+}
+
+/* ==========================================================================
+   Tablet Styles (768px - 1023px)
+   ========================================================================== */
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .guardian-intro-hero {
+    padding: 3rem 2rem;
+    text-align: left;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    align-items: center;
+  }
+
+  .guardian-intro-hero-content {
+    order: 1;
+  }
+
+  .guardian-intro-hero-image {
+    order: 2;
+  }
+
+  .guardian-intro-hero h1 {
+    font-size: 2.25rem;
+  }
+
+  .guardian-intro-buttons {
+    flex-direction: row;
+  }
+
+  .guardian-intro-buttons button {
+    width: auto;
+  }
+
+  .guardian-intro-about article {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+  }
+
+  .guardian-intro-about img {
+    height: 100%;
+    min-height: 220px;
+  }
+
+  .guardian-intro-resources-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .guardian-intro-resource-card p {
+    display: block;
+  }
+
+  .guardian-intro-footer-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+  }
+
+  .guardian-intro-footer-brand {
+    grid-column: span 2;
+    text-align: left;
+  }
+
+  .guardian-intro-footer-logo {
+    justify-content: flex-start;
+  }
+
+  .guardian-intro-footer-social {
+    justify-content: flex-start;
+  }
+}
+
+/* ==========================================================================
+   Touch Target Optimizations
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Ensure all interactive elements meet WCAG 2.5.5 (44px minimum) */
+  .guardian-intro-container a,
+  .guardian-intro-container button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Prevent text zoom on iOS */
+  .guardian-intro-container input,
+  .guardian-intro-container select,
+  .guardian-intro-container textarea {
+    font-size: 16px;
+  }
+
+  /* Smooth scrolling */
+  .guardian-intro-container {
+    scroll-behavior: smooth;
+  }
+}
+
+/* ==========================================================================
+   Safe Area Insets (iPhone X and later)
+   ========================================================================== */
+
+@supports (padding: env(safe-area-inset-bottom)) {
+  @media (max-width: 767px) {
+    .guardian-intro-footer {
+      padding-bottom: calc(2rem + env(safe-area-inset-bottom));
+    }
+
+    .guardian-intro-cta {
+      padding-bottom: calc(2rem + env(safe-area-inset-bottom));
+    }
+  }
+}
+
+/* ==========================================================================
+   Reduced Motion (Accessibility)
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .guardian-intro-container * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .guardian-intro-trust-badge .pulse-dot {
+    animation: none;
+  }
+}
+
+/* ==========================================================================
+   Dark Mode Support
+   ========================================================================== */
+
+@media (prefers-color-scheme: dark) {
+  @media (max-width: 767px) {
+    .guardian-intro-about,
+    .guardian-intro-resources {
+      background: #1f2937;
+    }
+
+    .guardian-intro-about article,
+    .guardian-intro-resource-card,
+    .guardian-intro-info-box {
+      background: #111827;
+      border-color: #374151;
+    }
+
+    .guardian-intro-about h3,
+    .guardian-intro-resource-card h3,
+    .guardian-intro-info-box h3 {
+      color: #f9fafb;
+    }
+
+    .guardian-intro-about p,
+    .guardian-intro-resource-card p,
+    .guardian-intro-info-box p,
+    .guardian-intro-about li {
+      color: #d1d5db;
+    }
+
+    .guardian-intro-section-header h2 {
+      color: #f9fafb;
+    }
+
+    .guardian-intro-section-header p {
+      color: #9ca3af;
+    }
+  }
+}

@@ -1,0 +1,600 @@
+/* ==========================================================================
+   Enhanced CSS Variables & Design Tokens
+   Immunicare Vaccination Management System
+   Production-Ready CSS Architecture
+   ========================================================================== */
+
+/* ==========================================================================
+   CSS Custom Properties - Design Tokens
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Color Palette - Primary
+   -------------------------------------------------------------------------- */
+:root {
+  --color-primary-50: #eef2ff;
+  --color-primary-100: #e0e7ff;
+  --color-primary-200: #c7d2fe;
+  --color-primary-300: #a5b4fc;
+  --color-primary-400: #818cf8;
+  --color-primary-500: #6366f1;
+  --color-primary-600: #4f46e5;
+  --color-primary-700: #4338ca;
+  --color-primary-800: #3730a3;
+  --color-primary-900: #312e81;
+  --color-primary-950: #1e1b4b;
+}
+
+/* --------------------------------------------------------------------------
+   Color Palette - Secondary (Success/Green)
+   -------------------------------------------------------------------------- */
+:root {
+  --color-secondary-50: #f0fdf4;
+  --color-secondary-100: #dcfce7;
+  --color-secondary-200: #bbf7d0;
+  --color-secondary-300: #86efac;
+  --color-secondary-400: #4ade80;
+  --color-secondary-500: #22c55e;
+  --color-secondary-600: #16a34a;
+  --color-secondary-700: #15803d;
+  --color-secondary-800: #166534;
+  --color-secondary-900: #14532d;
+  --color-secondary-950: #052e16;
+}
+
+/* --------------------------------------------------------------------------
+   Color Palette - Warning/Orange
+   -------------------------------------------------------------------------- */
+:root {
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-200: #fde68a;
+  --color-warning-300: #fcd34d;
+  --color-warning-400: #fbbf24;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-warning-800: #92400e;
+  --color-warning-900: #78350f;
+  --color-warning-950: #451a03;
+}
+
+/* --------------------------------------------------------------------------
+   Color Palette - Danger/Red
+   -------------------------------------------------------------------------- */
+:root {
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-200: #fecaca;
+  --color-danger-300: #fca5a5;
+  --color-danger-400: #f87171;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+  --color-danger-800: #991b1b;
+  --color-danger-900: #7f1d1d;
+  --color-danger-950: #450a0a;
+}
+
+/* --------------------------------------------------------------------------
+   Color Palette - Info/Blue
+   -------------------------------------------------------------------------- */
+:root {
+  --color-info-50: #eff6ff;
+  --color-info-100: #dbeafe;
+  --color-info-200: #bfdbfe;
+  --color-info-300: #93c5fd;
+  --color-info-400: #60a5fa;
+  --color-info-500: #3b82f6;
+  --color-info-600: #2563eb;
+  --color-info-700: #1d4ed8;
+  --color-info-800: #1e40af;
+  --color-info-900: #1e3a8a;
+  --color-info-950: #172554;
+}
+
+/* --------------------------------------------------------------------------
+   Color Palette - Neutral Grays
+   -------------------------------------------------------------------------- */
+:root {
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f9fafb;
+  --color-neutral-100: #f3f4f6;
+  --color-neutral-200: #e5e7eb;
+  --color-neutral-300: #d1d5db;
+  --color-neutral-400: #9ca3af;
+  --color-neutral-500: #6b7280;
+  --color-neutral-600: #4b5563;
+  --color-neutral-700: #374151;
+  --color-neutral-800: #1f2937;
+  --color-neutral-900: #111827;
+  --color-neutral-950: #030712;
+}
+
+/* --------------------------------------------------------------------------
+   Semantic Colors - Light Theme (Default)
+   -------------------------------------------------------------------------- */
+:root {
+  /* Text Colors */
+  --color-text-primary: var(--theme-text-primary, var(--color-neutral-900));
+  --color-text-secondary: var(--theme-text-secondary, var(--color-neutral-600));
+  --color-text-tertiary: var(--theme-text-tertiary, var(--color-neutral-500));
+  --color-text-muted: var(--theme-text-muted, var(--color-neutral-400));
+  --color-text-inverse: var(--theme-text-inverse, var(--color-neutral-0));
+  --color-text-link: var(--theme-primary, var(--color-primary-600));
+  --color-text-link-hover: var(--theme-primary-hover, var(--color-primary-700));
+
+  /* Background Colors */
+  --color-bg-primary: var(--theme-bg-primary, var(--color-neutral-0));
+  --color-bg-secondary: var(--theme-bg-secondary, var(--color-neutral-50));
+  --color-bg-tertiary: var(--theme-bg-tertiary, var(--color-neutral-100));
+  --color-bg-elevated: var(--theme-bg-elevated, var(--color-neutral-0));
+  --color-bg-inverse: var(--theme-bg-inverse, var(--color-neutral-900));
+
+  /* Border Colors */
+  --color-border-light: var(--theme-border-light, var(--color-neutral-200));
+  --color-border-default: var(--theme-border-default, var(--color-neutral-300));
+  --color-border-dark: var(--theme-border-dark, var(--color-neutral-400));
+  --color-border-focus: var(--color-primary-500);
+
+  /* Status Colors */
+  --color-status-success: var(--color-secondary-600);
+  --color-status-warning: var(--color-warning-600);
+  --color-status-error: var(--color-danger-600);
+  --color-status-info: var(--color-info-600);
+
+  /* Background Status Colors */
+  --color-bg-success: var(--color-secondary-100);
+  --color-bg-warning: var(--color-warning-100);
+  --color-bg-error: var(--color-danger-100);
+  --color-bg-info: var(--color-info-100);
+}
+
+/* ==========================================================================
+   Typography System
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Font Families
+   -------------------------------------------------------------------------- */
+:root {
+  --font-family-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-family-mono:
+    "Fira Code", "Monaco", "Consolas", "Courier New", monospace;
+  --font-family-display:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+}
+
+/* --------------------------------------------------------------------------
+   Fixed Font Size Scale
+   -------------------------------------------------------------------------- */
+:root {
+  --font-size-xs: 0.75rem; /* 12px */
+  --font-size-sm: 0.875rem; /* 14px */
+  --font-size-base: 1rem; /* 16px */
+  --font-size-lg: 1.125rem; /* 18px */
+  --font-size-xl: 1.25rem; /* 20px */
+  --font-size-2xl: 1.5rem; /* 24px */
+  --font-size-3xl: 1.875rem; /* 30px */
+  --font-size-4xl: 2.25rem; /* 36px */
+  --font-size-5xl: 3rem; /* 48px */
+  --font-size-6xl: 3.75rem; /* 60px */
+}
+
+/* --------------------------------------------------------------------------
+   Fluid Typography Scale (using clamp())
+   Scales smoothly between viewport widths
+   -------------------------------------------------------------------------- */
+:root {
+  --font-size-fluid-xs: clamp(0.7rem, 0.65rem + 0.25vw, 0.8rem);
+  --font-size-fluid-sm: clamp(0.8rem, 0.75rem + 0.25vw, 0.9rem);
+  --font-size-fluid-base: clamp(0.9rem, 0.85rem + 0.25vw, 1rem);
+  --font-size-fluid-lg: clamp(1rem, 0.9rem + 0.5vw, 1.25rem);
+  --font-size-fluid-xl: clamp(1.125rem, 1rem + 0.625vw, 1.5rem);
+  --font-size-fluid-2xl: clamp(1.35rem, 1.2rem + 0.75vw, 1.875rem);
+  --font-size-fluid-3xl: clamp(1.7rem, 1.5rem + 1vw, 2.5rem);
+  --font-size-fluid-4xl: clamp(2.2rem, 1.9rem + 1.5vw, 3.5rem);
+  --font-size-fluid-5xl: clamp(3rem, 2.5rem + 2.5vw, 5rem);
+}
+
+/* --------------------------------------------------------------------------
+   Font Weights
+   -------------------------------------------------------------------------- */
+:root {
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+}
+
+/* --------------------------------------------------------------------------
+   Line Heights
+   -------------------------------------------------------------------------- */
+:root {
+  --line-height-none: 1;
+  --line-height-tight: 1.25;
+  --line-height-snug: 1.375;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.625;
+  --line-height-loose: 2;
+}
+
+/* --------------------------------------------------------------------------
+   Letter Spacing
+   -------------------------------------------------------------------------- */
+:root {
+  --letter-spacing-tighter: -0.05em;
+  --letter-spacing-tight: -0.025em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide: 0.025em;
+  --letter-spacing-wider: 0.05em;
+  --letter-spacing-widest: 0.1em;
+}
+
+/* ==========================================================================
+   Spacing Scale
+   ========================================================================== */
+:root {
+  --space-px: 1px;
+  --space-0: 0;
+  --space-0-5: 0.125rem;
+  --space-1: 0.25rem;
+  --space-1-5: 0.375rem;
+  --space-2: 0.5rem;
+  --space-2-5: 0.625rem;
+  --space-3: 0.75rem;
+  --space-3-5: 0.875rem;
+  --space-4: 1rem;
+  --space-4-5: 1.125rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 1.75rem;
+  --space-8: 2rem;
+  --space-9: 2.25rem;
+  --space-10: 2.5rem;
+  --space-11: 2.75rem;
+  --space-12: 3rem;
+  --space-14: 3.5rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --space-24: 6rem;
+  --space-28: 7rem;
+  --space-32: 8rem;
+  --space-36: 9rem;
+  --space-40: 10rem;
+  --space-44: 11rem;
+  --space-48: 12rem;
+  --space-52: 13rem;
+  --space-56: 14rem;
+  --space-60: 15rem;
+  --space-64: 16rem;
+  --space-72: 18rem;
+  --space-80: 20rem;
+  --space-96: 24rem;
+}
+
+/* ==========================================================================
+   Border Radius
+   ========================================================================== */
+:root {
+  --radius-none: 0;
+  --radius-sm: 0.125rem;
+  --radius-md: 0.25rem;
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.75rem;
+  --radius-3xl: 1rem;
+  --radius-full: 9999px;
+}
+
+/* ==========================================================================
+   Shadows / Elevations
+   ========================================================================== */
+:root {
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm:
+    0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-md:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg:
+    0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-xl:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+  --shadow-none: 0 0 #0000;
+}
+
+/* ==========================================================================
+   Transitions & Animations
+   ========================================================================== */
+:root {
+  --transition-duration-fast: 150ms;
+  --transition-duration-normal: 300ms;
+  --transition-duration-slow: 500ms;
+  --transition-duration-slower: 700ms;
+
+  --transition-timing-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --transition-timing-ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --transition-timing-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-timing-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+  --transition-fast: all var(--transition-duration-fast)
+    var(--transition-timing-ease-out);
+  --transition-normal: all var(--transition-duration-normal)
+    var(--transition-timing-ease-in-out);
+  --transition-slow: all var(--transition-duration-slow)
+    var(--transition-timing-ease-in-out);
+}
+
+/* ==========================================================================
+   Z-Index Scale
+   ========================================================================== */
+:root {
+  --z-auto: auto;
+  --z-0: 0;
+  --z-10: 10;
+  --z-20: 20;
+  --z-30: 30;
+  --z-40: 40;
+  --z-50: 50;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-fixed: 300;
+  --z-modal-backdrop: 400;
+  --z-modal: 500;
+  --z-popover: 600;
+  --z-tooltip: 700;
+  --z-toast: 800;
+}
+
+/* ==========================================================================
+   Layout Dimensions
+   ========================================================================== */
+:root {
+  --sidebar-width: 280px;
+  --sidebar-collapsed-width: 72px;
+  --sidebar-mobile-width: 280px;
+  --header-height: 64px;
+  --header-height-mobile: 56px;
+  --max-content-width: 1280px;
+  --content-padding: var(--space-6);
+  --content-padding-mobile: var(--space-4);
+  --border-width: 1px;
+  --border-width-thick: 2px;
+}
+
+/* ==========================================================================
+   Container Query Breakpoints
+   ========================================================================== */
+:root {
+  --cq-xs: 20rem; /* 320px */
+  --cq-sm: 30rem; /* 480px */
+  --cq-md: 48rem; /* 768px */
+  --cq-lg: 64rem; /* 1024px */
+  --cq-xl: 80rem; /* 1280px */
+  --cq-2xl: 96rem; /* 1536px */
+}
+
+/* ==========================================================================
+   Logical Properties for Internationalization (RTL Support)
+   ========================================================================== */
+:root {
+  /* Logical Margins */
+  --margin-inline-start: var(--space-4);
+  --margin-inline-end: var(--space-4);
+  --margin-block-start: var(--space-4);
+  --margin-block-end: var(--space-4);
+  --margin-inline: var(--space-4);
+  --margin-block: var(--space-4);
+
+  /* Logical Paddings */
+  --padding-inline-start: var(--space-4);
+  --padding-inline-end: var(--space-4);
+  --padding-block-start: var(--space-4);
+  --padding-block-end: var(--space-4);
+  --padding-inline: var(--space-4);
+  --padding-block: var(--space-4);
+
+  /* Logical Borders */
+  --border-inline-start: var(--border-width) solid var(--color-border-default);
+  --border-inline-end: var(--border-width) solid var(--color-border-default);
+  --border-block-start: var(--border-width) solid var(--color-border-default);
+  --border-block-end: var(--border-width) solid var(--color-border-default);
+
+  /* Logical Border Radius */
+  --radius-inline-start: var(--radius-lg);
+  --radius-inline-end: var(--radius-lg);
+  --radius-block-start: var(--radius-lg);
+  --radius-block-end: var(--radius-lg);
+
+  /* Logical Text Alignment */
+  --text-align-start: left;
+  --text-align-end: right;
+}
+
+/* ==========================================================================
+   Aspect Ratios
+   ========================================================================== */
+:root {
+  --aspect-ratio-square: 1 / 1;
+  --aspect-ratio-video: 16 / 9;
+  --aspect-ratio-photo: 4 / 3;
+  --aspect-ratio-portrait: 3 / 4;
+  --aspect-ratio-wide: 21 / 9;
+}
+
+/* ==========================================================================
+   Grid System
+   ========================================================================== */
+:root {
+  --grid-columns-12: repeat(12, minmax(0, 1fr));
+  --grid-columns-8: repeat(8, minmax(0, 1fr));
+  --grid-columns-4: repeat(4, minmax(0, 1fr));
+  --grid-columns-3: repeat(3, minmax(0, 1fr));
+  --grid-columns-2: repeat(2, minmax(0, 1fr));
+  --grid-gap: var(--space-4);
+  --grid-gap-lg: var(--space-6);
+  --grid-gap-xl: var(--space-8);
+}
+
+/* ==========================================================================
+   Theme Colors (CSS Custom Properties for Theme Switching)
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Light Theme (Default)
+   -------------------------------------------------------------------------- */
+:root,
+[data-theme="light"] {
+  /* Semantic Colors */
+  --theme-text-primary: var(--color-neutral-900);
+  --theme-text-secondary: var(--color-neutral-600);
+  --theme-text-tertiary: var(--color-neutral-500);
+  --theme-text-muted: var(--color-neutral-400);
+  --theme-text-inverse: var(--color-neutral-0);
+
+  --theme-bg-primary: var(--color-neutral-0);
+  --theme-bg-secondary: var(--color-neutral-50);
+  --theme-bg-tertiary: var(--color-neutral-100);
+  --theme-bg-elevated: var(--color-neutral-0);
+  --theme-bg-inverse: var(--color-neutral-900);
+
+  --theme-border-light: var(--color-neutral-200);
+  --theme-border-default: var(--color-neutral-300);
+  --theme-border-dark: var(--color-neutral-400);
+
+  --theme-primary: var(--color-primary-600);
+  --theme-primary-hover: var(--color-primary-700);
+  --theme-primary-light: var(--color-primary-100);
+  --theme-primary-muted: var(--color-primary-200);
+
+  --theme-secondary: var(--color-secondary-600);
+  --theme-secondary-hover: var(--color-secondary-700);
+  --theme-secondary-light: var(--color-secondary-100);
+
+  --theme-success: var(--color-secondary-600);
+  --theme-warning: var(--color-warning-600);
+  --theme-error: var(--color-danger-600);
+  --theme-info: var(--color-info-600);
+}
+
+/* --------------------------------------------------------------------------
+   Dark Theme
+   -------------------------------------------------------------------------- */
+[data-theme="dark"] {
+  /* Semantic Colors - Enhanced for Accessibility (WCAG AA compliance) */
+  /* Primary text uses slate-100 (#f1f5f9) for 4.5:1+ contrast on dark backgrounds */
+  --theme-text-primary: #f1f5f9; /* slate-100 - ensures 4.5:1+ contrast */
+  --theme-text-secondary: #cbd5e1; /* slate-300 - improved from 400 for better contrast */
+  --theme-text-tertiary: #94a3b8; /* slate-400 */
+  --theme-text-muted: #64748b; /* slate-500 - minimum acceptable contrast */
+  --theme-text-inverse: var(--color-neutral-900);
+
+  --theme-bg-primary: #0f172a; /* slate-900 - slightly softer than pure black */
+  --theme-bg-secondary: #1e293b; /* slate-800 */
+  --theme-bg-tertiary: #334155; /* slate-700 */
+  --theme-bg-elevated: #1e293b; /* slate-800 */
+  --theme-bg-inverse: var(--color-neutral-0);
+
+  --theme-border-light: #334155; /* slate-700 - more visible borders */
+  --theme-border-default: #475569; /* slate-600 - improved from 600 for better visibility */
+  --theme-border-dark: #64748b; /* slate-500 */
+
+  --theme-primary: #60a5fa; /* blue-400 - lighter for better contrast on dark bg */
+  --theme-primary-hover: #93c5fd; /* blue-300 */
+  --theme-primary-light: rgba(96, 165, 250, 0.15); /* blue-400 with opacity */
+  --theme-primary-muted: rgba(96, 165, 250, 0.25);
+
+  --theme-secondary: #4ade80; /* green-400 - lighter for dark mode */
+  --theme-secondary-hover: #86efac; /* green-300 */
+  --theme-secondary-light: rgba(74, 222, 128, 0.15); /* green-400 with opacity */
+
+  /* Status colors with ensured contrast */
+  --theme-success: #4ade80; /* green-400 */
+  --theme-warning: #fbbf24; /* amber-400 - brighter for dark mode */
+  --theme-error: #f87171; /* red-400 - brighter for dark mode */
+  --theme-info: #60a5fa; /* blue-400 */
+}
+
+/* --------------------------------------------------------------------------
+   System Preference Dark Mode (Automatic)
+   -------------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    /* Semantic Colors - Enhanced for Accessibility (WCAG AA compliance) */
+    --theme-text-primary: #f1f5f9; /* slate-100 - ensures 4.5:1+ contrast */
+    --theme-text-secondary: #cbd5e1; /* slate-300 - improved from 400 */
+    --theme-text-tertiary: #94a3b8; /* slate-400 */
+    --theme-text-muted: #64748b; /* slate-500 - minimum acceptable contrast */
+    --theme-text-inverse: var(--color-neutral-900);
+
+    --theme-bg-primary: #0f172a; /* slate-900 - softer than pure black */
+    --theme-bg-secondary: #1e293b; /* slate-800 */
+    --theme-bg-tertiary: #334155; /* slate-700 */
+    --theme-bg-elevated: #1e293b; /* slate-800 */
+    --theme-bg-inverse: var(--color-neutral-0);
+
+    --theme-border-light: #334155; /* slate-700 - more visible */
+    --theme-border-default: #475569; /* slate-600 - improved visibility */
+    --theme-border-dark: #64748b; /* slate-500 */
+
+    --theme-primary: #60a5fa; /* blue-400 - lighter for better contrast */
+    --theme-primary-hover: #93c5fd; /* blue-300 */
+    --theme-primary-light: rgba(96, 165, 250, 0.15);
+    --theme-primary-muted: rgba(96, 165, 250, 0.25);
+
+    --theme-secondary: #4ade80; /* green-400 - lighter for dark mode */
+    --theme-secondary-hover: #86efac; /* green-300 */
+    --theme-secondary-light: rgba(74, 222, 128, 0.15);
+  }
+}
+
+/* ==========================================================================
+   High Contrast Mode Support
+   ========================================================================== */
+@media (prefers-contrast: high) {
+  :root {
+    --color-border-default: var(--color-neutral-500);
+    --color-border-light: var(--color-neutral-400);
+    --shadow-sm: 0 0 0 1px var(--color-neutral-500);
+    --shadow-md: 0 0 0 2px var(--color-neutral-500);
+  }
+
+  [data-theme="dark"] {
+    --color-border-default: var(--color-neutral-400);
+    --color-border-light: var(--color-neutral-500);
+  }
+}
+
+/* ==========================================================================
+   Reduced Motion Support
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast: all 0.01ms ease-out;
+    --transition-normal: all 0.01ms ease-out;
+    --transition-slow: all 0.01ms ease-out;
+  }
+}
+
+/* ==========================================================================
+   Print Mode Variables
+   ========================================================================== */
+@media print {
+  :root {
+    --color-text-primary: #000000;
+    --color-text-secondary: #333333;
+    --color-bg-primary: #ffffff;
+    --color-bg-secondary: #ffffff;
+    --color-border-light: #cccccc;
+    --color-border-default: #999999;
+    --shadow-none: none;
+    --font-size-base: 12pt;
+  }
+}

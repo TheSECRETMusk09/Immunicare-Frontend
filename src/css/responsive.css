@@ -1,0 +1,1045 @@
+/* ==========================================================================
+    Responsive Design System
+    Immunicare Vaccination Management System
+    ========================================================================== */
+
+/* ==========================================================================
+    Base Breakpoints
+    ========================================================================== */
+
+/* Small (sm) - 640px and below */
+@media (max-width: 640px) {
+  :root {
+    --content-padding: var(--space-4);
+    --sidebar-width: 100%;
+  }
+
+  /* Typography */
+  .text-xs {
+    font-size: 0.7rem;
+  }
+  .text-sm {
+    font-size: 0.8rem;
+  }
+  .text-base {
+    font-size: 0.9rem;
+  }
+  .text-lg {
+    font-size: 1rem;
+  }
+  .text-xl {
+    font-size: 1.1rem;
+  }
+  .text-2xl {
+    font-size: 1.25rem;
+  }
+  .text-3xl {
+    font-size: 1.5rem;
+  }
+  .text-4xl {
+    font-size: 1.75rem;
+  }
+  .text-5xl {
+    font-size: 2rem;
+  }
+
+  /* Layout */
+  .hide-sm {
+    display: none !important;
+  }
+
+  .sm-flex-col {
+    flex-direction: column;
+  }
+  .sm-flex-row {
+    flex-direction: row;
+  }
+
+  .sm-grid-cols-1 {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+  .sm-grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sm-p-0 {
+    padding: var(--space-0);
+  }
+  .sm-p-2 {
+    padding: var(--space-2);
+  }
+  .sm-p-4 {
+    padding: var(--space-4);
+  }
+  .sm-p-6 {
+    padding: var(--space-6);
+  }
+
+  .sm-m-0 {
+    margin: var(--space-0);
+  }
+  .sm-m-2 {
+    margin: var(--space-2);
+  }
+  .sm-m-4 {
+    margin: var(--space-4);
+  }
+  .sm-m-6 {
+    margin: var(--space-6);
+  }
+
+  /* Components */
+  .card {
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+  }
+
+  .btn {
+    padding: var(--space-2) var(--space-4);
+    min-height: 40px;
+  }
+
+  .input-field {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .modal {
+    margin: var(--space-4);
+    max-height: calc(100vh - var(--space-8));
+  }
+
+  .sidebar {
+    transform: translateX(-100%);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Metrics */
+  .metric-value {
+    font-size: var(--font-size-2xl);
+  }
+
+  /* Tables */
+  .table th,
+  .table td {
+    padding: var(--space-3);
+    font-size: var(--font-size-xs);
+  }
+
+  /* Navigation */
+  .mobile-nav {
+    display: flex;
+  }
+}
+
+/* Medium (md) - 641px to 1024px */
+@media (min-width: 641px) and (max-width: 1024px) {
+  :root {
+    --content-padding: var(--space-5);
+    --sidebar-width: 72px;
+  }
+
+  /* Typography */
+  .text-xs {
+    font-size: 0.75rem;
+  }
+  .text-sm {
+    font-size: 0.875rem;
+  }
+  .text-base {
+    font-size: 1rem;
+  }
+  .text-lg {
+    font-size: 1.125rem;
+  }
+  .text-xl {
+    font-size: 1.25rem;
+  }
+  .text-2xl {
+    font-size: 1.5rem;
+  }
+  .text-3xl {
+    font-size: 1.875rem;
+  }
+  .text-4xl {
+    font-size: 2.25rem;
+  }
+  .text-5xl {
+    font-size: 2.5rem;
+  }
+
+  /* Layout */
+  .hide-md {
+    display: none !important;
+  }
+
+  .md-flex-col {
+    flex-direction: column;
+  }
+  .md-flex-row {
+    flex-direction: row;
+  }
+
+  .md-grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .md-grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .md-p-4 {
+    padding: var(--space-4);
+  }
+  .md-p-6 {
+    padding: var(--space-6);
+  }
+  .md-p-8 {
+    padding: var(--space-8);
+  }
+
+  /* Components */
+  .card {
+    padding: var(--space-5);
+  }
+
+  .modal {
+    max-width: 600px;
+  }
+
+  .sidebar {
+    width: var(--sidebar-width);
+  }
+
+  .sidebar .sidebar-item-label,
+  .sidebar .sidebar-section-title {
+    display: none;
+  }
+
+  .sidebar-item {
+    justify-content: center;
+    padding: var(--space-3);
+  }
+
+  /* Metrics */
+  .metric-value {
+    font-size: var(--font-size-2xl);
+  }
+
+  /* Tables */
+  .table th,
+  .table td {
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--font-size-sm);
+  }
+}
+
+/* Large (lg) - 1025px to 1280px */
+@media (min-width: 1025px) and (max-width: 1280px) {
+  :root {
+    --content-padding: var(--space-6);
+    --sidebar-width: 260px;
+  }
+
+  /* Layout */
+  .hide-lg {
+    display: none !important;
+  }
+
+  .lg-grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .lg-grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  /* Components */
+  .modal {
+    max-width: 700px;
+  }
+}
+
+/* Extra Large (xl) - 1281px and above */
+@media (min-width: 1281px) {
+  :root {
+    --content-padding: var(--space-8);
+    --sidebar-width: 300px;
+  }
+
+  /* Layout */
+  .hide-xl {
+    display: none !important;
+  }
+
+  .xl-grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .xl-grid-cols-5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  /* Components */
+  .modal {
+    max-width: 800px;
+  }
+}
+
+/* ==========================================================================
+    Responsive Container Sizes
+    ========================================================================== */
+@media (max-width: 640px) {
+  .container {
+    max-width: 100%;
+  }
+  .container-sm {
+    max-width: 100%;
+  }
+  .container-md {
+    max-width: 100%;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  .container {
+    max-width: 720px;
+  }
+  .container-sm {
+    max-width: 640px;
+  }
+  .container-md {
+    max-width: 720px;
+  }
+  .container-lg {
+    max-width: 960px;
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1280px) {
+  .container {
+    max-width: 1024px;
+  }
+  .container-sm {
+    max-width: 640px;
+  }
+  .container-md {
+    max-width: 768px;
+  }
+  .container-lg {
+    max-width: 1024px;
+  }
+  .container-xl {
+    max-width: 1200px;
+  }
+}
+
+@media (min-width: 1281px) {
+  .container {
+    max-width: 1280px;
+  }
+  .container-sm {
+    max-width: 640px;
+  }
+  .container-md {
+    max-width: 768px;
+  }
+  .container-lg {
+    max-width: 1024px;
+  }
+  .container-xl {
+    max-width: 1280px;
+  }
+}
+
+/* ==========================================================================
+    Responsive Card Grid
+    ========================================================================== */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+}
+
+@media (min-width: 640px) {
+  .card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .card-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .card-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ==========================================================================
+    Responsive Dashboard Metrics
+    ========================================================================== */
+.dashboard-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (min-width: 640px) {
+  .dashboard-metrics {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .dashboard-metrics {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .dashboard-metrics {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+/* ==========================================================================
+    Responsive Sidebar
+    ========================================================================== */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 280px;
+    height: 100vh;
+    z-index: var(--z-fixed);
+    transform: translateX(-100%);
+    transition: transform var(--transition-normal);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: calc(var(--z-fixed) - 1);
+    opacity: 0;
+    visibility: hidden;
+    transition: all var(--transition-normal);
+  }
+
+  .sidebar-overlay.open {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .main-content {
+    margin-left: 0;
+  }
+}
+
+/* ==========================================================================
+    Responsive Navigation
+    ========================================================================== */
+@media (max-width: 768px) {
+  .header-title {
+    font-size: var(--font-size-lg);
+  }
+
+  .mobile-menu-btn {
+    display: flex;
+  }
+
+  .desktop-nav {
+    display: none;
+  }
+}
+
+@media (min-width: 769px) {
+  .mobile-menu-btn {
+    display: none;
+  }
+
+  .mobile-nav {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+    Responsive Tables
+    ========================================================================== */
+@media (max-width: 768px) {
+  .table-container {
+    margin: 0 calc(-1 * var(--content-padding));
+    border-left: none;
+    border-right: none;
+  }
+
+  .table-container:first-of-type {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+
+  .table thead {
+    display: none;
+  }
+
+  .table tbody tr {
+    display: block;
+    padding: var(--space-4);
+    border-bottom: 1px solid var(--color-border-light);
+  }
+
+  .table tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .table td {
+    display: block;
+    padding: var(--space-2) 0;
+    border: none;
+  }
+
+  .table td::before {
+    content: attr(data-label);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: var(--space-1);
+  }
+}
+
+/* ==========================================================================
+    Responsive Forms - Mobile First
+    ========================================================================== */
+@media (max-width: 640px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .form-actions .btn,
+  .form-actions button {
+    width: 100%;
+  }
+
+  /* Form grid utilities */
+  .form-grid-1-col {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid-2-col {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid-3-col {
+    grid-template-columns: 1fr;
+  }
+
+  /* Form field spacing */
+  .form-field-space {
+    margin-bottom: var(--space-3);
+  }
+
+  /* Full width on mobile */
+  .form-full-width-mobile {
+    width: 100%;
+  }
+
+  /* Stack form elements */
+  .form-stack-mobile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  /* Mobile-friendly form inputs */
+  .input-mobile {
+    font-size: 16px !important; /* Prevents iOS zoom */
+    min-height: 48px;
+    padding: var(--space-3);
+  }
+
+  /* Mobile modal form */
+  .modal-form-mobile {
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+}
+
+@media (min-width: 641px) {
+  .form-row-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .form-grid-2-col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .form-grid-3-col {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .form-row-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .form-grid-2-col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .form-grid-3-col {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ==========================================================================
+    Responsive Modals
+    ========================================================================== */
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: var(--space-2);
+    align-items: flex-end;
+  }
+
+  .modal {
+    max-width: none;
+    border-radius: 1rem 1rem 0 0;
+    margin-bottom: 0;
+    width: 100%;
+  }
+
+  .modal-header {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .modal-body {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .modal-footer {
+    padding: var(--space-3) var(--space-4);
+    flex-direction: column-reverse;
+  }
+
+  .modal-footer .btn,
+  .modal-footer button {
+    width: 100%;
+  }
+}
+
+/* ==========================================================================
+    Responsive Modals
+    ========================================================================== */
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: var(--space-4);
+    align-items: flex-end;
+  }
+
+  .modal {
+    max-width: none;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    margin-bottom: 0;
+  }
+
+  .modal-header {
+    padding: var(--space-4);
+  }
+
+  .modal-body {
+    padding: var(--space-4);
+  }
+
+  .modal-footer {
+    padding: var(--space-4);
+    flex-direction: column-reverse;
+  }
+
+  .modal-footer .btn {
+    width: 100%;
+  }
+}
+
+/* ==========================================================================
+    Responsive Hero Section
+    ========================================================================== */
+@media (max-width: 768px) {
+  .hero-section {
+    padding: var(--space-8) var(--space-4);
+  }
+
+  .hero-title {
+    font-size: var(--font-size-2xl);
+  }
+
+  .hero-subtitle {
+    font-size: var(--font-size-base);
+  }
+
+  .hero-actions {
+    flex-direction: column;
+  }
+
+  .hero-actions .btn {
+    width: 100%;
+  }
+}
+
+@media (min-width: 769px) {
+  .hero-actions {
+    flex-direction: row;
+  }
+
+  .hero-actions .btn {
+    min-width: 160px;
+  }
+}
+
+/* ==========================================================================
+    Responsive Charts Container
+    ========================================================================== */
+.charts-container {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@media (min-width: 1024px) {
+  .charts-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-6);
+  }
+}
+
+@media (min-width: 1280px) {
+  .charts-container {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+/* ==========================================================================
+    Print Media Query
+    ========================================================================== */
+@media print {
+  :root {
+    --content-padding: 0;
+  }
+
+  .hide-print {
+    display: none !important;
+  }
+
+  .page-break-before {
+    page-break-before: always;
+  }
+
+  .page-break-after {
+    page-break-after: always;
+  }
+
+  .avoid-break {
+    page-break-inside: avoid;
+  }
+}
+
+/* ==========================================================================
+    Dark Mode Responsive
+    ========================================================================== */
+@media (prefers-color-scheme: dark) {
+  .card {
+    background-color: var(--color-bg-secondary);
+    border-color: var(--color-border-dark);
+  }
+}
+
+/* ==========================================================================
+    High Contrast Responsive
+    ========================================================================== */
+@media (prefers-contrast: high) {
+  :root {
+    --color-border-default: var(--color-neutral-500);
+  }
+
+  .card {
+    border-width: 2px;
+  }
+
+  .btn {
+    border-width: 2px;
+  }
+
+  .input-field {
+    border-width: 2px;
+  }
+}
+
+/* ==========================================================================
+    Reduced Motion Responsive
+    ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .modal {
+    transition: none;
+  }
+
+  .modal {
+    animation: none;
+  }
+}
+
+/* ==========================================================================
+    Calendar Mobile View Fixes
+    Reposition calendar date numbers to be centered in upper right area
+    ========================================================================== */
+@media (max-width: 640px) {
+  .rbc-calendar {
+    font-size: 11px;
+  }
+
+  .rbc-header {
+    padding: 8px 2px;
+    font-size: 10px;
+    text-align: center;
+    font-weight: 600;
+  }
+
+  .rbc-date-cell {
+    padding: 2px;
+    text-align: center;
+    vertical-align: top;
+  }
+
+  .rbc-date-cell > span {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
+    text-align: center;
+    border-radius: 50%;
+    margin: 2px auto;
+  }
+
+  .rbc-off-range-bg {
+    background: rgba(0, 0, 0, 0.03);
+  }
+
+  .rbc-today {
+    background: rgba(16, 185, 129, 0.1);
+  }
+
+  .rbc-event {
+    font-size: 9px;
+    padding: 1px 3px;
+    min-height: 18px;
+  }
+
+  .rbc-toolbar {
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .rbc-toolbar-label {
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    margin: 4px 0;
+  }
+
+  .rbc-toolbar button {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .rbc-month-view,
+  .rbc-time-view {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .rbc-month-row {
+    min-height: 60px;
+  }
+
+  .rbc-day-bg + .rbc-day-bg,
+  .rbc-month-row + .rbc-month-row {
+    border-color: #e5e7eb;
+  }
+
+  .rbc-time-header {
+    font-size: 10px;
+  }
+
+  .rbc-time-content {
+    font-size: 10px;
+  }
+
+  .rbc-timeslot-group {
+    min-height: 40px;
+  }
+
+  .rbc-time-slot {
+    font-size: 9px;
+  }
+
+  /* Center weekday and month text */
+  .rbc-weekday,
+  .rbc-month-name {
+    text-align: center;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+}
+
+/* Tablet adjustments */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .rbc-calendar {
+    font-size: 12px;
+  }
+
+  .rbc-header {
+    padding: 10px 4px;
+    font-size: 11px;
+  }
+
+  .rbc-event {
+    font-size: 10px;
+  }
+}
+
+/* Ensure proper visibility on all devices */
+.rbc-calendar {
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.rbc-calendar * {
+  box-sizing: border-box;
+}
+
+/* ==========================================================================
+    Calendar Dark Mode - Mobile Responsive
+    Enhanced for eye comfort with optimized contrast ratios
+    ========================================================================== */
+@media (max-width: 640px) {
+  /* Dark mode calendar mobile adjustments */
+  .dark-calendar .rbc-toolbar,
+  .dark .rbc-calendar .rbc-toolbar {
+    padding: 8px;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .dark-calendar .rbc-toolbar button,
+  .dark .rbc-calendar .rbc-toolbar button {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .dark-calendar .rbc-toolbar-label,
+  .dark .rbc-calendar .rbc-toolbar-label {
+    font-size: 14px;
+  }
+
+  .dark-calendar .rbc-header,
+  .dark .rbc-calendar .rbc-header {
+    padding: 8px 4px;
+    font-size: 10px;
+  }
+
+  .dark-calendar .rbc-date-cell,
+  .dark .rbc-calendar .rbc-date-cell {
+    padding: 4px;
+  }
+
+  .dark-calendar .rbc-date-cell > a,
+  .dark-calendar .rbc-date-cell > span,
+  .dark .rbc-calendar .rbc-date-cell > a,
+  .dark .rbc-calendar .rbc-date-cell > span {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+
+  .dark-calendar .rbc-event,
+  .dark .rbc-calendar .rbc-event {
+    font-size: 9px;
+    padding: 1px 3px;
+    min-height: 16px;
+  }
+
+  .dark-calendar .rbc-month-view,
+  .dark .rbc-calendar .rbc-month-view {
+    border-radius: 6px;
+  }
+
+  .dark-calendar .rbc-time-view,
+  .dark .rbc-calendar .rbc-time-view {
+    border-radius: 6px;
+  }
+}
+
+/* Tablet dark mode adjustments */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .dark-calendar .rbc-toolbar,
+  .dark .rbc-calendar .rbc-toolbar {
+    padding: 10px;
+  }
+
+  .dark-calendar .rbc-toolbar button,
+  .dark .rbc-calendar .rbc-toolbar button {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+
+  .dark-calendar .rbc-header,
+  .dark .rbc-calendar .rbc-header {
+    padding: 10px 6px;
+    font-size: 11px;
+  }
+
+  .dark-calendar .rbc-event,
+  .dark .rbc-calendar .rbc-event {
+    font-size: 10px;
+    padding: 2px 4px;
+  }
+}
+
+/* ==========================================================================
+    Dark Mode Calendar Container
+    ========================================================================== */
+.dark .calendar-container,
+[data-theme="dark"] .calendar-container {
+  background-color: #1a1d23;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+/* Calendar navigation controls dark mode */
+.dark .bg-gray-50,
+[data-theme="dark"] .bg-gray-50 {
+  background-color: #21252b !important;
+}
+
+.dark .text-gray-700,
+[data-theme="dark"] .text-gray-700 {
+  color: #c9d1d9 !important;
+}
+
+.dark .text-gray-300,
+[data-theme="dark"] .text-gray-300 {
+  color: #8b949e !important;
+}

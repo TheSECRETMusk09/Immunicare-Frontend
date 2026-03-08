@@ -1,0 +1,466 @@
+/* ==========================================================================
+   Layout Styles
+   Immunicare Vaccination Management System
+   ========================================================================== */
+
+/* ==========================================================================
+   Main Layout
+   ========================================================================== */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  transition: margin-left var(--transition-normal);
+}
+
+/* Collapsed Sidebar State */
+.main-content.sidebar-collapsed {
+  margin-left: var(--sidebar-collapsed-width);
+}
+
+/* ==========================================================================
+   Header Layout
+   ========================================================================== */
+.app-header {
+  height: var(--header-height);
+  background-color: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-6);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.header-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+/* ==========================================================================
+   Page Container Layout
+   ========================================================================== */
+.page-container {
+  padding: var(--space-6);
+  min-height: calc(100vh - var(--header-height));
+}
+
+.page-container.full-width {
+  padding: 0;
+  max-width: none;
+}
+
+.page-container.narrow {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.page-container.wide {
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+/* ==========================================================================
+   Sidebar Layout Variants
+   ========================================================================== */
+
+/* Fixed Sidebar */
+.layout-fixed-sidebar .sidebar {
+  position: fixed;
+}
+
+/* Floating Sidebar */
+.layout-floating-sidebar .sidebar {
+  position: fixed;
+  margin: var(--space-4);
+  height: calc(100vh - var(--space-8));
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border-light);
+  box-shadow: var(--shadow-lg);
+}
+
+.layout-floating-sidebar .main-content {
+  margin-left: calc(var(--sidebar-width) + var(--space-8));
+}
+
+/* No Sidebar */
+.layout-no-sidebar .main-content {
+  margin-left: 0;
+}
+
+/* ==========================================================================
+   Two-Column Layout
+   ========================================================================== */
+.two-column-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-6);
+}
+
+@media (min-width: 768px) {
+  .two-column-layout {
+    grid-template-columns: 280px 1fr;
+  }
+}
+
+.two-column-sidebar {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .two-column-sidebar {
+    display: block;
+  }
+}
+
+/* ==========================================================================
+   Three-Column Layout
+   ========================================================================== */
+.three-column-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-6);
+}
+
+@media (min-width: 768px) {
+  .three-column-layout {
+    grid-template-columns: 240px 1fr 280px;
+  }
+}
+
+.three-column-left,
+.three-column-right {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .three-column-left,
+  .three-column-right {
+    display: block;
+  }
+}
+
+/* ==========================================================================
+   Card Grid Layout
+   ========================================================================== */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-5);
+}
+
+.card-grid-2 {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+
+.card-grid-3 {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+/* ==========================================================================
+   List Layout
+   ========================================================================== */
+.list-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.list-item {
+  display: flex;
+  align-items: center;
+  padding: var(--space-4);
+  background-color: var(--color-bg-primary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-light);
+  transition: all var(--transition-fast);
+}
+
+.list-item:hover {
+  border-color: var(--color-primary-300);
+  box-shadow: var(--shadow-sm);
+}
+
+.list-item-content {
+  flex: 1;
+}
+
+.list-item-action {
+  margin-left: var(--space-4);
+}
+
+/* ==========================================================================
+   Form Layout
+   ========================================================================== */
+.form-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@media (min-width: 640px) {
+  .form-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .form-row-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border-light);
+}
+
+/* ==========================================================================
+   Modal Layout
+   ========================================================================== */
+.modal-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ==========================================================================
+   Table Layout
+   ========================================================================== */
+.table-layout {
+  overflow-x: auto;
+}
+
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.table-search {
+  flex: 1;
+  max-width: 320px;
+}
+
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* ==========================================================================
+   Hero Section Layout
+   ========================================================================== */
+.hero-section {
+  padding: var(--space-12) 0;
+  text-align: center;
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-50) 0%,
+    var(--color-secondary-50) 100%
+  );
+  border-radius: var(--radius-2xl);
+  margin-bottom: var(--space-8);
+}
+
+.hero-title {
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-4);
+}
+
+.hero-subtitle {
+  font-size: var(--font-size-lg);
+  color: var(--color-text-secondary);
+  max-width: 600px;
+  margin: 0 auto var(--space-6);
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+}
+
+/* ==========================================================================
+   Stats Section Layout
+   ========================================================================== */
+.stats-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+.stat-item {
+  text-align: center;
+  padding: var(--space-5);
+}
+
+.stat-value {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.stat-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-1);
+}
+
+/* ==========================================================================
+   Footer Layout
+   ========================================================================== */
+.app-footer {
+  padding: var(--space-6);
+  background-color: var(--color-bg-primary);
+  border-top: 1px solid var(--color-border-light);
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.footer-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+/* ==========================================================================
+   Mobile Navigation Layout
+   ========================================================================== */
+.mobile-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background-color: var(--color-bg-primary);
+  border-top: 1px solid var(--color-border-light);
+  z-index: var(--z-fixed);
+}
+
+@media (max-width: 768px) {
+  .mobile-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 var(--space-4);
+  }
+}
+
+.mobile-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  min-width: 48px;
+}
+
+.mobile-nav-item.active {
+  color: var(--color-primary-600);
+}
+
+.mobile-nav-icon {
+  width: 24px;
+  height: 24px;
+}
+
+/* Mobile Content Padding */
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 0;
+    padding-bottom: 80px;
+  }
+
+  .app-header {
+    padding: 0 var(--space-4);
+  }
+
+  .page-container {
+    padding: var(--space-4);
+  }
+}
+
+/* ==========================================================================
+   Responsive Layout Utilities
+   ========================================================================== */
+@media (max-width: 640px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  .hide-tablet {
+    display: none !important;
+  }
+}
+
+@media (min-width: 1025px) {
+  .hide-desktop {
+    display: none !important;
+  }
+}
+
+/* ==========================================================================
+   Print Layout
+   ========================================================================== */
+@media print {
+  .app-header,
+  .sidebar,
+  .mobile-nav,
+  .app-footer {
+    display: none !important;
+  }
+
+  .main-content {
+    margin-left: 0;
+  }
+
+  .page-container {
+    padding: 0;
+  }
+}

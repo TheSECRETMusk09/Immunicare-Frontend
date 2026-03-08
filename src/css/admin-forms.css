@@ -1,0 +1,1212 @@
+/* ==========================================================================
+    Admin Dashboard Forms - Responsive Layout System
+    Immunicare Vaccination Management System
+
+    Features:
+    - Prevents width overflow in all form containers
+    - Responsive grid layouts that adapt to screen size
+    - Standardized input field sizing and alignment
+    - Mobile-first approach with proper touch targets
+    - Dark mode support
+    ========================================================================== */
+
+/* ==========================================================================
+    Form Container Overflow Prevention
+    ========================================================================== */
+
+/* Base form container - prevents horizontal overflow */
+.admin-form {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Form sections within modals */
+.admin-form .form-section {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-slate-200, #e2e8f0);
+}
+
+.admin-form .form-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* Form section headers */
+.admin-form .form-section-header {
+  width: 100%;
+  margin-bottom: 0.75rem;
+}
+
+.admin-form .form-section-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-slate-700, #334155);
+  margin-bottom: 0.25rem;
+}
+
+.admin-form .form-section-description {
+  font-size: 0.75rem;
+  color: var(--color-slate-500, #64748b);
+}
+
+/* ==========================================================================
+    Responsive Form Grid System
+    ========================================================================== */
+
+/* Base grid row - single column on mobile by default */
+.admin-form-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Two column grid - responsive */
+.admin-form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (min-width: 768px) {
+  .admin-form-row-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Three column grid - responsive */
+.admin-form-row-3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (min-width: 768px) {
+  .admin-form-row-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .admin-form-row-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Four column grid - responsive */
+.admin-form-row-4 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (min-width: 768px) {
+  .admin-form-row-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .admin-form-row-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ==========================================================================
+    Form Field Group - Standardized Input Container
+    ========================================================================== */
+
+.admin-field-group {
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-field-group input,
+.admin-field-group select,
+.admin-field-group textarea,
+.admin-field-group .admin-input,
+.admin-field-group .admin-select,
+.admin-field-group .admin-textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.admin-field-group > * {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.admin-field-group:last-child {
+  margin-bottom: 0;
+}
+
+/* Field label */
+.admin-field-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-slate-700, #334155);
+  margin-bottom: 0.5rem; /* Consistent 8px spacing between label and input */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-field-label.required::after {
+  content: " *";
+  color: var(--color-danger-500, #ef4444);
+}
+
+/* ==========================================================================
+    Form Validation Styles
+    ========================================================================== */
+
+/* Error state for inputs */
+.admin-input-error,
+.admin-select-error,
+.admin-textarea-error {
+  border-color: var(--color-danger-500, #ef4444) !important;
+  background-color: var(--color-danger-50, #fef2f2) !important;
+}
+
+.admin-input-error:focus,
+.admin-select-error:focus,
+.admin-textarea-error:focus {
+  border-color: var(--color-danger-500, #ef4444) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+/* Validation error message */
+.admin-field-error {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-danger-600, #dc2626);
+  margin-top: 0.25rem;
+  line-height: 1.4;
+}
+
+/* Success state for inputs */
+.admin-input-success,
+.admin-select-success {
+  border-color: var(--color-success-500, #22c55e) !important;
+  background-color: var(--color-success-50, #f0fdf4) !important;
+}
+
+.admin-input-success:focus,
+.admin-select-success:focus {
+  border-color: var(--color-success-500, #22c55e) !important;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15) !important;
+}
+
+/* Field group with error */
+.admin-field-group.has-error {
+  margin-bottom: 0.5rem;
+}
+
+/* Required field indicator */
+.admin-field-required {
+  color: var(--color-danger-500, #ef4444);
+  margin-left: 0.125rem;
+}
+
+/* ==========================================================================
+    Form Loading State Styles
+    ========================================================================== */
+
+/* Button loading state */
+.admin-button-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.admin-button-loading::after {
+  content: "";
+  position: absolute;
+  width: 1rem;
+  height: 1rem;
+  top: 50%;
+  left: 50%;
+  margin-top: -0.5rem;
+  margin-left: -0.5rem;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: admin-button-spin 0.6s linear infinite;
+}
+
+@keyframes admin-button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Disabled state styling */
+.admin-input:disabled,
+.admin-select:disabled,
+.admin-textarea:disabled {
+  background-color: var(--color-slate-100, #f1f5f9);
+  color: var(--color-slate-500, #64748b);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Field input wrapper */
+.admin-field-input {
+  width: 100%;
+  max-width: 100%;
+  position: relative;
+}
+
+/* ==========================================================================
+    Standardized Input Styles
+    ========================================================================== */
+
+/* Base input styling */
+.admin-input,
+.admin-select,
+.admin-textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0; /* Prevents flex items from overflowing */
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--color-slate-800, #1e293b);
+  background-color: #ffffff;
+  border: 1px solid var(--color-slate-300, #cbd5e1);
+  border-radius: 0.5rem;
+  transition: all 0.15s ease;
+  outline: none;
+  box-sizing: border-box;
+}
+
+/* Prevent iOS zoom on focus */
+@media (max-width: 479px) {
+  .admin-input,
+  .admin-select,
+  .admin-textarea {
+    font-size: 16px;
+  }
+}
+
+.admin-input::placeholder,
+.admin-textarea::placeholder {
+  color: var(--color-slate-400, #94a3b8);
+}
+
+.admin-input:hover:not(:disabled),
+.admin-select:hover:not(:disabled),
+.admin-textarea:hover:not(:disabled) {
+  border-color: var(--color-slate-400, #94a3b8);
+}
+
+.admin-input:focus,
+.admin-select:focus,
+.admin-textarea:focus {
+  border-color: var(--color-primary-500, #3b82f6);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.admin-input:disabled,
+.admin-select:disabled,
+.admin-textarea:disabled {
+  background-color: var(--color-slate-100, #f1f5f9);
+  color: var(--color-slate-500, #64748b);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Select specific styles */
+.admin-select {
+  padding-right: 2.5rem;
+  cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.25rem;
+}
+
+/* Textarea specific styles */
+.admin-textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* ==========================================================================
+    Form Field Sizing Variants
+    ========================================================================== */
+
+/* Small inputs */
+.admin-input-sm,
+.admin-select-sm {
+  padding: 0.375rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* Large inputs */
+.admin-input-lg,
+.admin-select-lg {
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+}
+
+/* Full width modifier */
+.admin-input-full {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Fixed width inputs */
+.admin-input-w-xs {
+  width: 100%;
+  max-width: 4rem;
+}
+
+.admin-input-w-sm {
+  width: 100%;
+  max-width: 8rem;
+}
+
+.admin-input-w-md {
+  width: 100%;
+  max-width: 12rem;
+}
+
+.admin-input-w-lg {
+  width: 100%;
+  max-width: 16rem;
+}
+
+.admin-input-w-xl {
+  width: 100%;
+  max-width: 20rem;
+}
+
+/* ==========================================================================
+    Form Cards and Sections
+    ========================================================================== */
+
+/* Form card container */
+.admin-form-card {
+  width: 100%;
+  max-width: 100%;
+  background-color: var(--color-slate-50, #f8fafc);
+  border: 1px solid var(--color-slate-200, #e2e8f0);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.admin-form-card:last-child {
+  margin-bottom: 0;
+}
+
+/* Form card header */
+.admin-form-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-slate-200, #e2e8f0);
+}
+
+.admin-form-card-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-slate-700, #334155);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Form card body */
+.admin-form-card-body {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Colored form cards */
+.admin-form-card-info {
+  background-color: rgba(59, 130, 246, 0.05);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.admin-form-card-success {
+  background-color: rgba(16, 185, 129, 0.05);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.admin-form-card-warning {
+  background-color: rgba(245, 158, 11, 0.05);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.admin-form-card-danger {
+  background-color: rgba(239, 68, 68, 0.05);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+/* ==========================================================================
+    Modal Form Specific Styles
+    ========================================================================== */
+
+/* Modal form container */
+.admin-modal-form {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Modal form body */
+.admin-modal-body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: calc(90vh - 200px);
+  padding: 1.5rem; /* 24px modal body baseline */
+  box-sizing: border-box;
+}
+
+@media (max-width: 639px) {
+  .admin-modal-body {
+    max-height: calc(85vh - 160px);
+    padding: 1.5rem; /* Keep spacing consistent on mobile */
+  }
+}
+
+/* Modal footer with buttons */
+.admin-modal-footer {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end !important;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid var(--color-slate-200, #e2e8f0);
+}
+
+.admin-modal-footer > * {
+  width: auto !important;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.admin-modal-footer button {
+  width: auto !important;
+  min-height: 40px !important;
+  white-space: nowrap;
+}
+
+.admin-modal-footer .admin-modal-actions {
+  width: 100%;
+  justify-content: flex-end;
+}
+
+@media (min-width: 480px) {
+  .admin-modal-footer {
+    justify-content: flex-end !important;
+  }
+
+  .admin-modal-footer button {
+    min-width: 120px;
+  }
+}
+
+/* ==========================================================================
+    Form Actions (Buttons)
+    ========================================================================== */
+
+.admin-form-actions,
+.form-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+  align-items: center;
+  justify-content: flex-end !important;
+  flex-wrap: nowrap;
+}
+
+@media (min-width: 480px) {
+  .admin-form-actions,
+  .form-actions {
+    flex-direction: row;
+  }
+}
+
+.admin-form-actions .btn,
+.admin-form-actions button,
+.form-actions .btn,
+.form-actions button {
+  width: auto;
+  min-width: 120px;
+}
+
+@media (min-width: 480px) {
+  .admin-form-actions .btn,
+  .admin-form-actions button,
+  .form-actions .btn,
+  .form-actions button {
+    width: auto;
+  }
+}
+
+/* ==========================================================================
+    Page Header Actions Cleanup
+    ========================================================================== */
+
+.page-header__container .page-header__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  width: auto !important;
+  min-width: 0;
+}
+
+.page-header__container .page-header__actions > * {
+  margin: 0 !important;
+}
+
+/* Remove decorative shells from buttons inside header actions */
+.page-header__container .page-header__actions .btn,
+.page-header__container .page-header__actions button {
+  margin: 0;
+  box-shadow: none;
+}
+
+/* ==========================================================================
+    Info Cards within Forms
+    ========================================================================== */
+
+.admin-info-card {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.admin-info-card:last-child {
+  margin-bottom: 0;
+}
+
+.admin-info-card-icon {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.admin-info-card-content {
+  flex: 1;
+  min-width: 0; /* Prevents text overflow */
+}
+
+.admin-info-card-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.admin-info-card-text {
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+/* Info card variants */
+.admin-info-card-info {
+  background-color: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.admin-info-card-info .admin-info-card-title {
+  color: #1e40af;
+}
+
+.admin-info-card-info .admin-info-card-text {
+  color: #3b82f6;
+}
+
+.admin-info-card-success {
+  background-color: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.admin-info-card-success .admin-info-card-title {
+  color: #047857;
+}
+
+.admin-info-card-success .admin-info-card-text {
+  color: #10b981;
+}
+
+.admin-info-card-warning {
+  background-color: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.admin-info-card-warning .admin-info-card-title {
+  color: #b45309;
+}
+
+.admin-info-card-warning .admin-info-card-text {
+  color: #f59e0b;
+}
+
+.admin-info-card-danger {
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.admin-info-card-danger .admin-info-card-title {
+  color: #b91c1c;
+}
+
+.admin-info-card-danger .admin-info-card-text {
+  color: #ef4444;
+}
+
+/* ==========================================================================
+    User Info Display (for showing selected user/patient info)
+    ========================================================================== */
+
+.admin-user-info {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background-color: var(--color-slate-50, #f8fafc);
+  border: 1px solid var(--color-slate-200, #e2e8f0);
+  border-radius: 0.5rem;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.admin-user-info-avatar {
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background-color: var(--color-primary-100, #dbeafe);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-user-info-avatar svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--color-primary-600, #2563eb);
+}
+
+.admin-user-info-details {
+  flex: 1;
+  min-width: 0; /* Prevents text overflow */
+}
+
+.admin-user-info-label {
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  color: var(--color-slate-500, #64748b);
+  letter-spacing: 0.05em;
+}
+
+.admin-user-info-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-slate-800, #1e293b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ==========================================================================
+    Dark Mode Styles - Using class-based dark mode (matches Tailwind config)
+    ========================================================================== */
+
+.dark .admin-form .form-section {
+  border-bottom-color: var(--color-slate-700, #334155);
+}
+
+.dark .admin-form .form-section-title {
+  color: var(--color-slate-200, #e2e8f0);
+}
+
+.dark .admin-form .form-section-description {
+  color: var(--color-slate-400, #94a3b8);
+}
+
+.dark .admin-field-label {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+.dark .admin-form .form-section-title {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+.dark .admin-form .form-section-description {
+  color: #e5e7eb !important;
+}
+
+.dark .admin-form-card-title {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+.dark .admin-form-section-title {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+.dark .admin-input,
+.dark .admin-select,
+.dark .admin-textarea {
+  color: var(--color-slate-100, #f1f5f9);
+  background-color: var(--color-slate-800, #1e293b);
+  border-color: var(--color-slate-600, #475569);
+}
+
+.dark .admin-input::placeholder,
+.dark .admin-textarea::placeholder {
+  color: var(--color-slate-500, #64748b);
+}
+
+.dark .admin-input:hover:not(:disabled),
+.dark .admin-select:hover:not(:disabled),
+.dark .admin-textarea:hover:not(:disabled) {
+  border-color: var(--color-slate-500, #64748b);
+}
+
+.dark .admin-input:focus,
+.dark .admin-select:focus,
+.dark .admin-textarea:focus {
+  border-color: var(--color-primary-400, #60a5fa);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+}
+
+.dark .admin-input:disabled,
+.dark .admin-select:disabled,
+.dark .admin-textarea:disabled {
+  background-color: var(--color-slate-900, #0f172a);
+  color: var(--color-slate-500, #64748b);
+}
+
+.dark .admin-form-card {
+  background-color: var(--color-slate-800, #1e293b);
+  border-color: var(--color-slate-700, #334155);
+}
+
+.dark .admin-form-card-header {
+  border-bottom-color: var(--color-slate-700, #334155);
+}
+
+.dark .admin-form-card-title {
+  color: var(--color-slate-200, #e2e8f0);
+}
+
+.dark .admin-form-card-info {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.dark .admin-form-card-success {
+  background-color: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.dark .admin-form-card-warning {
+  background-color: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.dark .admin-form-card-danger {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.dark .admin-modal-footer,
+.dark .admin-form-actions {
+  border-top-color: var(--color-slate-700, #334155);
+}
+
+.dark .admin-user-info {
+  background-color: var(--color-slate-800, #1e293b);
+  border-color: var(--color-slate-700, #334155);
+}
+
+.dark .admin-user-info-avatar {
+  background-color: var(--color-slate-700, #334155);
+}
+
+.dark .admin-user-info-label {
+  color: var(--color-slate-400, #94a3b8);
+}
+
+.dark .admin-user-info-name {
+  color: var(--color-slate-100, #f1f5f9);
+}
+
+/* Dark mode validation styles */
+.dark .admin-input-error,
+.dark .admin-select-error,
+.dark .admin-textarea-error {
+  border-color: var(--color-danger-400, #f87171) !important;
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
+
+.dark .admin-input-error:focus,
+.dark .admin-select-error:focus,
+.dark .admin-textarea-error:focus {
+  border-color: var(--color-danger-400, #f87171) !important;
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.2) !important;
+}
+
+.dark .admin-field-error {
+  color: var(--color-danger-400, #f87171);
+}
+
+.dark .admin-input-success,
+.dark .admin-select-success {
+  border-color: var(--color-success-400, #4ade80) !important;
+  background-color: rgba(34, 197, 94, 0.1) !important;
+}
+
+.dark .admin-input-success:focus,
+.dark .admin-select-success:focus {
+  border-color: var(--color-success-400, #4ade80) !important;
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.2) !important;
+}
+
+/* Dark mode info cards */
+.dark .admin-info-card-info {
+  background-color: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.dark .admin-info-card-info .admin-info-card-title {
+  color: #93c5fd;
+}
+
+.dark .admin-info-card-info .admin-info-card-text {
+  color: #60a5fa;
+}
+
+.dark .admin-info-card-success {
+  background-color: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.dark .admin-info-card-success .admin-info-card-title {
+  color: #6ee7b7;
+}
+
+.dark .admin-info-card-success .admin-info-card-text {
+  color: #34d399;
+}
+
+.dark .admin-info-card-warning {
+  background-color: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.dark .admin-info-card-warning .admin-info-card-title {
+  color: #fcd34d;
+}
+
+.dark .admin-info-card-warning .admin-info-card-text {
+  color: #fbbf24;
+}
+
+.dark .admin-info-card-danger {
+  background-color: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.dark .admin-info-card-danger .admin-info-card-title {
+  color: #fca5a5;
+}
+
+.dark .admin-info-card-danger .admin-info-card-text {
+  color: #f87171;
+}
+
+/* ==========================================================================
+    Utility Classes for Form Layout
+    ========================================================================== */
+
+/* Prevent text overflow */
+.admin-text-truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Flex utilities */
+.admin-flex-wrap {
+  flex-wrap: wrap;
+}
+
+.admin-flex-nowrap {
+  flex-wrap: nowrap;
+}
+
+.admin-flex-1 {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-min-w-0 {
+  min-width: 0;
+}
+
+/* Gap utilities */
+.admin-gap-1 {
+  gap: 0.25rem;
+}
+.admin-gap-2 {
+  gap: 0.5rem;
+}
+.admin-gap-3 {
+  gap: 0.75rem;
+}
+.admin-gap-4 {
+  gap: 1rem;
+}
+
+/* Width constraints for specific input types */
+.admin-input-date {
+  width: 100%;
+  max-width: 180px;
+}
+
+.admin-input-time {
+  width: 100%;
+  max-width: 140px;
+}
+
+.admin-input-number {
+  width: 100%;
+  max-width: 100px;
+}
+
+.admin-input-phone {
+  width: 100%;
+  max-width: 160px;
+}
+
+.admin-input-email {
+  width: 100%;
+  max-width: 280px;
+}
+
+/* Full width on mobile, constrained on desktop */
+@media (max-width: 479px) {
+  .admin-input-date,
+  .admin-input-time,
+  .admin-input-number,
+  .admin-input-phone,
+  .admin-input-email {
+    max-width: 100%;
+  }
+}
+
+/* ==========================================================================
+    Responsive Table Container (for forms with inline tables)
+    ========================================================================== */
+
+.admin-table-container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--color-slate-200, #e2e8f0);
+  border-radius: 0.5rem;
+}
+
+.admin-table-container table {
+  width: 100%;
+  min-width: 600px; /* Minimum width before scrolling kicks in */
+}
+
+/* Admin table styles */
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.admin-table-head {
+  background-color: var(--color-slate-50, #f8fafc);
+}
+
+.admin-table-header {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-slate-500, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.admin-table-body {
+}
+
+.admin-table-cell {
+  padding: 0.5rem 0.75rem;
+  color: var(--color-slate-700, #334155);
+  border-bottom: 1px solid var(--color-slate-200, #e2e8f0);
+}
+
+.admin-table-body tr:last-child .admin-table-cell {
+  border-bottom: none;
+}
+
+/* ==========================================================================
+    Form Section Styles
+    ========================================================================== */
+
+.admin-form-section {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--color-slate-200, #e2e8f0);
+  border-radius: 0.75rem;
+  background-color: var(--color-slate-50, #f8fafc);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.admin-form-section + .admin-form-section {
+  margin-top: 1rem;
+}
+
+.admin-form-section-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-slate-700, #334155);
+  margin-bottom: 0.75rem;
+}
+
+/* Dark mode for tables and sections */
+.dark .admin-table-container {
+  border-color: var(--color-slate-700, #334155);
+}
+
+.dark .admin-table-head {
+  background-color: var(--color-slate-800, #1e293b);
+}
+
+.dark .admin-table-header {
+  color: var(--color-slate-400, #94a3b8);
+}
+
+.dark .admin-table-cell {
+  color: var(--color-slate-300, #cbd5e1);
+  border-bottom-color: var(--color-slate-700, #334155);
+}
+
+.dark .admin-form-section {
+  border-color: var(--color-slate-700, #334155);
+  background-color: var(--color-slate-800, #1e293b);
+}
+
+.dark .admin-form-section-title {
+  color: var(--color-slate-300, #cbd5e1);
+}
+
+/* ==========================================================================
+    Print Styles
+    ========================================================================== */
+
+@media print {
+  .admin-form,
+  .admin-form-card,
+  .admin-modal-form {
+    box-shadow: none;
+    border: 1px solid #000;
+  }
+
+  .admin-input,
+  .admin-select,
+  .admin-textarea {
+    border: 1px solid #000;
+    box-shadow: none;
+  }
+}
+
+/* ==========================================================================
+    Standardized Form Actions Container
+    ========================================================================== */
+.form-actions-standardized {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-slate-200, #e2e8f0);
+}
+
+.dark .form-actions-standardized {
+    border-top-color: var(--color-slate-700, #334155);
+}

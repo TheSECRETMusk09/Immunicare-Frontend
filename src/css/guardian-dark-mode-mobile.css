@@ -1,0 +1,310 @@
+/**
+ * Guardian Dashboard Dark Mode - Mobile Optimizations
+ * Immunicare Vaccination Management System
+ *
+ * Purpose: Reduce eye strain and visual fatigue on mobile devices
+ * when using dark mode, with softer colors and improved contrast.
+ *
+ * @version 1.0
+ * @since 2026-03-02
+ */
+
+/* ==========================================================================
+   Mobile-Specific Dark Mode Adjustments
+   Only applies to viewports below 1024px (mobile and tablet)
+   ========================================================================== */
+
+@media (max-width: 1023px) {
+  /* Dark mode softer background gradient to reduce eye strain */
+  .dark .guardian-dashboard {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* Softer card backgrounds with reduced brightness */
+  .dark .guardian-card,
+  .dark .guardian-calendar-wrapper-expanded,
+  .dark .glassmorphism-card {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(30, 27, 75, 0.85) 50%, rgba(30, 41, 59, 0.9) 100%);
+    border-color: rgba(148, 163, 184, 0.15);
+    box-shadow:
+      0 4px 6px -1px rgba(0, 0, 0, 0.3),
+      0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Selected date and upcoming appointments cards */
+  .dark .guardian-selected-date-card,
+  .dark .guardian-upcoming-appointments-card {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(49, 46, 129, 0.9) 100%);
+    border-color: rgba(148, 163, 184, 0.2);
+  }
+
+  /* Reduce text weight for readability on mobile screens */
+  .dark .guardian-module-container {
+    color: #f1f5f9; /* slate-100 - warmer than pure white */
+    font-weight: 400;
+    text-shadow: none;
+  }
+
+  /* Warmer text tones to reduce blue light exposure */
+  .dark .text-gray-100 { color: #f1f5f9 !important; } /* slate-100 */
+  .dark .text-gray-200 { color: #e2e8f0 !important; } /* slate-200 */
+  .dark .text-gray-300 { color: #cbd5e1 !important; } /* slate-300 */
+  .dark .text-gray-400 { color: #94a3b8 !important; } /* slate-400 */
+
+  /* Headings with slightly more weight for hierarchy */
+  .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+    color: #f8fafc;
+    font-weight: 600;
+  }
+
+  /* Subtitles and secondary text */
+  .dark .text-gray-500,
+  .dark .text-gray-600 {
+    color: #94a3b8 !important;
+  }
+
+  /* Softer status badge backgrounds */
+  .dark .bg-blue-900\/30 {
+    background-color: rgba(30, 58, 138, 0.5) !important;
+    color: #93c5fd !important;
+  }
+
+  .dark .bg-emerald-900\/30 {
+    background-color: rgba(6, 78, 59, 0.5) !important;
+    color: #6ee7b7 !important;
+  }
+
+  .dark .bg-red-900\/30 {
+    background-color: rgba(127, 29, 29, 0.5) !important;
+    color: #fca5a5 !important;
+  }
+
+  .dark .bg-yellow-900\/30,
+  .dark .bg-amber-900\/30 {
+    background-color: rgba(120, 53, 15, 0.5) !important;
+    color: #fcd34d !important;
+  }
+
+  /* Softer shadow for calendar cells to reduce harshness */
+  .dark .guardian-calendar-cell {
+    background: rgba(30, 41, 59, 0.6);
+    border-color: rgba(148, 163, 184, 0.1);
+  }
+
+  .dark .guardian-calendar-cell:hover {
+    background: rgba(51, 65, 85, 0.7);
+  }
+
+  /* Sidebar adjustments for mobile dark mode */
+  .dark .guardian-sidebar {
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+    border-color: rgba(148, 163, 184, 0.15);
+  }
+
+  /* Appointment cards with softer appearance */
+  .dark .guardian-appointment-card {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(49, 46, 129, 0.7) 100%);
+    border-color: rgba(148, 163, 184, 0.15);
+  }
+
+  /* Form inputs in dark mode mobile */
+  .dark .input-field,
+  .dark .select-field,
+  .dark .textarea-field {
+    background: rgba(15, 23, 42, 0.8);
+    border-color: rgba(148, 163, 184, 0.25);
+    color: #f1f5f9;
+  }
+
+  .dark .input-field:focus,
+  .dark .select-field:focus,
+  .dark .textarea-field:focus {
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+  }
+
+  /* Neumorphic elements dark mode mobile adjustments */
+  .dark .btn-neumorphic {
+    background: linear-gradient(145deg, #1e293b, #0f172a);
+    color: #e2e8f0;
+    box-shadow:
+      4px 4px 8px rgba(0, 0, 0, 0.4),
+      -4px -4px 8px rgba(74, 85, 104, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+
+  .dark .btn-neumorphic:active {
+    box-shadow:
+      inset 3px 3px 6px rgba(0, 0, 0, 0.4),
+      inset -3px -3px 6px rgba(74, 85, 104, 0.2);
+  }
+
+  .dark .guardian-card-neumorphic {
+    background: linear-gradient(145deg, #1e293b, #0f172a);
+    box-shadow:
+      6px 6px 12px rgba(0, 0, 0, 0.4),
+      -6px -6px 12px rgba(74, 85, 104, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  }
+
+  /* Alerts and notifications - softer colors */
+  .dark .bg-red-50 { background-color: rgba(127, 29, 29, 0.3) !important; }
+  .dark .text-red-700 { color: #fca5a5 !important; }
+  .dark .text-red-600 { color: #fca5a5 !important; }
+
+  .dark .bg-green-50 { background-color: rgba(6, 78, 59, 0.3) !important; }
+  .dark .text-green-700 { color: #6ee7b7 !important; }
+  .dark .text-green-600 { color: #6ee7b7 !important; }
+
+  .dark .bg-blue-50 { background-color: rgba(30, 58, 138, 0.3) !important; }
+  .dark .text-blue-700 { color: #93c5fd !important; }
+
+  .dark .bg-yellow-50 { background-color: rgba(120, 53, 15, 0.3) !important; }
+  .dark .text-yellow-700 { color: #fcd34d !important; }
+
+  /* Table styling for dark mode mobile */
+  .dark table {
+    border-color: rgba(148, 163, 184, 0.15);
+  }
+
+  .dark th {
+    background: rgba(30, 41, 59, 0.8);
+    color: #cbd5e1;
+  }
+
+  .dark td {
+    border-color: rgba(148, 163, 184, 0.1);
+    color: #e2e8f0;
+  }
+
+  .dark tr:hover td {
+    background: rgba(51, 65, 85, 0.4);
+  }
+
+  /* Progress bars and indicators */
+  .dark .bg-gray-200 { background-color: rgba(51, 65, 85, 0.5) !important; }
+  .dark .bg-gray-700 { background-color: rgba(30, 41, 59, 0.8) !important; }
+
+  /* Tab navigation */
+  .dark .border-gray-200 { border-color: rgba(148, 163, 184, 0.15) !important; }
+  .dark .border-gray-700 { border-color: rgba(71, 85, 105, 0.5) !important; }
+
+  /* Ensure primary color is visible but not harsh */
+  .dark .text-primary-600 { color: #60a5fa !important; }
+  .dark .text-primary-700 { color: #93c5fd !important; }
+  .dark .bg-primary-100 { background-color: rgba(30, 58, 138, 0.4) !important; }
+
+  /* Loading states with softer animation */
+  .dark .guardian-skeleton {
+    background: linear-gradient(90deg, rgba(30, 41, 59, 0.5) 25%, rgba(51, 65, 85, 0.5) 50%, rgba(30, 41, 59, 0.5) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s ease-in-out infinite;
+  }
+
+  /* Modal overlays with softer backdrop */
+  .dark .guardian-modal-overlay {
+    background: rgba(0, 0, 0, 0.6);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+  }
+
+  .dark .guardian-modal {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-color: rgba(148, 163, 184, 0.2);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* ==========================================================================
+   Small Mobile Devices (below 640px) - Extra Optimizations
+   ========================================================================== */
+
+@media (max-width: 639px) {
+  .dark .guardian-dashboard {
+    /* Even softer gradient for very small screens */
+    background: linear-gradient(180deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+  }
+
+  /* Ensure text is readable on very small screens */
+  .dark .guardian-calendar-cell {
+    min-height: 50px;
+  }
+
+  .dark .guardian-calendar-cell .text-sm {
+    color: #e2e8f0;
+  }
+
+  /* Touch targets with better visibility */
+  .dark .guardian-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Bottom navigation dark mode */
+  .dark .guardian-dashboard__nav-bottom {
+    background: rgba(15, 23, 42, 0.98);
+    border-color: rgba(148, 163, 184, 0.1);
+  }
+
+  /* Header dark mode */
+  .dark .guardian-dashboard__header {
+    background: rgba(15, 23, 42, 0.95);
+    border-color: rgba(148, 163, 184, 0.1);
+  }
+}
+
+/* ==========================================================================
+   High Contrast Mode Override for Accessibility
+   ========================================================================== */
+
+@media (prefers-contrast: high) and (max-width: 1023px) {
+  .dark .guardian-card,
+  .dark .guardian-calendar-wrapper-expanded {
+    border: 2px solid rgba(255, 255, 255, 0.5);
+  }
+
+  .dark .text-gray-300,
+  .dark .text-gray-400 {
+    color: #e2e8f0 !important;
+  }
+
+  .dark .input-field,
+  .dark .select-field,
+  .dark .textarea-field {
+    border: 2px solid rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* ==========================================================================
+   Reduced Motion Support
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) and (max-width: 1023px) {
+  .dark .guardian-skeleton {
+    animation: none;
+    background: rgba(30, 41, 59, 0.5);
+  }
+}
+
+/* ==========================================================================
+   Safe Area Insets for Notched Devices
+   ========================================================================== */
+
+@supports (padding: max(0px)) {
+  @media (max-width: 1023px) {
+    .dark .guardian-dashboard {
+      padding-left: max(env(safe-area-inset-left), 1rem);
+      padding-right: max(env(safe-area-inset-right), 1rem);
+    }
+
+    .dark .guardian-dashboard__header {
+      padding-top: max(env(safe-area-inset-top), 0.5rem);
+    }
+
+    .dark .guardian-dashboard__nav-bottom {
+      padding-bottom: max(env(safe-area-inset-bottom), 0px);
+    }
+  }
+}

@@ -1,0 +1,162 @@
+import React, { useState, useEffect, useCallback } from "react";
+import { useParams } from "react-router-dom";
+import {
+  Button,
+  PageHeader,
+  Card,
+  Alert,
+  LoadingSpinner,
+} from "../../components/UI";
+import ImmunizationRecordBooklet from "../../components/ImmunizationRecordBooklet";
+import apiClient from "../../utils/api";
+import { FileCheck, FileText, Printer } from "lucide-react";
+
+export default function ImmunizationRecordPage() {
+  const { infantId } = useParams();
+  const [infant, setInfant] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchInfant = useCallback(async () => {
+    if (!infantId) {
+      setLoading(false);
+      return;
+    }
+    try {
+      setLoading(true);
+      const data = await apiClient.getInfant(infantId);
+      setInfant(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [infantId]);
+
+  useEffect(() => {
+    fetchInfant();
+  }, [fetchInfant]);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleDownload = () => {
+    alert("PDF download functionality - integrate with PDF generation library");
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <LoadingSpinner size="xl" text="Loading immunization record..." />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <Alert variant="danger">
+          <p>Error loading immunization record: {error}</p>
+        </Alert>
+        <Button onClick={fetchInfant} className="mt-4">
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <PageHeader
+        title="Child Immunization Record Booklet"
+        subtitle={
+          infant
+            ? `Immunization history for ${infant.first_name} ${infant.last_name}`
+            : "Complete immunization record for tracking vaccinations"
+        }
+        icon={<FileCheck className="w-6 h-6" />}
+        actions={
+          <div className="flex gap-2">
+            <Button onClick={handleDownload} variant="secondary">
+              <FileText className="w-4 h-4 mr-2" /> Download PDF
+            </Button>
+            <Button onClick={handlePrint}><Printer className="w-4 h-4 mr-2" /> Print</Button>
+          </div>
+        }
+      />
+
+      {/* Infant Summary Card */}
+      {infant && (
+        <Card className="p-4 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center text-2xl">
+                👶
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                  {infant.first_name} {infant.middle_name || ""}{" "}
+                  {infant.last_name}
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  DOB: {new Date(infant.dob).toLocaleDateString()} •{" "}
+                  {infant.sex === "M" ? "Male" : "Female"}
+                </p>
+              </div>
+            </div>
+            <div className="text-right space-y-1">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Mother: {infant.mother_name || "N/A"}
+              </p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Father: {infant.father_name || "N/A"}
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Immunization Record Booklet Component */}
+      {infantId ? (
+        <ImmunizationRecordBooklet infantId={infantId} />
+      ) : (
+        <Alert variant="info">
+          <p className="font-medium">Select an Infant</p>
+          <p className="mt-1">
+            Please select an infant to view their immunization record, or
+            navigate from the Infant Management page.
+          </p>
+        </Alert>
+      )}
+
+      {/* Information Card */}
+      <Card className="p-6 bg-gray-50 dark:bg-gray-800">
+        <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">
+          📋 About This Record
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
+          <div>
+            <p className="font-medium text-gray-900 dark:text-gray-100">
+              Purpose
+            </p>
+            <p>
+              This record tracks all vaccines administered to the child from
+              birth onwards.
+            </p>
+          </div>
+          <div>
+            <p className="font-medium text-gray-900 dark:text-gray-100">
+              For Health Center Use
+            </p>
+            <p>
+              This form is used by Barangay San Nicolas Health Center to
+              document infant vaccinations.
+            </p>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}

@@ -1,13 +1,13 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+/* ==========================================================================
+   Immunicare Vaccination Management System
+   Legacy CSS Entry Point
+   
+   DEPRECATED: Use ./css/index.css instead
+   This file is kept for backward compatibility.
+   ========================================================================== */
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
-}
+/* Import the new modular CSS architecture */
+@import "./css/index.css";
+
+/* Legacy styles that haven't been migrated yet can be added below */
+/* All new styles should be added to the appropriate module in ./css/ */

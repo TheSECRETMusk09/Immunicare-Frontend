@@ -1,0 +1,1160 @@
+/* ==========================================================================
+   Guardian Dashboard Mobile-First Responsive Design
+   Immunicare Vaccination Management System
+
+   Mobile Optimization Critical Requirements:
+   - Mobile-first responsive design
+   - Breakpoints for <768px
+   - Sidebar collapses into hamburger menu
+   - Full-width buttons
+   - 44px minimum touch height
+   - Stack cards vertically
+   - Light theme (white backgrounds)
+   - Proper font scaling
+   ========================================================================== */
+
+/* ==========================================================================
+   Base Mobile Styles (< 768px)
+   ========================================================================== */
+
+/* Prevent horizontal scroll on mobile */
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Hide scrollbar but keep functionality */
+.mobile-scrollbar,
+.mobile-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Fallback for Chrome < 121 and Safari */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Guardian Dashboard Container - Light Theme */
+.guardian-dashboard {
+  width: 100%;
+  min-height: 100vh;
+  padding: 0;
+  margin: 0;
+  overflow-x: hidden;
+  background-color: #f9fafb;
+  min-height: 100vh;
+}
+
+/* Main content area - full width on mobile */
+.guardian-main-content {
+  width: 100%;
+  padding: 0;
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  max-width: 100%;
+  overflow-x: hidden;
+  background-color: #f9fafb;
+}
+
+/* Content area with proper mobile spacing */
+.guardian-content-area {
+  width: 100%;
+  /* Mobile: proper side margins and top spacing */
+  padding-left: 16px;
+  padding-right: 16px;
+  padding-top: 60px; /* Space for hamburger menu */
+}
+
+@media (min-width: 1024px) {
+  .guardian-content-area {
+    padding-top: 24px; /* Less space needed on desktop */
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
+/* Ensure content doesn't get hidden behind bottom nav */
+@media (max-width: 1023px) {
+  .guardian-dashboard {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .guardian-dashboard main,
+  .guardian-dashboard .min-h-screen,
+  .guardian-dashboard .mobile-scroll-container {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* ==========================================================================
+   Touch Target Sizes (WCAG 2.5.5 - Minimum 44px)
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* All interactive elements must have minimum 44px touch target */
+  .guardian-btn,
+  .guardian-button,
+  .guardian-nav-item,
+  .guardian-card-action,
+  .guardian-menu-item,
+  .guardian-tab,
+  .guardian-list-item,
+  button,
+  [role="button"],
+  a.button {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.75rem 1rem;
+  }
+
+  /* Icon-only buttons */
+  .guardian-btn-icon {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.5rem;
+  }
+
+  /* Form inputs with adequate touch targets */
+  .guardian-input,
+  .guardian-select,
+  .guardian-textarea,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  input[type="number"],
+  select,
+  textarea {
+    min-height: 48px;
+    padding: 0.75rem 1rem;
+    font-size: 16px !important;
+  }
+
+  /* Checkbox and radio buttons */
+  .guardian-checkbox,
+  .guardian-radio,
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-width: 24px;
+    min-height: 24px;
+    width: 24px;
+    height: 24px;
+  }
+
+  .guardian-checkbox-label,
+  .guardian-radio-label,
+  label {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+    color: #1f2937;
+  }
+}
+
+/* ==========================================================================
+   Guardian Header - Mobile
+   ========================================================================== */
+
+@media (max-width: 1023px) {
+  .guardian-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 0.75rem 1rem;
+  }
+
+  .guardian-header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .guardian-header-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #1f2937;
+    flex: 1;
+  }
+
+  .guardian-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* Hamburger menu button */
+  .guardian-menu-btn,
+  .guardian-hamburger-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .guardian-menu-btn:hover,
+  .guardian-menu-btn:focus,
+  .guardian-hamburger-btn:hover,
+  .guardian-hamburger-btn:focus {
+    background-color: #f3f4f6;
+    border-color: #d1d5db;
+  }
+
+  .guardian-menu-btn:active,
+  .guardian-hamburger-btn:active {
+    background-color: #e5e7eb;
+    transform: scale(0.98);
+  }
+}
+
+/* ==========================================================================
+   Guardian Sidebar - Mobile Slide-out
+   ========================================================================== */
+
+@media (max-width: 1023px) {
+  /* Sidebar overlay */
+  .guardian-sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 299;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+  }
+
+  /* When open class is present, show the overlay */
+  .guardian-sidebar-overlay.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  /* When sidebar is open, ensure overlay is also visible (controlled by isOpen state) */
+  .guardian-sidebar-overlay[style*="z-index: 299"] {
+  }
+
+  /* Sidebar - fixed position slide-out */
+  .guardian-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 280px;
+    max-width: 85vw;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 300;
+    background: white;
+    /* Transform handled by Tailwind classes - translate-x-0 / -translate-x-full */
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+  }
+
+  /* When open class is present, ensure transform is applied */
+  .guardian-sidebar.open {
+  }
+
+  /* Sidebar content */
+  .guardian-sidebar-content {
+    padding: 1rem;
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Sidebar navigation items */
+  .guardian-sidebar-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    min-height: 48px;
+    border-radius: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    touch-action: manipulation;
+  }
+
+  .guardian-sidebar-nav-item:hover,
+  .guardian-sidebar-nav-item:focus {
+    background-color: #f3f4f6;
+    color: #1f2937;
+  }
+
+  .guardian-sidebar-nav-item.active {
+    background-color: #10b981;
+    color: white;
+    font-weight: 700;
+  }
+
+  .guardian-sidebar-nav-item:active {
+    transform: scale(0.98);
+  }
+}
+
+/* Desktop sidebar - static */
+@media (min-width: 1024px) {
+  .guardian-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 280px;
+    height: 100vh;
+    background: white;
+    border-right: 1px solid #e5e7eb;
+    z-index: 30;
+    transform: none;
+  }
+
+  .guardian-sidebar-overlay {
+    display: none;
+  }
+
+  .guardian-main-content {
+    margin-left: 280px;
+    padding: 0;
+    width: calc(100% - 280px);
+  }
+}
+
+/* ==========================================================================
+   Guardian Cards - Mobile Responsive
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Cards stack vertically */
+  .guardian-cards-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  /* Individual card */
+  .guardian-card {
+    width: 100%;
+    border-radius: 1rem;
+    padding: 1rem;
+    margin: 0;
+    background: white;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Card header */
+  .guardian-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 0.75rem;
+  }
+
+  .guardian-card-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1f2937;
+  }
+
+  .guardian-card-subtitle {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+  }
+
+  /* Card actions - full width buttons */
+  .guardian-card-actions {
+    display: flex;
+    flex-direction: row;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+    width: 100%;
+  }
+
+  .guardian-card-actions .guardian-btn {
+    flex: 1;
+    justify-content: center;
+    min-height: 48px;
+  }
+}
+
+/* Tablet and up - 2 column grid */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .guardian-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+}
+
+/* Desktop - 4 column grid for stats */
+@media (min-width: 1024px) {
+  .guardian-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+  }
+
+  .guardian-card-actions {
+    flex-direction: row;
+  }
+
+  .guardian-card-actions .guardian-btn {
+    width: auto;
+  }
+}
+
+/* ==========================================================================
+   Guardian Stats Cards - Mobile
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .guardian-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .guardian-stat-card {
+    padding: 1rem;
+    border-radius: 1rem;
+    text-align: left;
+    min-height: 100px;
+  }
+
+  .guardian-stat-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .guardian-stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    line-height: 1.2;
+  }
+
+  .guardian-stat-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+}
+
+@media (min-width: 768px) {
+  .guardian-stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+  }
+}
+
+/* ==========================================================================
+   Guardian Quick Actions - Mobile
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .guardian-quick-actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .guardian-quick-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    min-height: 80px;
+    border-radius: 0.75rem;
+    text-align: left;
+    touch-action: manipulation;
+  }
+
+  .guardian-quick-action-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .guardian-quick-action-label {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: white;
+  }
+
+  .guardian-quick-action-description {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.8);
+  }
+}
+
+@media (min-width: 768px) {
+  .guardian-quick-actions {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+  }
+}
+
+/* ==========================================================================
+   Guardian Bottom Navigation - Mobile
+   ========================================================================== */
+
+@media (max-width: 1023px) {
+  .guardian-bottom-nav,
+  .mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: white;
+    border-top: 1px solid #e5e7eb;
+    padding: 0.5rem;
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    justify-content: space-around;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+  }
+
+  .guardian-bottom-nav-item,
+  .mobile-bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    min-width: 60px;
+    min-height: 56px;
+    border-radius: 0.75rem;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    touch-action: manipulation;
+    flex: 1;
+    max-width: 80px;
+  }
+
+  .guardian-bottom-nav-item:active,
+  .mobile-bottom-nav-item:active {
+    transform: scale(0.95);
+  }
+
+  .guardian-bottom-nav-item.active,
+  .mobile-bottom-nav-item.active {
+    background: #ecfdf5;
+    color: #059669;
+  }
+
+  .guardian-bottom-nav-icon,
+  .mobile-bottom-nav-icon {
+    width: 24px;
+    height: 24px;
+    color: #9ca3af;
+    transition: color 0.2s ease;
+  }
+
+  .guardian-bottom-nav-item.active .guardian-bottom-nav-icon,
+  .mobile-bottom-nav-item.active .mobile-bottom-nav-icon {
+    color: #059669;
+  }
+
+  .guardian-bottom-nav-label,
+  .mobile-bottom-nav-label {
+    font-size: 0.625rem;
+    font-weight: 600;
+    color: #9ca3af;
+    transition: color 0.2s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .guardian-bottom-nav-item.active .guardian-bottom-nav-label,
+  .mobile-bottom-nav-item.active .mobile-bottom-nav-label {
+    color: #059669;
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-bottom-nav,
+  .mobile-bottom-nav {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   Guardian Forms - Mobile
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .guardian-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .guardian-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .guardian-form-label {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 0.25rem;
+  }
+
+  .guardian-form-input,
+  .guardian-form-select,
+  .guardian-form-textarea {
+    width: 100%;
+    min-height: 48px;
+    padding: 0.75rem 1rem;
+    font-size: 16px !important;
+    font-weight: 500;
+    border: 1px solid #d1d5db;
+    border-radius: 0.75rem;
+    background: white;
+    color: #1f2937;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .guardian-form-input:focus,
+  .guardian-form-select:focus,
+  .guardian-form-textarea:focus {
+    outline: none;
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+  }
+
+  .guardian-form-input::placeholder,
+  .guardian-form-textarea::placeholder {
+    color: #9ca3af;
+  }
+
+  /* Form helper text */
+  .guardian-form-helper {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #6b7280;
+    margin-top: 0.25rem;
+  }
+
+  /* Form error text */
+  .guardian-form-error {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #dc2626;
+    margin-top: 0.25rem;
+  }
+
+  /* Form row - stack on mobile */
+  .guardian-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  /* Form actions */
+  .guardian-form-actions {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    margin-top: 2rem;
+    justify-content: center;
+  }
+
+  .guardian-form-actions .guardian-btn {
+    flex: 1;
+    min-height: 44px;
+  }
+}
+
+@media (min-width: 768px) {
+  .guardian-form-row {
+    flex-direction: row;
+    gap: 1rem;
+  }
+
+  .guardian-form-row > * {
+    flex: 1;
+  }
+
+  .guardian-form-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+
+  .guardian-form-actions .guardian-btn {
+    width: auto;
+    min-width: 120px;
+  }
+}
+
+/* ==========================================================================
+   Guardian Typography - Mobile Scaling
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .guardian-heading-1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: #1f2937;
+  }
+
+  .guardian-heading-2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: #1f2937;
+  }
+
+  .guardian-heading-3 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    line-height: 1.4;
+    color: #1f2937;
+  }
+
+  .guardian-body {
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.6;
+    color: #374151;
+  }
+
+  .guardian-body-sm {
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.5;
+    color: #6b7280;
+  }
+
+  .guardian-caption {
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.5;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* Ensure text is not clipped */
+  .guardian-heading-1,
+  .guardian-heading-2,
+  .guardian-heading-3,
+  .guardian-body,
+  .guardian-body-sm {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    hyphens: auto;
+    -webkit-hyphens: auto;
+  }
+}
+
+/* ==========================================================================
+   Guardian Alerts - Mobile
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .guardian-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-radius: 1rem;
+    min-height: 44px;
+  }
+
+  .guardian-alert-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .guardian-alert-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .guardian-alert-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #1f2937;
+  }
+
+  .guardian-alert-message {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #6b7280;
+    margin-top: 0.25rem;
+  }
+
+  .guardian-alert-action {
+    margin-top: 0.75rem;
+    min-height: 44px;
+    font-weight: 700;
+  }
+}
+
+/* ==========================================================================
+   Guardian Empty States - Mobile
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .guardian-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    text-align: center;
+    background: white;
+    border-radius: 1rem;
+    border: 1px solid #e5e7eb;
+  }
+
+  .guardian-empty-state-icon {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 1rem;
+    color: #d1d5db;
+  }
+
+  .guardian-empty-state-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+  }
+
+  .guardian-empty-state-description {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #6b7280;
+    margin-bottom: 1rem;
+    max-width: 280px;
+  }
+
+  .guardian-empty-state-action {
+    min-height: 48px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 700;
+  }
+}
+
+/* ==========================================================================
+   Guardian Loading States - Mobile
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .guardian-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    min-height: 200px;
+  }
+
+  .guardian-loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #e5e7eb;
+    border-top-color: #10b981;
+    border-radius: 50%;
+    animation: guardian-spin 0.8s linear infinite;
+  }
+
+  .guardian-loading-text {
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #6b7280;
+  }
+}
+
+@keyframes guardian-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ==========================================================================
+   Guardian Safe Area Insets (iOS)
+   ========================================================================== */
+
+@supports (padding: env(safe-area-inset-bottom, 0px)) {
+  .guardian-bottom-nav,
+  .mobile-bottom-nav {
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .guardian-main-content {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ==========================================================================
+   Guardian Animations - Mobile
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .guardian-fade-in {
+    animation: guardianFadeIn 0.2s ease-out;
+  }
+
+  @keyframes guardianFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .guardian-slide-up {
+    animation: guardianSlideUp 0.3s ease-out;
+  }
+
+  @keyframes guardianSlideUp {
+    from {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .guardian-fade-in,
+  .guardian-slide-up,
+  .guardian-loading-spinner {
+    animation: none;
+  }
+
+  .guardian-sidebar {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   Form Styling Fixes - Comprehensive
+   ========================================================================== */
+
+/* Ensure all form elements have proper spacing and visibility */
+.guardian-form-input,
+.guardian-form-select,
+.guardian-form-textarea,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="number"],
+input[type="date"],
+select,
+textarea {
+  /* Prevent text clipping */
+  line-height: 1.5;
+  text-overflow: ellipsis;
+
+  /* Ensure proper box sizing */
+  box-sizing: border-box;
+
+  /* Better text rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Focus states for accessibility */
+.guardian-form-input:focus-visible,
+.guardian-form-select:focus-visible,
+.guardian-form-textarea:focus-visible {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
+}
+
+/* Disabled states */
+.guardian-form-input:disabled,
+.guardian-form-select:disabled,
+.guardian-form-textarea:disabled {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* Invalid states */
+.guardian-form-input:invalid,
+.guardian-form-input.guardian-form-input--error {
+  border-color: #dc2626;
+}
+
+.guardian-form-input:invalid:focus,
+.guardian-form-input.guardian-form-input--error:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+/* ==========================================================================
+     Guardian Page Layout Standardization - Mobile Reference Design Match
+     Standardized spacing for all Guardian Dashboard modules
+     Reference: screenshots/guardian dashboard design on mobile size.png
+     ========================================================================== */
+
+/* Base page wrapper - applies to all guardian pages */
+.guardian-page-wrapper {
+  width: 100%;
+  min-height: 100vh;
+  background-color: var(--theme-bg-primary, #f9fafb);
+  transition: background-color 200ms ease;
+}
+
+.dark .guardian-page-wrapper {
+  background-color: var(--theme-bg-primary, #111827);
+}
+
+/* Standardized page content container - MOBILE FIRST */
+.guardian-page-content {
+  width: 100%;
+  max-width: 1280px; /* max-w-7xl */
+  margin-left: auto;
+  margin-right: auto;
+  /* Mobile: Adequate side margins (16px = 1rem), minimal top margin */
+  /* Reference design shows content starts just below header with minimal gap */
+  padding-left: 16px;  /* px-4 */
+  padding-right: 16px; /* px-4 */
+  padding-top: 12px; /* Just enough space from top - not too far, not too close */
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); /* Space for bottom nav + safe area */
+}
+
+/* Extra Small mobile screens (320px - 374px) - maintain proper spacing */
+@media (max-width: 374px) {
+  .guardian-page-content {
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 8px; /* Minimal but presentable gap from top */
+  }
+}
+
+/* Small mobile screens (375px - 413px) - iPhone standard */
+@media (min-width: 375px) and (max-width: 413px) {
+  .guardian-page-content {
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 12px; /* Presentable spacing from header */
+  }
+}
+
+/* Medium mobile screens (414px - 767px) - larger phones */
+@media (min-width: 414px) and (max-width: 767px) {
+  .guardian-page-content {
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-top: 16px; /* Slightly more space on larger phones */
+  }
+}
+
+/* Tablet breakpoint (768px - 1023px) */
+@media (min-width: 768px) {
+  .guardian-page-content {
+    padding-left: 24px;  /* px-6 */
+    padding-right: 24px; /* px-6 */
+    padding-top: 20px;
+    padding-bottom: 24px;
+  }
+}
+
+/* Desktop breakpoint (>= 1024px) */
+@media (min-width: 1024px) {
+  .guardian-page-content {
+    /* Removed horizontal padding to allow full-width content on desktop */
+    padding-left: 0;
+    padding-right: 0;
+    padding-top: 24px;
+    padding-bottom: 24px;
+    /* Remove max-width constraint for full-width utilization */
+    max-width: none;
+  }
+}
+
+/* Ensure content doesn't touch viewport edges on very small screens */
+@media (max-width: 359px) {
+  .guardian-page-content {
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 8px;
+  }
+}
+
+/* Dark mode support for page content */
+.dark .guardian-page-content {
+  color: #f9fafb;
+}
+
+/* Transition for smooth theme switching */
+.guardian-page-wrapper,
+.guardian-page-content {
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+/* ==========================================================================
+   Print Styles
+   ========================================================================== */
+
+@media print {
+  .guardian-bottom-nav,
+  .mobile-bottom-nav,
+  .guardian-sidebar,
+  .guardian-sidebar-overlay,
+  .guardian-menu-btn,
+  .guardian-hamburger-btn {
+    display: none !important;
+  }
+
+  .guardian-main-content {
+    margin-left: 0;
+    padding: 0;
+  }
+
+  .guardian-card {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid #e5e7eb;
+  }
+}

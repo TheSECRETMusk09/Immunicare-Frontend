@@ -1,0 +1,625 @@
+/* ==========================================================================
+   Vaccine Inventory Status Indicators
+   Immunicare Vaccination Management System
+   ========================================================================== */
+
+/* ==========================================================================
+   Inventory Status Badges
+   ========================================================================== */
+
+.inventory-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.inventory-status--in-stock {
+  background-color: var(--color-secondary-100);
+  color: var(--color-secondary-700);
+}
+
+.inventory-status--low-stock {
+  background-color: var(--color-warning-100);
+  color: var(--color-warning-700);
+}
+
+.inventory-status--critical {
+  background-color: var(--color-danger-100);
+  color: var(--color-danger-700);
+}
+
+.inventory-status--out-of-stock {
+  background-color: var(--color-danger-50);
+  color: var(--color-danger-700);
+  border: 1px solid var(--color-danger-200);
+}
+
+.inventory-status--expiring {
+  background-color: var(--color-warning-100);
+  color: var(--color-warning-700);
+}
+
+.inventory-status--expired {
+  background-color: var(--color-danger-100);
+  color: var(--color-danger-700);
+}
+
+.inventory-status--overstocked {
+  background-color: var(--color-info-100);
+  color: var(--color-info-700);
+}
+
+.inventory-status--pending {
+  background-color: var(--color-neutral-100);
+  color: var(--color-neutral-700);
+}
+
+.inventory-status--discontinued {
+  background-color: var(--color-neutral-50);
+  color: var(--color-neutral-500);
+  text-decoration: line-through;
+}
+
+/* Status Icons */
+.inventory-status__icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.inventory-status--in-stock .inventory-status__icon {
+  color: var(--color-secondary-600);
+}
+
+.inventory-status--low-stock .inventory-status__icon {
+  color: var(--color-warning-600);
+}
+
+.inventory-status--critical .inventory-status__icon {
+  color: var(--color-danger-600);
+}
+
+.inventory-status--out-of-stock .inventory-status__icon {
+  color: var(--color-danger-600);
+}
+
+/* ==========================================================================
+   Stock Level Indicators
+   ========================================================================== */
+
+.stock-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.stock-indicator__bar-container {
+  flex: 1;
+  height: 8px;
+  background-color: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.stock-indicator__bar {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width var(--transition-normal);
+}
+
+.stock-indicator__bar--high {
+  background-color: var(--color-secondary-500);
+}
+
+.stock-indicator__bar--medium {
+  background-color: var(--color-warning-500);
+}
+
+.stock-indicator__bar--low {
+  background-color: var(--color-danger-500);
+}
+
+.stock-indicator__value {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  min-width: 60px;
+  text-align: right;
+}
+
+.stock-indicator__value--high {
+  color: var(--color-secondary-600);
+}
+
+.stock-indicator__value--medium {
+  color: var(--color-warning-600);
+}
+
+.stock-indicator__value--low {
+  color: var(--color-danger-600);
+}
+
+/* ==========================================================================
+   Stock Level Gauge
+   ========================================================================== */
+
+.stock-gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.stock-gauge__circle {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
+.stock-gauge__bg {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-full);
+  background-color: var(--color-bg-tertiary);
+}
+
+.stock-gauge__progress {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-full);
+  background: conic-gradient(
+    var(--color-primary-500) 0deg,
+    var(--color-primary-500) var(--progress),
+    transparent var(--progress)
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 8px),
+    black calc(100% - 8px)
+  );
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 8px),
+    black calc(100% - 8px)
+  );
+}
+
+.stock-gauge__content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-bg-primary);
+  border-radius: var(--radius-full);
+}
+
+.stock-gauge__value {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  line-height: 1;
+}
+
+.stock-gauge__label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.stock-gauge__status {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+}
+
+/* ==========================================================================
+   Vaccine Card Component
+   ========================================================================== */
+
+.vaccine-card {
+  background-color: var(--color-bg-primary);
+  border: var(--border-width) solid var(--color-border-light);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  transition: all var(--transition-fast);
+}
+
+.vaccine-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-primary-300);
+}
+
+.vaccine-card--alert {
+  border-color: var(--color-danger-300);
+  background-color: var(--color-danger-50);
+}
+
+.vaccine-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.vaccine-card__info {
+  flex: 1;
+}
+
+.vaccine-card__name {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.vaccine-card__manufacturer {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.vaccine-card__status {
+  flex-shrink: 0;
+}
+
+.vaccine-card__body {
+  margin-bottom: var(--space-4);
+}
+
+.vaccine-card__stock {
+  margin-bottom: var(--space-3);
+}
+
+.vaccine-card__stock-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-1);
+}
+
+.vaccine-card__details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+.vaccine-card__detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.vaccine-card__detail-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.vaccine-card__detail-value {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.vaccine-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-4);
+  border-top: var(--border-width) solid var(--color-border-light);
+}
+
+.vaccine-card__expiry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.vaccine-card__expiry--warning {
+  color: var(--color-warning-600);
+}
+
+.vaccine-card__expiry--danger {
+  color: var(--color-danger-600);
+}
+
+.vaccine-card__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* ==========================================================================
+   Stock Alert Component
+   ========================================================================== */
+
+.stock-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-bg-primary);
+  border: var(--border-width) solid var(--color-border-light);
+}
+
+.stock-alert--warning {
+  background-color: var(--color-warning-50);
+  border-color: var(--color-warning-200);
+}
+
+.stock-alert--danger {
+  background-color: var(--color-danger-50);
+  border-color: var(--color-danger-200);
+}
+
+.stock-alert--info {
+  background-color: var(--color-info-50);
+  border-color: var(--color-info-200);
+}
+
+.stock-alert__icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.stock-alert--warning .stock-alert__icon {
+  color: var(--color-warning-600);
+}
+
+.stock-alert--danger .stock-alert__icon {
+  color: var(--color-danger-600);
+}
+
+.stock-alert--info .stock-alert__icon {
+  color: var(--color-info-600);
+}
+
+.stock-alert__content {
+  flex: 1;
+}
+
+.stock-alert__title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.stock-alert__message {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-2);
+}
+
+.stock-alert__details {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.stock-alert__action {
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Inventory Dashboard Widgets
+   ========================================================================== */
+
+.inventory-widget {
+  background-color: var(--color-bg-primary);
+  border: var(--border-width) solid var(--color-border-light);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+}
+
+.inventory-widget__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.inventory-widget__title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.inventory-widget__body {
+  margin-bottom: var(--space-4);
+}
+
+.inventory-widget__stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) 0;
+  border-bottom: var(--border-width) solid var(--color-border-light);
+}
+
+.inventory-widget__stat:last-child {
+  border-bottom: none;
+}
+
+.inventory-widget__stat-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.inventory-widget__stat-value {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.inventory-widget__footer {
+  padding-top: var(--space-4);
+  border-top: var(--border-width) solid var(--color-border-light);
+}
+
+/* ==========================================================================
+   Stock Movement Timeline
+   ========================================================================== */
+
+.stock-timeline {
+  position: relative;
+  padding-left: var(--space-8);
+}
+
+.stock-timeline::before {
+  content: "";
+  position: absolute;
+  left: var(--space-3);
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: var(--color-border-light);
+}
+
+.stock-timeline__item {
+  position: relative;
+  padding-bottom: var(--space-5);
+}
+
+.stock-timeline__item:last-child {
+  padding-bottom: 0;
+}
+
+.stock-timeline__item::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--space-5));
+  top: var(--space-1);
+  width: var(--space-3);
+  height: var(--space-3);
+  border-radius: var(--radius-full);
+  background-color: var(--color-bg-primary);
+  border: 2px solid var(--color-primary-500);
+}
+
+.stock-timeline__item--in::before {
+  border-color: var(--color-secondary-500);
+  background-color: var(--color-secondary-500);
+}
+
+.stock-timeline__item--out::before {
+  border-color: var(--color-warning-500);
+}
+
+.stock-timeline__item--adjustment::before {
+  border-color: var(--color-info-500);
+}
+
+.stock-timeline__date {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-1);
+}
+
+.stock-timeline__title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.stock-timeline__details {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  display: flex;
+  gap: var(--space-3);
+}
+
+/* ==========================================================================
+   Expiry Warning Component
+   ========================================================================== */
+
+.expiry-warning {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-warning-50);
+  border: 1px solid var(--color-warning-200);
+  border-radius: var(--radius-lg);
+}
+
+.expiry-warning__icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  color: var(--color-warning-600);
+}
+
+.expiry-warning__content {
+  flex: 1;
+}
+
+.expiry-warning__title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-warning-800);
+  margin-bottom: var(--space-0-5);
+}
+
+.expiry-warning__message {
+  font-size: var(--font-size-xs);
+  color: var(--color-warning-700);
+}
+
+/* ==========================================================================
+   Responsive Inventory Styles
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .vaccine-card {
+    padding: var(--space-4);
+  }
+
+  .vaccine-card__details {
+    grid-template-columns: 1fr;
+  }
+
+  .stock-alert {
+    flex-direction: column;
+  }
+
+  .stock-alert__action {
+    width: 100%;
+  }
+
+  .stock-gauge__circle {
+    width: 60px;
+    height: 60px;
+  }
+
+  .stock-gauge__value {
+    font-size: var(--font-size-lg);
+  }
+}
+
+@media (max-width: 480px) {
+  .inventory-status {
+    padding: var(--space-1) var(--space-2);
+    font-size: 10px;
+  }
+
+  .stock-indicator {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .stock-indicator__bar-container {
+    width: 100%;
+  }
+
+  .stock-indicator__value {
+    text-align: left;
+  }
+}

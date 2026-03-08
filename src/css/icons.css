@@ -1,0 +1,502 @@
+/* ==========================================================================
+   Icon Fixes for Lucide React Icons
+   Production-ready icon styling for React 19 + Tailwind CSS
+   ========================================================================== */
+
+/* ==========================================================================
+   Base Icon Styles - Ensure all SVG icons render properly
+   ========================================================================== */
+
+/* Root level icon styles with maximum specificity */
+:root {
+  --icon-size-sm: 1rem;
+  --icon-size-md: 1.25rem;
+  --icon-size-lg: 1.5rem;
+  --icon-size-xl: 2rem;
+  --icon-size-2xl: 2.5rem;
+  --icon-size-3xl: 3rem;
+}
+
+/* Core icon display rules - essential for React 19 */
+.lucide,
+.lucide-react,
+[data-lucide],
+svg[class*="lucide"],
+svg[data-lucide],
+.lucide svg,
+.lucide-react svg {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 1em !important;
+  height: 1em !important;
+  min-width: 1em !important;
+  min-height: 1em !important;
+  stroke-width: 2 !important;
+  stroke: currentColor !important;
+  fill: none !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  overflow: visible !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+}
+
+/* ==========================================================================
+   Icon Size Utilities
+   ========================================================================== */
+
+.icon-sm .lucide,
+.icon-sm .lucide-react,
+.icon-sm svg[class*="lucide"],
+.lucide.icon-sm,
+.lucide-react.icon-sm {
+  width: var(--icon-size-sm) !important;
+  height: var(--icon-size-sm) !important;
+  min-width: var(--icon-size-sm) !important;
+  min-height: var(--icon-size-sm) !important;
+}
+
+.icon-md .lucide,
+.icon-md .lucide-react,
+.icon-md svg[class*="lucide"],
+.lucide.icon-md,
+.lucide-react.icon-md {
+  width: var(--icon-size-md) !important;
+  height: var(--icon-size-md) !important;
+  min-width: var(--icon-size-md) !important;
+  min-height: var(--icon-size-md) !important;
+}
+
+.icon-lg .lucide,
+.icon-lg .lucide-react,
+.icon-lg svg[class*="lucide"],
+.lucide.icon-lg,
+.lucide-react.icon-lg {
+  width: var(--icon-size-lg) !important;
+  height: var(--icon-size-lg) !important;
+  min-width: var(--icon-size-lg) !important;
+  min-height: var(--icon-size-lg) !important;
+}
+
+.icon-xl .lucide,
+.icon-xl .lucide-react,
+.icon-xl svg[class*="lucide"],
+.lucide.icon-xl,
+.lucide-react.icon-xl {
+  width: var(--icon-size-xl) !important;
+  height: var(--icon-size-xl) !important;
+  min-width: var(--icon-size-xl) !important;
+  min-height: var(--icon-size-xl) !important;
+}
+
+/* ==========================================================================
+   Common Width/Height Classes (Tailwind w-* and h-* compatibility)
+   ========================================================================== */
+
+/* w-4 h-4 = 1rem */
+.w-4.h-4 .lucide,
+.w-4.h-4 .lucide-react,
+.w-4.h-4 svg[class*="lucide"],
+.w-4 .lucide.w-4,
+.w-4 .lucide-react.w-4,
+.w-4 svg[class*="lucide"].w-4 {
+  width: 1rem !important;
+  height: 1rem !important;
+}
+
+/* w-5 h-5 = 1.25rem */
+.w-5.h-5 .lucide,
+.w-5.h-5 .lucide-react,
+.w-5.h-5 svg[class*="lucide"],
+.w-5 .lucide.w-5,
+.w-5 .lucide-react.w-5,
+.w-5 svg[class*="lucide"].w-5 {
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+}
+
+/* w-6 h-6 = 1.5rem */
+.w-6.h-6 .lucide,
+.w-6.h-6 .lucide-react,
+.w-6.h-6 svg[class*="lucide"],
+.w-6 .lucide.w-6,
+.w-6 .lucide-react.w-6,
+.w-6 svg[class*="lucide"].w-6 {
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+}
+
+/* w-7 h-7 = 1.75rem */
+.w-7.h-7 .lucide,
+.w-7.h-7 .lucide-react,
+.w-7.h-7 svg[class*="lucide"],
+.w-7 .lucide.w-7,
+.w-7 .lucide-react.w-7,
+.w-7 svg[class*="lucide"].w-7 {
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+}
+
+/* w-8 h-8 = 2rem */
+.w-8.h-8 .lucide,
+.w-8.h-8 .lucide-react,
+.w-8.h-8 svg[class*="lucide"],
+.w-8 .lucide.w-8,
+.w-8 .lucide-react.w-8,
+.w-8 svg[class*="lucide"].w-8 {
+  width: 2rem !important;
+  height: 2rem !important;
+}
+
+/* w-10 h-10 = 2.5rem */
+.w-10.h-10 .lucide,
+.w-10.h-10 .lucide-react,
+.w-10.h-10 svg[class*="lucide"],
+.w-10 .lucide.w-10,
+.w-10 .lucide-react.w-10,
+.w-10 svg[class*="lucide"].w-10 {
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+}
+
+/* w-12 h-12 = 3rem */
+.w-12.h-12 .lucide,
+.w-12.h-12 .lucide-react,
+.w-12.h-12 svg[class*="lucide"],
+.w-12 .lucide.w-12,
+.w-12 .lucide-react.w-12,
+.w-12 svg[class*="lucide"].w-12 {
+  width: 3rem !important;
+  height: 3rem !important;
+}
+
+/* w-16 h-16 = 4rem */
+.w-16.h-16 .lucide,
+.w-16.h-16 .lucide-react,
+.w-16.h-16 svg[class*="lucide"],
+.w-16 .lucide.w-16,
+.w-16 .lucide-react.w-16,
+.w-16 svg[class*="lucide"].w-16 {
+  width: 4rem !important;
+  height: 4rem !important;
+}
+
+/* ==========================================================================
+   Icon Container Styles
+   ========================================================================== */
+
+.icon-container {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: var(--icon-size-xl) !important;
+  height: var(--icon-size-xl) !important;
+  flex-shrink: 0 !important;
+}
+
+.icon-container .lucide,
+.icon-container .lucide-react,
+.icon-container svg[class*="lucide"] {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+}
+
+/* ==========================================================================
+   Sidebar Icon Styles
+   ========================================================================== */
+
+aside .lucide,
+aside .lucide-react,
+aside svg[class*="lucide"],
+.sidebar .lucide,
+.sidebar .lucide-react,
+.sidebar svg[class*="lucide"],
+[data-testid="sidebar"] .lucide,
+[data-testid="sidebar"] .lucide-react,
+[data-testid="sidebar"] svg[class*="lucide"] {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+  min-width: 1.25rem !important;
+  min-height: 1.25rem !important;
+  flex-shrink: 0 !important;
+  overflow: visible !important;
+}
+
+/* ==========================================================================
+   Button Icon Styles
+   ========================================================================== */
+
+button .lucide,
+button .lucide-react,
+button svg[class*="lucide"],
+.btn .lucide,
+.btn .lucide-react,
+.btn svg[class*="lucide"],
+[role="button"] .lucide,
+[role="button"] .lucide-react,
+[role="button"] svg[class*="lucide"] {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 1.25em !important;
+  height: 1.25em !important;
+  flex-shrink: 0 !important;
+}
+
+/* ==========================================================================
+   Card and Container Icon Styles
+   ========================================================================== */
+
+.card .lucide,
+.card .lucide-react,
+.card svg[class*="lucide"],
+[class*="card"] .lucide,
+[class*="card"] .lucide-react,
+[class*="card"] svg[class*="lucide"],
+.bg-primary .lucide,
+.bg-primary .lucide-react,
+.bg-primary svg[class*="lucide"],
+.bg-secondary .lucide,
+.bg-secondary .lucide-react,
+.bg-secondary svg[class*="lucide"],
+.bg-success .lucide,
+.bg-success .lucide-react,
+.bg-success svg[class*="lucide"],
+.bg-warning .lucide,
+.bg-warning .lucide-react,
+.bg-warning svg[class*="lucide"],
+.bg-danger .lucide,
+.bg-danger .lucide-react,
+.bg-danger svg[class*="lucide"],
+.bg-info .lucide,
+.bg-info .lucide-react,
+.bg-info svg[class*="lucide"],
+[class*="bg-"] .lucide,
+[class*="bg-"] .lucide-react,
+[class*="bg-"] svg[class*="lucide"] {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+/* ==========================================================================
+   Flex Container Icon Styles
+   ========================================================================== */
+
+.flex .lucide,
+.flex .lucide-react,
+.flex svg[class*="lucide"],
+.flex.items-center .lucide,
+.flex.items-center .lucide-react,
+.flex.items-center svg[class*="lucide"],
+.flex.items-center.justify-center .lucide,
+.flex.items-center.justify-center .lucide-react,
+.flex.items-center.justify-center svg[class*="lucide"] {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  width: auto !important;
+  height: auto !important;
+}
+
+/* ==========================================================================
+   Stats Card Icon Styles
+   ========================================================================== */
+
+.stats-card .lucide,
+.stats-card .lucide-react,
+.stats-card svg[class*="lucide"],
+[class*="stats"] .lucide,
+[class*="stats"] .lucide-react,
+[class*="stats"] svg[class*="lucide"],
+.stat-card .lucide,
+.stat-card .lucide-react,
+.stat-card svg[class*="lucide"] {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+  flex-shrink: 0 !important;
+}
+
+/* ==========================================================================
+   Navigation and Menu Icon Styles
+   ========================================================================== */
+
+nav .lucide,
+nav .lucide-react,
+nav svg[class*="lucide"],
+.nav .lucide,
+.nav .lucide-react,
+.nav svg[class*="lucide"],
+[data-nav] .lucide,
+[data-nav] .lucide-react,
+[data-nav] svg[class*="lucide"] {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+  flex-shrink: 0 !important;
+}
+
+/* ==========================================================================
+   Mobile Bottom Navigation Icon Styles
+   ========================================================================== */
+
+.mobile-nav-patient .lucide,
+.mobile-nav-patient .lucide-react,
+.mobile-nav-patient svg[class*="lucide"],
+.mobile-nav-item-patient .lucide,
+.mobile-nav-item-patient .lucide-react,
+.mobile-nav-item-patient svg[class*="lucide"] {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+  flex-shrink: 0 !important;
+  margin-bottom: 0.25rem !important;
+}
+
+.mobile-nav-icon-patient.lucide,
+.mobile-nav-icon-patient.lucide-react,
+.mobile-nav-icon-patient svg[class*="lucide"] {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+  font-size: 1.5rem !important;
+  line-height: 1 !important;
+}
+
+/* ==========================================================================
+   Dark Mode Icon Fixes
+   ========================================================================== */
+
+.dark .lucide,
+.dark .lucide-react,
+.dark svg[class*="lucide"],
+[data-theme="dark"] .lucide,
+[data-theme="dark"] .lucide-react,
+[data-theme="dark"] svg[class*="lucide"] {
+  stroke: currentColor !important;
+}
+
+/* ==========================================================================
+   Tailwind Utilities Override (Maximum Specificity)
+   ========================================================================== */
+
+.\!inline-flex.lucide,
+.\!inline-flex.lucide-react,
+.inline-flex.lucide,
+.inline-flex.lucide-react {
+  display: inline-flex !important;
+}
+
+.\!w-4.lucide,
+.\!w-4.lucide-react,
+.\!w-5.lucide,
+.\!w-5.lucide-react,
+.\!w-6.lucide,
+.\!w-6.lucide-react,
+.w-4.lucide,
+.w-4.lucide-react,
+.w-5.lucide,
+.w-5.lucide-react,
+.w-6.lucide,
+.w-6.lucide-react {
+  display: inline-flex !important;
+  width: auto !important;
+  height: auto !important;
+}
+
+/* ==========================================================================
+   Browser-Specific Fixes
+   ========================================================================== */
+
+/* Safari/iOS fix */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+  .lucide,
+  .lucide-react,
+  svg[class*="lucide"] {
+    display: inline-flex !important;
+  }
+}
+
+/* Firefox fix */
+@-moz-document url-prefix() {
+  .lucide,
+  .lucide-react,
+  svg[class*="lucide"] {
+    display: inline-flex !important;
+  }
+}
+
+/* IE/Edge specific fixes - these are legacy browser support and may cause validation warnings
+   The @-ms-high-contrast media query is IE/Edge specific and not recognized by all validators
+   Modern browsers support @media (prefers-contrast: active) instead */
+
+/* ==========================================================================
+   Accessibility and Focus Styles
+   ========================================================================== */
+
+.lucide:focus,
+.lucide-react:focus,
+svg[class*="lucide"]:focus,
+.lucide:focus-visible,
+.lucide-react:focus-visible,
+svg[class*="lucide"]:focus-visible {
+  outline: 2px solid currentColor !important;
+  outline-offset: 2px !important;
+}
+
+/* ==========================================================================
+   Animation and Transition Fixes
+   ========================================================================== */
+
+.lucide,
+.lucide-react,
+svg[class*="lucide"] {
+  transition: color 0.2s ease-in-out !important;
+}
+
+/* ==========================================================================
+   Force Display for Hidden Icons
+   ========================================================================== */
+
+[style*="display:none"] .lucide,
+[style*="display: none"] .lucide,
+[style*="display:none"] .lucide-react,
+[style*="display: none"] .lucide-react,
+[style*="display:none"] svg[class*="lucide"],
+[style*="display: none"] svg[class*="lucide"] {
+  display: none !important;
+}
+
+/* ==========================================================================
+   Emergency Fallback Styles
+   ========================================================================== */
+
+/* Fallback for icons that might still be blank - adds a visible indicator */
+.icon-blank-fallback {
+  background: currentColor !important;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3C/svg%3E") !important;
+  mask-repeat: no-repeat !important;
+  mask-position: center !important;
+  mask-size: contain !important;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3C/svg%3E") !important;
+  -webkit-mask-repeat: no-repeat !important;
+  -webkit-mask-position: center !important;
+  -webkit-mask-size: contain !important;
+}

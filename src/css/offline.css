@@ -1,0 +1,468 @@
+/* ==========================================================================
+   Offline Support & PWA Styles
+   Immunicare Vaccination Management System
+   ========================================================================== */
+
+/* ==========================================================================
+   Offline Indicator
+   ========================================================================== */
+.offline-indicator {
+  position: fixed;
+  top: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-popover);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-warning-500);
+  color: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  animation: slideDown var(--transition-normal) ease-out;
+}
+
+.offline-indicator-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.offline-indicator.hidden {
+  display: none;
+}
+
+/* ==========================================================================
+   Offline Mode Styles
+   ========================================================================== */
+.offline-mode {
+  /* Adjustments for offline mode */
+}
+
+.offline-mode .online-only {
+  display: none !important;
+}
+
+.offline-mode .offline-only {
+  display: flex !important;
+}
+
+/* ==========================================================================
+   Cached Content Indicator
+   ========================================================================== .cached-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  padding: var(--space-1) var(--space-2);
+  background-color: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+}
+
+.cached-indicator-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* ==========================================================================
+   Sync Indicator
+   ========================================================================== */
+.sync-indicator {
+  position: fixed;
+  bottom: var(--space-4);
+  right: var(--space-4);
+  z-index: var(--z-popover);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--font-size-sm);
+  animation: slideInRight var(--transition-normal) ease-out;
+}
+
+.sync-indicator.syncing .sync-indicator-spinner {
+  animation: spin 1s linear infinite;
+}
+
+.sync-indicator.success {
+  border-color: var(--color-secondary-500);
+}
+
+.sync-indicator.error {
+  border-color: var(--color-danger-500);
+}
+
+.sync-indicator-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.sync-indicator-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-border-light);
+  border-top-color: var(--color-primary-500);
+  border-radius: 50%;
+}
+
+.sync-indicator.hidden {
+  display: none;
+}
+
+/* ==========================================================================
+   Offline Fallback Content
+   ========================================================================== */
+.offline-fallback {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-12);
+  text-align: center;
+}
+
+.offline-mode .offline-fallback {
+  display: flex;
+}
+
+.offline-fallback-icon {
+  width: 80px;
+  height: 80px;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-6);
+}
+
+.offline-fallback-title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.offline-fallback-description {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-6);
+  max-width: 400px;
+}
+
+.offline-fallback-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+/* ==========================================================================
+   Data Caching Badge
+   ========================================================================== */
+.cached-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-size-xs);
+  background-color: var(--color-secondary-100);
+  color: var(--color-secondary-700);
+  border-radius: var(--radius-md);
+}
+
+.cached-badge-icon {
+  width: 12px;
+  height: 12px;
+}
+
+/* ==========================================================================
+   Last Synced Indicator
+   ========================================================================== */
+.last-synced {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.last-synced-label {
+  margin-right: var(--space-1);
+}
+
+/* ==========================================================================
+   Pending Sync Indicator
+   ========================================================================== */
+.pending-sync {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--color-warning-50);
+  border: 1px solid var(--color-warning-200);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  color: var(--color-warning-700);
+}
+
+.pending-sync-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background-color: var(--color-warning-500);
+  color: white;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: var(--font-weight-bold);
+}
+
+/* ==========================================================================
+   PWA Install Prompt
+   ========================================================================== */
+.pwa-install-prompt {
+  position: fixed;
+  bottom: var(--space-4);
+  left: var(--space-4);
+  right: var(--space-4);
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  animation: slideUp var(--transition-normal) ease-out;
+}
+
+.pwa-install-prompt.hidden {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .pwa-install-prompt {
+    left: auto;
+    max-width: 400px;
+  }
+}
+
+.pwa-install-icon {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-500),
+    var(--color-primary-700)
+  );
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  flex-shrink: 0;
+}
+
+.pwa-install-content {
+  flex: 1;
+}
+
+.pwa-install-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.pwa-install-description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.pwa-install-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.pwa-install-close {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.pwa-install-close:hover {
+  background-color: var(--color-bg-tertiary);
+}
+
+/* ==========================================================================
+   Network Status Banner
+   ========================================================================== */
+.network-status-banner {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--font-size-sm);
+  text-align: center;
+  display: none;
+}
+
+.network-status-banner.offline {
+  display: block;
+  background-color: var(--color-warning-50);
+  color: var(--color-warning-700);
+  border-bottom: 1px solid var(--color-warning-200);
+}
+
+.network-status-banner.slow {
+  display: block;
+  background-color: var(--color-primary-50);
+  color: var(--color-primary-700);
+  border-bottom: 1px solid var(--color-primary-200);
+}
+
+/* ==========================================================================
+   Service Worker Update Notification
+   ========================================================================== */
+.sw-update-notification {
+  position: fixed;
+  bottom: var(--space-4);
+  left: var(--space-4);
+  right: var(--space-4);
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-primary-200);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  animation: slideUp var(--transition-normal) ease-out;
+}
+
+.sw-update-notification.hidden {
+  display: none;
+}
+
+.sw-update-icon {
+  width: 40px;
+  height: 40px;
+  background-color: var(--color-primary-100);
+  color: var(--color-primary-600);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sw-update-content {
+  flex: 1;
+}
+
+.sw-update-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.sw-update-description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+@media (min-width: 640px) {
+  .sw-update-notification {
+    left: auto;
+    max-width: 400px;
+  }
+}
+
+/* ==========================================================================
+   Offline Data Placeholder
+   ========================================================================== */
+.offline-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 2px dashed var(--color-border-light);
+}
+
+.offline-placeholder-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-4);
+}
+
+.offline-placeholder-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+/* ==========================================================================
+   Connection Quality Indicator
+   ========================================================================== */
+.connection-quality {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.connection-quality-bar {
+  width: 4px;
+  background-color: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.connection-quality-bar-fill {
+  height: 100%;
+  background-color: var(--color-secondary-500);
+  border-radius: var(--radius-full);
+}
+
+.connection-quality-bar:nth-child(1) {
+  height: 6px;
+}
+.connection-quality-bar:nth-child(2) {
+  height: 10px;
+}
+.connection-quality-bar:nth-child(3) {
+  height: 14px;
+}
+.connection-quality-bar:nth-child(4) {
+  height: 18px;
+}
+
+.connection-quality.fast
+  .connection-quality-bar:nth-child(4)
+  .connection-quality-bar-fill {
+  background-color: var(--color-secondary-500);
+}
+
+.connection-quality.slow
+  .connection-quality-bar:nth-child(4)
+  .connection-quality-bar-fill {
+  background-color: var(--color-warning-500);
+}
+
+.connection-quality.offline .connection-quality-bar-fill {
+  background-color: var(--color-danger-500);
+}

@@ -68,3 +68,13 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/d
 ### `npm run build` fails to minify
 
 This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+
+### Development Tools Recommendation
+
+For a better development experience, we recommend installing:
+
+- **React Developer Tools**: [https://react.dev/link/react-devtools](https://react.dev/link/react-devtools)
+  This browser extension helps you inspect React component hierarchies, state, and props.
+
+- **Redux DevTools** (if using Redux): [https://redux.js.org/introduction/getting-started](https://redux.js.org/introduction/getting-started)
+  For debugging application state management.

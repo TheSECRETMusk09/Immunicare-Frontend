@@ -1,0 +1,1417 @@
+/* ==========================================================================
+   Guardian Mobile Responsive Fixes
+   Immunicare Vaccination Management System
+
+   Additional mobile responsiveness fixes for Guardian Dashboard
+   ========================================================================== */
+
+/* ==========================================================================
+   Base Mobile Overrides - Fix common overlapping issues
+   ========================================================================== */
+
+/* Prevent body scroll issues on mobile */
+@media (max-width: 767px) {
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+  @supports (-webkit-overflow-scrolling: touch) {
+    html, body { -webkit-overflow-scrolling: touch; }
+  }
+
+  /* Fix for content overflow */
+  #root {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+}
+
+/* ==========================================================================
+   Mobile Touch Targets - Ensure minimum 44px touch areas
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* All buttons have minimum touch target */
+  button,
+  .btn,
+  [role="button"],
+  a.button,
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"] {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+  }
+
+  /* Form buttons */
+  button[type="submit"],
+  button[type="button"],
+  input[type="submit"] {
+    min-height: 48px;
+  }
+
+  /* Icon-only buttons need larger touch targets */
+  button[class*="p-1"]:not(:has(span)),
+  button[class*="p-2"]:not(:has(span)),
+  button[class*="w-"]:not(:has(span)):not([class*="w-full"]) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Links */
+  a {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+/* ==========================================================================
+   Mobile Form Fixes
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Form inputs */
+  input,
+  select,
+  textarea {
+    min-height: 48px;
+    font-size: 16px !important; /* Prevents iOS zoom */
+  }
+
+  /* Checkboxes and radios need proper sizing */
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-width: 20px;
+    min-height: 20px;
+    width: 20px;
+    height: 20px;
+  }
+
+  /* Labels */
+  label {
+    min-height: 20px;
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+}
+
+/* ==========================================================================
+   Mobile Card Fixes
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Cards stack vertically */
+  .rounded-2xl,
+  .rounded-xl,
+  .rounded-lg {
+    border-radius: 1rem;
+  }
+
+  /* Card padding */
+  .p-4,
+  .p-5,
+  .p-6 {
+    padding: 1rem;
+  }
+
+  /* Card shadows */
+  .shadow-lg,
+  .shadow-xl,
+  .shadow-md {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* ==========================================================================
+   Mobile Grid Fixes
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Ensure grids don't overflow */
+  .grid {
+    overflow-x: hidden;
+  }
+
+  /* Full width on mobile */
+  .w-full {
+    width: 100%;
+    max-width: 100vw;
+  }
+
+  /* Fix for flex containers */
+  .flex {
+    flex-wrap: wrap;
+  }
+
+  /* Spacing on mobile */
+  .space-y-4 > * + *,
+  .space-y-5 > * + *,
+  .space-y-6 > * + * {
+    margin-top: 1rem;
+  }
+}
+
+/* ==========================================================================
+   Mobile Modal Fixes - Prevent overlapping
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Modal overlay */
+  [class*="modal-overlay"],
+  [class*="Modal-overlay"],
+  [role="dialog"] {
+    z-index: 10000 !important;
+  }
+
+  /* Modal content */
+  [class*="modal-content"],
+  [class*="Modal-content"],
+  [role="dialog"] > div {
+    max-height: 90vh;
+    max-height: 90dvh;
+    overflow-y: auto;
+  }
+  @supports (-webkit-overflow-scrolling: touch) {
+    [class*="modal-content"], [class*="Modal-content"], [role="dialog"] > div { -webkit-overflow-scrolling: touch; }
+  }
+}
+
+/* ==========================================================================
+   Mobile Navigation Fixes
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Bottom navigation - ensure it's above other content */
+  [class*="bottom-nav"],
+  [class*="BottomNav"],
+  nav[class*="fixed"] {
+    z-index: 9999;
+  }
+
+  /* Header */
+  header,
+  [class*="header"],
+  nav[class*="sticky"] {
+    z-index: 9990;
+    position: sticky;
+    top: 0;
+  }
+}
+
+/* ==========================================================================
+   Mobile Calendar Fixes - Guardian Appointments
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Calendar grid */
+  .grid-cols-7 {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.25rem;
+  }
+
+  /* Calendar cells */
+  [class*="calendar"] button,
+  [class*="calendar"] div[class*="min-h-"] {
+    min-height: 60px !important;
+    padding: 0.5rem;
+  }
+
+  /* Calendar day numbers */
+  [class*="calendar"] span:first-child {
+    font-size: 0.75rem;
+  }
+}
+
+/* ==========================================================================
+   Admin Calendar Styles (Matching Guardian Design)
+   ========================================================================== */
+
+/* Admin Calendar Container */
+.admin-calendar-container {
+  background: var(--color-bg-primary, #ffffff);
+  border-radius: 1rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+  overflow: hidden;
+}
+
+.dark .admin-calendar-container,
+[data-theme="dark"] .admin-calendar-container {
+  background: var(--color-bg-primary, #1f2937);
+  border-color: var(--color-border, #374151);
+}
+
+/* Calendar Legend */
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--color-bg-secondary, #f9fafb);
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+.dark .calendar-legend,
+[data-theme="dark"] .calendar-legend {
+  background: var(--color-bg-secondary, #111827);
+  border-color: var(--color-border, #374151);
+}
+
+.calendar-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.calendar-legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+.calendar-legend-color.weekend {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.dark .calendar-legend-color.weekend,
+[data-theme="dark"] .calendar-legend-color.weekend {
+  background-color: #374151;
+  border-color: #4b5563;
+}
+
+.calendar-legend-color.holiday {
+  background-color: #fef3c7;
+  border-color: #fbbf24;
+}
+
+.dark .calendar-legend-color.holiday,
+[data-theme="dark"] .calendar-legend-color.holiday {
+  background-color: rgba(251, 191, 36, 0.2);
+  border-color: #fbbf24;
+}
+
+.calendar-legend-color.today {
+  background-color: #dbeafe;
+  border-color: #3b82f6;
+}
+
+.dark .calendar-legend-color.today,
+[data-theme="dark"] .calendar-legend-color.today {
+  background-color: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+}
+
+/* Weekend cell specific styling */
+.calendar-cell-weekend {
+  background-color: #f9fafb !important;
+  border-color: #d1d5db !important;
+}
+
+.dark .calendar-cell-weekend,
+[data-theme="dark"] .calendar-cell-weekend {
+  background-color: #374151 !important;
+  border-color: #4b5563 !important;
+}
+
+/* Holiday cell specific styling */
+.calendar-cell-holiday {
+  background-color: #fef3c7 !important;
+  border-color: #fbbf24 !important;
+}
+
+.dark .calendar-cell-holiday,
+[data-theme="dark"] .calendar-cell-holiday {
+  background-color: rgba(251, 191, 36, 0.15) !important;
+  border-color: #fbbf24 !important;
+}
+
+/* Today highlight */
+.calendar-cell-today {
+  position: relative;
+}
+
+.calendar-cell-today::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  background-color: #3b82f6;
+  border-radius: 50%;
+}
+
+/* ==========================================================================
+   Mobile List Fixes
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* List items */
+  [class*="list"] > div,
+  [class*="List"] > div,
+  .space-y-2 > div,
+  .space-y-3 > div {
+    padding: 0.75rem;
+  }
+}
+
+/* ==========================================================================
+   Mobile Sidebar Fixes
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Sidebar */
+  [class*="sidebar"],
+  [class*="Sidebar"],
+  aside {
+    z-index: 9999;
+    position: fixed;
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  /* Sidebar overlay */
+  [class*="sidebar-overlay"],
+  [class*="Sidebar-overlay"] {
+    z-index: 9998;
+  }
+}
+
+/* ==========================================================================
+   iOS Specific Fixes
+   ========================================================================== */
+
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 767px) {
+    /* iOS Safari 100vh fix */
+    .min-h-screen,
+    .min-h-\[100vh\] {
+      min-height: -webkit-fill-available;
+      min-height: 100dvh;
+    }
+
+    /* iOS safe area */
+    .pb-safe {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* iOS input zoom prevention */
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="tel"],
+    input[type="url"],
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+}
+
+/* ==========================================================================
+    Prevent Horizontal Scroll
+    ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Prevent horizontal scroll */
+  * {
+    max-width: 100vw;
+    box-sizing: border-box;
+  }
+
+  /* Only apply overflow-x to containers, not all elements */
+  html, body, #root {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  /* Container fixes */
+  .container,
+  .max-w-7xl,
+  .max-w-6xl,
+  .max-w-5xl,
+  .max-w-4xl {
+    max-width: 100%;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Ensure guardian main content doesn't overflow on mobile */
+  .guardian-main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+  }
+}
+
+/* ==========================================================================
+   Responsive Font Sizes
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Smaller fonts on mobile */
+  .text-xl {
+    font-size: 1.25rem;
+  }
+
+  .text-lg {
+    font-size: 1rem;
+  }
+
+  .text-base {
+    font-size: 0.875rem;
+  }
+
+  .text-sm {
+    font-size: 0.75rem;
+  }
+
+  .text-xs {
+    font-size: 0.625rem;
+  }
+}
+
+/* ==========================================================================
+   Loading States
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Loading spinner */
+  .loading {
+    width: 2rem;
+    height: 2rem;
+  }
+}
+
+/* ==========================================================================
+   Print Styles - Hide Mobile Elements
+   ========================================================================== */
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  /* Hide navigation */
+  nav,
+  [class*="nav"],
+  [class*="sidebar"],
+  [class*="bottom-nav"] {
+    display: none !important;
+  }
+}
+
+/* ==========================================================================
+   Guardian Appointments Page Fixes
+   ========================================================================== */
+
+/* Calendar Grid - Fixed 6x7 layout for proper weekday alignment */
+.guardian-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(6, 1fr);
+  gap: 0.5rem;
+  padding: 0.5rem;
+  min-height: 360px;
+}
+
+@media (min-width: 640px) {
+  .guardian-calendar-grid {
+    gap: 0.75rem;
+    padding: 1rem;
+    min-height: 420px;
+  }
+}
+
+/* Calendar Cell Styling */
+.guardian-calendar-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  min-height: 60px;
+  padding: 0.5rem;
+  border: 1px solid;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+@media (min-width: 640px) {
+  .guardian-calendar-cell {
+    min-height: 70px;
+    padding: 0.75rem;
+  }
+}
+
+/* Weekend-specific styling */
+.guardian-calendar-cell[data-weekend="true"] {
+  background-color: rgba(229, 231, 235, 0.5);
+}
+
+.dark .guardian-calendar-cell[data-weekend="true"] {
+  background-color: rgba(55, 65, 81, 0.5);
+}
+
+/* Calendar Wrapper */
+.guardian-calendar-wrapper {
+  width: 100%;
+  overflow-x: hidden;
+  background: var(--color-bg-primary, #ffffff);
+  border-radius: 1rem;
+  padding: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .guardian-calendar-wrapper {
+    padding: 1rem;
+  }
+}
+
+/* Appointment Card */
+.guardian-appointment-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-primary, #ffffff);
+  border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+@media (min-width: 640px) {
+  .guardian-appointment-card {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+/* Appointments Grid */
+.guardian-appointments-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .guardian-appointments-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-appointments-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ==========================================================================
+   Guardian Login Page Fixes
+   ========================================================================== */
+
+.guardian-login-container {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background-color: var(--color-bg-secondary, #f3f4f6);
+}
+
+.guardian-login-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--color-bg-primary, #ffffff);
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  padding: 1.5rem;
+}
+
+@media (max-width: 480px) {
+  .guardian-login-card {
+    padding: 1.25rem;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  .guardian-login-container {
+    background-color: var(--color-bg-primary, #ffffff);
+    align-items: flex-start;
+    padding-top: 2rem;
+  }
+}
+
+/* ==========================================================================
+   Guardian Notifications Page Fixes
+   ========================================================================== */
+
+.guardian-notification-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.guardian-notification-item {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  background: var(--color-bg-primary, #ffffff);
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+  transition: background-color 0.2s;
+}
+
+.guardian-notification-item:active {
+  background-color: var(--color-bg-secondary, #f9fafb);
+}
+
+.guardian-notification-item.unread {
+  border-left: 4px solid var(--color-primary-500, #3b82f6);
+  background-color: var(--color-primary-50, #eff6ff);
+}
+
+.guardian-notification-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+}
+
+.guardian-notification-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--color-text-primary, #111827);
+}
+
+.guardian-notification-time {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #6b7280);
+  white-space: nowrap;
+  margin-left: 0.5rem;
+}
+
+.guardian-notification-body {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #4b5563);
+  margin-bottom: 0.75rem;
+}
+
+.guardian-notification-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .guardian-notification-item {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .guardian-notification-content {
+    flex: 1;
+    margin-right: 1rem;
+  }
+
+  .guardian-notification-header {
+    margin-bottom: 0.25rem;
+  }
+
+  .guardian-notification-body {
+    margin-bottom: 0;
+  }
+
+  .guardian-notification-actions {
+    flex-shrink: 0;
+  }
+}
+
+/* ==========================================================================
+   Guardian Settings Page Fixes
+   ========================================================================== */
+
+.guardian-settings-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-bottom: 2rem;
+}
+
+.guardian-settings-section {
+  background: var(--color-bg-primary, #ffffff);
+  border-radius: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+.guardian-settings-section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--color-text-primary, #111827);
+}
+
+.guardian-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.guardian-settings-row:last-child {
+  border-bottom: none;
+}
+
+/* Toggle Switch Enhancement for Touch */
+.guardian-toggle-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  cursor: pointer;
+  min-height: 44px; /* Touch target */
+}
+
+@media (min-width: 768px) {
+  .guardian-settings-section {
+    padding: 1.5rem;
+  }
+}
+
+/* ==========================================================================
+   My Children Page Fixes
+   ========================================================================== */
+
+.guardian-children-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .guardian-children-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-children-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Child Card Actions */
+.guardian-child-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+.guardian-child-actions button,
+.guardian-child-actions a {
+  width: 100%;
+  justify-content: center;
+}
+
+@media (min-width: 640px) {
+  .guardian-child-actions {
+    flex-direction: row;
+  }
+
+  .guardian-child-actions button,
+  .guardian-child-actions a {
+    width: auto;
+    flex: 1;
+  }
+}
+
+.guardian-child-info {
+  padding: 1rem;
+}
+
+/* ==========================================================================
+   Guardian Form Fixes
+   ========================================================================== */
+
+.guardian-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+}
+
+.guardian-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .guardian-form-row {
+    flex-direction: row;
+    gap: 1.5rem;
+  }
+
+  .guardian-form-row > * {
+    flex: 1;
+  }
+}
+
+.guardian-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0.75rem 1rem;
+  font-size: 16px; /* Prevent iOS zoom */
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.5rem;
+  background-color: var(--color-bg-primary, #ffffff);
+  color: var(--color-text-primary, #111827);
+}
+
+.guardian-input:focus {
+  outline: 2px solid var(--color-primary-500, #3b82f6);
+  outline-offset: -1px;
+}
+
+.guardian-btn {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+/* ==========================================================================
+   Guardian Immunization Chart Fixes
+   ========================================================================== */
+
+.guardian-chart-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 0.5rem;
+  background-color: var(--color-bg-secondary, #f9fafb);
+  border-radius: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .guardian-chart-legend {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    background-color: transparent;
+    padding: 0;
+  }
+}
+
+.guardian-chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #4b5563);
+}
+
+.guardian-chart-legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+    Guardian Z-Index Hierarchy (Mobile)
+    ========================================================================== */
+
+/* Ensure sidebar sub-items have proper spacing and don't overlap */
+.guardian-sidebar-subitems {
+  position: relative;
+  overflow: hidden;
+  background: transparent;
+  transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out;
+}
+
+/* Fix for sub-items overlapping with next navigation items */
+@media (max-width: 767px) {
+  .sidebar-link + .guardian-sidebar-subitems,
+  .guardian-sidebar-subitems + .sidebar-link {
+    margin-top: 0.25rem;
+  }
+
+  /* Ensure proper spacing in sidebar navigation */
+  .guardian-sidebar-content > div {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Fix navigation item positioning */
+  .guardian-sidebar-content > div[style*="animation-delay"] {
+    margin-bottom: 0.25rem;
+  }
+
+  /* Ensure header stays below sidebar/modals but above content */
+  .guardian-header {
+    z-index: 40 !important;
+  }
+
+  /* Sidebar and overlay */
+  .guardian-sidebar-overlay {
+    z-index: 9998 !important;
+  }
+
+  .guardian-sidebar {
+    z-index: 9999 !important;
+  }
+
+  /* Bottom navigation */
+  .guardian-bottom-nav {
+    z-index: 100 !important;
+  }
+
+  /* Modals */
+  .guardian-modal-overlay {
+    z-index: 10000 !important;
+  }
+
+  .guardian-modal {
+    z-index: 10001 !important;
+  }
+
+  /* Ensure sidebar toggle is clickable */
+  .guardian-menu-btn {
+    z-index: 50 !important;
+    position: relative;
+  }
+}
+
+/* ==========================================================================
+   Mobile Overflow Prevention - Guardian Dashboard
+   Ensures content never overflows viewport on mobile
+   ========================================================================== */
+
+@media (max-width: 639px) {
+  /* Prevent horizontal scroll on all Guardian pages */
+  .guardian-page-wrapper,
+  .guardian-dashboard {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  /* Ensure all direct children respect viewport width */
+  .guardian-page-content > * {
+    max-width: 100%;
+  }
+
+  /* Tables - horizontal scroll container */
+  .guardian-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Calendar specific - prevent overflow */
+  .guardian-calendar-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  /* FullCalendar mobile fixes */
+  .guardian-calendar-wrapper .fc {
+    min-width: 600px; /* Ensure calendar doesn't squash */
+  }
+
+  /* Cards - ensure they don't overflow */
+  .guardian-card,
+  .glassmorphism-card {
+    width: 100%;
+    max-width: 100%;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+  }
+
+  /* Form inputs - full width on mobile */
+  .guardian-form input,
+  .guardian-form select,
+  .guardian-form textarea,
+  .guardian-input {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  /* Grid adjustments for mobile */
+  .guardian-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  /* Two-column grids should stack on mobile */
+  .guardian-grid-2 {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  /* Ensure text doesn't overflow containers */
+  .guardian-text-wrap,
+  .guardian-card p,
+  .guardian-card h3,
+  .guardian-card h4 {
+    overflow-wrap: break-word;
+    word-break: break-word;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+  }
+
+  /* Stat cards should be full width on mobile */
+  .guardian-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  /* Appointment cards on mobile */
+  .guardian-appointment-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  /* Child cards on mobile */
+  .guardian-child-card {
+    width: 100%;
+  }
+
+  /* Prevent button overflow */
+  .guardian-btn,
+  .guardian-form-actions button {
+    max-width: 100%;
+    white-space: normal;
+    height: auto;
+    min-height: 44px;
+  }
+
+  /* Modal content should respect viewport */
+  .guardian-modal-content {
+    max-width: calc(100vw - 2rem);
+    margin: 1rem;
+  }
+
+  /* Chart container overflow */
+  .guardian-chart-scroll-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Immunization chart specific */
+  .guardian-chart-scroll-container > * {
+    min-width: 600px;
+  }
+}
+
+/* ==========================================================================
+   Tablet Adjustments (640px - 1023px)
+   ========================================================================== */
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .guardian-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+
+  .guardian-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+
+  .guardian-appointment-card {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+/* ==========================================================================
+   Desktop Layout (1024px+)
+   ========================================================================== */
+
+@media (min-width: 1024px) {
+  .guardian-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+  }
+
+  .guardian-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+
+  /* Sidebar layout adjustments */
+  .guardian-page-wrapper:has(.guardian-sidebar) .guardian-page-content {
+    margin-left: 280px; /* Sidebar width */
+  }
+}
+
+/* ==========================================================================
+   Mobile Bottom Navigation Spacing
+   Ensures content isn't obscured by bottom nav
+   ========================================================================== */
+
+@media (max-width: 1023px) {
+  /* Standard bottom padding for mobile */
+  .guardian-page-content {
+    padding-bottom: 7rem !important; /* 112px - accounts for 64px nav + safe area */
+  }
+
+  /* Additional spacing for last elements */
+  .guardian-page-content > *:last-child {
+    margin-bottom: 1rem;
+  }
+
+  /* Form actions need extra space */
+  .guardian-form-actions {
+    padding-bottom: 2rem;
+  }
+
+  /* Fixed elements should respect bottom nav */
+  .guardian-fixed-bottom {
+    bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Safe area support */
+@supports (padding: env(safe-area-inset-bottom)) {
+  @media (max-width: 1023px) {
+    .guardian-page-content {
+      padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px)) !important;
+    }
+  }
+}
+
+/* ==========================================================================
+   Header Alignment Standards
+   ========================================================================== */
+
+/* Custom headers should align with content padding */
+.guardian-dashboard-header,
+.guardian-custom-header {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .guardian-dashboard-header,
+  .guardian-custom-header {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-dashboard-header,
+  .guardian-custom-header {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* Header internal max-width alignment */
+.guardian-dashboard-header .max-w-7xl,
+.guardian-custom-header .max-w-7xl {
+  width: 100%;
+  max-width: 1280px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ==========================================================================
+   FullCalendar Mobile Optimization
+   ========================================================================== */
+
+@media (max-width: 639px) {
+  .fc {
+    font-size: 0.875rem;
+  }
+
+  .fc .fc-toolbar-title {
+    font-size: 1rem;
+  }
+
+  .fc .fc-button {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .fc .fc-daygrid-day-frame {
+    min-height: 60px;
+  }
+
+  .fc .fc-daygrid-day-number {
+    font-size: 0.75rem;
+  }
+
+  .fc-event {
+    font-size: 0.625rem;
+  }
+}
+
+/* ==========================================================================
+   Glassmorphism Card Mobile Fixes
+   ========================================================================== */
+
+@media (max-width: 639px) {
+  .glassmorphism-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .dark .glassmorphism-card {
+    background: rgba(31, 41, 55, 0.8);
+    border: 1px solid rgba(75, 85, 99, 0.4);
+  }
+
+  /* Ensure text is readable on mobile */
+  .glassmorphism-card h3,
+  .glassmorphism-card p {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* ==========================================================================
+   Form Layout Mobile Fixes
+   ========================================================================== */
+
+@media (max-width: 639px) {
+  .guardian-form-row {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .guardian-form-row > * {
+    width: 100%;
+  }
+
+  /* Stack form actions on mobile */
+  .guardian-form-actions {
+    flex-direction: column-reverse;
+    gap: 0.75rem;
+  }
+
+  .guardian-form-actions button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Modal form spacing */
+  .guardian-modal form {
+    padding: 0.5rem 0;
+  }
+}
+
+/* ==========================================================================
+   Notification List Mobile Fixes
+   ========================================================================== */
+
+@media (max-width: 639px) {
+  .guardian-notification-list {
+    gap: 0.5rem;
+  }
+
+  .guardian-notification-item {
+    padding: 0.75rem;
+  }
+
+  .guardian-notification-item .MuiListItemText-root {
+    margin: 0;
+  }
+
+  /* Ensure notification text wraps */
+  .guardian-notification-item .MuiTypography-root {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+}
+
+/* ==========================================================================
+   Child Card Mobile Fixes
+   ========================================================================== */
+
+@media (max-width: 639px) {
+  .guardian-child-card {
+    padding: 1rem;
+  }
+
+  .guardian-child-card .guardian-child-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .guardian-child-card .guardian-child-actions button {
+    width: 100%;
+  }
+
+  /* Compact child info on mobile */
+  .guardian-child-info {
+    padding: 0.75rem;
+  }
+}
+
+/* ==========================================================================
+   Select Dropdown Mobile Fixes
+   ========================================================================== */
+
+@media (max-width: 639px) {
+  .guardian-child-selector {
+    position: relative;
+  }
+
+  .guardian-child-selector .dropdown-menu {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 60vh;
+    border-radius: 1rem 1rem 0 0;
+    z-index: 1000;
+  }
+
+  /* Backdrop for mobile dropdown */
+  .guardian-child-selector .dropdown-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+  }
+}

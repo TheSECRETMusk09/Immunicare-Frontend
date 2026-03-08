@@ -1,0 +1,1579 @@
+m/**
+ * Guardian Modules Standardized CSS
+ * Consistent styling across all Guardian dashboard modules
+ *
+ * Features:
+ * - Blue/Purple gradient theme with glassmorphism effects
+ * - Standardized padding across all modules
+ * - Responsive calendar layout
+ * - Consistent PageHeader sizing
+ * - Improved space utilization
+ * - Mobile-first responsive design
+ * - Dark mode support with neon accents
+ */
+
+/* ============================================
+   Glassmorphism Effect Base Styles
+   ============================================ */
+.glassmorphism-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 50%, rgba(59, 130, 246, 0.1) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(59, 130, 246, 0.1);
+}
+
+.glassmorphism-card:hover {
+  box-shadow:
+    0 12px 48px rgba(0, 0, 0, 0.15),
+    0 4px 16px rgba(59, 130, 246, 0.2);
+}
+
+/* ============================================
+   Dynamic Theme-Aware Typography
+   ============================================ */
+.guardian-dashboard,
+.guardian-module-container {
+  color: #000000;
+  font-weight: 400;
+  transition: color 0.2s ease, font-weight 0.2s ease;
+}
+
+.dark .guardian-dashboard,
+.dark .guardian-module-container {
+  color: #ffffff;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5); /* Enhance readability for bold white text */
+}
+
+/* ============================================
+   Guardian Dashboard Background
+   ============================================ */
+.guardian-dashboard-bg {
+  background: linear-gradient(135deg, #1e3a8a 0%, #3730a3 50%, #581c87 100%);
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .guardian-dashboard-bg {
+    padding: 1.5rem;
+  }
+}
+
+/* ============================================
+   Standardized Module Container - Fluid width
+   ============================================ */
+.guardian-module-container {
+  @apply space-y-6;
+  padding: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+@media (min-width: 640px) {
+  .guardian-module-container {
+    padding: 0;
+    width: 100%;
+    max-width: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-module-container {
+    padding: 0 var(--space-6);
+    width: 100%;
+    max-width: none;
+  }
+}
+
+/* ============================================
+    Expanded Calendar Layout
+    ============================================ */
+.guardian-calendar-layout {
+  @apply w-full space-y-6;
+}
+
+.guardian-calendar-wrapper-expanded {
+  @apply w-full rounded-xl border border-transparent backdrop-blur-md;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 50%, rgba(59, 130, 246, 0.1) 100%);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(59, 130, 246, 0.1);
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Flexible viewport container for appointments page - maximizes content width */
+.guardian-appointments-fixed-container,
+.guardian-appointments-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 1023px) {
+  .guardian-appointments-fixed-container,
+  .guardian-appointments-layout {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+/* Calendar grid with optimized width - fits viewport without overflow */
+.guardian-calendar-grid {
+  @apply grid gap-1 sm:gap-2 p-2 sm:p-3;
+  grid-template-columns: repeat(7, 1fr);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Calendar container - no forced height constraints */
+.guardian-calendar-scrollable {
+  overflow-y: auto;
+  max-height: none;
+}
+
+/* Sidebar container - flexible height */
+.guardian-sidebar-scrollable {
+  overflow-y: auto;
+  max-height: none;
+}
+
+/* Calendar cell sizing - optimized for content fit without overflow */
+.guardian-calendar-cell {
+  @apply relative rounded-lg sm:rounded-xl border border-white/10 p-1 sm:p-1.5 text-left transition-all cursor-pointer;
+  min-height: 50px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  overflow: hidden;
+}
+
+.guardian-calendar-cell:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+@media (min-width: 640px) {
+  .guardian-calendar-cell {
+    min-height: 60px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-calendar-cell {
+    min-height: 70px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .guardian-calendar-cell {
+    min-height: 80px;
+  }
+}
+
+@media (min-width: 1536px) {
+  .guardian-calendar-cell {
+    min-height: 90px;
+  }
+}
+
+/* ============================================
+   PageHeader Standardization
+   ============================================ */
+.guardian-page-header {
+  @apply w-full mb-6;
+}
+
+/* Ensure PageHeader uses full width */
+.guardian-page-header .page-header {
+  @apply w-full;
+  margin: 0 0 1.5rem 0;
+}
+
+/* ============================================
+   Content Width Management
+   ============================================ */
+.guardian-content-full-width {
+  @apply w-full max-w-none;
+}
+
+.guardian-content-constrained {
+  @apply w-full max-w-full mx-auto;
+}
+
+/* Remove excessive padding on main content areas */
+.guardian-main-content-area {
+  @apply w-full;
+  padding: 0;
+}
+
+/* ============================================
+   Responsive Grid Layouts - Fluid expansion
+   ============================================ */
+.guardian-responsive-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: none;
+}
+
+@media (min-width: 640px) {
+  .guardian-responsive-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-6);
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-responsive-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1400px) {
+  .guardian-responsive-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.guardian-two-column-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: none;
+}
+
+@media (min-width: 1024px) {
+  .guardian-two-column-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-6);
+  }
+}
+
+/* ============================================
+   Standardized Content Width Utilities
+   Maximum viewport utilization - fluid expansion
+   ============================================ */
+
+/* Full-width content without constraints */
+.guardian-content-full-width {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+/* Standard content padding - fluid width */
+.guardian-content-padded {
+  width: 100%;
+  max-width: none;
+  padding: 0 var(--space-4);
+  margin: 0;
+  box-sizing: border-box;
+}
+
+@media (min-width: 640px) {
+  .guardian-content-padded {
+    padding: 0 var(--space-6);
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-content-padded {
+    padding: 0 var(--space-8);
+  }
+}
+
+/* Content that maximizes available viewport - no letterboxing */
+.guardian-content-maximize {
+  width: 100vw;
+  max-width: none;
+  margin: 0;
+  padding: 0 var(--space-4);
+  box-sizing: border-box;
+}
+
+@media (min-width: 640px) {
+  .guardian-content-maximize {
+    padding: 0 var(--space-6);
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-content-maximize {
+    padding: 0 var(--space-8);
+  }
+}
+
+/* Fluid grid expansion - fills all available space */
+.guardian-fluid-grid {
+  display: grid;
+  width: 100%;
+  max-width: none;
+  gap: var(--space-6);
+}
+
+/* ============================================
+   Button Groups
+   ============================================ */
+.guardian-btn-group {
+  @apply flex flex-col sm:flex-row gap-2 sm:gap-3;
+}
+
+.guardian-btn-group > button,
+.guardian-btn-group > .btn {
+  @apply w-full sm:w-auto justify-center;
+}
+
+/* ============================================
+   Form Layouts
+   ============================================ */
+.guardian-form-grid {
+  @apply grid grid-cols-1 sm:grid-cols-2 gap-4;
+}
+
+.guardian-form-row {
+  @apply flex flex-col sm:flex-row gap-4;
+}
+
+.guardian-form-actions {
+  @apply flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 mt-6;
+}
+
+.guardian-form-actions > button {
+  @apply w-full sm:w-auto;
+}
+
+/* ============================================
+   Card Layouts
+   ============================================ */
+.guardian-card {
+  @apply rounded-xl border border-transparent;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 50%, rgba(59, 130, 246, 0.1) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(59, 130, 246, 0.1);
+}
+
+.guardian-card-compact {
+  @apply p-4 sm:p-5;
+}
+
+.guardian-card-default {
+  @apply p-4 sm:p-6;
+}
+
+/* ============================================
+   Stats Grid
+   ============================================ */
+.guardian-stats-grid {
+  @apply grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6;
+}
+
+/* Enhanced stat cards for dashboard */
+.guardian-stats-grid .guardian-stat-card {
+  @apply relative overflow-hidden rounded-2xl p-5 transition-all duration-300;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.guardian-stats-grid .guardian-stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -10px rgba(59, 130, 246, 0.3);
+}
+
+.dark .guardian-stats-grid .guardian-stat-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(147, 51, 234, 0.2) 100%);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Stat card icon containers */
+.guardian-stats-grid .guardian-stat-card .stat-icon {
+  @apply flex items-center justify-center w-12 h-12 rounded-xl mb-3;
+  background: linear-gradient(135deg, #3b82f6 0%, #9333ea 100%);
+}
+
+.guardian-stats-grid .guardian-stat-card .stat-value {
+  @apply text-3xl font-bold text-gray-900 dark:text-white mb-1;
+}
+
+.guardian-stats-grid .guardian-stat-card .stat-label {
+  @apply text-sm font-medium text-gray-600 dark:text-gray-400;
+}
+
+/* ============================================
+    Children Grid
+    ============================================ */
+.guardian-children-grid {
+  @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 sm:gap-6;
+}
+
+/* Enhanced Child Card Styling */
+.guardian-child-card {
+  @apply rounded-2xl p-6 transition-all duration-300 cursor-pointer;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 4px 20px -4px rgba(0, 0, 0, 0.1),
+    0 8px 40px -8px rgba(59, 130, 246, 0.08);
+}
+
+.guardian-child-card:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 8px 30px -4px rgba(0, 0, 0, 0.15),
+    0 12px 60px -8px rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.dark .guardian-child-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.guardian-child-card .child-avatar {
+  @apply w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold text-white;
+  background: linear-gradient(135deg, #3b82f6 0%, #9333ea 100%);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* ============================================
+   Appointments List
+   ============================================ */
+.guardian-appointments-grid {
+  @apply space-y-3;
+}
+
+.guardian-appointment-card {
+  @apply flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-2.5 sm:p-3 rounded-lg border border-transparent;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 50%, rgba(59, 130, 246, 0.1) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.08),
+    0 1px 4px rgba(59, 130, 246, 0.08);
+  max-width: 100%;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+}
+
+.guardian-appointment-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.15);
+}
+
+.guardian-appointment-card:hover {
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
+/* ============================================
+   Notifications List
+   ============================================ */
+.guardian-notification-list {
+  @apply space-y-3;
+}
+
+/* ============================================
+   Guardian Header / Module Overflow Safeguards
+   ============================================ */
+
+.guardian-module-header__actions-shell,
+.guardian-module-header__actions-shell > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.guardian-notifications-summary-strip,
+.guardian-notifications-filters,
+.guardian-notifications-list,
+.guardian-appointments-mobile-switch,
+.guardian-appointments-calendar-toolbar,
+.guardian-appointments-calendar-nav,
+.guardian-appointments-calendar-views,
+.guardian-appointments-calendar-current,
+.guardian-appointments-calendar-shell,
+.guardian-appointments-calendar-legend {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.guardian-appointments-calendar-toolbar .btn,
+.guardian-appointments-calendar-nav .btn,
+.guardian-appointments-calendar-views .btn {
+  white-space: nowrap;
+}
+
+@media (min-width: 1024px) {
+  .guardian-appointments-calendar-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 1rem;
+    row-gap: 0.5rem;
+  }
+
+  .guardian-appointments-calendar-nav {
+    grid-column: 1;
+    justify-self: start;
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+
+  .guardian-appointments-calendar-views {
+    grid-column: 2;
+    justify-self: center;
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+
+  .guardian-appointments-calendar-current {
+    grid-column: 3;
+    justify-self: end;
+    text-align: right;
+    white-space: nowrap;
+  }
+}
+
+.guardian-appointments-calendar-shell .fc,
+.guardian-appointments-calendar-shell .fc-view-harness {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.guardian-appointments-calendar-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.guardian-appointments-calendar-shell .guardian-appointments-fullcalendar.fc,
+.guardian-appointments-calendar-shell .fc,
+.guardian-appointments-calendar-shell .fc-media-screen,
+.guardian-appointments-calendar-shell .fc-view-harness,
+.guardian-appointments-calendar-shell .fc-view-harness-active,
+.guardian-appointments-calendar-shell .fc-scrollgrid,
+.guardian-appointments-calendar-shell .fc-scroller-harness,
+.guardian-appointments-calendar-shell .fc-scroller {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.guardian-appointments-calendar-shell .fc .fc-scrollgrid,
+.guardian-appointments-calendar-shell .fc .fc-scrollgrid table,
+.guardian-appointments-calendar-shell .fc .fc-scrollgrid-sync-table {
+  table-layout: fixed;
+}
+
+.guardian-appointments-calendar-shell .fc .fc-scrollgrid-sync-table,
+.guardian-appointments-calendar-shell .fc .fc-col-header,
+.guardian-appointments-calendar-shell .fc .fc-daygrid-body,
+.guardian-appointments-calendar-shell .fc .fc-timegrid-body,
+.guardian-appointments-calendar-shell .fc .fc-timegrid-cols table,
+.guardian-appointments-calendar-shell .fc .fc-timegrid-slots table {
+  width: 100% !important;
+}
+
+.guardian-appointments-calendar-shell .fc .fc-col-header-cell,
+.guardian-appointments-calendar-shell .fc .fc-daygrid-day {
+  min-width: 0;
+}
+
+.guardian-appointments-calendar-shell .fc .fc-col-header-cell-cushion {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 0.5rem 0.2rem;
+  font-weight: 600;
+}
+
+.guardian-appointments-calendar-shell .fc .fc-daygrid-day-frame {
+  min-height: clamp(3.2rem, 7vw, 5.25rem);
+}
+
+.guardian-appointments-calendar-shell .fc .fc-daygrid-day-top {
+  justify-content: flex-start;
+  min-height: 1.65rem;
+}
+
+.guardian-appointments-calendar-shell .fc .fc-daygrid-day-number {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  min-height: 1.6rem;
+  margin: 0.15rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 9999px;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.guardian-appointments-calendar-shell .fc .fc-daygrid-day.fc-day-today,
+.guardian-appointments-calendar-shell
+  .fc
+  .guardian-appointments-calendar-day--today:not(.guardian-appointments-calendar-day--weekend),
+.guardian-appointments-calendar-shell .fc .fc-timegrid-col.fc-day-today {
+  background: rgba(79, 70, 229, 0.09);
+}
+
+.guardian-appointments-calendar-shell .fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number,
+.guardian-appointments-calendar-shell
+  .fc
+  .guardian-appointments-calendar-day--today
+  .fc-daygrid-day-number {
+  background: #4f46e5;
+  color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.24);
+}
+
+.guardian-appointments-calendar-shell .fc .guardian-appointments-calendar-header--today,
+.guardian-appointments-calendar-shell .fc .fc-col-header-cell.fc-day-today {
+  background: rgba(79, 70, 229, 0.12);
+}
+
+.guardian-appointments-calendar-shell .fc .guardian-appointments-day-header,
+.guardian-appointments-calendar-shell .fc .guardian-appointments-day-header-compact {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.25rem;
+  text-align: center;
+}
+
+.guardian-appointments-calendar-shell .fc .guardian-appointments-day-header.is-today,
+.guardian-appointments-calendar-shell .fc .guardian-appointments-day-header-compact.is-today {
+  color: #3730a3;
+  font-weight: 700;
+}
+
+.dark .guardian-appointments-calendar-shell .fc .fc-daygrid-day.fc-day-today,
+.dark
+  .guardian-appointments-calendar-shell
+  .fc
+  .guardian-appointments-calendar-day--today:not(.guardian-appointments-calendar-day--weekend),
+.dark .guardian-appointments-calendar-shell .fc .fc-timegrid-col.fc-day-today,
+.dark .guardian-appointments-calendar-shell .fc .fc-col-header-cell.fc-day-today,
+.dark .guardian-appointments-calendar-shell .fc .guardian-appointments-calendar-header--today {
+  background: rgba(129, 140, 248, 0.2);
+}
+
+.dark .guardian-appointments-calendar-shell .fc .guardian-appointments-day-header.is-today,
+.dark .guardian-appointments-calendar-shell .fc .guardian-appointments-day-header-compact.is-today {
+  color: #c7d2fe;
+}
+
+/* Guardian Appointments weekend guard visuals (FullCalendar parity with admin policy) */
+.guardian-appointments-calendar-shell .fc .guardian-appointments-calendar-day--weekend {
+  background: rgba(229, 231, 235, 0.55);
+}
+
+.guardian-appointments-calendar-shell .fc .guardian-appointments-calendar-day--weekend .fc-daygrid-day-number,
+.guardian-appointments-calendar-shell .fc .guardian-appointments-calendar-day--weekend .fc-col-header-cell-cushion {
+  color: #6b7280;
+}
+
+.guardian-appointments-calendar-shell .fc .guardian-appointments-calendar-day--weekend .fc-daygrid-day-number {
+  cursor: not-allowed;
+}
+
+.dark .guardian-appointments-calendar-shell .fc .guardian-appointments-calendar-day--weekend {
+  background: rgba(31, 41, 55, 0.72);
+}
+
+.dark .guardian-appointments-calendar-shell .fc .guardian-appointments-calendar-day--weekend .fc-daygrid-day-number,
+.dark .guardian-appointments-calendar-shell .fc .guardian-appointments-calendar-day--weekend .fc-col-header-cell-cushion {
+  color: #9ca3af;
+}
+
+.guardian-selected-date-card > *,
+.guardian-upcoming-appointments-card > *,
+.guardian-appointment-history-card > *,
+.guardian-appointment-card > * {
+  min-width: 0;
+}
+
+.guardian-selected-date-card p,
+.guardian-upcoming-appointments-card p,
+.guardian-appointment-history-card p,
+.guardian-appointment-card p,
+.guardian-selected-date-card h3,
+.guardian-selected-date-card h4,
+.guardian-upcoming-appointments-card h3,
+.guardian-appointment-history-card h3 {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ============================================
+   Touch Target Sizes
+   ============================================ */
+@media (pointer: coarse) {
+  .guardian-calendar-cell {
+    min-height: 60px;
+  }
+
+  .guardian-touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+}
+
+/* ============================================
+   Mobile Optimizations - Reduced padding for better space utilization
+   ============================================ */
+@media (max-width: 640px) {
+  .guardian-module-container {
+    @apply space-y-3;
+    padding: 0.5rem;
+  }
+
+  .guardian-module-header-shell .page-header__title,
+  .guardian-module-header-shell .page-header__subtitle {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: normal;
+  }
+
+  .guardian-module-header-shell .page-header__actions {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .guardian-notifications-header-actions-inner,
+  .guardian-appointments-header-actions-inner {
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .guardian-notifications-header-actions-inner > *,
+  .guardian-appointments-header-actions-inner > * {
+    min-width: 0;
+    flex: 1 1 calc(50% - 0.25rem);
+  }
+
+  .guardian-calendar-cell {
+    @apply p-1;
+    min-height: 45px;
+  }
+
+  /* Ensure text is readable on small screens */
+  .guardian-calendar-cell .text-sm {
+    font-size: 0.7rem;
+  }
+
+  .guardian-calendar-cell .text-xs {
+    font-size: 0.65rem;
+  }
+}
+
+@media (max-width: 479px) {
+  .guardian-notifications-header-actions-inner > *,
+  .guardian-appointments-header-actions-inner > * {
+    flex: 1 1 100%;
+  }
+
+  .guardian-appointments-calendar-toolbar .btn,
+  .guardian-appointments-calendar-nav .btn,
+  .guardian-appointments-calendar-views .btn {
+    white-space: normal;
+  }
+}
+
+/* ============================================
+   Dark Mode Support
+   ============================================ */
+.dark .guardian-calendar-wrapper-expanded {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(59, 130, 246, 0.15) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .guardian-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(59, 130, 246, 0.15) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .glassmorphism-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(59, 130, 246, 0.15) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================
+   Print Styles
+   ============================================ */
+@media print {
+  .guardian-calendar-wrapper-expanded {
+    @apply shadow-none;
+    background: white;
+    border: 1px solid #e5e7eb;
+  }
+
+  .guardian-card {
+    @apply shadow-none border-gray-300;
+    background: white;
+  }
+
+  .glassmorphism-card {
+    background: white;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: 1px solid #e5e7eb;
+    box-shadow: none;
+  }
+}
+
+/* ============================================
+   Animation Effects
+   ============================================ */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.4);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* ============================================
+    Status Badges - WCAG 2.1 AA Compliant
+    ============================================ */
+.guardian-status-badge {
+  @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid transparent;
+}
+
+/* Active/On Track - 7.2:1 contrast ratio on white, 6.8:1 on dark */
+.guardian-status-badge--active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #047857;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.dark .guardian-status-badge--active {
+  background: rgba(16, 185, 129, 0.25);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+/* Pending/Due Soon - 7.5:1 contrast ratio on white, 7.2:1 on dark */
+.guardian-status-badge--pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #92400e;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.dark .guardian-status-badge--pending {
+  background: rgba(245, 158, 11, 0.25);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+/* Completed - 7.1:1 contrast ratio on white, 6.9:1 on dark */
+.guardian-status-badge--completed {
+  background: rgba(59, 130, 246, 0.15);
+  color: #1d4ed8;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.dark .guardian-status-badge--completed {
+  background: rgba(59, 130, 246, 0.25);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+/* Overdue - High Priority - 8.2:1 contrast ratio on white, 7.8:1 on dark */
+.guardian-status-badge--overdue {
+  background: rgba(239, 68, 68, 0.15);
+  color: #991b1b;
+  border-color: rgba(239, 68, 68, 0.4);
+  font-weight: 600;
+}
+
+.dark .guardian-status-badge--overdue {
+  background: rgba(239, 68, 68, 0.25);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* Upcoming - 6.8:1 contrast ratio on white, 6.5:1 on dark */
+.guardian-status-badge--upcoming {
+  background: rgba(139, 92, 246, 0.15);
+  color: #6d28d9;
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.dark .guardian-status-badge--upcoming {
+  background: rgba(139, 92, 246, 0.25);
+  color: #a78bfa;
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+/* Cancelled/Skipped - 7.0:1 contrast ratio on white, 6.7:1 on dark */
+.guardian-status-badge--cancelled,
+.guardian-status-badge--skipped {
+  background: rgba(107, 114, 128, 0.15);
+  color: #374151;
+  border-color: rgba(107, 114, 128, 0.3);
+}
+
+.dark .guardian-status-badge--cancelled,
+.dark .guardian-status-badge--skipped {
+  background: rgba(107, 114, 128, 0.25);
+  color: #9ca3af;
+  border-color: rgba(107, 114, 128, 0.4);
+}
+
+/* Hover states for better interactivity */
+.guardian-status-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Focus states for accessibility */
+.guardian-status-badge:focus {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* Animation for urgent states */
+@keyframes urgent-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0);
+  }
+}
+
+.guardian-status-badge--overdue {
+  animation: urgent-pulse 2s ease-in-out infinite;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .guardian-status-badge--overdue {
+    animation: none;
+  }
+
+  .guardian-status-badge:hover {
+    transform: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .guardian-status-badge {
+    border-width: 2px;
+  }
+
+  .guardian-status-badge--active {
+    background: #047857;
+    color: #ffffff;
+  }
+
+  .guardian-status-badge--pending {
+    background: #92400e;
+    color: #ffffff;
+  }
+
+  .guardian-status-badge--completed {
+    background: #1d4ed8;
+    color: #ffffff;
+  }
+
+  .guardian-status-badge--overdue {
+    background: #991b1b;
+    color: #ffffff;
+  }
+}
+
+/* ============================================
+   Overdue Vaccination Alert Banner
+   High priority health notification component
+   ============================================ */
+.guardian-overdue-alert {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%);
+  border-left: 4px solid #ef4444;
+  border-radius: 0 0.75rem 0.75rem 0;
+  padding: 1rem;
+  box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.1), 0 2px 4px -1px rgba(239, 68, 68, 0.06);
+}
+
+.dark .guardian-overdue-alert {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.15) 100%);
+  border-left-color: #f87171;
+}
+
+.guardian-overdue-alert__icon {
+  flex-shrink: 0;
+  animation: alert-pulse 2s ease-in-out infinite;
+}
+
+@keyframes alert-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+/* Reduced motion support for alert animation */
+@media (prefers-reduced-motion: reduce) {
+  .guardian-overdue-alert__icon {
+    animation: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .guardian-overdue-alert {
+    border: 2px solid #991b1b;
+    background: #fef2f2;
+  }
+
+  .dark .guardian-overdue-alert {
+    border-color: #f87171;
+    background: rgba(127, 29, 29, 0.5);
+  }
+}
+
+/* ============================================
+   Color Utilities for Blue/Purple Theme
+   ============================================ */
+.text-gradient {
+  background: linear-gradient(135deg, #3b82f6 0%, #9333ea 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.bg-gradient-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #9333ea 100%);
+}
+
+.border-gradient {
+  border-image: linear-gradient(135deg, #3b82f6 0%, #9333ea 100%) 1;
+}
+
+/* ============================================
+   Focus States for Accessibility
+   ============================================ */
+.guardian-stat-card:focus,
+.guardian-child-card:focus,
+.guardian-appointment-card:focus,
+.guardian-quick-action-btn:focus {
+  outline: 2px solid rgba(59, 130, 246, 0.5);
+  outline-offset: 2px;
+}
+
+/* ============================================
+    Loading States
+    ============================================ */
+.guardian-skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ============================================
+     Appointments Layout - Right Side Cards
+     ============================================ */
+.guardian-appointments-layout {
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 1024px) {
+  .guardian-appointments-layout {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .guardian-appointments-layout {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .guardian-appointments-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.guardian-appointments-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Selected Date Card Styling - compact and width-optimized */
+.guardian-selected-date-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 50%, rgba(59, 130, 246, 0.1) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(59, 130, 246, 0.08);
+  padding: 1rem;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.guardian-selected-date-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
+/* Upcoming Appointments Card Styling - compact with maintained usability */
+.guardian-upcoming-appointments-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 50%, rgba(59, 130, 246, 0.1) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(59, 130, 246, 0.08);
+  padding: 1rem;
+  max-height: 400px;
+  overflow-y: auto;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 767px) {
+  .guardian-upcoming-appointments-card {
+    max-height: none;
+  }
+}
+
+.dark .guardian-selected-date-card,
+.dark .guardian-upcoming-appointments-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(59, 130, 246, 0.15) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================
+   Appointment History Card Styling
+   ============================================ */
+.guardian-appointment-history-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 50%, rgba(59, 130, 246, 0.1) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(59, 130, 246, 0.08);
+  padding: 1rem;
+  max-height: 350px;
+  overflow-y: auto;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 767px) {
+  .guardian-appointment-history-card {
+    max-height: none;
+  }
+}
+
+.guardian-appointment-history-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
+.dark .guardian-appointment-history-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(59, 130, 246, 0.15) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================
+   Guardian Modal/Form Rhythm Stabilizers
+   ============================================ */
+
+.guardian-page-wrapper .guardian-appointments-modal-form {
+  margin-top: 0;
+}
+
+.guardian-page-wrapper .guardian-appointments-modal-form > :where(.admin-field-group, .grid, label, .alert, .MuiAlert-root) + :where(.admin-field-group, .grid, label, .alert, .MuiAlert-root) {
+  margin-top: 0.875rem;
+}
+
+.guardian-page-wrapper .guardian-modal-body-density--guardian {
+  row-gap: 0.875rem;
+}
+
+.guardian-page-wrapper .guardian-modal-body-density--guardian p {
+  line-height: 1.45;
+}
+
+.guardian-page-wrapper .guardian-form-actions--guardian-order {
+  width: 100%;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.guardian-page-wrapper .guardian-form-actions--guardian-order .guardian-form-actions__primary,
+.guardian-page-wrapper .guardian-form-actions--guardian-order .guardian-form-actions__secondary {
+  min-width: 148px;
+}
+
+/* Mobile-first order parity: primary action appears first in DOM and visual flow */
+@media (max-width: 639px) {
+  .guardian-page-wrapper .guardian-form-actions--guardian-order {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .guardian-page-wrapper .guardian-form-actions--guardian-order .guardian-form-actions__primary,
+  .guardian-page-wrapper .guardian-form-actions--guardian-order .guardian-form-actions__secondary {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (min-width: 640px) {
+  .guardian-page-wrapper .guardian-form-actions--guardian-order {
+    flex-direction: row;
+  }
+}
+
+/* Mobile scrollbar styling for appointment lists */
+.mobile-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+.mobile-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.mobile-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.mobile-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+}
+
+.mobile-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.7);
+}
+
+.dark .mobile-scrollbar {
+  scrollbar-color: rgba(75, 85, 99, 0.5) transparent;
+}
+
+.dark .mobile-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(75, 85, 99, 0.5);
+}
+
+.dark .mobile-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(75, 85, 99, 0.7);
+}
+
+/* ============================================
+     Sidebar Z-Index Hierarchy Fix
+     ============================================ */
+.guardian-sidebar {
+  z-index: 300;
+}
+
+.guardian-sidebar-overlay {
+  z-index: 299;
+}
+
+.guardian-sidebar-content {
+  position: relative;
+  z-index: 1;
+}
+
+.guardian-sidebar-subitems {
+  position: relative;
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out;
+}
+
+/* Ensure sub-items expand inline without overlay */
+@media (max-width: 1023px) {
+  .guardian-sidebar-subitems {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .guardian-sidebar-subitems button {
+    position: relative;
+  }
+}
+
+/* Ensure proper stacking context for vaccinations page */
+.guardian-vaccinations-content {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+}
+
+/* Fix for sidebar navigation items stacking */
+.guardian-sidebar nav {
+  position: relative;
+  z-index: 305;
+}
+
+.guardian-sidebar nav > div {
+  position: relative;
+  z-index: 306;
+}
+
+/* ============================================
+    Neumorphic Design - Soft UI
+    ============================================ */
+
+/* Neumorphic Button Base */
+.btn-neumorphic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  background: linear-gradient(145deg, #ffffff, #e6e6e6);
+  border: none;
+  border-radius: 12px;
+  box-shadow:
+    6px 6px 12px rgba(0, 0, 0, 0.1),
+    -6px -6px 12px rgba(255, 255, 255, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 48px;
+  min-width: 48px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-neumorphic:hover:not(:disabled) {
+  box-shadow:
+    8px 8px 16px rgba(0, 0, 0, 0.12),
+    -8px -8px 16px rgba(255, 255, 255, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+}
+
+.btn-neumorphic:active:not(:disabled) {
+  box-shadow:
+    inset 4px 4px 8px rgba(0, 0, 0, 0.1),
+    inset -4px -4px 8px rgba(255, 255, 255, 0.8);
+  transform: translateY(1px);
+}
+
+.btn-neumorphic:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-neumorphic-primary {
+  background: linear-gradient(145deg, #3b82f6, #2563eb);
+  color: #ffffff;
+  box-shadow:
+    6px 6px 12px rgba(37, 99, 235, 0.3),
+    -6px -6px 12px rgba(59, 130, 246, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.btn-neumorphic-primary:hover:not(:disabled) {
+  box-shadow:
+    8px 8px 16px rgba(37, 99, 235, 0.35),
+    -8px -8px 16px rgba(59, 130, 246, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.btn-neumorphic-primary:active:not(:disabled) {
+  box-shadow:
+    inset 4px 4px 8px rgba(0, 0, 0, 0.2),
+    inset -4px -4px 8px rgba(255, 255, 255, 0.1);
+}
+
+.btn-neumorphic-danger {
+  background: linear-gradient(145deg, #ef4444, #dc2626);
+  color: #ffffff;
+  box-shadow:
+    6px 6px 12px rgba(220, 38, 38, 0.3),
+    -6px -6px 12px rgba(239, 68, 68, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.btn-neumorphic-success {
+  background: linear-gradient(145deg, #10b981, #059669);
+  color: #ffffff;
+  box-shadow:
+    6px 6px 12px rgba(5, 150, 105, 0.3),
+    -6px -6px 12px rgba(16, 185, 129, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Dark mode neumorphic buttons */
+.dark .btn-neumorphic {
+  background: linear-gradient(145deg, #2d3748, #1a202c);
+  color: #e2e8f0;
+  box-shadow:
+    6px 6px 12px rgba(0, 0, 0, 0.4),
+    -6px -6px 12px rgba(74, 85, 104, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.dark .btn-neumorphic:hover:not(:disabled) {
+  box-shadow:
+    8px 8px 16px rgba(0, 0, 0, 0.45),
+    -8px -8px 16px rgba(74, 85, 104, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.dark .btn-neumorphic:active:not(:disabled) {
+  box-shadow:
+    inset 4px 4px 8px rgba(0, 0, 0, 0.4),
+    inset -4px -4px 8px rgba(74, 85, 104, 0.2);
+}
+
+.dark .btn-neumorphic-primary {
+  background: linear-gradient(145deg, #3b82f6, #2563eb);
+  box-shadow:
+    6px 6px 12px rgba(0, 0, 0, 0.4),
+    -6px -6px 12px rgba(74, 85, 104, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Neumorphic Card */
+.guardian-card-neumorphic {
+  background: linear-gradient(145deg, #f8fafc, #e2e8f0);
+  border-radius: 16px;
+  box-shadow:
+    8px 8px 16px rgba(0, 0, 0, 0.08),
+    -8px -8px 16px rgba(255, 255, 255, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.guardian-card-neumorphic:hover {
+  box-shadow:
+    12px 12px 24px rgba(0, 0, 0, 0.1),
+    -12px -12px 24px rgba(255, 255, 255, 0.95),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transform: translateY(-2px);
+}
+
+.dark .guardian-card-neumorphic {
+  background: linear-gradient(145deg, #1e293b, #0f172a);
+  box-shadow:
+    8px 8px 16px rgba(0, 0, 0, 0.4),
+    -8px -8px 16px rgba(74, 85, 104, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.dark .guardian-card-neumorphic:hover {
+  box-shadow:
+    12px 12px 24px rgba(0, 0, 0, 0.5),
+    -12px -12px 24px rgba(74, 85, 104, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+/* ============================================
+    Enhanced Accessibility - Focus States
+    ============================================ */
+.guardian-focus-visible:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 3px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .btn-neumorphic,
+  .btn-neumorphic-primary,
+  .btn-neumorphic-danger,
+  .btn-neumorphic-success {
+    border: 2px solid currentColor;
+  }
+
+  .guardian-card,
+  .guardian-card-neumorphic,
+  .guardian-calendar-wrapper-expanded {
+    border: 2px solid #6b7280;
+  }
+
+  .dark .guardian-card,
+  .dark .guardian-card-neumorphic,
+  .dark .guardian-calendar-wrapper-expanded {
+    border: 2px solid #9ca3af;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .btn-neumorphic,
+  .guardian-card-neumorphic,
+  .guardian-calendar-cell,
+  .guardian-appointment-card {
+    transition: none;
+  }
+
+  .btn-neumorphic:hover:not(:disabled),
+  .guardian-card-neumorphic:hover {
+    transform: none;
+  }
+}

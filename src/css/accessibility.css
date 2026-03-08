@@ -1,0 +1,889 @@
+/* ==========================================================================
+   Accessibility Enhancements
+   Immunicare Vaccination Management System
+   WCAG 2.1 AA Compliant
+   ========================================================================== */
+
+/* ==========================================================================
+   Focus States (WCAG 2.4.7)
+   ========================================================================== */
+
+/* Default Focus Visible */
+:focus-visible {
+  outline: 3px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+/* High Contrast Focus */
+@media (prefers-contrast: high) {
+  :focus-visible {
+    outline: 3px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+/* Focus Within Container */
+.focus-within-container:focus-within {
+  box-shadow: 0 0 0 2px var(--color-primary-500);
+  border-radius: var(--radius-lg);
+}
+
+/* Focus Ring Utility */
+.focus-ring {
+  transition: box-shadow var(--transition-fast);
+}
+
+.focus-ring:focus {
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+}
+
+/* Focus Scale */
+.focus-scale:focus {
+  transform: scale(1.02);
+}
+
+/* Focus Lift */
+.focus-lift:focus {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Focus Outline for Specific Elements */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--color-primary-500);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
+}
+
+/* ==========================================================================
+   Skip Links (WCAG 2.4.1)
+   ========================================================================== */
+
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-primary-600);
+  color: white;
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-lg);
+  z-index: var(--z-tooltip);
+  transition: top var(--transition-fast);
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: var(--space-4);
+}
+
+/* Skip to Main Content */
+.skip-to-content {
+  position: absolute;
+  top: -100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--space-3) var(--space-6);
+  background: var(--color-primary-600);
+  color: white;
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-lg);
+  z-index: var(--z-tooltip);
+  transition: top var(--transition-fast);
+  text-decoration: none;
+}
+
+.skip-to-content:focus {
+  top: var(--space-4);
+}
+
+/* ==========================================================================
+   Screen Reader Only Content (WCAG 1.3.1)
+   ========================================================================== */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Make sr-only element focusable when navigated to via keyboard */
+.sr-only-focusable:focus,
+.sr-only-focusable:active {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: inherit;
+  margin: inherit;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* ==========================================================================
+   Reduced Motion (WCAG 2.3.3)
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Disable Animations */
+  .animate-fade-in,
+  .animate-fade-out,
+  .animate-slide-up,
+  .animate-slide-down,
+  .animate-slide-left,
+  .animate-slide-right,
+  .animate-slide-in-right,
+  .animate-scale-in,
+  .animate-scale-out {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Disable Hover Effects */
+  .hover-scale:hover {
+    transform: none;
+  }
+
+  .hover-lift:hover {
+    transform: none;
+  }
+
+  .hover-shadow:hover {
+    box-shadow: none;
+  }
+
+  /* Disable Skeleton Loading Animation */
+  .skeleton {
+    animation: none;
+    background: var(--color-bg-tertiary);
+  }
+
+  .c-skeleton {
+    animation: none;
+    background: var(--color-bg-tertiary);
+  }
+
+  /* Disable Spinner Animation */
+  .c-spinner {
+    animation: none;
+    border-color: var(--color-border-default);
+    border-top-color: var(--color-primary-500);
+  }
+
+  /* Disable Progress Bar Transitions */
+  .c-progress__bar {
+    transition: none;
+  }
+
+  /* Disable Modal Animations */
+  .modal {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .modal-overlay {
+    animation: none;
+    opacity: 1;
+  }
+
+  /* Disable Sidebar Transitions */
+  .sidebar {
+    transition: none;
+  }
+
+  /* Disable Dropdown Animations */
+  .dropdown__menu {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    visibility: visible;
+  }
+
+  /* Disable Toast Animations */
+  .toast {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Disable Focus Ring Pulse */
+  @keyframes pulse-ring {
+    0% {
+      transform: scale(0.8);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(2);
+      opacity: 0;
+    }
+  }
+}
+
+/* ==========================================================================
+   High Contrast Mode (WCAG 1.4.11)
+   ========================================================================== */
+
+@media (prefers-contrast: high) {
+  :root {
+    --color-border-default: var(--color-neutral-500);
+    --color-border-light: var(--color-neutral-400);
+  }
+
+  /* Increase Border Widths */
+  .c-card {
+    border-width: 2px;
+  }
+
+  .c-button {
+    border-width: 2px;
+  }
+
+  .c-input,
+  .c-select,
+  .c-textarea {
+    border-width: 2px;
+  }
+
+  .c-badge {
+    border: 1px solid currentColor;
+  }
+
+  .c-alert {
+    border-width: 2px;
+  }
+
+  .c-modal {
+    border-width: 2px;
+  }
+
+  /* Remove Subtle Shadows */
+  .c-card {
+    box-shadow: none;
+  }
+
+  .c-button--primary {
+    box-shadow: 0 0 0 1px white;
+  }
+
+  /* Increase Text Contrast */
+  .c-badge--primary {
+    color: var(--color-primary-900);
+    background-color: var(--color-primary-100);
+  }
+
+  .c-badge--success {
+    color: var(--color-secondary-900);
+    background-color: var(--color-secondary-100);
+  }
+
+  .c-badge--warning {
+    color: var(--color-warning-900);
+    background-color: var(--color-warning-100);
+  }
+
+  .c-badge--danger {
+    color: var(--color-danger-900);
+    background-color: var(--color-danger-100);
+  }
+
+  /* Increase Focus Outline */
+  :focus-visible {
+    outline-width: 3px;
+    outline-offset: 3px;
+  }
+
+  /* Increase Link Underline */
+  a {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+  }
+
+  /* Table Borders */
+  .c-table th,
+  .c-table td {
+    border-width: 2px;
+  }
+}
+
+/* Force Colors Mode (Windows High Contrast) */
+@media (forced-colors: active) {
+  .c-button {
+    border: 2px solid ButtonText;
+  }
+
+  .c-button--primary {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .c-card {
+    border: 2px solid CanvasText;
+  }
+
+  .c-alert {
+    border: 2px solid CanvasText;
+  }
+
+  .c-modal {
+    border: 2px solid CanvasText;
+  }
+
+  .c-badge {
+    border: 2px solid CanvasText;
+  }
+
+  .c-input,
+  .c-select,
+  .c-textarea {
+    border: 2px solid CanvasText;
+  }
+
+  :focus-visible {
+    outline: 3px solid CanvasText;
+  }
+}
+
+/* ==========================================================================
+   Touch Target Sizes (WCAG 2.5.5)
+   ========================================================================== */
+
+/* Minimum Touch Target Size */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Interactive Elements */
+button,
+[role="button"],
+input[type="checkbox"],
+input[type="radio"],
+a,
+[tabindex] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Icon Buttons */
+.btn-icon {
+  width: 44px;
+  height: 44px;
+  padding: var(--space-2);
+}
+
+/* Form Inputs */
+.c-input,
+.c-select,
+.c-textarea {
+  min-height: 44px;
+  padding: var(--space-3) var(--space-4);
+}
+
+/* Adjust for Smaller Screens */
+@media (max-width: 640px) {
+  .touch-target {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  button,
+  [role="button"],
+  input[type="checkbox"],
+  input[type="radio"],
+  a,
+  [tabindex] {
+    min-height: 48px;
+    min-width: 48px;
+  }
+}
+
+/* Links with Icons */
+.link-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  min-height: 44px;
+}
+
+/* Checkbox and Radio Touch Targets */
+.c-checkbox,
+.c-radio {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  cursor: pointer;
+}
+
+.c-checkbox__input,
+.c-radio__input {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Text Spacing (WCAG 1.4.12)
+   ========================================================================== */
+
+.text-spaced {
+  line-height: 1.5;
+  letter-spacing: 0.12em;
+  word-spacing: 0.16em;
+}
+
+/* Increase Line Height */
+.line-height-loose {
+  line-height: 1.75;
+}
+
+.line-height-looser {
+  line-height: 2;
+}
+
+/* Increase Letter Spacing */
+.letter-spacing-wide {
+  letter-spacing: 0.05em;
+}
+
+.letter-spacing-wider {
+  letter-spacing: 0.1em;
+}
+
+/* Increase Word Spacing */
+.word-spacing-wide {
+  word-spacing: 0.05em;
+}
+
+.word-spacing-wider {
+  word-spacing: 0.1em;
+}
+
+/* ==========================================================================
+   Visible Focus Indicators
+   ========================================================================== */
+
+/* Always show focus outline */
+.keyboard-navigation :focus {
+  outline: 3px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+/* Focus on Interactive Elements */
+.interactive:focus {
+  outline: 3px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+/* Focus on Links */
+a:focus {
+  outline: 3px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+/* Focus on Buttons */
+button:focus {
+  outline: 3px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+/* Focus on Form Elements */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 3px solid var(--color-primary-500);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
+}
+
+/* ==========================================================================
+   Error Identification (WCAG 3.3.1)
+   ========================================================================== */
+
+.error-border {
+  border-color: var(--color-danger-500) !important;
+  border-width: 2px !important;
+}
+
+.error-border:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+.error-message {
+  color: var(--color-danger-600);
+  font-size: var(--font-size-sm);
+  margin-top: var(--space-1);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.error-message::before {
+  content: "!";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: var(--color-danger-500);
+  color: white;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* ==========================================================================
+   Status Messages (WCAG 4.1.3)
+   ========================================================================== */
+
+[role="status"],
+[role="alert"],
+[role="log"] {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* Live Region Styles */
+.live-region {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.live-region--polite {
+  left: -10000px;
+}
+
+.live-region--assertive {
+  left: -10000px;
+}
+
+/* ==========================================================================
+   ARIA Widget Accessibility
+   ========================================================================== */
+
+/* Tab Panel */
+[role="tabpanel"] {
+  padding: var(--space-4);
+}
+
+[role="tabpanel"][hidden] {
+  display: none;
+}
+
+/* Disclosure Widget */
+[role="region"][aria-expanded="false"] {
+  display: none;
+}
+
+[role="region"][aria-expanded="true"] {
+  display: block;
+}
+
+/* Dialog/Modal */
+[role="dialog"] {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+}
+
+[role="dialog"][aria-modal="true"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Tooltip */
+[role="tooltip"] {
+  position: absolute;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-neutral-900);
+  color: white;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  z-index: var(--z-tooltip);
+}
+
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-neutral-900);
+  color: white;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all var(--transition-fast);
+  z-index: var(--z-tooltip);
+}
+
+[data-tooltip]:hover::after,
+[data-tooltip]:focus::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* ==========================================================================
+   Loading State Accessibility
+   ========================================================================== */
+
+[aria-busy="true"] {
+  cursor: wait;
+}
+
+[aria-busy="true"]::before {
+  content: "";
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: var(--radius-full);
+  animation: spin 0.8s linear infinite;
+  margin-right: var(--space-2);
+}
+
+/* ==========================================================================
+   Disabled State Accessibility
+   ========================================================================== */
+
+[aria-disabled="true"],
+[disabled] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+[aria-disabled="true"]:focus,
+[disabled]:focus {
+  outline: none;
+}
+
+/* ==========================================================================
+   Hidden Content Accessibility
+   ========================================================================== */
+
+[hidden="true"],
+[aria-hidden="true"] {
+  display: none !important;
+}
+
+/* ==========================================================================
+   Landmark Regions (WCAG 1.3.1)
+   ========================================================================== */
+
+[role="banner"] {
+  /* Header region */
+}
+
+[role="navigation"] {
+  /* Navigation region */
+}
+
+[role="main"] {
+  /* Main content region */
+}
+
+[role="complementary"] {
+  /* Complementary content */
+}
+
+[role="contentinfo"] {
+  /* Footer region */
+}
+
+[role="search"] {
+  /* Search region */
+}
+
+[role="region"] {
+  /* Generic region with label */
+}
+
+/* ==========================================================================
+   Form Accessibility
+   ========================================================================== */
+
+/* Required Field Indicator */
+.required-indicator {
+  color: var(--color-danger-500);
+  margin-left: var(--space-1);
+}
+
+/* Field Group */
+fieldset {
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+legend {
+  font-weight: var(--font-weight-semibold);
+  padding: 0 var(--space-2);
+}
+
+/* ==========================================================================
+   List Accessibility
+   ========================================================================== */
+
+[role="list"] {
+  list-style: none;
+  padding: 0;
+}
+
+[role="listitem"] {
+  display: list-item;
+  list-style-position: inside;
+}
+
+/* ==========================================================================
+   Table Accessibility
+   ========================================================================== */
+
+[role="table"] {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+[role="rowgroup"] {
+  /* Row group */
+}
+
+[role="row"] {
+  /* Row */
+}
+
+[role="columnheader"],
+[role="rowheader"],
+th {
+  text-align: left;
+  font-weight: var(--font-weight-semibold);
+}
+
+[role="cell"],
+td {
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width) solid var(--color-border-light);
+}
+
+/* ==========================================================================
+   Link Accessibility
+   ========================================================================== */
+
+/* Distinguishable Links */
+a:not(.c-button):not([role="button"]) {
+  color: var(--color-primary-600);
+  text-decoration: none;
+}
+
+a:not(.c-button):not([role="button"]):hover {
+  text-decoration-thickness: 2px;
+}
+
+/* Links that open in new tab */
+[target="_blank"]::after {
+  content: " (opens in new tab)";
+  font-size: 0.8em;
+  color: var(--color-text-muted);
+}
+
+/* ==========================================================================
+   Focus Management for Modals/Dialogs
+   ========================================================================== */
+
+/* Focus trap indicator */
+.focus-trap-active :focus {
+  outline: 3px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Color Contrast Utilities (WCAG 1.4.3)
+   ========================================================================== */
+
+/* Ensure minimum 4.5:1 contrast ratio */
+.text-contrast-high {
+  color: var(--color-text-primary);
+}
+
+.text-contrast-medium {
+  color: var(--color-text-secondary);
+}
+
+/* Large text (18px+) can use 3:1 contrast */
+.text-contrast-large {
+  color: var(--color-text-tertiary);
+}
+
+/* Background contrast */
+.bg-contrast-light {
+  background-color: var(--color-bg-primary);
+}
+
+.bg-contrast-dark {
+  background-color: var(--color-bg-inverse);
+}
+
+/* ==========================================================================
+   Print Accessibility
+   ========================================================================== */
+
+@media print {
+  /* Ensure links are readable when printed */
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 10pt;
+    color: #666;
+  }
+
+  /* Ensure form controls are visible */
+  input,
+  select,
+  textarea {
+    border: 1px solid #000 !important;
+  }
+
+  /* Ensure focus is visible */
+  :focus {
+    outline: 2px solid #000 !important;
+    outline-offset: 2px !important;
+  }
+}

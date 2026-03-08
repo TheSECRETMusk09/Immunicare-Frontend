@@ -1,0 +1,289 @@
+/* ==========================================================================
+   Guardian Button Responsive Enhancements
+   Immunicare Vaccination Management System
+
+   Ensures all buttons work correctly across all screen sizes
+   ========================================================================== */
+
+/* ==========================================================================
+   Base Button Styles - All Screen Sizes
+   ========================================================================== */
+
+/* Ensure all buttons have proper cursor */
+button {
+  cursor: pointer;
+}
+
+/* Remove tap highlight on mobile */
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ensure buttons don't shrink in flex containers */
+button {
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Mobile Button Styles (< 768px)
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* All interactive elements must have minimum 44px touch target */
+  button,
+  .btn,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Icon-only buttons need larger touch targets */
+  button[class*="p-2"],
+  button[class*="p-1"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Quick action buttons - Guardian Layout */
+  .guardian-quick-action,
+  [class*="quick-action"] {
+    min-height: 72px;
+    padding: 12px;
+  }
+
+  /* Sidebar navigation items */
+  .sidebar-nav-item,
+  [class*="sidebar-nav"] button,
+  nav button {
+    min-height: 48px;
+    padding: 12px 16px;
+  }
+
+  /* Card action buttons */
+  .card-action,
+  [class*="card"] button {
+    min-height: 44px;
+    width: 100%;
+  }
+
+  /* Form submit buttons */
+  button[type="submit"],
+  .form-submit button {
+    min-height: 52px;
+    width: 100%;
+  }
+
+  /* Modal buttons (exclude admin modal footer and generic button wrappers) */
+  .modal button:not(.admin-modal-footer button):not([class*="admin-modal"] button):not(.guardian-form-actions button),
+  [class*="modal"] button:not(.admin-modal-footer button):not([class*="admin-modal"] button):not(.guardian-form-actions button) {
+    min-height: 48px;
+    width: 100%;
+  }
+
+  /* Table action buttons */
+  table button,
+  [class*="table"] button {
+    min-height: 40px;
+    padding: 8px 12px;
+  }
+
+  /* Bottom navigation */
+  .bottom-nav button,
+  .mobile-nav button,
+  [class*="bottom-nav"] button {
+    min-height: 44px;
+    min-width: 48px;
+    padding: 8px;
+  }
+
+  /* Grid of buttons */
+  .grid button,
+  [class*="grid-cols"] button {
+    min-height: 48px;
+  }
+
+}
+
+/* ==========================================================================
+   Tablet Button Styles (768px - 1023px)
+   ========================================================================== */
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* Increase touch targets slightly on tablet */
+  button[class*="p-1"],
+  button[class*="p-2"] {
+    min-height: 40px;
+    min-width: 40px;
+  }
+
+  /* Quick action buttons */
+  .guardian-quick-action,
+  [class*="quick-action"] {
+    min-height: 80px;
+  }
+
+  /* Card action buttons */
+  .card-action,
+  [class*="card"] button {
+    min-height: 44px;
+  }
+
+  /* Form submit buttons */
+  button[type="submit"] {
+    min-height: 48px;
+    width: auto;
+  }
+}
+
+/* ==========================================================================
+   Desktop Button Styles (>= 1024px)
+   ========================================================================== */
+
+@media (min-width: 1024px) {
+  /* Standard desktop button sizing */
+  button[class*="p-2"] {
+    min-height: 36px;
+  }
+
+  /* Quick action buttons */
+  .guardian-quick-action,
+  [class*="quick-action"] {
+    min-height: 72px;
+  }
+
+  /* Card action buttons */
+  .card-action,
+  [class*="card"] button {
+    min-height: 40px;
+    width: auto;
+  }
+
+  /* Form submit buttons */
+  button[type="submit"] {
+    min-height: 44px;
+    min-width: 120px;
+  }
+
+  /* Modal buttons (exclude admin modal footer and generic button wrappers) */
+  .modal button:not(.admin-modal-footer button):not([class*="admin-modal"] button):not(.guardian-form-actions button),
+  [class*="modal"] button:not(.admin-modal-footer button):not([class*="admin-modal"] button):not(.guardian-form-actions button) {
+    width: auto;
+    min-width: 100px;
+  }
+
+  /* Grid of buttons */
+  .grid button,
+  [class*="grid-cols"] button {
+    min-height: 40px;
+  }
+}
+
+/* ==========================================================================
+   Button Focus States - Accessibility
+   ========================================================================== */
+
+/* Ensure focus states are visible */
+button:focus-visible,
+.btn:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
+}
+
+/* High contrast focus for Windows high contrast mode */
+@media (prefers-contrast: high) {
+  button:focus-visible,
+  .btn:focus-visible {
+    outline: 3px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+/* Reduced motion - remove animations */
+@media (prefers-reduced-motion: reduce) {
+  button {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   Button Loading States
+   ========================================================================== */
+
+button[disabled],
+button[aria-disabled="true"],
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Loading spinner positioning */
+button .animate-spin {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* ==========================================================================
+   Button Hover States
+   ========================================================================== */
+
+/* Desktop hover states (disable on touch devices) */
+@media (hover: hover) and (pointer: fine) {
+  button:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  button:active:not(:disabled) {
+    transform: translateY(0);
+  }
+}
+
+/* Touch device hover state fix - prevent sticky hover */
+@media (hover: none) {
+  button:hover {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   iOS Safari Specific Fixes
+   ========================================================================== */
+
+/* iOS Safari button tap highlight removal */
+@supports (-webkit-touch-callout: none) {
+  button {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Fix for iOS input/button zoom on focus */
+  button,
+  input[type="button"],
+  input[type="submit"] {
+    font-size: 16px;
+  }
+}
+
+/* ==========================================================================
+   Safe Area Insets for Notched Devices
+   ========================================================================== */
+
+@supports (padding: env(safe-area-inset-bottom, 0px)) {
+  /* Bottom fixed buttons with safe area */
+  .fixed-bottom button,
+  [class*="fixed-bottom"] button {
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ==========================================================================
+   Print Styles - Hide Interactive Buttons
+   ========================================================================== */
+
+@media print {
+  button,
+  .btn {
+    display: none !important;
+  }
+}

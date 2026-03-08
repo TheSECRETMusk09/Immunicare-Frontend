@@ -1,0 +1,1795 @@
+import React, { useState, useCallback, useEffect, useMemo } from "react";
+import moment from "moment";
+import {
+  AdminModalActions,
+  Button,
+  Modal,
+  PageHeader,
+  PageContainer,
+  DataTable,
+  Badge,
+  Alert,
+  EmptyState,
+  SkeletonTable,
+  Input,
+  Select,
+} from "../components/UI";
+import { useAppointments, useInfants } from "../hooks/useDashboard";
+import apiClient from "../utils/api";
+import { isPhilippineHoliday } from "../utils/holidays";
+import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import {
+  hasFieldErrors,
+  sanitizeIdentifier,
+  sanitizeText,
+  validateLength,
+  validateRequired,
+} from "../utils/adminFormValidation";
+
+// Calendar utility functions (matching GuardianAppointmentsPage)
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const toDateKey = (value) => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const toMonthKey = (date) => {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${date.getFullYear()}-${month}`;
+};
+
+const buildCalendarGrid = (monthDate) => {
+  const startOfMonth = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const gridStart = new Date(startOfMonth);
+  gridStart.setDate(startOfMonth.getDate() - startOfMonth.getDay());
+
+  const cells = [];
+  for (let index = 0; index < 42; index += 1) {
+    const cursor = new Date(gridStart);
+    cursor.setDate(gridStart.getDate() + index);
+    cells.push({
+      date: cursor,
+      dateKey: toDateKey(cursor),
+      isCurrentMonth: cursor.getMonth() === monthDate.getMonth(),
+      isToday: toDateKey(cursor) === toDateKey(new Date()),
+    });
+  }
+
+  return cells;
+};
+
+const isWeekend = (date) => {
+  const d = date instanceof Date ? date : new Date(date);
+  const day = d.getDay();
+  return day === 0 || day === 6; // 0 = Sunday, 6 = Saturday
+};
+
+// Get minimum booking date (today)
+const getMinDate = () => {
+  const today = new Date();
+  return today.toISOString().split("T")[0];
+};
+
+// Validate date selection - returns { valid: boolean, message: string }
+const validateDateSelection = (dateStr) => {
+  if (!dateStr) return { valid: false, message: "Please select a date" };
+
+  const selectedDate = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (selectedDate < today) {
+    return {
+      valid: false,
+      message: "Cannot schedule appointments in the past",
+    };
+  }
+
+  // Check for weekend
+  const day = selectedDate.getDay();
+  if (day === 6) {
+    return {
+      valid: false,
+      message: "Saturdays are not available for appointments",
+    };
+  }
+  if (day === 0) {
+    return {
+      valid: false,
+      message: "Sundays are not available for appointments",
+    };
+  }
+
+  // Check for Philippine holidays
+  const holiday = isPhilippineHoliday(selectedDate);
+  if (holiday) {
+    return {
+      valid: false,
+      message: `${holiday.name} (${holiday.type === "regular" ? "Regular Holiday" : "Special Holiday"}) - Not available for appointments`,
+    };
+  }
+
+  return { valid: true, message: "Date is available" };
+};
+
+// Generate time options from 8am to 5pm
+const generateTimeOptions = () => {
+  const options = [{ value: "", label: "Select Time" }];
+  for (let hour = 8; hour <= 17; hour++) {
+    for (let min = 0; min < 60; min += 30) {
+      const time = `${hour.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
+      const displayTime = new Date(`2000-01-01T${time}`).toLocaleTimeString(
+        "en-US",
+        {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        },
+      );
+      options.push({ value: time, label: displayTime });
+    }
+  }
+  return options;
+};
+
+export default function Appointments() {
+  // Use local state for appointments to enable CRUD operations
+  const {
+    appointments: initialAppointments,
+    loading,
+    error: hookError,
+  } = useAppointments();
+  const { infants } = useInfants();
+
+  const [appointments, setAppointments] = useState(initialAppointments || []);
+  const [error, setError] = useState(null);
+
+  const [view, setView] = useState("list");
+  // Custom calendar state (matching GuardianAppointmentsPage)
+  const [monthCursor, setMonthCursor] = useState(new Date());
+  const [availabilityByDate, setAvailabilityByDate] = useState({});
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(toDateKey(new Date()));
+  const [selectedDateDetails, setSelectedDateDetails] = useState(null);
+  const [showDateDetailsModal, setShowDateDetailsModal] = useState(false);
+
+  // Calendar grid memoized
+  const calendarCells = useMemo(() => buildCalendarGrid(monthCursor), [monthCursor]);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [filteredAppointments, setFilteredAppointments] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dateDetailsLoading, setDateDetailsLoading] = useState(false);
+  const [createFormError, setCreateFormError] = useState("");
+  const [editFormErrors, setEditFormErrors] = useState({});
+  const [cancelModalError, setCancelModalError] = useState("");
+  const timeOptions = generateTimeOptions();
+
+  // Form states
+  const [createFormData, setCreateFormData] = useState({
+    infant_id: "",
+    scheduled_date: "",
+    scheduled_time: "",
+    type: "",
+    notes: "",
+  });
+
+  const [bookingDateDetails, setBookingDateDetails] = useState(null);
+
+  const [formErrors, setFormErrors] = useState({});
+
+  const [editFormData, setEditFormData] = useState({
+    id: "",
+    infant_id: "",
+    scheduled_date: "",
+    scheduled_time: "",
+    type: "",
+    notes: "",
+  });
+
+  const getSelectedInfantControlNumber = useCallback(
+    (infantId) => {
+      const selectedInfant = infants.find((infant) => infant.id === parseInt(infantId, 10));
+      return selectedInfant?.control_number || "";
+    },
+    [infants],
+  );
+
+  // Fetch calendar availability from API (matching GuardianAppointmentsPage)
+  const fetchCalendarAvailability = useCallback(async () => {
+    setCalendarLoading(true);
+    try {
+      const response = await apiClient.getAppointmentCalendarAvailability({
+        month: toMonthKey(monthCursor),
+      });
+
+      const dates = Array.isArray(response?.dates) ? response.dates : [];
+      const mapped = dates.reduce((accumulator, current) => {
+        accumulator[current.date] = current;
+        return accumulator;
+      }, {});
+
+      setAvailabilityByDate(mapped);
+    } catch (err) {
+      setAvailabilityByDate({});
+    } finally {
+      setCalendarLoading(false);
+    }
+  }, [monthCursor]);
+
+  // Fetch calendar availability when month changes
+  useEffect(() => {
+    fetchCalendarAvailability();
+  }, [fetchCalendarAvailability]);
+
+  useEffect(() => {
+    const fetchBookingDateDetails = async () => {
+      if (!showBookingModal || !createFormData.scheduled_date) {
+        setBookingDateDetails(null);
+        return;
+      }
+
+      try {
+        const details = await apiClient.getAppointmentDateDetails(
+          createFormData.scheduled_date,
+        );
+        setBookingDateDetails(details || null);
+      } catch (err) {
+        setBookingDateDetails(null);
+      }
+    };
+
+    fetchBookingDateDetails();
+  }, [showBookingModal, createFormData.scheduled_date]);
+
+  // Handle date cell click
+  const handleDateCellClick = (dateKey) => {
+    setSelectedDate(dateKey);
+    setSelectedSlot(new Date(dateKey));
+    setShowDateDetailsModal(true);
+  };
+
+  useEffect(() => {
+    const fetchSelectedDateDetails = async () => {
+      if (!selectedDate || !showDateDetailsModal) {
+        return;
+      }
+
+      try {
+        setDateDetailsLoading(true);
+        const details = await apiClient.getAppointmentDateDetails(selectedDate);
+        setSelectedDateDetails(details || null);
+      } catch (err) {
+        setSelectedDateDetails(null);
+      } finally {
+        setDateDetailsLoading(false);
+      }
+    };
+
+    fetchSelectedDateDetails();
+  }, [selectedDate, showDateDetailsModal]);
+
+  // Get appointments for a specific date
+  const getAppointmentsForDate = (dateKey) => {
+    return appointments.filter((apt) => {
+      if (!apt.scheduled_date) return false;
+      const aptDateKey = toDateKey(apt.scheduled_date);
+      return aptDateKey === dateKey;
+    });
+  };
+
+  const columns = [
+    {
+      key: "first_name",
+      label: "Infant",
+      render: (val, row) => (
+        <div className="font-medium text-gray-900 dark:text-gray-100">
+          {row.first_name} {row.last_name}
+        </div>
+      ),
+    },
+    {
+      key: "guardian_name",
+      label: "Guardian",
+    },
+    {
+      key: "scheduled_date",
+      label: "Date & Time",
+      type: "datetime",
+    },
+    {
+      key: "type",
+      label: "Type",
+      render: (val) => val || "General Checkup",
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (val) => {
+        let variant = "default";
+        if (val === "scheduled") variant = "info";
+        if (val === "attended") variant = "success";
+        if (val === "cancelled") variant = "danger";
+        if (val === "pending") variant = "warning";
+        return (
+          <Badge variant={variant} className="capitalize">
+            {val}
+          </Badge>
+        );
+      },
+    },
+  ];
+
+  const tableActions = (row) => (
+    <div className="flex items-center gap-1.5">
+      <Button
+        variant="primary"
+        size="sm"
+        onClick={() => handleViewAppointment(row)}
+        className="gap-1.5"
+      >
+        View
+      </Button>
+      {row.status !== "cancelled" && row.status !== "attended" && (
+        <>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => handleEditAppointment(row)}
+            className="gap-1.5"
+          >
+            Edit
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={() => handleCancelAppointmentClick(row)}
+            className="gap-1.5"
+          >
+            Cancel
+          </Button>
+        </>
+      )}
+    </div>
+  );
+
+  // Handle Cancel Appointment Click
+  const handleCancelAppointmentClick = (appointment) => {
+    setSelectedAppointment(appointment);
+    setCancelReason("");
+    setCancelModalError("");
+    setShowCancelModal(true);
+  };
+
+  // Handle Confirm Cancel Appointment
+  const handleConfirmCancelAppointment = async (event) => {
+    event.preventDefault();
+    if (!selectedAppointment) return;
+
+    setCancelModalError("");
+
+    const normalizedCancelReason = sanitizeText(cancelReason, {
+      preserveNewLines: true,
+    });
+    const cancelReasonLengthError = validateLength(normalizedCancelReason, {
+      min: 0,
+      max: 500,
+      label: "Cancellation reason",
+    });
+    if (cancelReasonLengthError) {
+      setCancelModalError("Cancellation reason must not exceed 500 characters.");
+      return;
+    }
+
+    // Prevent cancellation if already completed
+    if (selectedAppointment.status === "attended") {
+      setCancelModalError(
+        "Cannot cancel an appointment that has already been attended",
+      );
+      return;
+    }
+
+    // Prevent cancellation if already cancelled
+    if (selectedAppointment.status === "cancelled") {
+      setCancelModalError("This appointment is already cancelled");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setError(null);
+
+      await apiClient.cancelAppointment(
+        selectedAppointment.id,
+        normalizedCancelReason,
+      );
+
+      // Update UI immediately without page reload
+      setAppointments(
+        appointments.map((apt) =>
+          apt.id === selectedAppointment.id
+            ? {
+                ...apt,
+                status: "cancelled",
+                cancellation_reason: normalizedCancelReason,
+              }
+            : apt,
+        ),
+      );
+
+      setShowCancelModal(false);
+      setCancelReason("");
+      setSelectedAppointment(null);
+      setCancelModalError("");
+    } catch (err) {
+      setCancelModalError(err.message || "Failed to cancel appointment");
+      console.error("Error cancelling appointment:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle View Appointment
+  const handleViewAppointment = (appointment) => {
+    setSelectedAppointment(appointment);
+    setShowViewModal(true);
+  };
+
+  // Handle Edit Appointment
+  const handleEditAppointment = (appointment) => {
+    setSelectedAppointment(appointment);
+
+    // Parse the scheduled_date to get date and time separately
+    let dateStr = "";
+    let timeStr = "";
+    if (appointment.scheduled_date) {
+      const dateTime = new Date(appointment.scheduled_date);
+      dateStr = dateTime.toISOString().split("T")[0];
+      timeStr = dateTime.toTimeString().slice(0, 5);
+    }
+
+    setEditFormData({
+      id: appointment.id,
+      infant_id: appointment.infant_id || "",
+      scheduled_date: dateStr,
+      scheduled_time: timeStr,
+      type: appointment.type || "",
+      notes: appointment.notes || "",
+    });
+    setShowEditModal(true);
+  };
+
+  // Handle Create Appointment
+  const handleCreateAppointment = async (event) => {
+    event.preventDefault();
+    setCreateFormError("");
+
+    // Validate all required fields
+    const newErrors = {};
+    const infantRequired = validateRequired(
+      createFormData.infant_id,
+      "Please select an infant",
+    );
+    if (infantRequired) {
+      newErrors.infant_id = infantRequired;
+    }
+
+    const dateRequired = validateRequired(
+      createFormData.scheduled_date,
+      "Please select a date",
+    );
+    if (dateRequired) {
+      newErrors.scheduled_date = dateRequired;
+    }
+
+    const timeRequired = validateRequired(
+      createFormData.scheduled_time,
+      "Please select a time",
+    );
+    if (timeRequired) {
+      newErrors.scheduled_time = timeRequired;
+    }
+    const normalizedType = sanitizeText(createFormData.type, { maxLength: 100 });
+    const typeLengthError = validateLength(normalizedType, {
+      min: 0,
+      max: 100,
+      label: "Appointment type",
+    });
+    if (typeLengthError) {
+      newErrors.type = "Appointment type must not exceed 100 characters.";
+    }
+
+    const normalizedNotes = sanitizeText(createFormData.notes, {
+      maxLength: 500,
+      preserveNewLines: true,
+    });
+    const notesLengthError = validateLength(normalizedNotes, {
+      min: 0,
+      max: 500,
+      label: "Additional notes",
+    });
+    if (notesLengthError) {
+      newErrors.notes = "Additional notes must not exceed 500 characters.";
+    }
+
+    if (hasFieldErrors(newErrors)) {
+      setFormErrors(newErrors);
+      return;
+    }
+
+    const selectedDateDetails = bookingDateDetails;
+    if (
+      selectedDateDetails &&
+      (selectedDateDetails.isWeekend || Boolean(selectedDateDetails.holiday))
+    ) {
+      setCreateFormError(
+        selectedDateDetails.holiday
+          ? `${selectedDateDetails.holiday.name} is a holiday. Please choose another date.`
+          : "Appointments can only be booked on weekdays (Monday-Friday).",
+      );
+      return;
+    }
+
+    // Validate date is not weekend or holiday
+    const dateValidation = validateDateSelection(createFormData.scheduled_date);
+    if (!dateValidation.valid) {
+      setCreateFormError(dateValidation.message);
+      return;
+    }
+
+    // Find the selected infant
+    const selectedInfant = infants.find(
+      (i) => i.id === parseInt(createFormData.infant_id),
+    );
+    if (!selectedInfant) {
+      setCreateFormError("Infant not found");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setError(null);
+      setCreateFormError("");
+
+      // Combine date and time
+      const scheduledDateTime = `${createFormData.scheduled_date}T${createFormData.scheduled_time}:00`;
+
+      const appointmentData = {
+        infant_id: parseInt(createFormData.infant_id),
+        scheduled_date: scheduledDateTime,
+        type: normalizedType || "General Checkup",
+        notes: normalizedNotes,
+      };
+
+      const newAppointment = await apiClient.createAppointment(appointmentData);
+      setAppointments([newAppointment, ...appointments]);
+      setShowBookingModal(false);
+      setCreateFormData({
+        infant_id: "",
+        scheduled_date: "",
+        scheduled_time: "",
+        type: "",
+        notes: "",
+      });
+      setFormErrors({});
+    } catch (err) {
+      const backendFields = err?.response?.data?.fields || {};
+      if (Object.keys(backendFields).length > 0) {
+        setFormErrors((prev) => ({
+          ...prev,
+          ...backendFields,
+        }));
+      }
+      setCreateFormError(err.message || "Failed to create appointment");
+      console.error("Error creating appointment:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle Update Appointment
+  const handleUpdateAppointment = async (event) => {
+    event.preventDefault();
+    const nextErrors = {};
+    if (!editFormData.scheduled_date) {
+      nextErrors.scheduled_date = "Please select a date.";
+    }
+    if (!editFormData.scheduled_time) {
+      nextErrors.scheduled_time = "Please select a time.";
+    }
+    const normalizedEditType = sanitizeText(editFormData.type, { maxLength: 100 });
+    const editTypeLengthError = validateLength(normalizedEditType, {
+      min: 0,
+      max: 100,
+      label: "Appointment type",
+    });
+    if (editTypeLengthError) {
+      nextErrors.type = "Appointment type must not exceed 100 characters.";
+    }
+
+    const normalizedEditNotes = sanitizeText(editFormData.notes, {
+      maxLength: 500,
+      preserveNewLines: true,
+    });
+    const editNotesLengthError = validateLength(normalizedEditNotes, {
+      min: 0,
+      max: 500,
+      label: "Additional notes",
+    });
+    if (editNotesLengthError) {
+      nextErrors.notes = "Additional notes must not exceed 500 characters.";
+    }
+
+    if (hasFieldErrors(nextErrors)) {
+      setEditFormErrors(nextErrors);
+      return;
+    }
+
+    // Validate date is not weekend or holiday
+    const dateValidation = validateDateSelection(editFormData.scheduled_date);
+    if (!dateValidation.valid) {
+      setEditFormErrors({
+        scheduled_date: dateValidation.message,
+      });
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setError(null);
+      setEditFormErrors({});
+
+      // Combine date and time
+      const scheduledDateTime = `${editFormData.scheduled_date}T${editFormData.scheduled_time}:00`;
+
+      const appointmentData = {
+        scheduled_date: scheduledDateTime,
+        type: normalizedEditType,
+        notes: normalizedEditNotes,
+      };
+
+      const updatedAppointment = await apiClient.updateAppointment(
+        editFormData.id,
+        appointmentData,
+      );
+      setAppointments(
+        appointments.map((apt) =>
+          apt.id === editFormData.id ? { ...apt, ...updatedAppointment } : apt,
+        ),
+      );
+      setShowEditModal(false);
+      setSelectedAppointment(null);
+    } catch (err) {
+      const backendFields = err?.response?.data?.fields || {};
+      if (Object.keys(backendFields).length > 0) {
+        setEditFormErrors((prev) => ({
+          ...prev,
+          ...backendFields,
+        }));
+      }
+      setError(err.message || "Failed to update appointment");
+      console.error("Error updating appointment:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (loading && appointments.length === 0 && !hookError) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="h-20 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse mb-8" />
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-48 animate-pulse" />
+          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse" />
+        </div>
+        <SkeletonTable rows={10} columns={5} />
+      </div>
+    );
+  }
+
+  if (hookError && appointments.length === 0) {
+    return (
+      <PageContainer>
+        <Alert variant="error" title="Error loading appointments">
+          {hookError}
+          <div className="mt-4">
+            <Button onClick={() => window.location.reload()} size="sm">
+              Retry
+            </Button>
+          </div>
+        </Alert>
+      </PageContainer>
+    );
+  }
+
+  return (
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <PageHeader
+        title="Appointments Management"
+        subtitle="Schedule, manage, and track vaccination appointments"
+        icon={<CalendarDays className="w-8 h-8 text-white" />}
+        actions={
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1" role="group" aria-label="View toggle">
+              <button
+                onClick={() => setView("list")}
+                aria-pressed={view === "list"}
+                aria-label="List view"
+                className={`px-3 py-1 rounded text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+                  view === "list"
+                    ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                }`}
+              >
+                📋 List
+              </button>
+              <button
+                onClick={() => setView("calendar")}
+                aria-pressed={view === "calendar"}
+                aria-label="Calendar view"
+                className={`px-3 py-1 rounded text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+                  view === "calendar"
+                    ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                }`}
+              >
+                📅 Calendar
+              </button>
+            </div>
+            <Button
+              variant="primary"
+              onClick={() => setShowBookingModal(true)}
+              className="gap-2"
+            >
+              Schedule New Appointment
+            </Button>
+          </div>
+        }
+      />
+
+      {view === "calendar" ? (
+        <PageContainer title="Calendar View">
+          {/* Calendar Header with Navigation */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {/* Month Navigation */}
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() =>
+                  setMonthCursor(
+                    (previous) => new Date(previous.getFullYear(), previous.getMonth() - 1, 1),
+                  )
+                }
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                aria-label="Previous month"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                {monthCursor.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+              </h3>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setMonthCursor(
+                    (previous) => new Date(previous.getFullYear(), previous.getMonth() + 1, 1),
+                  )
+                }
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                aria-label="Next month"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Today Button */}
+            <div className="flex items-center justify-center gap-2 py-3 border-b border-gray-200 dark:border-gray-700">
+              <button
+                type="button"
+                onClick={() => {
+                  const today = new Date();
+                  setMonthCursor(today);
+                  setSelectedDate(toDateKey(today));
+                }}
+                className="px-4 py-1.5 text-sm font-medium rounded-lg bg-primary-100 text-primary-700 hover:bg-primary-200 dark:bg-primary-900/30 dark:text-primary-300 dark:hover:bg-primary-900/50 transition-colors"
+                aria-label="Go to today"
+              >
+                Today
+              </button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setShowBookingModal(true)}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                New Appointment
+              </Button>
+            </div>
+
+            {/* Calendar Grid */}
+            {calendarLoading ? (
+              <div className="p-8 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+                <p className="text-sm text-gray-500 mt-2">Loading calendar...</p>
+              </div>
+            ) : (
+              <>
+                {/* Weekday Headers */}
+                <div className="grid grid-cols-7 gap-1 sm:gap-2 px-2 sm:px-4 pt-3 sm:pt-4 text-[10px] sm:text-xs font-semibold text-gray-500">
+                  {WEEKDAY_LABELS.map((label) => (
+                    <div key={label} className="text-center uppercase tracking-wide py-1">
+                      {label}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Calendar Cells */}
+                <div className="grid grid-cols-7 gap-1 sm:gap-2 p-2 sm:p-4 min-h-[360px] sm:min-h-[420px]">
+                  {calendarCells.map((cell) => {
+                    const info = availabilityByDate[cell.dateKey];
+                    const isCurrentMonth = cell.isCurrentMonth;
+                    const dayAppointments = getAppointmentsForDate(cell.dateKey);
+                    const hasAppointments = dayAppointments.length > 0;
+                    const isWeekendDay = isWeekend(cell.date);
+                    const holiday = isPhilippineHoliday(cell.date);
+
+                    // Determine cell styling
+                    let cellClass = "relative flex flex-col justify-start items-stretch min-h-[60px] sm:min-h-[70px] p-1.5 sm:p-2 rounded-lg border transition-all ";
+
+                    if (!isCurrentMonth) {
+                      // Non-current month days - faded
+                      cellClass += "border-gray-100 bg-gray-50/50 dark:border-gray-800 dark:bg-gray-900/30 opacity-50 ";
+                    } else if (holiday) {
+                      // Holiday
+                      cellClass += "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 ";
+                    } else if (isWeekendDay) {
+                      // Weekend - Saturday or Sunday
+                      cellClass += "border-gray-300 bg-gray-100 dark:border-gray-700 dark:bg-gray-800 ";
+                    } else {
+                      // Regular weekday
+                      cellClass += "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 hover:shadow-md ";
+                    }
+
+                    if (cell.dateKey === selectedDate) {
+                      cellClass += "ring-2 ring-primary-500 ";
+                    }
+
+                    return (
+                      <button
+                        key={cell.dateKey}
+                        type="button"
+                        onClick={() => isCurrentMonth && handleDateCellClick(cell.dateKey)}
+                        disabled={!isCurrentMonth}
+                        className={cellClass}
+                        aria-label={`${isCurrentMonth ? 'Select' : 'Date from other month'} ${cell.dateKey}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`text-sm font-semibold ${
+                              cell.isToday
+                                ? "text-primary-600 bg-primary-100 dark:bg-primary-900/30 rounded-full w-6 h-6 flex items-center justify-center"
+                                : isCurrentMonth
+                                  ? isWeekendDay
+                                    ? "text-gray-500 dark:text-gray-400"
+                                    : "text-gray-800 dark:text-gray-100"
+                                  : "text-gray-400 dark:text-gray-600"
+                            }`}
+                          >
+                            {cell.date.getDate()}
+                          </span>
+                          {isCurrentMonth && hasAppointments && (
+                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary-600 text-white">
+                              {dayAppointments.length}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="mt-1 space-y-0.5">
+                          {isCurrentMonth && holiday && (
+                            <p className="text-[9px] sm:text-[10px] font-semibold text-amber-700 dark:text-amber-300 truncate">
+                              {holiday.name}
+                            </p>
+                          )}
+                          {isCurrentMonth && isWeekendDay && !holiday && (
+                            <p className="text-[9px] sm:text-[10px] font-semibold text-gray-500 dark:text-gray-400">
+                              Weekend
+                            </p>
+                          )}
+                          {isCurrentMonth && hasAppointments && (
+                            <div className="space-y-0.5">
+                              {dayAppointments.slice(0, 2).map((apt, idx) => (
+                                <p key={idx} className="text-[9px] sm:text-[10px] text-gray-600 dark:text-gray-400 truncate">
+                                  {apt.first_name} {apt.last_name?.charAt(0)}.
+                                </p>
+                              ))}
+                              {dayAppointments.length > 2 && (
+                                <p className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-500">
+                                  +{dayAppointments.length - 2} more
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Calendar Legend */}
+          <div className="mt-4 flex flex-wrap gap-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-gray-100 border border-gray-300 dark:bg-gray-800 dark:border-gray-600"></div>
+              <span className="text-gray-600 dark:text-gray-400">Weekend (Sat/Sun)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-amber-50 border border-amber-300 dark:bg-amber-900/20 dark:border-amber-800"></div>
+              <span className="text-gray-600 dark:text-gray-400">Holiday</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700"></div>
+              <span className="text-gray-600 dark:text-gray-400">Available</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-primary-600"></div>
+              <span className="text-gray-600 dark:text-gray-400">Has Appointments</span>
+            </div>
+          </div>
+
+          {/* Selected Date Details */}
+          {selectedDate && (
+            <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                Appointments for {new Date(selectedDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+              </h4>
+              {(() => {
+                const dayAppointments = getAppointmentsForDate(selectedDate);
+                if (dayAppointments.length === 0) {
+                  return (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      No appointments scheduled for this date.
+                    </p>
+                  );
+                }
+                return (
+                  <div className="space-y-2">
+                    {dayAppointments.map((apt) => (
+                      <div
+                        key={apt.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                      >
+                        <div>
+                          <p className="font-medium text-gray-900 dark:text-gray-100">
+                            {apt.first_name} {apt.last_name}
+                          </p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {new Date(apt.scheduled_date).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} - {apt.type || "General Checkup"}
+                          </p>
+                        </div>
+                        <Badge
+                          variant={
+                            apt.status === "scheduled"
+                              ? "info"
+                              : apt.status === "attended"
+                                ? "success"
+                                : apt.status === "cancelled"
+                                  ? "danger"
+                                  : "warning"
+                          }
+                        >
+                          {apt.status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </PageContainer>
+      ) : filteredAppointments.length === 0 ? (
+        <EmptyState
+          title="No appointments scheduled"
+          description="There are no appointments in the selected date range. You can schedule a new one using the button above."
+          icon="📅"
+          actionLabel="Schedule New Appointment"
+          onAction={() => setShowBookingModal(true)}
+          className="py-20"
+        />
+      ) : (
+        <DataTable
+          data={filteredAppointments}
+          columns={columns}
+          actions={tableActions}
+          emptyMessage="No appointments scheduled."
+          emptyIcon={<span>📅</span>}
+        />
+      )}
+
+      {/* Date Details Modal */}
+      <Modal
+        isOpen={showDateDetailsModal}
+        onClose={() => {
+          setShowDateDetailsModal(false);
+          setDateDetailsLoading(false);
+        }}
+        title={`Date Details • ${selectedDate ? new Date(selectedDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : ""}`}
+        size="lg"
+        footer={
+          <AdminModalActions>
+            <Button
+              type="button"
+              variant="cancel"
+              onClick={() => setShowDateDetailsModal(false)}
+            >
+              Close
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setShowDateDetailsModal(false);
+                setShowBookingModal(true);
+                if (selectedDate) {
+                  setCreateFormData((prev) => ({
+                    ...prev,
+                    scheduled_date: selectedDate,
+                  }));
+                }
+              }}
+              disabled={
+                dateDetailsLoading ||
+                (selectedDateDetails
+                  ? selectedDateDetails.isWeekend ||
+                    Boolean(selectedDateDetails.holiday)
+                  : selectedDate &&
+                    (isWeekend(selectedDate) ||
+                      Boolean(isPhilippineHoliday(selectedDate))))
+              }
+            >
+              Book Appointment
+            </Button>
+          </AdminModalActions>
+        }
+      >
+        {dateDetailsLoading ? (
+          <div className="py-8 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+            <p className="text-sm text-gray-500 mt-3">Loading date details...</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+          {/* Availability Info */}
+          {selectedDate && (() => {
+            const holiday = selectedDateDetails?.holiday || isPhilippineHoliday(selectedDate);
+            const isWeekendDay =
+              selectedDateDetails?.isWeekend ?? isWeekend(selectedDate);
+
+            if (holiday) {
+              return (
+                <Alert variant="warning">
+                  <strong>{holiday.name}</strong> - This is a Philippine {holiday.type || 'regular'} holiday. Appointments cannot be scheduled on holidays.
+                </Alert>
+              );
+            }
+            if (isWeekendDay) {
+              return (
+                <Alert variant="warning">
+                  This date falls on a weekend (Saturday or Sunday). Appointments are only available on weekdays (Monday-Friday).
+                </Alert>
+              );
+            }
+            return (
+              <Alert variant="info">
+                This date is available for booking appointments.
+              </Alert>
+            );
+          })()}
+
+          {/* Appointment Summary */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+              <p className="text-xs text-gray-500">Total Appointments</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                {selectedDateDetails?.summary?.total ??
+                  (selectedDate ? getAppointmentsForDate(selectedDate).length : 0)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+              <p className="text-xs text-gray-500">Holiday</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {(selectedDateDetails?.holiday?.name ||
+                  (selectedDate && isPhilippineHoliday(selectedDate)?.name)) ||
+                  "None"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+              <p className="text-xs text-gray-500">Weekend</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {(selectedDateDetails?.isWeekend ??
+                  (selectedDate && isWeekend(selectedDate)))
+                  ? "Yes (Sat/Sun)"
+                  : "No"}
+              </p>
+            </div>
+          </div>
+
+          {/* Appointments List */}
+          <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+            <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              Appointments for this date:
+            </h4>
+            {(selectedDateDetails?.appointments ||
+              (selectedDate && getAppointmentsForDate(selectedDate)) ||
+              []).length === 0 ? (
+              <p className="text-sm text-gray-500">No appointments scheduled for this date.</p>
+            ) : (
+              (selectedDateDetails?.appointments ||
+                (selectedDate && getAppointmentsForDate(selectedDate)) ||
+                []).map((appointment) => (
+                <div
+                  key={appointment.id}
+                  className="rounded-xl border border-gray-200 dark:border-gray-700 p-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
+                      {(appointment.first_name || "Infant") + " " + (appointment.last_name || "")}
+                    </p>
+                    <Badge
+                      variant={
+                        appointment.status === "scheduled"
+                          ? "info"
+                          : appointment.status === "attended"
+                            ? "success"
+                          : appointment.status === "cancelled"
+                            ? "danger"
+                            : "warning"
+                      }
+                      className="text-[11px]"
+                    >
+                      {appointment.status}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {new Date(appointment.scheduled_date).toLocaleTimeString("en-US", {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })} - {appointment.type || "General Checkup"}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Booking Modal */}
+      <Modal
+        isOpen={showBookingModal}
+        onClose={() => {
+          setShowBookingModal(false);
+          setSelectedSlot(null);
+          setBookingDateDetails(null);
+          setCreateFormError("");
+          setCreateFormData({
+            infant_id: "",
+            scheduled_date: "",
+            scheduled_time: "",
+            type: "",
+            notes: "",
+          });
+          setFormErrors({});
+        }}
+        title="Schedule New Appointment"
+        size="md"
+        footer={
+          <AdminModalActions>
+            <Button
+              variant="cancel"
+              type="button"
+              onClick={() => {
+                setShowBookingModal(false);
+                setSelectedSlot(null);
+                setBookingDateDetails(null);
+                setCreateFormError("");
+                setCreateFormData({
+                  infant_id: "",
+                  scheduled_date: "",
+                  scheduled_time: "",
+                  type: "",
+                  notes: "",
+                });
+                setFormErrors({});
+              }}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="appointmentCreateForm"
+              loading={isSubmitting}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Scheduling..." : "Schedule Appointment"}
+            </Button>
+          </AdminModalActions>
+        }
+      >
+        <form id="appointmentCreateForm" className="admin-form" onSubmit={handleCreateAppointment}>
+          {selectedSlot && (
+            <div className="admin-info-card admin-info-card-info">
+              <div className="admin-info-card-content">
+                <p className="admin-info-card-text flex items-center gap-2">
+                  <span>📅</span> Selected Date:{" "}
+                  {moment(selectedSlot).format("MMMM Do YYYY, h:mm A")}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {createFormData.scheduled_date && bookingDateDetails?.holiday && (
+            <Alert variant="warning" className="mb-3">
+              {bookingDateDetails.holiday.name} is a holiday. Appointments are
+              not available on this date.
+            </Alert>
+          )}
+
+          {createFormData.scheduled_date &&
+            !bookingDateDetails?.holiday &&
+            bookingDateDetails?.isWeekend && (
+              <Alert variant="warning" className="mb-3">
+                This selected date is a weekend. Appointments are available on
+                weekdays only.
+              </Alert>
+            )}
+
+          {/* Patient Selection */}
+          <div className="admin-field-group">
+            <label className="admin-field-label required">Select Infant</label>
+              <Select
+                value={createFormData.infant_id}
+                onChange={(e) => {
+                  setCreateFormData({
+                    ...createFormData,
+                    infant_id: e.target.value,
+                  });
+                  setFormErrors((prev) => ({ ...prev, infant_id: undefined }));
+                }}
+                error={formErrors.infant_id}
+                disabled={isSubmitting}
+                aria-required="true"
+                aria-invalid={formErrors.infant_id ? "true" : "false"}
+              >
+              <option value="">Choose an infant...</option>
+              {infants.map((infant) => (
+                <option key={infant.id} value={infant.id}>
+                  {infant.first_name} {infant.last_name} {infant.control_number ? `(${infant.control_number})` : ""}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          {/* Auto-resolved Control Number */}
+          <div className="admin-field-group">
+            <label className="admin-field-label">Infant Control Number</label>
+            <Input
+              type="text"
+              value={getSelectedInfantControlNumber(createFormData.infant_id) || "Auto-populated from infant profile"}
+              disabled
+              readOnly
+              placeholder="Auto-populated from infant profile"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              This value is automatically loaded from the selected infant record and cannot be edited.
+            </p>
+          </div>
+
+          {/* Schedule Details */}
+          <div className="admin-form-row-2">
+            <div className="admin-field-group">
+              <label className="admin-field-label required">
+                Appointment Date
+              </label>
+              <Input
+                type="date"
+                value={createFormData.scheduled_date}
+                min={getMinDate()}
+                onChange={(e) => {
+                  setCreateFormData({
+                    ...createFormData,
+                    scheduled_date: e.target.value,
+                  });
+                  setFormErrors((prev) => ({
+                    ...prev,
+                    scheduled_date: undefined,
+                  }));
+                }}
+                error={formErrors.scheduled_date}
+                disabled={isSubmitting}
+                aria-required="true"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Select a weekday (Mon-Fri). Weekends and Philippine holidays are
+                not available.
+              </p>
+            </div>
+            <div className="admin-field-group">
+              <label className="admin-field-label required">
+                Appointment Time (8AM - 5PM)
+              </label>
+              <Select
+                value={createFormData.scheduled_time}
+                onChange={(e) => {
+                  setCreateFormData({
+                    ...createFormData,
+                    scheduled_time: e.target.value,
+                  });
+                  setFormErrors((prev) => ({
+                    ...prev,
+                    scheduled_time: undefined,
+                  }));
+                }}
+                error={formErrors.scheduled_time}
+                disabled={isSubmitting}
+                aria-required="true"
+              >
+                {timeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          <div className="admin-field-group">
+            <label className="admin-field-label">Appointment Type</label>
+            <Select
+              value={createFormData.type}
+              onChange={(e) => {
+                setCreateFormData({
+                  ...createFormData,
+                  type: e.target.value,
+                });
+                setFormErrors((prev) => ({ ...prev, type: undefined }));
+              }}
+              disabled={isSubmitting}
+              error={formErrors.type}
+            >
+              <option value="">Select type...</option>
+              <option value="Vaccination">Vaccination</option>
+              <option value="Checkup">General Checkup</option>
+              <option value="Follow-up">Follow-up</option>
+              <option value="Consultation">Consultation</option>
+            </Select>
+          </div>
+
+          {/* Notes */}
+          <div className="admin-field-group">
+            <label className="admin-field-label">Additional Notes</label>
+            <textarea
+              value={createFormData.notes}
+              onChange={(e) => {
+                setCreateFormData({
+                  ...createFormData,
+                  notes: e.target.value,
+                });
+                setFormErrors((prev) => ({ ...prev, notes: undefined }));
+              }}
+              disabled={isSubmitting}
+              rows={3}
+              className={`admin-textarea ${formErrors.notes ? "admin-textarea-error" : ""}`}
+              placeholder="Additional notes..."
+              maxLength={500}
+            />
+            {formErrors.notes && (
+              <span className="admin-field-error">{formErrors.notes}</span>
+            )}
+          </div>
+
+          {error && (
+            <Alert variant="error" className="mb-4">
+              {error}
+            </Alert>
+          )}
+
+          {createFormError && (
+            <Alert variant="error" className="mb-4">
+              {createFormError}
+            </Alert>
+          )}
+        </form>
+      </Modal>
+
+      {/* View Appointment Modal */}
+      <Modal
+        isOpen={showViewModal}
+        onClose={() => {
+          setShowViewModal(false);
+          setSelectedAppointment(null);
+        }}
+        title="Appointment Details"
+        size="md"
+        footer={
+          <AdminModalActions>
+            <Button
+              variant="cancel"
+              type="button"
+              onClick={() => {
+                setShowViewModal(false);
+                setSelectedAppointment(null);
+              }}
+            >
+              Close
+            </Button>
+          </AdminModalActions>
+        }
+      >
+        {selectedAppointment && (
+          <div className="space-y-4">
+            <div className="admin-form-row-2">
+              <div>
+                <label className="text-sm text-gray-500 dark:text-gray-400">
+                  Infant Name
+                </label>
+                <p className="font-medium text-gray-900 dark:text-gray-100">
+                  {selectedAppointment.first_name}{" "}
+                  {selectedAppointment.last_name}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500 dark:text-gray-400">
+                  Guardian
+                </label>
+                <p className="font-medium text-gray-900 dark:text-gray-100">
+                  {selectedAppointment.guardian_name || "N/A"}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500 dark:text-gray-400">
+                  Date & Time
+                </label>
+                <p className="font-medium text-gray-900 dark:text-gray-100">
+                  {selectedAppointment.scheduled_date
+                    ? moment(selectedAppointment.scheduled_date).format(
+                        "MMMM D, YYYY h:mm A",
+                      )
+                    : "N/A"}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500 dark:text-gray-400">
+                  Type
+                </label>
+                <p className="font-medium text-gray-900 dark:text-gray-100">
+                  {selectedAppointment.type || "General Checkup"}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500 dark:text-gray-400">
+                  Status
+                </label>
+                <Badge
+                  variant={
+                    selectedAppointment.status === "scheduled"
+                      ? "info"
+                      : selectedAppointment.status === "attended"
+                        ? "success"
+                        : selectedAppointment.status === "cancelled"
+                          ? "danger"
+                          : "warning"
+                  }
+                  className="capitalize mt-1"
+                >
+                  {selectedAppointment.status || "Pending"}
+                </Badge>
+              </div>
+            </div>
+
+          </div>
+        )}
+      </Modal>
+
+      {/* Edit Appointment Modal */}
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedAppointment(null);
+          setEditFormErrors({});
+        }}
+        title="Edit Appointment"
+        size="md"
+        footer={
+          <AdminModalActions>
+            <Button
+              variant="cancel"
+              type="button"
+              onClick={() => {
+                setShowEditModal(false);
+                setSelectedAppointment(null);
+                setEditFormErrors({});
+              }}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="appointmentEditForm"
+              loading={isSubmitting}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Updating..." : "Update Appointment"}
+            </Button>
+          </AdminModalActions>
+        }
+      >
+        <form id="appointmentEditForm" className="admin-form" onSubmit={handleUpdateAppointment}>
+          {/* Patient Info Card */}
+          <div className="admin-form-card admin-form-card-info">
+            <div className="admin-form-card-header">
+              <h4 className="admin-form-card-title">
+                <span>👶</span> Patient Information
+              </h4>
+            </div>
+            <div className="admin-form-row-2">
+              <div className="admin-user-info">
+                <div className="admin-user-info-details">
+                  <p className="admin-user-info-label">Infant</p>
+                  <p className="admin-user-info-name">
+                    {selectedAppointment?.first_name}{" "}
+                    {selectedAppointment?.last_name}
+                  </p>
+                </div>
+              </div>
+              <div className="admin-user-info">
+                <div className="admin-user-info-details">
+                  <p className="admin-user-info-label">Guardian</p>
+                  <p className="admin-user-info-name">
+                    {selectedAppointment?.guardian_name || "N/A"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Schedule Details */}
+          <div className="admin-form-row-2">
+            <div className="admin-field-group">
+              <label className="admin-field-label required">
+                Appointment Date
+              </label>
+              <Input
+                type="date"
+                value={editFormData.scheduled_date}
+                min={getMinDate()}
+                onChange={(e) => {
+                  setEditFormData({
+                    ...editFormData,
+                    scheduled_date: e.target.value,
+                  });
+                  setEditFormErrors((prev) => ({
+                    ...prev,
+                    scheduled_date: undefined,
+                  }));
+                }}
+                disabled={isSubmitting}
+                error={editFormErrors.scheduled_date}
+                aria-required="true"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Select a weekday (Mon-Fri). Weekends and Philippine holidays are
+                not available.
+              </p>
+            </div>
+            <div className="admin-field-group">
+              <label className="admin-field-label required">
+                Appointment Time (8AM - 5PM)
+              </label>
+              <Select
+                value={editFormData.scheduled_time}
+                onChange={(e) => {
+                  setEditFormData({
+                    ...editFormData,
+                    scheduled_time: e.target.value,
+                  });
+                  setEditFormErrors((prev) => ({
+                    ...prev,
+                    scheduled_time: undefined,
+                  }));
+                }}
+                disabled={isSubmitting}
+                error={editFormErrors.scheduled_time}
+                aria-required="true"
+              >
+                {timeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          <div className="admin-field-group">
+            <label className="admin-field-label">Appointment Type</label>
+            <Select
+              value={editFormData.type}
+              onChange={(e) => {
+                setEditFormData({ ...editFormData, type: e.target.value });
+                setEditFormErrors((prev) => ({ ...prev, type: undefined }));
+              }}
+              disabled={isSubmitting}
+              error={editFormErrors.type}
+            >
+              <option value="">Select type...</option>
+              <option value="Vaccination">Vaccination</option>
+              <option value="Checkup">General Checkup</option>
+              <option value="Follow-up">Follow-up</option>
+              <option value="Consultation">Consultation</option>
+            </Select>
+          </div>
+
+          {/* Notes */}
+          <div className="admin-field-group">
+            <label className="admin-field-label">Additional Notes</label>
+            <textarea
+              value={editFormData.notes}
+              onChange={(e) => {
+                setEditFormData({ ...editFormData, notes: e.target.value });
+                setEditFormErrors((prev) => ({ ...prev, notes: undefined }));
+              }}
+              disabled={isSubmitting}
+              rows={3}
+              className={`admin-textarea ${editFormErrors.notes ? "admin-textarea-error" : ""}`}
+              placeholder="Additional notes..."
+              maxLength={500}
+            />
+            {editFormErrors.notes && (
+              <span className="admin-field-error">{editFormErrors.notes}</span>
+            )}
+          </div>
+
+          {error && (
+            <Alert variant="error" className="mb-4">
+              {error}
+            </Alert>
+          )}
+        </form>
+      </Modal>
+
+      {/* Cancel Appointment Modal */}
+      <Modal
+        isOpen={showCancelModal}
+        onClose={() => {
+          setShowCancelModal(false);
+          setCancelReason("");
+          setSelectedAppointment(null);
+          setCancelModalError("");
+        }}
+        title="Cancel Appointment"
+        size="md"
+        footer={
+          <AdminModalActions>
+            <Button
+              variant="cancel"
+              type="button"
+              onClick={() => {
+                setShowCancelModal(false);
+                setCancelReason("");
+                setSelectedAppointment(null);
+                setCancelModalError("");
+              }}
+              disabled={isSubmitting}
+            >
+              No, Keep Appointment
+            </Button>
+            <Button
+              variant="danger"
+              type="submit"
+              form="appointmentCancelForm"
+              loading={isSubmitting}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Cancelling..." : "Yes, Cancel Appointment"}
+            </Button>
+          </AdminModalActions>
+        }
+      >
+        <form id="appointmentCancelForm" className="admin-form" onSubmit={handleConfirmCancelAppointment}>
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 mx-auto bg-danger-100 dark:bg-danger-900/30 rounded-full flex items-center justify-center mb-4">
+            <span className="text-3xl">⚠️</span>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            Are you sure you want to cancel this appointment?
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400">
+            This action cannot be undone. Please provide a reason for
+            cancellation.
+          </p>
+        </div>
+
+        {selectedAppointment && (
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-4">
+            <div className="admin-form-row-2 text-sm">
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">
+                  Infant:
+                </span>
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {selectedAppointment.first_name}{" "}
+                  {selectedAppointment.last_name}
+                </p>
+              </div>
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">
+                  Date & Time:
+                </span>
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {selectedAppointment.scheduled_date
+                    ? moment(selectedAppointment.scheduled_date).format(
+                        "MMM D, YYYY h:mm A",
+                      )
+                    : "N/A"}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="admin-field-group">
+          <label className="admin-field-label">Cancellation Reason</label>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => {
+                setCancelReason(e.target.value);
+                setCancelModalError("");
+              }}
+              disabled={isSubmitting}
+              rows={3}
+              className="admin-textarea"
+              placeholder="Please provide a reason for cancellation (optional)"
+              maxLength={500}
+            />
+        </div>
+
+        {cancelModalError && (
+          <Alert variant="error" className="mt-2">
+            {cancelModalError}
+          </Alert>
+        )}
+        </form>
+      </Modal>
+      {/* Screen reader announcements */}
+      <div
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {view === "calendar"
+          ? `Calendar view: ${monthCursor.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`
+          : `List view showing ${filteredAppointments.length} appointments`
+        }
+      </div>
+    </div>
+  );
+}

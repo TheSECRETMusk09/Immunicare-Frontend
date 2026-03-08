@@ -1,0 +1,1279 @@
+/* ==========================================================================
+    Guardian Dashboard Comprehensive Theme Styles (Dark & Daylight Mode)
+    Immunicare Vaccination Management System
+
+    Purpose: Fix all theme inconsistencies across the Guardian dashboard
+    Features:
+    - CSS custom properties for theme consistency
+    - Full daylight mode support
+    - Smooth theme transitions
+    - High contrast mode support
+    - Accessibility-compliant contrast ratios
+    - Component-specific theme overrides
+
+    @version 2.0
+    @since 2026-03-02
+    ========================================================================== */
+
+/* ==========================================================================
+   CSS Custom Properties - Theme Tokens
+   ========================================================================== */
+
+:root {
+  /* Background Colors - Light Mode */
+  --theme-bg-primary: #ffffff;
+  --theme-bg-secondary: #f9fafb;
+  --theme-bg-tertiary: #f3f4f6;
+  --theme-bg-elevated: #ffffff;
+  --theme-bg-sidebar: #ffffff;
+  --theme-bg-header: #ffffff;
+  --theme-bg-card: #ffffff;
+  --theme-bg-input: #f9fafb;
+  --theme-bg-hover: #f3f4f6;
+  --theme-bg-active: #e5e7eb;
+  --theme-bg-overlay: rgba(0, 0, 0, 0.5);
+
+  /* Text Colors - Light Mode */
+  --theme-text-primary: #111827;
+  --theme-text-secondary: #6b7280;
+  --theme-text-tertiary: #9ca3af;
+  --theme-text-muted: #9ca3af;
+  --theme-text-placeholder: #9ca3af;
+  --theme-text-inverse: #ffffff;
+
+  /* Border Colors - Light Mode */
+  --theme-border-primary: #e5e7eb;
+  --theme-border-secondary: #d1d5db;
+  --theme-border-focus: #10b981;
+  --theme-border-error: #ef4444;
+
+  /* Accent Colors */
+  --theme-accent-primary: #10b981;
+  --theme-accent-primary-hover: #059669;
+  --theme-accent-secondary: #3b82f6;
+  --theme-accent-danger: #ef4444;
+  --theme-accent-warning: #f59e0b;
+
+  /* Shadow Colors */
+  --theme-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --theme-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --theme-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --theme-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+
+  /* Transition Timing */
+  --theme-transition-fast: 150ms ease;
+  --theme-transition-normal: 200ms ease;
+  --theme-transition-slow: 300ms ease;
+}
+
+/* ==========================================================================
+   Dark Mode Theme Variables
+   ========================================================================== */
+
+.dark {
+  /* Background Colors - Dark Mode */
+  --theme-bg-primary: #111827;
+  --theme-bg-secondary: #1f2937;
+  --theme-bg-tertiary: #374151;
+  --theme-bg-elevated: #1f2937;
+  --theme-bg-sidebar: #111827;
+  --theme-bg-header: #111827;
+  --theme-bg-card: #1f2937;
+  --theme-bg-input: #374151;
+  --theme-bg-hover: #374151;
+  --theme-bg-active: #4b5563;
+  --theme-bg-overlay: rgba(0, 0, 0, 0.7);
+
+  /* Text Colors - Dark Mode */
+  --theme-text-primary: #f9fafb;
+  --theme-text-secondary: #d1d5db;
+  --theme-text-tertiary: #9ca3af;
+  --theme-text-muted: #6b7280;
+  --theme-text-placeholder: #6b7280;
+  --theme-text-inverse: #111827;
+
+  /* Border Colors - Dark Mode */
+  --theme-border-primary: #374151;
+  --theme-border-secondary: #4b5563;
+  --theme-border-focus: #10b981;
+  --theme-border-error: #ef4444;
+
+  /* Accent Colors - Dark Mode (slightly adjusted for visibility) */
+  --theme-accent-primary: #10b981;
+  --theme-accent-primary-hover: #34d399;
+  --theme-accent-secondary: #60a5fa;
+  --theme-accent-danger: #f87171;
+  --theme-accent-warning: #fbbf24;
+
+  /* Shadow Colors - Dark Mode */
+  --theme-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --theme-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --theme-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  --theme-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
+}
+
+/* ==========================================================================
+   Global Theme Transitions
+   Apply smooth transitions to all theme-affected properties
+   ========================================================================== */
+
+.theme-transition-enabled *,
+.theme-transition-enabled *::before,
+.theme-transition-enabled *::after {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: var(--theme-transition-normal);
+  transition-timing-function: ease;
+}
+
+/* Disable transitions for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .theme-transition-enabled *,
+  .theme-transition-enabled *::before,
+  .theme-transition-enabled *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ==========================================================================
+   Guardian Dashboard Container
+   ========================================================================== */
+
+.guardian-dashboard {
+  background-color: var(--theme-bg-primary);
+  color: var(--theme-text-primary);
+}
+
+/* ==========================================================================
+   Sidebar Dark Mode Fixes
+   ========================================================================== */
+
+/* Main sidebar container */
+.guardian-sidebar {
+  background-color: var(--theme-bg-sidebar) !important;
+  border-right: 1px solid var(--theme-border-primary);
+  transition: background-color var(--theme-transition-normal),
+              border-color var(--theme-transition-normal);
+}
+
+.dark .guardian-sidebar {
+  background-color: var(--theme-bg-sidebar) !important;
+  border-right-color: var(--theme-border-primary);
+}
+
+/* Sidebar header/logo area */
+.guardian-sidebar .border-b {
+  border-color: var(--theme-border-primary);
+}
+
+/* Sidebar navigation items */
+.guardian-sidebar-nav-item {
+  color: var(--theme-text-secondary);
+  transition: all var(--theme-transition-fast);
+}
+
+.guardian-sidebar-nav-item:hover {
+  background-color: var(--theme-bg-hover);
+  color: var(--theme-text-primary);
+}
+
+.guardian-sidebar-nav-item.active {
+  background-color: var(--theme-accent-primary);
+  color: var(--theme-text-inverse);
+}
+
+.dark .guardian-sidebar-nav-item {
+  color: var(--theme-text-secondary);
+}
+
+.dark .guardian-sidebar-nav-item:hover {
+  background-color: var(--theme-bg-hover);
+  color: var(--theme-text-primary);
+}
+
+.dark .guardian-sidebar-nav-item.active {
+  background-color: var(--theme-accent-primary);
+  color: var(--theme-text-inverse);
+}
+
+/* Sidebar sub-items container */
+.guardian-sidebar-subitems {
+  background-color: var(--theme-bg-secondary);
+}
+
+.dark .guardian-sidebar-subitems {
+  background-color: var(--theme-bg-secondary);
+}
+
+/* Sidebar footer/user section */
+.guardian-sidebar .mt-auto {
+  border-color: var(--theme-border-primary);
+}
+
+/* ==========================================================================
+   Card Component Dark Mode
+   ========================================================================== */
+
+/* Base card styles */
+.theme-card,
+.guardian-card,
+.profile-page .bg-white.rounded-2xl,
+.bg-white.rounded-2xl,
+.bg-white.rounded-xl {
+  background-color: var(--theme-bg-card) !important;
+  border-color: var(--theme-border-primary) !important;
+  color: var(--theme-text-primary);
+  transition: background-color var(--theme-transition-normal),
+              border-color var(--theme-transition-normal),
+              box-shadow var(--theme-transition-normal);
+}
+
+.dark .theme-card,
+.dark .guardian-card,
+.dark .profile-page .bg-white.rounded-2xl,
+.dark .bg-white.rounded-2xl,
+.dark .bg-white.rounded-xl {
+  background-color: var(--theme-bg-card) !important;
+  border-color: var(--theme-border-primary) !important;
+  color: var(--theme-text-primary);
+}
+
+/* Card headers */
+.theme-card-header,
+.profile-page .border-b {
+  border-color: var(--theme-border-primary);
+  background-color: var(--theme-bg-secondary);
+}
+
+.dark .theme-card-header,
+.dark .profile-page .border-b {
+  border-color: var(--theme-border-primary);
+  background-color: var(--theme-bg-secondary);
+}
+
+/* Card footers */
+.theme-card-footer {
+  border-color: var(--theme-border-primary);
+  background-color: var(--theme-bg-secondary);
+}
+
+/* ==========================================================================
+   Empty State Cards (Dashboard)
+   ========================================================================== */
+
+/* Empty state containers */
+.empty-state-card,
+.guardian-dashboard .bg-white.rounded-2xl.p-6,
+.guardian-dashboard .bg-white.rounded-2xl.p-8 {
+  background-color: var(--theme-bg-card) !important;
+  border: 1px solid var(--theme-border-primary);
+}
+
+.dark .empty-state-card,
+.dark .guardian-dashboard .bg-white.rounded-2xl.p-6,
+.dark .guardian-dashboard .bg-white.rounded-2xl.p-8 {
+  background-color: var(--theme-bg-card) !important;
+  border-color: var(--theme-border-primary);
+}
+
+/* Empty state text */
+.empty-state-card h3,
+.empty-state-card p,
+.guardian-dashboard .bg-white h3,
+.guardian-dashboard .bg-white p {
+  color: var(--theme-text-primary);
+}
+
+.empty-state-card .text-gray-500,
+.guardian-dashboard .bg-white .text-gray-500 {
+  color: var(--theme-text-secondary);
+}
+
+.dark .empty-state-card h3,
+.dark .empty-state-card p,
+.dark .guardian-dashboard .bg-white h3,
+.dark .guardian-dashboard .bg-white p {
+  color: var(--theme-text-primary);
+}
+
+/* ==========================================================================
+   Form Input Dark Mode
+   ========================================================================== */
+
+/* Input fields */
+.theme-input,
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="password"],
+select,
+textarea,
+.profile-page input,
+.profile-page select,
+.profile-page textarea {
+  background-color: var(--theme-bg-input) !important;
+  border-color: var(--theme-border-primary) !important;
+  color: var(--theme-text-primary) !important;
+  transition: all var(--theme-transition-fast);
+}
+
+.dark .theme-input,
+.dark input[type="text"],
+.dark input[type="email"],
+.dark input[type="tel"],
+.dark input[type="password"],
+.dark select,
+.dark textarea,
+.dark .profile-page input,
+.dark .profile-page select,
+.dark .profile-page textarea {
+  background-color: var(--theme-bg-input) !important;
+  border-color: var(--theme-border-primary) !important;
+  color: var(--theme-text-primary) !important;
+}
+
+/* Input placeholders */
+.theme-input::placeholder,
+input::placeholder,
+textarea::placeholder {
+  color: var(--theme-text-placeholder);
+}
+
+.dark .theme-input::placeholder,
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--theme-text-placeholder);
+}
+
+/* Input focus states */
+.theme-input:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--theme-border-focus);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.dark .theme-input:focus,
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+  border-color: var(--theme-border-focus);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+/* Read-only / Display fields */
+.form-display-field,
+.profile-page .bg-gray-50,
+.profile-page .bg-gray-50.dark\:bg-gray-700\/50 {
+  background-color: var(--theme-bg-secondary) !important;
+  color: var(--theme-text-primary);
+}
+
+.dark .form-display-field,
+.dark .profile-page .bg-gray-50,
+.dark .profile-page .bg-gray-50.dark\:bg-gray-700\/50 {
+  background-color: var(--theme-bg-tertiary) !important;
+  color: var(--theme-text-primary);
+}
+
+/* ==========================================================================
+   Tab Components Dark Mode
+   ========================================================================== */
+
+/* Tab buttons */
+.theme-tab,
+[role="tab"],
+button[data-state="active"],
+.tab-button {
+  background-color: var(--theme-bg-secondary);
+  color: var(--theme-text-secondary);
+  border-color: var(--theme-border-primary);
+  transition: all var(--theme-transition-fast);
+}
+
+.dark .theme-tab,
+.dark [role="tab"],
+.dark button[data-state="active"],
+.dark .tab-button {
+  background-color: var(--theme-bg-secondary);
+  color: var(--theme-text-secondary);
+  border-color: var(--theme-border-primary);
+}
+
+/* Active tab */
+.theme-tab.active,
+.theme-tab[data-active="true"],
+[role="tab"][aria-selected="true"] {
+  background-color: var(--theme-accent-primary);
+  color: var(--theme-text-inverse);
+  border-color: var(--theme-accent-primary);
+}
+
+.dark .theme-tab.active,
+.dark .theme-tab[data-active="true"],
+.dark [role="tab"][aria-selected="true"] {
+  background-color: var(--theme-accent-primary);
+  color: var(--theme-text-inverse);
+}
+
+/* ==========================================================================
+   Dropdown / Select Dark Mode
+   ========================================================================== */
+
+/* Select dropdowns */
+.theme-select,
+select.form-select,
+.All\ Types,
+[data-testid="select-trigger"] {
+  background-color: var(--theme-bg-card) !important;
+  border-color: var(--theme-border-primary) !important;
+  color: var(--theme-text-primary) !important;
+}
+
+.dark .theme-select,
+.dark select.form-select,
+.dark .All\ Types,
+.dark [data-testid="select-trigger"] {
+  background-color: var(--theme-bg-card) !important;
+  border-color: var(--theme-border-primary) !important;
+  color: var(--theme-text-primary) !important;
+}
+
+/* Dropdown options */
+.theme-select option,
+select option {
+  background-color: var(--theme-bg-card);
+  color: var(--theme-text-primary);
+}
+
+.dark .theme-select option,
+.dark select option {
+  background-color: var(--theme-bg-card);
+  color: var(--theme-text-primary);
+}
+
+/* ==========================================================================
+   Modal Dark Mode
+   ========================================================================== */
+
+/* Modal overlay */
+.theme-modal-overlay,
+.guardian-modal-overlay,
+[role="dialog"] {
+  background-color: var(--theme-bg-overlay);
+}
+
+.dark .theme-modal-overlay,
+.dark .guardian-modal-overlay {
+  background-color: var(--theme-bg-overlay);
+}
+
+/* Modal content */
+.theme-modal,
+.guardian-modal,
+[role="dialog"] > div {
+  background-color: var(--theme-bg-card);
+  border-color: var(--theme-border-primary);
+  color: var(--theme-text-primary);
+}
+
+.dark .theme-modal,
+.dark .guardian-modal,
+.dark [role="dialog"] > div {
+  background-color: var(--theme-bg-card);
+  border-color: var(--theme-border-primary);
+  color: var(--theme-text-primary);
+}
+
+/* ==========================================================================
+   Button Dark Mode Enhancements
+   ========================================================================== */
+
+/* Secondary/Ghost buttons */
+.btn-secondary,
+button[class*="secondary"],
+button[class*="ghost"] {
+  background-color: var(--theme-bg-secondary);
+  color: var(--theme-text-primary);
+  border-color: var(--theme-border-primary);
+}
+
+.dark .btn-secondary,
+.dark button[class*="secondary"],
+.dark button[class*="ghost"] {
+  background-color: var(--theme-bg-secondary);
+  color: var(--theme-text-primary);
+  border-color: var(--theme-border-primary);
+}
+
+.btn-secondary:hover,
+button[class*="secondary"]:hover {
+  background-color: var(--theme-bg-hover);
+}
+
+.dark .btn-secondary:hover,
+.dark button[class*="secondary"]:hover {
+  background-color: var(--theme-bg-hover);
+}
+
+/* ==========================================================================
+   Text Color Utilities
+   ========================================================================== */
+
+/* Primary text */
+.theme-text-primary,
+.text-theme-primary {
+  color: var(--theme-text-primary);
+}
+
+.dark .theme-text-primary,
+.dark .text-theme-primary {
+  color: var(--theme-text-primary);
+}
+
+/* Secondary text */
+.theme-text-secondary,
+.text-theme-secondary {
+  color: var(--theme-text-secondary);
+}
+
+.dark .theme-text-secondary,
+.dark .text-theme-secondary {
+  color: var(--theme-text-secondary);
+}
+
+/* Muted text */
+.theme-text-muted,
+.text-theme-muted {
+  color: var(--theme-text-muted);
+}
+
+.dark .theme-text-muted,
+.dark .text-theme-muted {
+  color: var(--theme-text-muted);
+}
+
+/* ==========================================================================
+   Profile Page Specific Fixes
+   ========================================================================== */
+
+/* Profile page background */
+.profile-page {
+  background-color: var(--theme-bg-primary);
+}
+
+.dark .profile-page {
+  background-color: var(--theme-bg-primary);
+}
+
+/* Profile cards - force dark mode support */
+.profile-page .bg-white,
+.profile-page [class*="bg-white"] {
+  background-color: var(--theme-bg-card) !important;
+}
+
+.dark .profile-page .bg-white,
+.dark .profile-page [class*="bg-white"] {
+  background-color: var(--theme-bg-card) !important;
+}
+
+/* Profile card borders */
+.profile-page .border-gray-100,
+.profile-page [class*="border-gray-100"] {
+  border-color: var(--theme-border-primary) !important;
+}
+
+.dark .profile-page .border-gray-100,
+.dark .profile-page [class*="border-gray-100"] {
+  border-color: var(--theme-border-primary) !important;
+}
+
+/* Profile text colors */
+.profile-page .text-gray-900,
+.profile-page [class*="text-gray-900"] {
+  color: var(--theme-text-primary) !important;
+}
+
+.dark .profile-page .text-gray-900,
+.dark .profile-page [class*="text-gray-900"] {
+  color: var(--theme-text-primary) !important;
+}
+
+.profile-page .text-gray-500,
+.profile-page [class*="text-gray-500"] {
+  color: var(--theme-text-secondary) !important;
+}
+
+.dark .profile-page .text-gray-500,
+.dark .profile-page [class*="text-gray-500"] {
+  color: var(--theme-text-secondary) !important;
+}
+
+/* Profile input backgrounds */
+.profile-page .bg-gray-50,
+.profile-page [class*="bg-gray-50"] {
+  background-color: var(--theme-bg-secondary) !important;
+}
+
+.dark .profile-page .bg-gray-50,
+.dark .profile-page [class*="bg-gray-50"] {
+  background-color: var(--theme-bg-tertiary) !important;
+}
+
+/* ==========================================================================
+   My Children Page Specific Fixes
+   ========================================================================== */
+
+/* My Children page container */
+.my-children-page {
+  background-color: var(--theme-bg-primary);
+}
+
+.dark .my-children-page {
+  background-color: var(--theme-bg-primary);
+}
+
+/* Empty state cards on My Children page */
+.my-children-page .bg-white,
+.my-children-page [class*="bg-white"] {
+  background-color: var(--theme-bg-card) !important;
+}
+
+.dark .my-children-page .bg-white,
+.dark .my-children-page [class*="bg-white"] {
+  background-color: var(--theme-bg-card) !important;
+}
+
+/* ==========================================================================
+   Notifications Page Specific Fixes
+   ========================================================================== */
+
+/* Notifications page tabs */
+.notifications-page [role="tab"],
+.notifications-page .tab-button,
+.notifications-page button[class*="tab"] {
+  background-color: var(--theme-bg-secondary);
+  color: var(--theme-text-secondary);
+  border: 1px solid var(--theme-border-primary);
+}
+
+.dark .notifications-page [role="tab"],
+.dark .notifications-page .tab-button,
+.dark .notifications-page button[class*="tab"] {
+  background-color: var(--theme-bg-secondary);
+  color: var(--theme-text-secondary);
+  border-color: var(--theme-border-primary);
+}
+
+/* Active notification tab */
+.notifications-page [role="tab"][aria-selected="true"],
+.notifications-page .tab-button.active {
+  background-color: var(--theme-accent-primary);
+  color: var(--theme-text-inverse);
+  border-color: var(--theme-accent-primary);
+}
+
+.dark .notifications-page [role="tab"][aria-selected="true"],
+.dark .notifications-page .tab-button.active {
+  background-color: var(--theme-accent-primary);
+  color: var(--theme-text-inverse);
+}
+
+/* Notifications dropdown/filter */
+.notifications-page select,
+.notifications-page .form-select,
+.notifications-page [class*="select"] {
+  background-color: var(--theme-bg-card) !important;
+  color: var(--theme-text-primary) !important;
+  border-color: var(--theme-border-primary) !important;
+}
+
+.dark .notifications-page select,
+.dark .notifications-page .form-select,
+.dark .notifications-page [class*="select"] {
+  background-color: var(--theme-bg-card) !important;
+  color: var(--theme-text-primary) !important;
+  border-color: var(--theme-border-primary) !important;
+}
+
+/* ==========================================================================
+   Scrollbar Dark Mode
+   ========================================================================== */
+
+/* Webkit scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--theme-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--theme-border-secondary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-text-tertiary);
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: var(--theme-bg-secondary);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--theme-border-secondary);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-text-tertiary);
+}
+
+/* Firefox scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--theme-border-secondary) var(--theme-bg-secondary);
+}
+
+.dark * {
+  scrollbar-color: var(--theme-border-secondary) var(--theme-bg-secondary);
+}
+
+/* ==========================================================================
+   High Contrast Mode Support
+   ========================================================================== */
+
+@media (prefers-contrast: high) {
+  :root {
+    --theme-border-primary: #6b7280;
+    --theme-border-secondary: #4b5563;
+  }
+
+  .dark {
+    --theme-border-primary: #9ca3af;
+    --theme-border-secondary: #d1d5db;
+  }
+
+  /* Ensure borders are visible */
+  .theme-card,
+  .guardian-card,
+  input,
+  select,
+  textarea,
+  button {
+    border-width: 2px !important;
+  }
+
+  /* Enhanced focus indicators */
+  *:focus-visible {
+    outline: 3px solid var(--theme-accent-primary) !important;
+    outline-offset: 2px !important;
+  }
+}
+
+/* ==========================================================================
+    Print Styles - Disable Dark Mode for Printing
+    ========================================================================== */
+
+@media print {
+  .dark,
+  .dark * {
+    background-color: white !important;
+    color: black !important;
+    border-color: #ccc !important;
+  }
+
+  .guardian-sidebar,
+  .guardian-bottom-nav {
+    display: none !important;
+  }
+}
+
+/* ==========================================================================
+   Additional Guardian Dashboard Dark Mode Fixes
+   Fixes for specific components and edge cases
+   ========================================================================== */
+
+/* Force dark mode on guardian layout wrapper */
+.guardian-layout-wrapper.dark,
+.guardian-layout-wrapper .dark {
+  color-scheme: dark;
+}
+
+/* Sidebar specific fixes - ensure proper dark mode inheritance */
+.dark .guardian-sidebar,
+.guardian-layout-wrapper.dark .guardian-sidebar {
+  background-color: #111827 !important;
+  border-color: #374151 !important;
+}
+
+/* Sidebar logo/header area */
+.dark .guardian-sidebar > div:first-child,
+.guardian-layout-wrapper.dark .guardian-sidebar > div:first-child {
+  background-color: #111827 !important;
+  border-color: #374151 !important;
+}
+
+/* Sidebar footer area */
+.dark .guardian-sidebar .mt-auto,
+.guardian-layout-wrapper.dark .guardian-sidebar .mt-auto {
+  background-color: #111827 !important;
+  border-color: #374151 !important;
+}
+
+/* Sub-navigation items in sidebar */
+.dark .guardian-sidebar-subitems,
+.guardian-layout-wrapper.dark .guardian-sidebar-subitems {
+  background-color: #1f2937 !important;
+  border-color: #374151 !important;
+}
+
+.dark .guardian-sidebar-subitems button,
+.guardian-layout-wrapper.dark .guardian-sidebar-subitems button {
+  color: #d1d5db !important;
+}
+
+.dark .guardian-sidebar-subitems button:hover,
+.guardian-layout-wrapper.dark .guardian-sidebar-subitems button:hover {
+  background-color: #374151 !important;
+}
+
+/* Empty state card fixes */
+.dark .guardian-dashboard .bg-white.rounded-2xl,
+.guardian-layout-wrapper.dark .guardian-dashboard .bg-white.rounded-2xl {
+  background-color: #1f2937 !important;
+  border-color: #374151 !important;
+}
+
+/* Notification filter tabs */
+.dark .guardian-module-container .bg-gray-100,
+.guardian-layout-wrapper.dark .guardian-module-container .bg-gray-100 {
+  background-color: #374151 !important;
+}
+
+.dark .guardian-module-container .bg-gray-100 button,
+.guardian-layout-wrapper.dark .guardian-module-container .bg-gray-100 button {
+  color: #d1d5db !important;
+}
+
+.dark .guardian-module-container .bg-gray-100 button.bg-white,
+.guardian-layout-wrapper.dark .guardian-module-container .bg-gray-100 button.bg-white {
+  background-color: #4b5563 !important;
+  color: #ffffff !important;
+}
+
+/* Select dropdown dark mode */
+.dark select,
+.guardian-layout-wrapper.dark select,
+.dark select option,
+.guardian-layout-wrapper.dark select option {
+  background-color: #1f2937 !important;
+  color: #f9fafb !important;
+  border-color: #4b5563 !important;
+}
+
+/* MyChildren page empty state */
+.dark .my-children-page .bg-white,
+.guardian-layout-wrapper.dark .my-children-page .bg-white {
+  background-color: #1f2937 !important;
+  border-color: #374151 !important;
+}
+
+/* Profile page specific fixes */
+.dark .profile-page .bg-white.rounded-2xl,
+.guardian-layout-wrapper.dark .profile-page .bg-white.rounded-2xl {
+  background-color: #1f2937 !important;
+  border-color: #374151 !important;
+}
+
+/* Card header backgrounds in dark mode */
+.dark .profile-page .bg-gray-50\/50,
+.guardian-layout-wrapper.dark .profile-page .bg-gray-50\/50 {
+  background-color: rgba(31, 41, 55, 0.5) !important;
+}
+
+/* Form display fields */
+.dark .profile-page .bg-gray-50,
+.guardian-layout-wrapper.dark .profile-page .bg-gray-50 {
+  background-color: #374151 !important;
+  border-color: #4b5563 !important;
+}
+
+/* Status badges dark mode */
+.dark .guardian-status-badge--active {
+  background: rgba(16, 185, 129, 0.25);
+  color: #34d399;
+}
+
+.dark .guardian-status-badge--pending {
+  background: rgba(245, 158, 11, 0.25);
+  color: #fbbf24;
+}
+
+.dark .guardian-status-badge--completed {
+  background: rgba(59, 130, 246, 0.25);
+  color: #60a5fa;
+}
+
+/* Appointment cards */
+.dark .guardian-appointment-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(59, 130, 246, 0.15) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Child cards */
+.dark .guardian-child-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Stats cards */
+.dark .guardian-stats-grid .guardian-stat-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(147, 51, 234, 0.2) 100%);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Glassmorphism cards */
+.dark .glassmorphism-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(59, 130, 246, 0.15) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Calendar wrapper */
+.dark .guardian-calendar-wrapper-expanded {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(59, 130, 246, 0.15) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Calendar cells */
+.dark .guardian-calendar-cell {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .guardian-calendar-cell:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Upcoming appointments card */
+.dark .guardian-upcoming-appointments-card,
+.dark .guardian-selected-date-card,
+.dark .guardian-appointment-history-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(59, 130, 246, 0.15) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Neumorphic buttons in dark mode */
+.dark .btn-neumorphic {
+  background: linear-gradient(145deg, #2d3748, #1a202c);
+  color: #e2e8f0;
+  box-shadow:
+    6px 6px 12px rgba(0, 0, 0, 0.4),
+    -6px -6px 12px rgba(74, 85, 104, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.dark .btn-neumorphic:hover:not(:disabled) {
+  box-shadow:
+    8px 8px 16px rgba(0, 0, 0, 0.45),
+    -8px -8px 16px rgba(74, 85, 104, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.dark .btn-neumorphic:active:not(:disabled) {
+  box-shadow:
+    inset 4px 4px 8px rgba(0, 0, 0, 0.4),
+    inset -4px -4px 8px rgba(74, 85, 104, 0.2);
+}
+
+/* Neumorphic cards */
+.dark .guardian-card-neumorphic {
+  background: linear-gradient(145deg, #1e293b, #0f172a);
+  box-shadow:
+    8px 8px 16px rgba(0, 0, 0, 0.4),
+    -8px -8px 16px rgba(74, 85, 104, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+/* Guardian module container text */
+.dark .guardian-module-container,
+.guardian-layout-wrapper.dark .guardian-module-container {
+  color: #ffffff;
+}
+
+/* Page header subtitle */
+.dark .guardian-page-header .text-gray-500,
+.guardian-layout-wrapper.dark .guardian-page-header .text-gray-500,
+.dark .guardian-page-header .text-gray-400,
+.guardian-layout-wrapper.dark .guardian-page-header .text-gray-400 {
+  color: #9ca3af !important;
+}
+
+/* Ensure all transitions are smooth */
+.dark *,
+.guardian-layout-wrapper.dark * {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+}
+
+/* Focus states for accessibility in dark mode */
+.dark *:focus-visible,
+.guardian-layout-wrapper.dark *:focus-visible {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+    DAYLIGHT MODE SPECIFIC FIXES
+    Ensure proper contrast and visibility in light mode
+    ========================================================================== */
+
+/* Light mode card backgrounds */
+.guardian-dashboard .bg-white:not(.dark .bg-white) {
+  background-color: #ffffff !important;
+}
+
+/* Light mode text colors - ensure proper contrast */
+.guardian-dashboard:not(.dark) .text-white {
+  color: #111827 !important;
+}
+
+.guardian-dashboard:not(.dark) .text-white\/80,
+.guardian-dashboard:not(.dark) .text-white\/70,
+.guardian-dashboard:not(.dark) .text-white\/60 {
+  color: #374151 !important;
+}
+
+/* Light mode card fixes */
+.guardian-dashboard:not(.dark) .guardian-child-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(147, 51, 234, 0.08) 100%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.guardian-dashboard:not(.dark) .guardian-child-card h3,
+.guardian-dashboard:not(.dark) .guardian-child-card .text-white {
+  color: #111827 !important;
+}
+
+.guardian-dashboard:not(.dark) .guardian-child-card .text-white\/70,
+.guardian-dashboard:not(.dark) .guardian-child-card .text-white\/60 {
+  color: #4b5563 !important;
+}
+
+/* Light mode stat cards */
+.guardian-dashboard:not(.dark) .guardian-stat-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+}
+
+/* Light mode table styles */
+.guardian-dashboard:not(.dark) .guardian-table tr {
+  border-color: #e5e7eb;
+}
+
+.guardian-dashboard:not(.dark) .guardian-table td {
+  color: #374151;
+}
+
+/* Light mode form inputs */
+.guardian-dashboard:not(.dark) input,
+.guardian-dashboard:not(.dark) select,
+.guardian-dashboard:not(.dark) textarea {
+  background-color: #ffffff;
+  border-color: #d1d5db;
+  color: #111827;
+}
+
+.guardian-dashboard:not(.dark) input::placeholder,
+.guardian-dashboard:not(.dark) textarea::placeholder {
+  color: #9ca3af;
+}
+
+/* Light mode modal backgrounds */
+.guardian-dashboard:not(.dark) .guardian-modal {
+  background: #ffffff;
+  border-color: #e5e7eb;
+}
+
+/* Light mode notification items */
+.guardian-dashboard:not(.dark) .guardian-notification-item {
+  background: #ffffff;
+  border-color: #e5e7eb;
+}
+
+.guardian-dashboard:not(.dark) .guardian-notification-item:hover {
+  border-color: #d1d5db;
+}
+
+/* Light mode quick action buttons */
+.guardian-dashboard:not(.dark) .guardian-quick-action-btn {
+  background: #ffffff;
+  border-color: #e5e7eb;
+  color: #111827;
+}
+
+.guardian-dashboard:not(.dark) .guardian-quick-action-btn:hover {
+  background: #f9fafb;
+  border-color: #10b981;
+}
+
+/* Light mode empty states */
+.guardian-dashboard:not(.dark) .guardian-empty-state {
+  background: #ffffff;
+  border-color: #e5e7eb;
+}
+
+/* Light mode sidebar fixes */
+.guardian-dashboard:not(.dark) .guardian-sidebar {
+  background: #ffffff;
+  border-color: #e5e7eb;
+}
+
+.guardian-dashboard:not(.dark) .guardian-sidebar-nav-item {
+  color: #374151;
+}
+
+.guardian-dashboard:not(.dark) .guardian-sidebar-nav-item:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+/* Light mode page headers */
+.guardian-dashboard:not(.dark) .page-header {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #9333ea 100%);
+}
+
+/* Light mode badge fixes */
+.guardian-dashboard:not(.dark) .guardian-status-badge--active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+}
+
+.guardian-dashboard:not(.dark) .guardian-status-badge--pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+}
+
+.guardian-dashboard:not(.dark) .guardian-status-badge--completed {
+  background: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
+}
+
+/* ==========================================================================
+    NAVIGATION CLIPPING FIXES
+    Fix persistent navigation clipping issues
+    ========================================================================== */
+
+/* Ensure main content doesn't clip */
+.guardian-main-content {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Fix sidebar z-index and positioning */
+.guardian-sidebar {
+  z-index: 300;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Desktop sidebar margin fix */
+@media (min-width: 1024px) {
+  .guardian-main-content {
+    margin-left: 288px !important;
+    width: calc(100% - 288px) !important;
+    max-width: none !important;
+  }
+
+  .guardian-sidebar {
+    transform: translateX(0) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+}
+
+/* Mobile sidebar overlay fix */
+.guardian-sidebar-overlay {
+  z-index: 299;
+}
+
+/* Content area width fix */
+.guardian-content-area {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+/* Fix for clipped page headers */
+.page-header {
+  position: relative;
+  z-index: 10;
+}
+
+/* Fix module container overflow */
+.guardian-module-container {
+  width: 100%;
+  max-width: none;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* Prevent horizontal scroll on all modules */
+.guardian-dashboard * {
+  max-width: 100%;
+}
+
+/* Fix for clipped buttons and actions */
+.guardian-dashboard button,
+.guardian-dashboard .btn,
+.guardian-dashboard [role="button"] {
+  position: relative;
+  z-index: 1;
+}
+
+/* Fix clipped dropdowns */
+.guardian-dashboard select,
+.guardian-dashboard .dropdown-menu {
+  z-index: 100;
+}
+
+/* Ensure proper stacking context */
+.guardian-layout-wrapper {
+  position: relative;
+  z-index: 0;
+}
+
+/* Fix clipped table containers */
+.guardian-table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Fix modal z-index hierarchy */
+.guardian-modal-overlay {
+  z-index: 350;
+}
+
+.guardian-modal {
+  z-index: 351;
+}
+
+/* Bottom nav z-index fix */
+.guardian-bottom-nav {
+  z-index: 200;
+}
+
+/* Quick action FAB z-index */
+.quick-action-fab {
+  z-index: 150;
+}

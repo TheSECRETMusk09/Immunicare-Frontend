@@ -1,0 +1,728 @@
+/* ==========================================================================
+   Offline-First Styling
+   Immunicare Vaccination Management System
+   ========================================================================== */
+
+/* ==========================================================================
+   Offline Indicator Banner
+   ========================================================================== */
+
+.offline-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-toast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-warning-500);
+  color: white;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  animation: slideDown var(--transition-normal) ease-out;
+}
+
+.offline-indicator--error {
+  background-color: var(--color-danger-500);
+}
+
+.offline-indicator__icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.offline-indicator__text {
+  flex: 1;
+  text-align: center;
+}
+
+.offline-indicator__action {
+  flex-shrink: 0;
+}
+
+.offline-indicator--hidden {
+  display: none;
+}
+
+/* ==========================================================================
+   Sync Status Indicator
+   ========================================================================== */
+
+.sync-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-xs);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-medium);
+}
+
+.sync-status--synced {
+  background-color: var(--color-secondary-100);
+  color: var(--color-secondary-700);
+}
+
+.sync-status--syncing {
+  background-color: var(--color-primary-100);
+  color: var(--color-primary-700);
+}
+
+.sync-status--pending {
+  background-color: var(--color-warning-100);
+  color: var(--color-warning-700);
+}
+
+.sync-status--error {
+  background-color: var(--color-danger-100);
+  color: var(--color-danger-700);
+}
+
+.sync-status--offline {
+  background-color: var(--color-neutral-100);
+  color: var(--color-neutral-700);
+}
+
+.sync-status__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: var(--radius-full);
+  animation: spin 0.8s linear infinite;
+}
+
+.sync-status--syncing .sync-status__spinner {
+  animation-duration: 0.5s;
+}
+
+.sync-status__icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* ==========================================================================
+   Pending Sync Badge
+   ========================================================================== */
+
+.pending-sync {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--color-warning-50);
+  border: 1px solid var(--color-warning-200);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  color: var(--color-warning-700);
+}
+
+.pending-sync__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 var(--space-1);
+  background-color: var(--color-warning-500);
+  color: white;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+}
+
+/* ==========================================================================
+   Cached Data Indicator
+   ========================================================================== */
+
+.cached-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  background-color: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+}
+
+.cached-indicator__icon {
+  width: 12px;
+  height: 12px;
+}
+
+.cached-indicator--stale {
+  background-color: var(--color-warning-50);
+  color: var(--color-warning-700);
+}
+
+/* ==========================================================================
+   Last Synced Time
+   ========================================================================== */
+
+.last-synced {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.last-synced__icon {
+  width: 14px;
+  height: 14px;
+}
+
+.last-synced__time {
+  font-weight: var(--font-weight-medium);
+}
+
+/* ==========================================================================
+   Loading Skeleton Screens
+   ========================================================================== */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-tertiary) 25%,
+    var(--color-bg-secondary) 50%,
+    var(--color-bg-tertiary) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-md);
+}
+
+/* Skeleton Variants */
+.skeleton--text {
+  height: 1em;
+  width: 100%;
+}
+
+.skeleton--title {
+  height: 1.5em;
+  width: 60%;
+  margin-bottom: 0.5em;
+}
+
+.skeleton--subtitle {
+  height: 1em;
+  width: 80%;
+}
+
+.skeleton--avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+}
+
+.skeleton--avatar-lg {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-full);
+}
+
+.skeleton--button {
+  height: 44px;
+  width: 120px;
+  border-radius: var(--radius-lg);
+}
+
+.skeleton--card {
+  height: 200px;
+  border-radius: var(--radius-xl);
+}
+
+.skeleton--table-row {
+  height: 60px;
+  margin-bottom: var(--space-2);
+}
+
+.skeleton--chart {
+  height: 300px;
+  border-radius: var(--radius-xl);
+}
+
+.skeleton--badge {
+  height: 24px;
+  width: 80px;
+  border-radius: var(--radius-full);
+}
+
+/* Skeleton Animation */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* ==========================================================================
+   Skeleton Components
+   ========================================================================== */
+
+.skeleton-card {
+  background: var(--color-bg-primary);
+  border: var(--border-width) solid var(--color-border-light);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+}
+
+.skeleton-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.skeleton-card__avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+}
+
+.skeleton-card__info {
+  flex: 1;
+}
+
+.skeleton-card__title {
+  height: 1.25em;
+  width: 60%;
+  margin-bottom: 0.5em;
+}
+
+.skeleton-card__subtitle {
+  height: 1em;
+  width: 40%;
+}
+
+.skeleton-card__body {
+  margin-bottom: var(--space-4);
+}
+
+.skeleton-card__line {
+  height: 1em;
+  width: 100%;
+  margin-bottom: 0.5em;
+}
+
+.skeleton-card__line:last-child {
+  width: 80%;
+}
+
+.skeleton-card__footer {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* ==========================================================================
+   Skeleton Table
+   ========================================================================== */
+
+.skeleton-table {
+  background: var(--color-bg-primary);
+  border: var(--border-width) solid var(--color-border-light);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+.skeleton-table__header {
+  display: flex;
+  padding: var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border-light);
+  gap: var(--space-4);
+}
+
+.skeleton-table__header-cell {
+  flex: 1;
+  height: 1em;
+  width: 20%;
+}
+
+.skeleton-table__body {
+  padding: var(--space-4);
+}
+
+.skeleton-table__row {
+  display: flex;
+  padding: var(--space-3) 0;
+  border-bottom: var(--border-width) solid var(--color-border-light);
+  gap: var(--space-4);
+}
+
+.skeleton-table__row:last-child {
+  border-bottom: none;
+}
+
+.skeleton-table__cell {
+  flex: 1;
+  height: 1em;
+  width: 20%;
+}
+
+/* ==========================================================================
+   Offline Fallback Content
+   ========================================================================== */
+
+.offline-fallback {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-12);
+  text-align: center;
+}
+
+.offline-mode .offline-fallback {
+  display: flex;
+}
+
+.offline-fallback__icon {
+  width: 80px;
+  height: 80px;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-6);
+}
+
+.offline-fallback__title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.offline-fallback__description {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-6);
+  max-width: 400px;
+}
+
+.offline-fallback__actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+/* ==========================================================================
+   Cached Data Placeholder
+   ========================================================================== */
+
+.cached-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 2px dashed var(--color-border-light);
+  text-align: center;
+}
+
+.cached-placeholder__icon {
+  width: 48px;
+  height: 48px;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-4);
+}
+
+.cached-placeholder__text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-4);
+}
+
+.cached-placeholder__time {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+/* ==========================================================================
+   Network Status Banner
+   ========================================================================== */
+
+.network-status-banner {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--font-size-sm);
+  text-align: center;
+  display: none;
+}
+
+.network-status-banner--offline {
+  display: block;
+  background-color: var(--color-warning-50);
+  color: var(--color-warning-700);
+  border-bottom: 1px solid var(--color-warning-200);
+}
+
+.network-status-banner--slow {
+  display: block;
+  background-color: var(--color-primary-50);
+  color: var(--color-primary-700);
+  border-bottom: 1px solid var(--color-primary-200);
+}
+
+.network-status-banner--reconnecting {
+  display: block;
+  background-color: var(--color-info-50);
+  color: var(--color-info-700);
+  border-bottom: 1px solid var(--color-info-200);
+}
+
+/* ==========================================================================
+   Service Worker Update Notification
+   ========================================================================== */
+
+.sw-update-notification {
+  position: fixed;
+  bottom: var(--space-4);
+  left: var(--space-4);
+  right: var(--space-4);
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-primary-200);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  animation: slideUp var(--transition-normal) ease-out;
+}
+
+@media (min-width: 640px) {
+  .sw-update-notification {
+    left: auto;
+    max-width: 400px;
+  }
+}
+
+.sw-update-notification--hidden {
+  display: none;
+}
+
+.sw-update-notification__icon {
+  width: 40px;
+  height: 40px;
+  background-color: var(--color-primary-100);
+  color: var(--color-primary-600);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sw-update-notification__content {
+  flex: 1;
+}
+
+.sw-update-notification__title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.sw-update-notification__description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.sw-update-notification__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   PWA Install Prompt
+   ========================================================================== */
+
+.pwa-install-prompt {
+  position: fixed;
+  bottom: var(--space-4);
+  left: var(--space-4);
+  right: var(--space-4);
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  animation: slideUp var(--transition-normal) ease-out;
+}
+
+@media (min-width: 640px) {
+  .pwa-install-prompt {
+    left: auto;
+    max-width: 400px;
+  }
+}
+
+.pwa-install-prompt--hidden {
+  display: none;
+}
+
+.pwa-install-prompt__icon {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-500),
+    var(--color-primary-700)
+  );
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  flex-shrink: 0;
+}
+
+.pwa-install-prompt__content {
+  flex: 1;
+}
+
+.pwa-install-prompt__title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.pwa-install-prompt__description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.pwa-install-prompt__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.pwa-install-prompt__close {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.pwa-install-prompt__close:hover {
+  background-color: var(--color-bg-tertiary);
+}
+
+/* ==========================================================================
+   Connection Quality Indicator
+   ========================================================================== */
+
+.connection-quality {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.connection-quality__bar {
+  width: 4px;
+  background-color: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.connection-quality__bar-fill {
+  height: 100%;
+  background-color: var(--color-secondary-500);
+  border-radius: var(--radius-full);
+  transition: width var(--transition-normal);
+}
+
+.connection-quality__bar:nth-child(1) {
+  height: 6px;
+}
+.connection-quality__bar:nth-child(2) {
+  height: 10px;
+}
+.connection-quality__bar:nth-child(3) {
+  height: 14px;
+}
+.connection-quality__bar:nth-child(4) {
+  height: 18px;
+}
+
+.connection-quality--fast
+  .connection-quality__bar:nth-child(4)
+  .connection-quality__bar-fill {
+  width: 100%;
+}
+
+.connection-quality--slow
+  .connection-quality__bar:nth-child(4)
+  .connection-quality__bar-fill {
+  width: 50%;
+}
+
+.connection-quality--offline .connection-quality__bar-fill {
+  background-color: var(--color-danger-500);
+}
+
+/* ==========================================================================
+   Offline Mode Styles
+   ========================================================================== */
+
+.offline-mode .online-only {
+  display: none !important;
+}
+
+.offline-mode .offline-only {
+  display: flex !important;
+}
+
+.offline-mode .interactive-element--online {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* ==========================================================================
+   Reduced Motion Support for Offline Indicators
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .offline-indicator {
+    animation: none;
+    transform: none;
+  }
+
+  .sw-update-notification,
+  .pwa-install-prompt {
+    animation: none;
+    transform: none;
+  }
+
+  .sync-status__spinner {
+    animation: none;
+  }
+
+  .skeleton {
+    animation: none;
+    background: var(--color-bg-tertiary);
+  }
+}

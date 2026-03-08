@@ -1,0 +1,917 @@
+/* ==========================================================================
+   Immunicare Vaccination Management System
+   Main CSS Entry Point - Production-Ready CSS Architecture
+   ========================================================================== */
+
+/* Tailwind CSS Directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================================================
+   CSS Module Order (Import Order Matters!)
+   ========================================================================== */
+
+/* 1. CSS Variables & Design Tokens */
+@import "./enhanced-variables.css";
+
+/* 1a. Healthcare Form Variables & Design Tokens */
+@import "./variables.css";
+
+/* 1b. Healthcare Form Styles */
+@import "./forms.css";
+
+/* 1c. Admin Dashboard Form Styles */
+@import "./admin-forms.css";
+
+/* 2. Base Reset & Normalization */
+@import "./reset.css";
+
+/* 3. Container Queries (Component-Level Responsiveness) */
+@import "./container-queries.css";
+
+/* 4. CSS Grid & Subgrid Layouts */
+@import "./grid-subgrid.css";
+
+/* 5. BEM-Style Component Styles */
+@import "./components-bem.css";
+
+/* 5a. Additional Component Styles (Tabs, Accordion, Breadcrumb, Pagination, Tooltip, Popover, File Upload, Progress, Charts) */
+@import "./additional-components.css";
+
+/* 6. Page-Specific Styles */
+@import "./pages-comprehensive.css";
+
+/* 7. Responsive Navigation Patterns */
+@import "./navigation-responsive.css";
+
+/* 8. Vaccine Inventory Status Indicators */
+@import "./inventory-status.css";
+
+/* 9. Immunization Timeline Responsive Layouts */
+@import "./immunization-timeline.css";
+
+/* 10. Dark Mode with data-theme Toggle */
+@import "./dark-mode.css";
+
+/* 11. Offline-First Styling */
+@import "./offline-first.css";
+
+/* 12. Print Styles for Vaccination Records & Medical Forms */
+@import "./print-styles.css";
+
+/* 13. Accessibility Enhancements (WCAG 2.1 AA) */
+@import "./accessibility.css";
+
+/* 14. Utility Classes */
+@import "./utilities.css";
+
+/* 15. Animations & Transitions */
+@import "./animations.css";
+
+/* 16. Responsive Design */
+@import "./responsive.css";
+
+/* 17. Legacy Styles (To be migrated gradually) */
+@import "./legacy.css";
+
+/* 18. Icon Fixes */
+@import "./icons.css";
+
+/* 19a. Guardian Module Standardized Styles */
+@import "./guardian-modules.css";
+
+/* 20. Settings Module Mobile Optimizations */
+@import "./settings-mobile.css";
+
+/* 21-22. Legacy password toggle overrides disabled to prevent global button overlays in modals */
+
+/* ==========================================================================
+   Global Scrollbar Hiding - Make Scrollbars Invisible Everywhere
+   ========================================================================== */
+
+/* Hide scrollbar for all elements but allow scrolling - use with caution */
+/* For guardian dashboard, we use a custom scrollbar class instead */
+/* Use @supports for browsers that support scrollbar-width (Firefox, Chrome 121+, Edge 121+) */
+@supports (scrollbar-width: none) {
+  * {
+    scrollbar-width: none;
+  }
+}
+
+@supports (scrollbar-width: none) {
+  html {
+    scrollbar-width: none;
+  }
+}
+
+@supports (scrollbar-width: none) {
+  body {
+    scrollbar-width: none;
+  }
+}
+
+/* For IE and Edge (older versions) - uses -ms-overflow-style */
+* {
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* Hide scrollbar for WebKit browsers (Chrome, Safari, Opera) */
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for html element */
+html {
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for body element */
+body {
+  -ms-overflow-style: none;
+}
+
+body::-webkit-scrollbar {
+  display: none;
+}
+
+/* Guardian-specific: Allow scrolling in content areas */
+.guardian-main-content,
+.guardian-content-area {
+  overflow-y: auto;
+  -ms-overflow-style: auto;
+}
+
+/* Use @supports for browsers that support scrollbar-width */
+@supports (scrollbar-width: auto) {
+  .guardian-main-content,
+  .guardian-content-area {
+    scrollbar-width: auto;
+  }
+}
+
+.guardian-main-content::-webkit-scrollbar,
+.guardian-content-area::-webkit-scrollbar {
+  display: block;
+  width: 6px;
+}
+
+.guardian-main-content::-webkit-scrollbar-thumb,
+.guardian-content-area::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+/* Mobile-specific scrollbar handling */
+@media (max-width: 768px) {
+  .guardian-main-content {
+    /* Modern browsers handle momentum scrolling natively */
+    overflow-y: scroll;
+    /* Note: -webkit-overflow-scrolling is deprecated and not needed in modern browsers */
+    /* It was only needed for older iOS Safari (pre-2019) */
+  }
+}
+
+/* Ensure content is still scrollable on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  /* Use @supports for scrollbar-width */
+  @supports (scrollbar-width: none) {
+    * {
+      scrollbar-width: none;
+    }
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* But allow scrolling in main content areas */
+  .guardian-main-content,
+  .mobile-scrollbar {
+    -ms-overflow-style: none;
+  }
+
+  /* Use @supports for scrollbar-width in touch devices */
+  @supports (scrollbar-width: none) {
+    .guardian-main-content,
+    .mobile-scrollbar {
+      scrollbar-width: none;
+    }
+  }
+
+  /* Note: -webkit-overflow-scrolling is deprecated, not needed in modern browsers */
+  .guardian-main-content::-webkit-scrollbar,
+  .mobile-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   Prevent Horizontal Overflow
+   ========================================================================== */
+
+/* Prevent horizontal overflow globally */
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* Ensure content doesn't overflow horizontally */
+body,
+html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+/* Ensure input elements don't cause overflow */
+input,
+textarea,
+select,
+button {
+  max-width: 100%;
+}
+
+/* Ensure images and media don't overflow */
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Ensure all elements use border-box */
+* {
+  box-sizing: border-box;
+}
+
+/* Only apply max-width to specific elements that need it */
+img,
+video,
+canvas,
+svg,
+iframe,
+table {
+  max-width: 100%;
+}
+
+/* Mobile-specific overflow prevention */
+@media (max-width: 640px) {
+  html,
+  body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  body {
+    position: relative;
+  }
+}
+
+/* ==========================================================================
+   Legacy Styles (Backward Compatibility)
+   ========================================================================== */
+
+/* Login Themes - Legacy */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #eef2ff 0%, #dcfce7 100%);
+  padding: 0;
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  /* body {
+    background-color: #111827;
+    color: #f9fafb;
+  } */
+
+  .card {
+    background-color: #1f2937;
+  }
+
+  .sidebar {
+    background-color: #1f2937;
+    border-right-color: #374151;
+  }
+
+  .sidebar-item-idle {
+    color: #d1d5db;
+  }
+
+  .sidebar-item-idle:hover {
+    background-color: #374151;
+  }
+
+  .dropdown {
+    background-color: #1f2937;
+  }
+
+  .icon-btn:hover {
+    background-color: #374151;
+  }
+
+  .alert-info {
+    background-color: rgba(59, 130, 246, 0.1);
+    color: #60a5fa;
+  }
+
+  .alert-success {
+    background-color: rgba(34, 197, 94, 0.1);
+    color: #4ade80;
+  }
+
+  .alert-warning {
+    background-color: rgba(245, 158, 11, 0.1);
+    color: #fbbf24;
+  }
+
+  .alert-error {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: #f87171;
+  }
+
+  .help-text {
+    color: #9ca3af;
+  }
+
+  .text-high-contrast {
+    color: #ffffff;
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .card {
+    border: 2px solid currentColor;
+  }
+
+  .sidebar-item-idle:hover {
+    border: 2px solid currentColor;
+  }
+
+  button,
+  a {
+    border: 1px solid transparent;
+  }
+
+  button:focus,
+  a:focus {
+    border-color: currentColor;
+  }
+}
+
+/* ==========================================================================
+   Print Styles
+   ========================================================================== */
+@media print {
+  .sidebar,
+  .mobile-nav,
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .card {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+  }
+}
+
+/* ==========================================================================
+   Focus Visible Styles
+   ========================================================================== */
+*:focus-visible {
+  outline: 3px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #4f46e5;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.2);
+}
+
+/* ==========================================================================
+   Keyboard Navigation
+   ========================================================================== */
+.keyboard-navigation *:focus {
+  outline: 3px solid #4f46e5 !important;
+  outline-offset: 2px !important;
+}
+
+/* ==========================================================================
+   Touch Target Sizes (WCAG 2.5.5)
+   ========================================================================== */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+@media (max-width: 640px) {
+  .touch-target {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  input,
+  button,
+  select,
+  textarea,
+  a {
+    min-height: 44px;
+  }
+}
+
+.touch-target:focus-visible {
+  outline: 3px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+.touch-target + .touch-target {
+  margin-top: 0.5rem;
+}
+
+/* ==========================================================================
+   Text Spacing (WCAG 1.4.12)
+   ========================================================================== */
+.text-spaced {
+  line-height: 1.5;
+  letter-spacing: 0.12em;
+  word-spacing: 0.16em;
+}
+
+/* ==========================================================================
+   Error States
+   ========================================================================== */
+.has-error {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2) !important;
+}
+
+.error-message {
+  color: #dc2626;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.has-success {
+  border-color: #16a34a !important;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2) !important;
+}
+
+/* ==========================================================================
+   Required Field Indicator
+   ========================================================================== */
+.required::after {
+  content: " *";
+  color: #dc2626;
+}
+
+/* ==========================================================================
+   Disabled States
+   ========================================================================== */
+.disabled,
+[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   Loading States
+   ========================================================================== */
+.loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.loading::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ==========================================================================
+   Scrollbar Styling
+   ========================================================================== */
+.scrollbar-thin {
+  /* Base styles - works in most modern browsers */
+  /* Use @supports for browsers that support scrollbar-width (Firefox, Chrome 121+, Edge 121+) */
+  @supports (scrollbar-width: thin) {
+    scrollbar-width: thin;
+    scrollbar-color: #6366f1 transparent;
+  }
+}
+
+/* WebKit/Blink browsers (Chrome, Safari, Edge) */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: #6366f1;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: #4f46e5;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+/* Firefox-specific scrollbar styling with feature query */
+@supports (scrollbar-width: thin) {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #6366f1 transparent;
+  }
+}
+
+/* Fallback for browsers that don't support scrollbar-width thin */
+@supports not (scrollbar-width: thin) {
+  .scrollbar-thin {
+    /* Use overflow for older browsers */
+    overflow: auto;
+  }
+}
+
+/* IE and Edge specific fallback - removed as IE/Edge are legacy browsers
+   Use @supports for feature detection instead */
+/* The -ms-high-contrast media query is only recognized in IE/Edge and causes
+   parsing warnings in modern browsers. Modern browsers support scrollbar-width. */
+
+/* ==========================================================================
+   Skip Link
+   ========================================================================== */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #4f46e5;
+  color: white;
+  padding: 8px 16px;
+  z-index: 100;
+  transition: top 0.3s;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* ==========================================================================
+   Mobile Bottom Navigation
+   ========================================================================== */
+.mobile-nav-patient {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--color-bg-primary);
+  border-top: 1px solid var(--color-border-light);
+  display: flex;
+  justify-content: space-around;
+  padding: var(--space-2);
+  z-index: 50;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.mobile-nav-item-patient {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-2);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border-radius: 0.5rem;
+  transition: color var(--transition-fast) ease;
+  gap: var(--space-1);
+  min-width: 3rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.mobile-nav-item-patient.active {
+  color: var(--color-primary-600);
+}
+
+.mobile-nav-icon-patient {
+  font-size: 1.25rem;
+}
+
+.mobile-nav-label-patient {
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+}
+
+/* Hide on desktop */
+@media (min-width: 768px) {
+  .mobile-nav-patient {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+    Guardian Mobile Bottom Navigation
+    ========================================================================== */
+.mobile-nav-guardian {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--color-bg-primary);
+  border-top: 1px solid var(--color-border-light);
+  display: flex;
+  justify-content: space-around;
+  padding: var(--space-2);
+  z-index: 50;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.mobile-nav-item-guardian {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-2);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border-radius: 0.5rem;
+  transition: color var(--transition-fast) ease;
+  gap: var(--space-1);
+  min-width: 3rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.mobile-nav-item-guardian.active {
+  color: var(--color-success-600);
+}
+
+.mobile-nav-item-guardian:hover {
+  color: var(--color-success-700);
+}
+
+.mobile-nav-icon-guardian {
+  font-size: 1.25rem;
+}
+
+.mobile-nav-label-guardian {
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+}
+
+/* Hide on desktop */
+@media (min-width: 1024px) {
+  .mobile-nav-guardian {
+    display: none;
+  }
+}
+
+/* Add padding to main content on mobile to prevent overlap */
+@media (max-width: 767px) {
+  main {
+    padding-bottom: 5rem;
+  }
+}
+
+/* ==========================================================================
+   ARIA Live Region
+   ========================================================================== */
+[aria-live="polite"],
+[aria-live="assertive"] {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   Visually Hidden (for accessibility)
+   ========================================================================== */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ==========================================================================
+   Background Gradient
+   ========================================================================== */
+.bg-gradient-primary {
+  background-image: linear-gradient(to right, #6366f1, #8b5cf6);
+  background-color: #6366f1;
+}
+
+/* ==========================================================================
+   Hover Scale
+   ========================================================================== */
+.hover-scale {
+  transition: transform 0.2s ease;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+/* ==========================================================================
+   Text Shadow
+   ========================================================================== */
+.text-shadow {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* ==========================================================================
+   Animation Keyframes
+   ========================================================================== */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ==========================================================================
+   Theme Custom Properties for JavaScript Interop
+   ========================================================================== */
+
+/*
+  These CSS custom properties can be accessed via JavaScript
+  for theme switching and other dynamic functionality:
+
+  // Get current theme
+  const theme = getComputedStyle(document.documentElement)
+    .getPropertyValue('--theme-bg-primary').trim();
+
+  // Set theme
+  document.documentElement.setAttribute('data-theme', 'dark');
+*/
+
+:root {
+  /* Version for cache busting */
+  --css-version: "1.0.0";
+
+  /* Build timestamp (set during build) */
+  --build-timestamp: "";
+}
+
+/* ==========================================================================
+   CSS Performance Optimizations
+   ========================================================================== */
+
+/* Will-change for performance-critical animations */
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+.will-change-scroll {
+  will-change: scroll-position;
+}
+
+/* Content visibility for lazy loading */
+.content-visibility-auto {
+  content-visibility: auto;
+}
+
+.content-visibility-visible {
+  content-visibility: visible;
+}
+
+.content-visibility-hidden {
+  content-visibility: hidden;
+}
+
+/* Containment for layout optimization */
+.contain-layout {
+  contain: layout;
+}
+
+.contain-paint {
+  contain: paint;
+}
+
+.contain-size {
+  contain: size;
+}
+
+.contain-content {
+  contain: content;
+}
+
+/* ==========================================================================
+   CSS Custom Properties Documentation
+   ========================================================================== */
+
+/*
+  CSS Custom Properties Available:
+
+  Colors:
+  --color-primary-50 to --color-primary-950
+  --color-secondary-50 to --color-secondary-950
+  --color-warning-50 to --color-warning-950
+  --color-danger-50 to --color-danger-950
+  --color-info-50 to --color-info-950
+  --color-neutral-0 to --color-neutral-950
+
+  Typography:
+  --font-family-sans, --font-family-mono
+  --font-size-xs to --font-size-6xl
+  --font-size-fluid-xs to --font-size-fluid-5xl
+  --font-weight-light to --font-weight-extrabold
+  --line-height-tight to --line-height-loose
+
+  Spacing:
+  --space-0 to --space-96
+
+  Borders:
+  --radius-none to --radius-full
+
+  Shadows:
+  --shadow-xs to --shadow-2xl, --shadow-inner
+
+  Transitions:
+  --transition-fast, --transition-normal, --transition-slow
+
+  Z-Index:
+  --z-dropdown, --z-sticky, --z-fixed, --z-modal-backdrop,
+  --z-modal, --z-popover, --z-tooltip
+
+  Layout:
+  --sidebar-width, --sidebar-collapsed-width
+  --header-height, --header-height-mobile
+  --max-content-width
+
+  Container Queries:
+  --cq-xs, --cq-sm, --cq-md, --cq-lg, --cq-xl, --cq-2xl
+
+  Logical Properties:
+  --margin-inline-start, --margin-inline-end
+  --padding-block-start, --padding-block-end
+*/
+
+/* Calendar Responsive Styles */
+@media (max-width: 640px) {
+  .rbc-calendar {
+    font-size: 12px;
+  }
+  .rbc-event {
+    font-size: 10px;
+    padding: 2px;
+  }
+  .rbc-toolbar {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .rbc-toolbar button {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+}

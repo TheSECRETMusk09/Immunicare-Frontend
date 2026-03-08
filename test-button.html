@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Button Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .test-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            background-color: #ff0000;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .test-button:hover {
+            background-color: #cc0000;
+            transform: scale(1.05);
+        }
+        
+        .test-button:active {
+            transform: scale(0.95);
+        }
+        
+        #results {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Button Click Test</h1>
+        
+        <button class="test-button" id="testButton">
+            Test Button (Click Me!)
+            <span class="arrow">→</span>
+        </button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Get the button and results element
+        const testButton = document.getElementById('testButton');
+        const resultsDiv = document.getElementById('results');
+        
+        // Function to log results
+        function logResult(message, isSuccess = true) {
+            const resultItem = document.createElement('p');
+            resultItem.textContent = message;
+            resultItem.className = isSuccess ? 'success' : 'error';
+            resultsDiv.appendChild(resultItem);
+            
+            // Scroll to the results
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+        
+        // Test button click functionality
+        testButton.addEventListener('click', function() {
+            logResult('Button clicked successfully!');
+            
+            // Simulate some work
+            setTimeout(() => {
+                logResult('Button click handler completed.');
+            }, 500);
+        });
+        
+        // Test different click methods
+        logResult('Testing button click functionality...');
+        
+        // Method 1: Programmatically click the button
+        setTimeout(() => {
+            logResult('Testing programmatic click...');
+            testButton.click();
+        }, 1000);
+        
+        // Method 2: Create and dispatch click event
+        setTimeout(() => {
+            logResult('Testing click event dispatch...');
+            const clickEvent = new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true,
+                view: window
+            });
+            testButton.dispatchEvent(clickEvent);
+        }, 2000);
+        
+        // Test button properties
+        logResult(`Button text: "${testButton.textContent.trim()}"`);
+        logResult(`Button class: "${testButton.className}"`);
+        logResult(`Button style: "${testButton.getAttribute('style')}"`);
+        
+        // Check if button is visible
+        const isVisible = testButton.offsetParent !== null;
+        logResult(`Button is visible: ${isVisible}`, isVisible);
+        
+        // Check if button is clickable
+        const isClickable = !testButton.hasAttribute('disabled');
+        logResult(`Button is clickable: ${isClickable}`, isClickable);
+    </script>
+</body>
+</html>

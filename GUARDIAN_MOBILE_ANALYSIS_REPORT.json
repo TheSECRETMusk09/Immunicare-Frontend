@@ -1,0 +1,419 @@
+{
+  "timestamp": "2026-02-21T16:27:03.543Z",
+  "summary": {
+    "passed": 67,
+    "warnings": 12,
+    "categories": {
+      "Mobile Classes": 13,
+      "Responsive Patterns": 6,
+      "Touch Targets": 10,
+      "Dark Mode": 12,
+      "Accessibility": 8,
+      "Sidebar Mobile": 11,
+      "CSS Features": 7
+    }
+  },
+  "findings": {
+    "passed": [
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Mobile Classes",
+        "message": "Mobile scrollbar class: Found 1 occurrences"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Mobile Classes",
+        "message": "Responsive hide classes: Found 3 occurrences"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Mobile Classes",
+        "message": "Touch manipulation CSS: Found 2 occurrences"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Responsive Patterns",
+        "message": "Responsive grid classes: Found 11 occurrences"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Responsive Patterns",
+        "message": "Tailwind responsive prefixes: Found 135 occurrences"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Touch Targets",
+        "message": "Touch-friendly padding: Found"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Touch Targets",
+        "message": "Readable text size: Found"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Dark Mode",
+        "message": "Dark mode Tailwind classes: Found (158 occurrences)"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Dark Mode",
+        "message": "Dark mode color classes: Found (151 occurrences)"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Accessibility",
+        "message": "Focus styles: Found (3 occurrences)"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Mobile Classes",
+        "message": "Mobile scrollbar class: Found 1 occurrences"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Mobile Classes",
+        "message": "Responsive hide classes: Found 1 occurrences"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Mobile Classes",
+        "message": "Touch target minimum (44-48px): Found 3 occurrences"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Responsive Patterns",
+        "message": "Tailwind responsive prefixes: Found 12 occurrences"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Touch Targets",
+        "message": "Minimum touch width: Found"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Touch Targets",
+        "message": "Minimum touch height: Found"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Touch Targets",
+        "message": "Readable text size: Found"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Dark Mode",
+        "message": "Dark mode Tailwind classes: Found (14 occurrences)"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Dark Mode",
+        "message": "Dark mode color classes: Found (13 occurrences)"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Dark Mode",
+        "message": "Dark mode state variable: Found (7 occurrences)"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Dark Mode",
+        "message": "Dark mode toggle function: Found (2 occurrences)"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Sidebar Mobile",
+        "message": "Fixed positioning: Found"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Sidebar Mobile",
+        "message": "Open/close state: Found"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Sidebar Mobile",
+        "message": "Close handler: Found"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Sidebar Mobile",
+        "message": "Mobile-only visibility: Found"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Sidebar Mobile",
+        "message": "Touch-friendly menu button: Found"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Accessibility",
+        "message": "ARIA labels: Found (1 occurrences)"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Mobile Classes",
+        "message": "Responsive hide classes: Found 3 occurrences"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Mobile Classes",
+        "message": "Touch target minimum (44-48px): Found 5 occurrences"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Mobile Classes",
+        "message": "Touch manipulation CSS: Found 2 occurrences"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Responsive Patterns",
+        "message": "Tailwind responsive prefixes: Found 7 occurrences"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Touch Targets",
+        "message": "Minimum touch width: Found"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Touch Targets",
+        "message": "Minimum touch height: Found"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Touch Targets",
+        "message": "Readable text size: Found"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Dark Mode",
+        "message": "Dark mode Tailwind classes: Found (15 occurrences)"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Dark Mode",
+        "message": "Dark mode color classes: Found (13 occurrences)"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Dark Mode",
+        "message": "Dark mode state variable: Found (18 occurrences)"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Dark Mode",
+        "message": "Dark mode toggle function: Found (7 occurrences)"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Sidebar Mobile",
+        "message": "Fixed positioning: Found"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Sidebar Mobile",
+        "message": "Slide animation: Found"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Sidebar Mobile",
+        "message": "Open/close state: Found"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Sidebar Mobile",
+        "message": "Close handler: Found"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Sidebar Mobile",
+        "message": "Mobile-only visibility: Found"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Sidebar Mobile",
+        "message": "Touch-friendly menu button: Found"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Accessibility",
+        "message": "ARIA labels: Found (2 occurrences)"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Accessibility",
+        "message": "ARIA roles: Found (1 occurrences)"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Accessibility",
+        "message": "Expanded state: Found (1 occurrences)"
+      },
+      {
+        "file": "MobileBottomNav.jsx",
+        "category": "Mobile Classes",
+        "message": "Mobile navigation: Found 8 occurrences"
+      },
+      {
+        "file": "MobileBottomNav.jsx",
+        "category": "Accessibility",
+        "message": "ARIA labels: Found (2 occurrences)"
+      },
+      {
+        "file": "MobileBottomNav.jsx",
+        "category": "Accessibility",
+        "message": "ARIA roles: Found (1 occurrences)"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Mobile Classes",
+        "message": "Mobile scrollbar class: Found 1 occurrences"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Mobile Classes",
+        "message": "Responsive hide classes: Found 3 occurrences"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Mobile Classes",
+        "message": "Touch manipulation CSS: Found 2 occurrences"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Responsive Patterns",
+        "message": "Responsive grid classes: Found 11 occurrences"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Responsive Patterns",
+        "message": "Tailwind responsive prefixes: Found 135 occurrences"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Touch Targets",
+        "message": "Touch-friendly padding: Found"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Touch Targets",
+        "message": "Readable text size: Found"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Dark Mode",
+        "message": "Dark mode Tailwind classes: Found (158 occurrences)"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Dark Mode",
+        "message": "Dark mode color classes: Found (151 occurrences)"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Accessibility",
+        "message": "Focus styles: Found (3 occurrences)"
+      },
+      {
+        "file": "guardian-buttons.css",
+        "category": "CSS Features",
+        "message": "Touch target minimum CSS found"
+      },
+      {
+        "file": "guardian-buttons.css",
+        "category": "CSS Features",
+        "message": "Media queries for mobile: 2 found"
+      },
+      {
+        "file": "guardian-dashboard-mobile.css",
+        "category": "CSS Features",
+        "message": "Fixed bottom navigation CSS found"
+      },
+      {
+        "file": "guardian-dashboard-mobile.css",
+        "category": "CSS Features",
+        "message": "Touch target minimum CSS found"
+      },
+      {
+        "file": "guardian-mobile.css",
+        "category": "CSS Features",
+        "message": "Fixed bottom navigation CSS found"
+      },
+      {
+        "file": "guardian-mobile.css",
+        "category": "CSS Features",
+        "message": "Touch target minimum CSS found"
+      },
+      {
+        "file": "guardian-mobile.css",
+        "category": "CSS Features",
+        "message": "Media queries for mobile: 25 found"
+      }
+    ],
+    "failed": [],
+    "warnings": [
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Mobile Classes",
+        "message": "Touch target minimum (44-48px): Not found"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Mobile Classes",
+        "message": "Mobile navigation: Not found"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Mobile Classes",
+        "message": "Touch manipulation CSS: Not found"
+      },
+      {
+        "file": "GuardianLayout.jsx",
+        "category": "Mobile Classes",
+        "message": "Mobile navigation: Not found"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Mobile Classes",
+        "message": "Mobile scrollbar class: Not found"
+      },
+      {
+        "file": "GuardianSidebar.jsx",
+        "category": "Mobile Classes",
+        "message": "Mobile navigation: Not found"
+      },
+      {
+        "file": "MobileBottomNav.jsx",
+        "category": "Mobile Classes",
+        "message": "Mobile scrollbar class: Not found"
+      },
+      {
+        "file": "MobileBottomNav.jsx",
+        "category": "Mobile Classes",
+        "message": "Responsive hide classes: Not found"
+      },
+      {
+        "file": "MobileBottomNav.jsx",
+        "category": "Mobile Classes",
+        "message": "Touch target minimum (44-48px): Not found"
+      },
+      {
+        "file": "MobileBottomNav.jsx",
+        "category": "Mobile Classes",
+        "message": "Touch manipulation CSS: Not found"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Mobile Classes",
+        "message": "Touch target minimum (44-48px): Not found"
+      },
+      {
+        "file": "GuardianDashboard.jsx",
+        "category": "Mobile Classes",
+        "message": "Mobile navigation: Not found"
+      }
+    ],
+    "info": []
+  }
+}

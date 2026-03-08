@@ -1,0 +1,536 @@
+/* ==========================================================================
+   Settings Module Mobile Optimizations
+   Guardian Dashboard - Immunicare Vaccination Management System
+   ========================================================================== */
+
+/* ==========================================================================
+   Base Settings Layout - Mobile First
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Settings page container */
+  .settings-page {
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* Settings header */
+  .settings-header {
+    padding: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-2);
+  }
+
+  /* Settings search */
+  .settings-search {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: var(--color-bg-primary);
+    padding: var(--space-2) var(--space-4);
+    margin: 0 calc(-1 * var(--space-4));
+    margin-bottom: var(--space-2);
+  }
+
+  /* Settings sidebar - convert to horizontal scroll on mobile */
+  .settings-sidebar {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: var(--space-2);
+    margin-bottom: var(--space-3);
+    border-bottom: 1px solid var(--color-border-light);
+  }
+
+  .settings-sidebar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-sidebar-nav {
+    display: flex;
+    gap: var(--space-1);
+    min-width: max-content;
+    padding: 0 var(--space-2);
+  }
+
+  .settings-sidebar-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-lg);
+    min-width: 64px;
+    min-height: 56px;
+    white-space: nowrap;
+    touch-action: manipulation;
+  }
+
+  .settings-sidebar-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .settings-sidebar-label {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+  }
+
+  /* Settings content area */
+  .settings-content {
+    padding: 0;
+  }
+
+  .settings-section {
+    margin-bottom: var(--space-4);
+  }
+
+  .settings-section-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    background: var(--color-gray-50);
+    border-radius: var(--radius-lg);
+    min-height: 48px;
+    touch-action: manipulation;
+  }
+
+  .settings-section-title {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    flex: 1;
+  }
+
+  .settings-section-content {
+    padding: var(--space-3);
+  }
+
+  /* Settings form fields */
+  .settings-field {
+    margin-bottom: var(--space-4);
+  }
+
+  .settings-field-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-1.5);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+  }
+
+  .settings-field-help {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    margin-top: var(--space-1);
+  }
+
+  /* Settings toggle */
+  .settings-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3);
+    background: var(--color-gray-50);
+    border-radius: var(--radius-lg);
+    min-height: 56px;
+  }
+
+  .settings-toggle-content {
+    flex: 1;
+    min-width: 0;
+    margin-right: var(--space-3);
+  }
+
+  .settings-toggle-label {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+  }
+
+  .settings-toggle-description {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    margin-top: var(--space-0.5);
+  }
+
+  /* Settings actions */
+  .settings-actions {
+    position: fixed;
+    bottom: 80px;
+    left: 0;
+    right: 0;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-bg-primary);
+    border-top: 1px solid var(--color-border-light);
+    z-index: 30;
+  }
+
+  .settings-actions button {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  /* Settings floating save button */
+  .settings-floating-save {
+    position: fixed;
+    bottom: 80px;
+    right: var(--space-4);
+    z-index: 40;
+    animation: settingsSlideUp 0.3s ease-out;
+  }
+
+  @keyframes settingsSlideUp {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+}
+
+/* Tablet and up */
+@media (min-width: 768px) {
+  .settings-floating-save {
+    display: none;
+  }
+
+  .settings-actions {
+    position: static;
+    padding: 0;
+    background: transparent;
+    border-top: none;
+    flex-direction: row;
+    justify-content: flex-end;
+    gap: var(--space-3);
+  }
+
+  .settings-actions button {
+    width: auto;
+    min-width: 120px;
+  }
+}
+
+/* ==========================================================================
+   Settings Manager Component
+   ========================================================================== */
+
+.settings-manager {
+  width: 100%;
+}
+
+.settings-manager-tabs {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.settings-manager-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-manager-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  min-height: 44px;
+  touch-action: manipulation;
+  transition: all var(--transition-fast);
+}
+
+.settings-manager-tab.active {
+  background: var(--color-primary-100);
+  color: var(--color-primary-700);
+}
+
+.settings-manager-content {
+  padding: var(--space-4);
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-xl);
+  min-height: 300px;
+}
+
+/* ==========================================================================
+   Settings Cards - Mobile Optimized
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .settings-card {
+    margin-bottom: var(--space-4);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+  }
+
+  .settings-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-gray-50);
+    cursor: pointer;
+    min-height: 48px;
+    touch-action: manipulation;
+  }
+
+  .settings-card-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .settings-card-body {
+    padding: var(--space-4);
+  }
+
+  .settings-card-icon {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* ==========================================================================
+   Settings Form - Mobile Optimized
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .settings-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .settings-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1.5);
+  }
+
+  .settings-form-label {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-primary);
+  }
+
+  .settings-form-input {
+    width: 100%;
+    min-height: 48px;
+    padding: var(--space-3);
+    font-size: 16px; /* Prevents iOS zoom */
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-primary);
+    transition: border-color var(--transition-fast);
+  }
+
+  .settings-form-input:focus {
+    outline: none;
+    border-color: var(--color-primary-500);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+  }
+
+  .settings-form-select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='%236b7280'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right var(--space-3) center;
+    padding-right: var(--space-10);
+  }
+
+  .settings-form-error {
+    font-size: var(--font-size-xs);
+    color: var(--color-red-500);
+    margin-top: var(--space-1);
+  }
+
+  .settings-form-help {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    margin-top: var(--space-1);
+  }
+
+  .settings-form-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--color-border-light);
+  }
+
+  .settings-form-actions button {
+    width: 100%;
+    min-height: 48px;
+  }
+}
+
+@media (min-width: 768px) {
+  .settings-form-row {
+    flex-direction: row;
+    gap: var(--space-4);
+  }
+
+  .settings-form-row > * {
+    flex: 1;
+  }
+
+  .settings-form-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+
+  .settings-form-actions button {
+    width: auto;
+    min-width: 120px;
+  }
+}
+
+/* ==========================================================================
+   Settings Toggle Switch - Mobile Optimized
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .settings-switch {
+    position: relative;
+    display: inline-block;
+    width: 52px;
+    height: 32px;
+    flex-shrink: 0;
+  }
+
+  .settings-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .settings-switch-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--color-gray-200);
+    transition: 0.3s;
+    border-radius: 32px;
+  }
+
+  .settings-switch-slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .settings-switch input:checked + .settings-switch-slider {
+    background-color: var(--color-primary-600);
+  }
+
+  .settings-switch input:focus + .settings-switch-slider {
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+  }
+
+  .settings-switch input:checked + .settings-switch-slider:before {
+    transform: translateX(20px);
+  }
+}
+
+/* ==========================================================================
+   Settings Info Section - Mobile Optimized
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .settings-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--color-blue-50);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-blue-200);
+  }
+
+  .settings-info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--color-blue-100);
+  }
+
+  .settings-info-item:last-child {
+    border-bottom: none;
+  }
+
+  .settings-info-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+  }
+
+  .settings-info-value {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+  }
+}
+
+/* ==========================================================================
+   Accessibility - Reduced Motion
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-floating-save {
+    animation: none;
+  }
+
+  .settings-switch-slider {
+    transition: none;
+  }
+
+  .settings-switch-slider:before {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   Print Styles
+   ========================================================================== */
+
+@media print {
+  .settings-actions,
+  .settings-floating-save,
+  .settings-search {
+    display: none;
+  }
+
+  .settings-content {
+    padding: 0;
+  }
+}

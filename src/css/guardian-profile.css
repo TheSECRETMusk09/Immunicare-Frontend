@@ -1,0 +1,566 @@
+/**
+ * Guardian Profile Page Styles
+ * Immunicare Vaccination Management System
+ *
+ * Mobile-first responsive design with improved touch targets
+ * and smooth animations
+ *
+ * @version 2.0
+ */
+
+/* ==========================================================================
+   CSS Custom Properties
+   ========================================================================== */
+
+.profile-page {
+  --profile-touch-target: 48px;
+  --profile-touch-target-sm: 44px;
+  --profile-card-radius: 1rem;
+  --profile-transition-fast: 150ms ease;
+  --profile-transition-medium: 200ms ease;
+  --profile-transition-slow: 300ms ease;
+}
+
+.guardian-profile-mobile-ui {
+  --profile-mobile-inline-padding: clamp(0.75rem, 3.2vw, 1rem);
+}
+
+/* ==========================================================================
+   Base Mobile Styles (< 640px)
+   ========================================================================== */
+
+@media (max-width: 639px) {
+  /* Profile page container */
+  .profile-page {
+    padding: var(--profile-mobile-inline-padding);
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  .guardian-profile-mobile-ui .guardian-page-content {
+    padding-left: var(--profile-mobile-inline-padding) !important;
+    padding-right: var(--profile-mobile-inline-padding) !important;
+  }
+
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content > * {
+    max-width: 100%;
+  }
+
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content .grid {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content .lg\:col-span-2,
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content .space-y-6 {
+    min-width: 0;
+  }
+
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content .bg-white.rounded-2xl,
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content .dark\:bg-gray-800.rounded-2xl {
+    border-radius: 0.9rem;
+    overflow: hidden;
+  }
+
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content .px-6,
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content .p-6 {
+    padding-left: 0.9rem;
+    padding-right: 0.9rem;
+  }
+
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content h1,
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content h2,
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content h3,
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content p,
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content span,
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content button,
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content a {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content .truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content .flex.items-center.justify-between {
+    gap: 0.625rem;
+    min-width: 0;
+  }
+
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content .text-2xl,
+  .guardian-profile-mobile-ui .guardian-profile-mobile-content .text-3xl {
+    line-height: 1.25;
+  }
+
+  /* Touch targets - minimum 48px for accessibility */
+  .profile-page button,
+  .profile-page [role="button"],
+  .profile-page input,
+  .profile-page select,
+  .profile-page textarea,
+  .profile-page .touch-target {
+    min-height: var(--profile-touch-target);
+    min-width: var(--profile-touch-target);
+  }
+
+  /* Smaller touch targets for desktop-sized buttons */
+  .profile-page button.sm\:min-h-\[44px\],
+  .profile-page .sm\:min-h-\[44px\] {
+    min-height: var(--profile-touch-target);
+  }
+
+  /* Form inputs - prevent iOS zoom */
+  .profile-page input,
+  .profile-page select,
+  .profile-page textarea {
+    font-size: 16px;
+    padding: 0.75rem 1rem;
+  }
+
+  /* Card spacing */
+  .profile-page .space-y-6 > * + * {
+    margin-top: 1rem;
+  }
+
+  /* Grid adjustments */
+  .profile-page .grid {
+    gap: 1rem;
+  }
+
+  /* Alert spacing */
+  .profile-page .alert {
+    margin-bottom: 1rem;
+  }
+}
+
+/* ==========================================================================
+   Tablet (640px - 1023px)
+   ========================================================================== */
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .profile-page {
+    padding: 1.5rem;
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Touch targets for tablet */
+  .profile-page button,
+  .profile-page [role="button"] {
+    min-height: var(--profile-touch-target-sm);
+  }
+}
+
+/* ==========================================================================
+    Desktop (>= 1024px)
+    ========================================================================== */
+
+@media (min-width: 1024px) {
+  .profile-page {
+    padding: 1.5rem;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+
+  /* Sidebar can be sticky on desktop */
+  .profile-page .lg\:col-span-1 {
+    position: sticky;
+    top: 1.5rem;
+    align-self: start;
+  }
+}
+
+/* ==========================================================================
+   Card Styles & Hover Effects
+   ========================================================================== */
+
+.profile-page .bg-white.rounded-2xl {
+  transition: box-shadow var(--profile-transition-medium),
+              transform var(--profile-transition-fast);
+  will-change: transform, box-shadow;
+}
+
+.profile-page .bg-white.rounded-2xl:hover {
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode card hover */
+.dark .profile-page .bg-white.rounded-2xl:hover {
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.3);
+}
+
+/* Card header icons */
+.profile-page .rounded-xl {
+  transition: transform var(--profile-transition-fast);
+}
+
+.profile-page button:hover .rounded-xl,
+.profile-page [role="button"]:hover .rounded-xl {
+  transform: scale(1.05);
+}
+
+/* ==========================================================================
+   Guardian Profile Hero Card Alignment
+   ========================================================================== */
+
+.guardian-profile-hero-layout {
+  width: 100%;
+}
+
+.guardian-profile-hero-content {
+  min-width: 0;
+}
+
+.guardian-profile-hero-info {
+  margin-bottom: 0;
+}
+
+@media (max-width: 639px) {
+  .guardian-profile-hero-card {
+    padding: 1.1rem 1rem;
+  }
+
+  .guardian-profile-hero-actions {
+    width: 100%;
+    margin-top: 1rem;
+  }
+
+  .guardian-profile-hero-actions button {
+    width: 100%;
+  }
+}
+
+@media (min-width: 640px) {
+  .guardian-profile-hero-card {
+    padding: 1.65rem 2rem;
+  }
+
+  .guardian-profile-hero-layout {
+    gap: 1.5rem;
+  }
+
+  .guardian-profile-hero-actions {
+    margin-top: 0.85rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-profile-hero-card {
+    padding: 2rem 2.35rem;
+  }
+
+  .guardian-profile-hero-layout {
+    align-items: center;
+    gap: 2rem;
+  }
+
+  .guardian-profile-hero-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .guardian-profile-hero-content {
+    display: flex;
+    min-height: 6rem;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .guardian-profile-hero-info {
+    text-align: left;
+  }
+
+  .guardian-profile-hero-meta {
+    justify-content: flex-start;
+  }
+
+  .guardian-profile-hero-actions {
+    margin-top: 0.85rem;
+    justify-content: flex-start;
+  }
+}
+
+/* ==========================================================================
+   Button Animations
+   ========================================================================== */
+
+.profile-page button,
+.profile-page [role="button"] {
+  transition: background-color var(--profile-transition-fast),
+              transform var(--profile-transition-fast),
+              box-shadow var(--profile-transition-fast);
+  will-change: transform;
+}
+
+.profile-page button:active:not(:disabled),
+.profile-page [role="button"]:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Primary button hover effect */
+.profile-page button.bg-emerald-600:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* ==========================================================================
+   Form Input Styles
+   ========================================================================== */
+
+.profile-page input,
+.profile-page select,
+.profile-page textarea {
+  transition: border-color var(--profile-transition-fast),
+              box-shadow var(--profile-transition-fast);
+}
+
+.profile-page input:focus,
+.profile-page select:focus,
+.profile-page textarea:focus {
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+/* Error state */
+.profile-page input.border-red-500:focus,
+.profile-page select.border-red-500:focus,
+.profile-page textarea.border-red-500:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+/* ==========================================================================
+   Alert Animations
+   ========================================================================== */
+
+.profile-page .alert {
+  animation: slideInDown var(--profile-transition-slow) ease-out;
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==========================================================================
+   Loading States
+   ========================================================================== */
+
+.profile-page .animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Spinner animation */
+.profile-page .animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ==========================================================================
+   Modal Styles
+   ========================================================================== */
+
+.profile-page [role="dialog"] {
+  animation: fadeIn var(--profile-transition-fast);
+}
+
+.profile-page [role="dialog"] > div {
+  animation: scaleIn var(--profile-transition-medium);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ==========================================================================
+   Safe Area Insets (iOS)
+   ========================================================================== */
+
+@supports (padding: env(safe-area-inset-bottom)) {
+  .profile-page {
+    padding-left: max(var(--profile-mobile-inline-padding), env(safe-area-inset-left));
+    padding-right: max(var(--profile-mobile-inline-padding), env(safe-area-inset-right));
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+  }
+
+  @media (min-width: 640px) {
+    .profile-page {
+      padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+    }
+  }
+}
+
+/* ==========================================================================
+   Dark Mode Overrides
+   ========================================================================== */
+
+.dark .profile-page {
+  background-color: rgb(17, 24, 39); /* gray-900 */
+}
+
+.dark .profile-page input,
+.dark .profile-page select,
+.dark .profile-page textarea {
+  background-color: rgb(55, 65, 81); /* gray-700 */
+  border-color: rgb(75, 85, 99); /* gray-600 */
+  color: white;
+}
+
+.dark .profile-page input:focus,
+.dark .profile-page select:focus,
+.dark .profile-page textarea:focus {
+  border-color: rgb(16, 185, 129); /* emerald-500 */
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+/* Dark mode placeholder text */
+.dark .profile-page input::placeholder,
+.dark .profile-page textarea::placeholder {
+  color: rgb(156, 163, 175); /* gray-400 */
+}
+
+/* ==========================================================================
+   Accessibility - Focus Visible
+   ========================================================================== */
+
+.profile-page *:focus-visible {
+  outline: 2px solid rgb(16, 185, 129);
+  outline-offset: 2px;
+}
+
+.profile-page button:focus-visible,
+.profile-page [role="button"]:focus-visible {
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Reduced Motion
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-page *,
+  .profile-page *::before,
+  .profile-page *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ==========================================================================
+   Print Styles
+   ========================================================================== */
+
+@media print {
+  .profile-page {
+    background: white;
+    padding: 0;
+  }
+
+  .profile-page button,
+  .profile-page [role="button"] {
+    display: none;
+  }
+
+  .profile-page .bg-white {
+    box-shadow: none;
+    border: 1px solid #e5e7eb;
+  }
+}
+
+/* ==========================================================================
+   Utility Classes
+   ========================================================================== */
+
+.profile-page .touch-manipulation {
+  touch-action: manipulation;
+}
+
+/* Prevent text selection on interactive elements */
+.profile-page button,
+.profile-page [role="button"] {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Smooth scrolling */
+.profile-page {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar for webkit browsers */
+.profile-page ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.profile-page ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.profile-page ::-webkit-scrollbar-thumb {
+  background: rgb(209, 213, 219);
+  border-radius: 4px;
+}
+
+.profile-page ::-webkit-scrollbar-thumb:hover {
+  background: rgb(156, 163, 175);
+}
+
+.dark .profile-page ::-webkit-scrollbar-thumb {
+  background: rgb(75, 85, 99);
+}
+
+.dark .profile-page ::-webkit-scrollbar-thumb:hover {
+  background: rgb(107, 114, 128);
+}

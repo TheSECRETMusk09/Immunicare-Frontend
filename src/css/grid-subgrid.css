@@ -1,0 +1,558 @@
+/* ==========================================================================
+   CSS Grid & Subgrid Patterns
+   Immunicare Vaccination Management System
+   ========================================================================== */
+
+/* ==========================================================================
+   Grid Layout Base Classes
+   ========================================================================== */
+
+/* Grid Container */
+.grid {
+  display: grid;
+  gap: var(--grid-gap);
+}
+
+.grid--gap-none {
+  gap: 0;
+}
+
+.grid--gap-sm {
+  gap: var(--space-2);
+}
+
+.grid--gap-md {
+  gap: var(--space-4);
+}
+
+.grid--gap-lg {
+  gap: var(--space-6);
+}
+
+.grid--gap-xl {
+  gap: var(--space-8);
+}
+
+/* Grid Columns */
+.grid-cols-1 {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+.grid-cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid-cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.grid-cols-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.grid-cols-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.grid-cols-6 {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.grid-cols-12 {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+/* Grid Auto Columns */
+.grid-cols-auto {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+}
+
+.grid-cols-auto-sm {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+}
+
+.grid-cols-auto-lg {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
+}
+
+/* Grid Rows */
+.grid-rows-1 {
+  grid-template-rows: repeat(1, minmax(0, 1fr));
+}
+
+.grid-rows-2 {
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.grid-rows-3 {
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+}
+
+.grid-rows-4 {
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+}
+
+/* ==========================================================================
+   Subgrid Patterns
+   ========================================================================== */
+
+/* Dashboard Grid with Subgrid */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-6);
+}
+
+.dashboard-grid--3-cols {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.dashboard-grid--4-cols {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.dashboard-card {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 3;
+  gap: var(--space-4);
+}
+
+.dashboard-card__header {
+  grid-row: 1;
+}
+
+.dashboard-card__content {
+  grid-row: 2;
+}
+
+.dashboard-card__footer {
+  grid-row: 3;
+}
+
+/* Form Grid with Subgrid */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  gap: var(--space-4);
+}
+
+.form-group {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: span 1;
+  gap: var(--space-2);
+}
+
+/* Card Grid with Subgrid */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-6);
+}
+
+.card-grid--2-cols {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.card-grid--3-cols {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.card-grid--4-cols {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.card-item {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 4;
+  min-height: 200px;
+}
+
+.card-item__media {
+  grid-row: 1;
+  aspect-ratio: var(--aspect-ratio-video);
+}
+
+.card-item__header {
+  grid-row: 2;
+}
+
+.card-item__body {
+  grid-row: 3;
+}
+
+.card-item__footer {
+  grid-row: 4;
+}
+
+/* Table Grid with Subgrid */
+.table-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-bg-primary);
+  border: var(--border-width) solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+}
+
+.table-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+.table-cell__label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  margin-bottom: var(--space-1);
+}
+
+.table-cell__value {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+
+/* Stats Grid with Subgrid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+}
+
+.stat-card {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 2;
+  gap: var(--space-3);
+}
+
+.stat-card__icon {
+  grid-row: 1;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+}
+
+.stat-card__value {
+  grid-row: 2;
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.stat-card__label {
+  grid-row: 3;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Timeline Grid with Subgrid */
+.timeline-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--space-4);
+}
+
+.timeline-item {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 3;
+  gap: var(--space-3);
+  padding-left: var(--space-6);
+  position: relative;
+}
+
+.timeline-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-border-light);
+}
+
+.timeline-item__marker {
+  grid-row: 1;
+  width: var(--space-4);
+  height: var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-primary);
+  border: 2px solid var(--color-primary-500);
+}
+
+.timeline-item__date {
+  grid-row: 2;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.timeline-item__content {
+  grid-row: 3;
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+}
+
+/* ==========================================================================
+   Responsive Grid Patterns
+   ========================================================================== */
+
+/* Mobile Grid (Single column) */
+.grid-mobile {
+  grid-template-columns: 1fr;
+}
+
+/* Tablet Grid (2 columns) */
+@media (min-width: 481px) {
+  .grid-tablet {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Desktop Grid (3-4 columns) */
+@media (min-width: 769px) {
+  .grid-desktop {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1025px) {
+  .grid-desktop-lg {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ==========================================================================
+   Grid with Named Lines
+   ========================================================================== */
+
+.grid-main {
+  display: grid;
+  grid-template-columns:
+    [full-start] minmax(var(--space-6), 1fr)
+    [main-start] minmax(0, 800px) [main-end]
+    minmax(var(--space-6), 1fr) [full-end];
+  gap: var(--space-6);
+}
+
+.grid-sidebar {
+  display: grid;
+  grid-template-columns:
+    [sidebar-start] 280px [sidebar-end]
+    [content-start] 1fr [content-end];
+  gap: var(--space-6);
+}
+
+@media (max-width: 1024px) {
+  .grid-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .grid-sidebar .sidebar-area {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   Grid Areas
+   ========================================================================== */
+
+.layout-dashboard {
+  display: grid;
+  grid-template-areas:
+    "header header"
+    "sidebar main"
+    "footer footer";
+  grid-template-columns: 280px 1fr;
+  grid-template-rows: var(--header-height) 1fr auto;
+  min-height: 100vh;
+}
+
+.layout-dashboard__header {
+  grid-area: header;
+}
+
+.layout-dashboard__sidebar {
+  grid-area: sidebar;
+}
+
+.layout-dashboard__main {
+  grid-area: main;
+}
+
+.layout-dashboard__footer {
+  grid-area: footer;
+}
+
+@media (max-width: 1024px) {
+  .layout-dashboard {
+    grid-template-areas:
+      "header"
+      "main"
+      "footer";
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--header-height-mobile) 1fr auto;
+  }
+
+  .layout-dashboard__sidebar {
+    display: none;
+  }
+}
+
+.layout-auth {
+  display: grid;
+  grid-template-areas: "content";
+  grid-template-columns: 1fr;
+  min-height: 100vh;
+}
+
+.layout-auth__content {
+  grid-area: content;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.layout-two-column {
+  display: grid;
+  grid-template-areas: "left right";
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-8);
+}
+
+.layout-two-column__left {
+  grid-area: left;
+}
+
+.layout-two-column__right {
+  grid-area: right;
+}
+
+@media (max-width: 768px) {
+  .layout-two-column {
+    grid-template-areas:
+      "left"
+      "right";
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================================================
+   Flex Grid Fallback
+   ========================================================================== */
+
+.flex-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.flex-grid__item {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+
+.flex-grid__item--small {
+  flex: 1 1 200px;
+}
+
+.flex-grid__item--large {
+  flex: 1 1 400px;
+}
+
+/* ==========================================================================
+   Masonry-like Grid
+   ========================================================================== */
+
+.grid-masonry {
+  columns: 3;
+  column-gap: var(--space-6);
+}
+
+.grid-masonry__item {
+  break-inside: avoid;
+  margin-bottom: var(--space-6);
+}
+
+@media (max-width: 1024px) {
+  .grid-masonry {
+    columns: 2;
+  }
+}
+
+@media (max-width: 640px) {
+  .grid-masonry {
+    columns: 1;
+  }
+}
+
+/* ==========================================================================
+   Grid Debug Utilities (for development)
+   ========================================================================== */
+
+.grid-debug {
+  --grid-debug-color: rgba(255, 0, 0, 0.1);
+}
+
+.grid-debug * {
+  background-color: var(--grid-debug-color);
+  border: 1px dashed red;
+}
+
+/* ==========================================================================
+   Subgrid Browser Support
+   ========================================================================== */
+
+@supports not (grid-template-rows: subgrid) {
+  .dashboard-card {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .card-item {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-card {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .timeline-item {
+    display: flex;
+    flex-direction: column;
+    padding-left: var(--space-4);
+  }
+
+  .form-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+  }
+
+  .form-group {
+    flex: 1 1 calc(50% - var(--space-4));
+    min-width: 200px;
+  }
+}

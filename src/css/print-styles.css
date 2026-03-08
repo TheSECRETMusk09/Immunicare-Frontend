@@ -1,0 +1,752 @@
+/* ==========================================================================
+   Print Styles for Vaccination Records & Medical Forms
+   Immunicare Vaccination Management System
+   ========================================================================== */
+
+/* ==========================================================================
+   Base Print Styles
+   ========================================================================== */
+
+@media print {
+  /* Reset */
+  *,
+  *::before,
+  *::after {
+    background-color: transparent !important;
+    color: black !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    border-color: #ddd !important;
+  }
+
+  /* Page Setup */
+  @page {
+    margin: 1cm;
+    size: A4 portrait;
+  }
+
+  /* Typography */
+  body {
+    font-size: 12pt;
+    line-height: 1.5;
+    color: black;
+    background: white;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    page-break-after: avoid;
+    color: black;
+  }
+
+  /* Print layout control -orphans and widows are valid print properties but may cause validation warnings
+   Keeping for proper print formatting */
+
+  a {
+    text-decoration: underline;
+  }
+
+  /* Links */
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 10pt;
+    color: #666;
+  }
+
+  /* Images */
+  img {
+    max-width: 100% !important;
+    page-break-inside: avoid;
+  }
+
+  /* Tables */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  th,
+  td {
+    border: 1px solid #ddd !important;
+  }
+}
+
+/* ==========================================================================
+   Vaccination Record Print Layout
+   ========================================================================== */
+
+.print-vaccination-record {
+  background: white;
+  color: black;
+  padding: var(--space-6);
+  border: 1px solid #ddd;
+  border-radius: var(--radius-lg);
+  max-width: 100%;
+  font-family: "Times New Roman", serif;
+}
+
+.print-vaccination-record__header {
+  text-align: center;
+  border-bottom: 2px solid #333;
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.print-vaccination-record__logo {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto var(--space-3);
+  background: #f0f0f0;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.print-vaccination-record__title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: var(--space-2);
+  color: #1a1a1a;
+}
+
+.print-vaccination-record__subtitle {
+  font-size: 14px;
+  color: #666;
+}
+
+.print-vaccination-record__section {
+  margin-bottom: var(--space-6);
+}
+
+.print-vaccination-record__section-title {
+  font-size: 16px;
+  font-weight: bold;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
+  color: #333;
+}
+
+.print-vaccination-record__info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-4);
+}
+
+.print-vaccination-record__info-item {
+  margin-bottom: var(--space-2);
+}
+
+.print-vaccination-record__info-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #666;
+  margin-bottom: var(--space-0-5);
+}
+
+.print-vaccination-record__info-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.print-vaccination-record__table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--space-4);
+  font-size: 12pt;
+}
+
+.print-vaccination-record__table th,
+.print-vaccination-record__table td {
+  border: 1px solid #ddd;
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+}
+
+.print-vaccination-record__table th {
+  background-color: #f5f5f5;
+  font-weight: bold;
+}
+
+.print-vaccination-record__footer {
+  margin-top: var(--space-8);
+  padding-top: var(--space-4);
+  border-top: 1px solid #ddd;
+  display: flex;
+  justify-content: space-between;
+}
+
+.print-vaccination-record__signature {
+  text-align: center;
+  min-width: 200px;
+}
+
+.print-vaccination-record__signature-line {
+  border-top: 1px solid #333;
+  margin-top: var(--space-8);
+  padding-top: var(--space-2);
+  font-size: 12px;
+}
+
+.print-vaccination-record__qr-code {
+  width: 80px;
+  height: 80px;
+  margin: var(--space-4) auto;
+  background: #f5f5f5;
+}
+
+/* ==========================================================================
+   Immunization Certificate Print Layout
+   ========================================================================== */
+
+.print-immunization-certificate {
+  background: white;
+  color: black;
+  padding: var(--space-8);
+  border: 2px solid #1a1a1a;
+  max-width: 100%;
+  font-family: "Times New Roman", serif;
+  position: relative;
+}
+
+.print-immunization-certificate::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  border: 1px solid #ddd;
+  pointer-events: none;
+}
+
+.print-immunization-certificate__header {
+  text-align: center;
+  border-bottom: 2px solid #1a1a1a;
+  padding-bottom: var(--space-6);
+  margin-bottom: var(--space-6);
+}
+
+.print-immunization-certificate__logo {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto var(--space-4);
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  border-radius: var(--radius-xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 32px;
+  font-weight: bold;
+}
+
+.print-immunization-certificate__title {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: var(--space-2);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.print-immunization-certificate__subtitle {
+  font-size: 14px;
+  color: #666;
+}
+
+.print-immunization-certificate__content {
+  margin-bottom: var(--space-6);
+}
+
+.print-immunization-certificate__intro {
+  font-size: 14px;
+  text-align: center;
+  margin-bottom: var(--space-6);
+  font-style: italic;
+}
+
+.print-immunization-certificate__recipient {
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: var(--space-6);
+  padding: var(--space-4);
+  border-bottom: 1px solid #ddd;
+}
+
+.print-immunization-certificate__vaccines {
+  margin-bottom: var(--space-6);
+}
+
+.print-immunization-certificate__footer {
+  text-align: center;
+  margin-top: var(--space-8);
+}
+
+.print-immunization-certificate__seal {
+  width: 100px;
+  height: 100px;
+  margin: 0 auto var(--space-4);
+  border: 3px solid #1a1a1a;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* ==========================================================================
+   Medical Form Print Layout
+   ========================================================================== */
+
+.print-medical-form {
+  background: white;
+  color: black;
+  padding: var(--space-6);
+  max-width: 100%;
+}
+
+.print-medical-form__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 2px solid #1a1a1a;
+}
+
+.print-medical-form__title {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: var(--space-2);
+}
+
+.print-medical-form__meta {
+  text-align: right;
+  font-size: 12px;
+}
+
+.print-medical-form__section {
+  margin-bottom: var(--space-6);
+  page-break-inside: avoid;
+}
+
+.print-medical-form__section-title {
+  font-size: 14px;
+  font-weight: bold;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
+  text-transform: uppercase;
+}
+
+.print-medical-form__field {
+  display: flex;
+  margin-bottom: var(--space-4);
+  align-items: flex-start;
+}
+
+.print-medical-form__field-label {
+  width: 200px;
+  font-size: 12px;
+  font-weight: bold;
+  padding: var(--space-2) 0;
+}
+
+.print-medical-form__field-value {
+  flex: 1;
+  border-bottom: 1px solid #333;
+  padding: var(--space-2) var(--space-2);
+  min-height: 32px;
+}
+
+.print-medical-form__checkbox-group {
+  display: flex;
+  gap: var(--space-6);
+  margin-top: var(--space-3);
+}
+
+.print-medical-form__checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.print-medical-form__checkbox-box {
+  width: 16px;
+  height: 16px;
+  border: 1px solid #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.print-medical-form__checkbox-box--checked {
+  background-color: #1a1a1a;
+}
+
+.print-medical-form__checkbox-box--checked::after {
+  content: "✓";
+  color: white;
+  font-size: 12px;
+}
+
+.print-medical-form__footer {
+  margin-top: var(--space-8);
+  padding-top: var(--space-4);
+  border-top: 1px solid #ddd;
+  display: flex;
+  justify-content: space-between;
+}
+
+.print-medical-form__signature-block {
+  text-align: center;
+  min-width: 200px;
+}
+
+.print-medical-form__signature-line {
+  border-top: 1px solid #333;
+  margin-top: var(--space-6);
+  padding-top: var(--space-2);
+  font-size: 11px;
+}
+
+/* ==========================================================================
+   Patient Health Record Print Layout
+   ========================================================================== */
+
+.print-health-record {
+  background: white;
+  color: black;
+  padding: var(--space-6);
+  max-width: 100%;
+}
+
+.print-health-record__patient-header {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-4);
+  background-color: #f5f5f5;
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-6);
+}
+
+.print-health-record__patient-info {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+}
+
+.print-health-record__info-item {
+  font-size: 12px;
+}
+
+.print-health-record__info-label {
+  font-weight: bold;
+  margin-bottom: var(--space-1);
+}
+
+.print-health-record__timeline {
+  margin-bottom: var(--space-6);
+}
+
+.print-health-record__timeline-item {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid #eee;
+}
+
+.print-health-record__timeline-date {
+  width: 100px;
+  font-size: 12px;
+  color: #666;
+}
+
+.print-health-record__timeline-content {
+  flex: 1;
+}
+
+.print-health-record__timeline-title {
+  font-weight: bold;
+  margin-bottom: var(--space-1);
+}
+
+.print-health-record__timeline-details {
+  font-size: 12px;
+  color: #666;
+}
+
+/* ==========================================================================
+   Appointment Card Print Layout
+   ========================================================================== */
+
+.print-appointment-card {
+  background: white;
+  color: black;
+  padding: var(--space-6);
+  border: 1px solid #ddd;
+  border-radius: var(--radius-lg);
+  max-width: 400px;
+  font-family: "Times New Roman", serif;
+}
+
+.print-appointment-card__header {
+  text-align: center;
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid #ddd;
+  margin-bottom: var(--space-4);
+}
+
+.print-appointment-card__title {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: var(--space-2);
+}
+
+.print-appointment-card__content {
+  margin-bottom: var(--space-4);
+}
+
+.print-appointment-card__info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-2) 0;
+  border-bottom: 1px dotted #ddd;
+}
+
+.print-appointment-card__info-label {
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.print-appointment-card__info-value {
+  font-size: 12px;
+}
+
+.print-appointment-card__footer {
+  text-align: center;
+  font-size: 11px;
+  color: #666;
+}
+
+/* ==========================================================================
+   Print Utilities
+   ========================================================================== */
+
+@media print {
+  /* Hide Elements */
+  .no-print,
+  .sidebar,
+  .header,
+  .mobile-bottom-nav,
+  .nav,
+  .modal-overlay,
+  .toast-container,
+  .offline-indicator {
+    display: none !important;
+  }
+
+  /* Layout */
+  .main-content {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+
+  .page-container {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  /* Page Breaks */
+  .page-break-before {
+    page-break-before: always;
+  }
+
+  .page-break-after {
+    page-break-after: always;
+  }
+
+  .page-break-inside-avoid {
+    page-break-inside: avoid;
+  }
+
+  .avoid-break {
+    page-break-inside: avoid;
+  }
+
+  /* Width */
+  .print-full-width {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  /* Borders */
+  .print-bordered {
+    border: 1px solid #ddd !important;
+  }
+
+  .print-dashed {
+    border: 1px dashed #ddd !important;
+  }
+
+  /* Text */
+  .print-text-center {
+    text-align: center !important;
+  }
+
+  .print-text-left {
+    text-align: left !important;
+  }
+
+  .print-text-right {
+    text-align: right !important;
+  }
+
+  .print-text-bold {
+    font-weight: bold !important;
+  }
+
+  .print-text-sm {
+    font-size: 10pt !important;
+  }
+
+  .print-text-xs {
+    font-size: 8pt !important;
+  }
+
+  /* Backgrounds */
+  .print-bg-white {
+    background-color: white !important;
+  }
+
+  .print-bg-gray {
+    background-color: #f5f5f5 !important;
+  }
+
+  /* Spacing */
+  .print-m-0 {
+    margin: 0 !important;
+  }
+
+  .print-p-0 {
+    padding: 0 !important;
+  }
+
+  .print-mb-4 {
+    margin-bottom: 1rem !important;
+  }
+
+  .print-mb-6 {
+    margin-bottom: 1.5rem !important;
+  }
+}
+
+/* ==========================================================================
+   Print Specific Components
+   ========================================================================== */
+
+@media print {
+  /* Cards */
+  .c-card {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+  }
+
+  /* Buttons */
+  .c-button {
+    border: 1px solid #ddd !important;
+    background: none !important;
+    color: black !important;
+  }
+
+  /* Forms */
+  .c-input,
+  .c-select,
+  .c-textarea {
+    border: 1px solid #ddd !important;
+    background: none !important;
+  }
+
+  /* Tables */
+  .c-table-container {
+    border: none !important;
+    overflow: visible !important;
+  }
+
+  .c-table {
+    font-size: 11pt;
+  }
+
+  .c-table th {
+    background-color: #f5f5f5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Alerts */
+  .c-alert {
+    border: 1px solid #ddd !important;
+    background: none !important;
+  }
+
+  /* Badges */
+  .c-badge {
+    border: 1px solid #ddd !important;
+    background: none !important;
+  }
+
+  /* Progress Bars */
+  .c-progress {
+    border: 1px solid #ddd !important;
+  }
+
+  .c-progress__bar {
+    background-color: #333 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* ==========================================================================
+   Landscape Print Support
+   ========================================================================== */
+
+@media print and (orientation: landscape) {
+  @page {
+    size: A4 landscape;
+  }
+
+  .print-vaccination-record__info-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ==========================================================================
+   Hide Print Only Content
+   ========================================================================== */
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  .print-only {
+    display: block;
+  }
+
+  .screen-only {
+    display: none !important;
+  }
+}

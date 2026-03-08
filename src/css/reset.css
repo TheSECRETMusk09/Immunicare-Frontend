@@ -1,0 +1,263 @@
+/* ==========================================================================
+   Base Reset & Normalization
+   Immunicare Vaccination Management System
+   ========================================================================== */
+
+/* Box Sizing Reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Remove Default Margins */
+* {
+  margin: 0;
+  padding: 0;
+}
+
+/* Prevent Font Size Inflation - vendor prefixed for compatibility */
+html {
+  /* text-size-adjust: Controls text enlargement on mobile devices */
+  /* -webkit- prefix for Safari/iOS */
+  -webkit-text-size-adjust: 100%;
+  /* Unprefixed for Chrome 54+, Edge 79+, Samsung Internet 6.0+ */
+  text-size-adjust: 100%;
+}
+
+/* Core Root Defaults */
+:root {
+  /* Use established, comfortable reading sizes */
+  --body-text-size: 100%;
+  --body-line-height: 1.5;
+}
+
+/* Body Defaults */
+body {
+  min-height: 100vh;
+  text-rendering: optimizeSpeed;
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Improve Media Defaults */
+img,
+picture,
+svg,
+video {
+  display: block;
+  max-width: 100%;
+}
+
+/* Inherit Fonts for Inputs and Buttons */
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+
+/* Remove Default Button Styles */
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* Remove Default Link Styles */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* List Styles */
+ul,
+ol {
+  list-style: none;
+}
+
+/* Table Styles */
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+/* Form Elements */
+input:not([type="checkbox"]):not([type="radio"]),
+textarea,
+select {
+  width: 100%;
+  border: none;
+  outline: none;
+}
+
+/* Scrollbar Styling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom Scrollbar for WebKit */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-default);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* Selection Color */
+::selection {
+  background-color: var(--color-primary-200);
+  color: var(--color-primary-900);
+}
+
+/* Focus Visible Outline */
+:focus-visible {
+  outline: 3px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+/* Remove Default Number Input Spinners */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+/* Remove Default Date Input Styling */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+}
+
+/* Placeholder Styling */
+::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
+/* Disabled Element Styling */
+:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Read-Only Element Styling */
+[readonly] {
+  cursor: default;
+  background-color: var(--color-bg-tertiary);
+}
+
+/* Hidden Elements */
+[hidden] {
+  display: none !important;
+}
+
+/* ==========================================================================
+   Forgot Password Link Styling
+   Vivid red color for consistent appearance across all login forms
+   ========================================================================== */
+.forgot-password-link {
+  color: #ff0000 !important;
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    color 0.2s ease,
+    text-decoration 0.2s ease;
+}
+
+.forgot-password-link:hover {
+  color: #cc0000 !important;
+  text-decoration: underline;
+}
+
+.forgot-password-link:focus {
+  outline: 2px solid #ff0000;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Invisible Elements (for accessibility) */
+.invisible {
+  visibility: hidden;
+}
+
+/* Screen Reader Only (sr-only) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Allow sr-only element to be focusable when navigated to via keyboard */
+.sr-only-focusable:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: inherit;
+  margin: inherit;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  :focus-visible {
+    outline: 3px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+/* Print Styles */
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+
+  a {
+    text-decoration: none;
+  }
+
+  img {
+    max-width: 100%;
+  }
+}

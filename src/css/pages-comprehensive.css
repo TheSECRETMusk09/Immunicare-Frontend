@@ -1,0 +1,1106 @@
+/* ==========================================================================
+   Page-Specific Styles
+   Immunicare Vaccination Management System
+   ========================================================================== */
+
+/* ==========================================================================
+   Authentication Pages
+   ========================================================================== */
+
+/* Login Page */
+.page-login {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-50) 0%,
+    var(--color-secondary-50) 100%
+  );
+  padding: var(--space-6);
+}
+
+.page-login__container {
+  width: 100%;
+  max-width: 440px;
+}
+
+.page-login__card {
+  background-color: var(--color-bg-primary);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-xl);
+  padding: var(--space-8);
+}
+
+.page-login__header {
+  text-align: center;
+  margin-bottom: var(--space-8);
+}
+
+.page-login__logo {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto var(--space-4);
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-500),
+    var(--color-primary-700)
+  );
+  border-radius: var(--radius-xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+}
+
+.page-login__title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.page-login__subtitle {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+}
+
+.page-login__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.page-login__footer {
+  text-align: center;
+  margin-top: var(--space-6);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.page-login__footer a {
+  color: var(--color-primary-600);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Register Page */
+.page-register {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-50) 0%,
+    var(--color-secondary-50) 100%
+  );
+  padding: var(--space-6);
+}
+
+.page-register__container {
+  width: 100%;
+  max-width: 540px;
+}
+
+.page-register__card {
+  background-color: var(--color-bg-primary);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-xl);
+  padding: var(--space-8);
+}
+
+.page-register__title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.page-register__subtitle {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-6);
+}
+
+/* Forgot Password Page */
+.page-forgot-password {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-50) 0%,
+    var(--color-secondary-50) 100%
+  );
+  padding: var(--space-6);
+}
+
+.page-forgot-password__container {
+  width: 100%;
+  max-width: 440px;
+}
+
+.page-forgot-password__card {
+  background-color: var(--color-bg-primary);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-xl);
+  padding: var(--space-8);
+}
+
+.page-forgot-password__title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.page-forgot-password__description {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-6);
+}
+
+/* ==========================================================================
+   Dashboard Pages
+   ========================================================================== */
+
+/* Guardian Dashboard */
+.page-guardian-dashboard {
+  padding: var(--space-6);
+  max-width: 1400px;
+  margin: 0 auto;
+  padding-bottom: calc(var(--space-24) + var(--space-8));
+}
+
+.page-guardian-dashboard__header {
+  margin-bottom: var(--space-8);
+}
+
+.page-guardian-dashboard__title {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.page-guardian-dashboard__subtitle {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+}
+
+.page-guardian-dashboard__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-6);
+}
+
+/* Management Dashboard */
+.page-management-dashboard {
+  padding: var(--space-6);
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.page-management-dashboard__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.page-management-dashboard__title {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.page-management-dashboard__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+.page-management-dashboard__content {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: var(--space-6);
+}
+
+/* Analytics Page */
+.page-analytics {
+  padding: var(--space-6);
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.page-analytics__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.page-analytics__title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.page-analytics__filters {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.page-analytics__charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: var(--space-6);
+}
+
+.page-analytics__chart-card {
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  border: var(--border-width) solid var(--color-border-light);
+}
+
+.page-analytics__chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.page-analytics__chart-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.page-analytics__chart-body {
+  height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ==========================================================================
+   Appointments Page
+   ========================================================================== */
+
+.page-appointments {
+  padding: var(--space-6);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-appointments__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.page-appointments__title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.page-appointments__content {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: var(--space-6);
+}
+
+.page-appointments__calendar {
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  border: var(--border-width) solid var(--color-border-light);
+}
+
+.page-appointments__calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.page-appointments__calendar-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.page-appointments__calendar-nav {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.page-appointments__upcoming {
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  border: var(--border-width) solid var(--color-border-light);
+}
+
+.page-appointments__upcoming-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-4);
+}
+
+/* Calendar Grid */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--space-1);
+}
+
+.calendar-header {
+  padding: var(--space-2);
+  text-align: center;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-height: 44px;
+  font-size: var(--font-size-sm);
+}
+
+.calendar-day:hover {
+  background-color: var(--color-bg-tertiary);
+}
+
+.calendar-day--today {
+  background-color: var(--color-primary-100);
+  color: var(--color-primary-700);
+  font-weight: var(--font-weight-semibold);
+}
+
+.calendar-day--selected {
+  background-color: var(--color-primary-600);
+  color: white;
+}
+
+.calendar-day--disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.calendar-day--has-appointments::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  background-color: var(--color-primary-500);
+  border-radius: var(--radius-full);
+  margin-top: var(--space-1);
+}
+
+/* ==========================================================================
+   Infant Management Page
+   ========================================================================== */
+
+.page-infant-management {
+  padding: var(--space-6);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-infant-management__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.page-infant-management__title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.page-infant-management__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-6);
+}
+
+/* Infant Profile Card */
+.infant-card {
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  border: var(--border-width) solid var(--color-border-light);
+  display: flex;
+  gap: var(--space-4);
+}
+
+.infant-card__avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-400),
+    var(--color-primary-600)
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  flex-shrink: 0;
+}
+
+.infant-card__info {
+  flex: 1;
+}
+
+.infant-card__name {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.infant-card__details {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-3);
+}
+
+.infant-card__vaccinations {
+  margin-top: var(--space-3);
+}
+
+.infant-card__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+/* ==========================================================================
+   Inventory Management Page
+   ========================================================================== */
+
+.page-inventory {
+  padding: var(--space-6);
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.page-inventory__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.page-inventory__title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.page-inventory__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+.page-inventory__stat-card {
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  border: var(--border-width) solid var(--color-border-light);
+}
+
+.page-inventory__stat-value {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.page-inventory__stat-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-1);
+}
+
+.page-inventory__stat-card--warning .page-inventory__stat-value {
+  color: var(--color-warning-600);
+}
+
+.page-inventory__stat-card--danger .page-inventory__stat-value {
+  color: var(--color-danger-600);
+}
+
+.page-inventory__content {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: var(--space-6);
+}
+
+.page-inventory__table-card {
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  border: var(--border-width) solid var(--color-border-light);
+}
+
+/* ==========================================================================
+   My Children Page
+   ========================================================================== */
+
+.page-my-children {
+  padding: var(--space-6);
+  max-width: 1400px;
+  margin: 0 auto;
+  padding-bottom: calc(var(--space-24) + var(--space-8));
+}
+
+.page-my-children__header {
+  margin-bottom: var(--space-8);
+}
+
+.page-my-children__title {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.page-my-children__subtitle {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+}
+
+.page-my-children__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: var(--space-6);
+}
+
+/* ==========================================================================
+   Vaccination Records Page
+   ========================================================================== */
+
+.page-vaccination-records {
+  padding: var(--space-6);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.page-vaccination-records__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.page-vaccination-records__title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.page-vaccination-records__filters {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.page-vaccination-records__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.vaccine-record {
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  border: var(--border-width) solid var(--color-border-light);
+}
+
+.vaccine-record__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.vaccine-record__name {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.vaccine-record__date {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.vaccine-record__details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.vaccine-record__detail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ==========================================================================
+   Health Information Pages
+   ========================================================================== */
+
+.page-health-information {
+  padding: var(--space-6);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.page-health-information__header {
+  margin-bottom: var(--space-8);
+}
+
+.page-health-information__title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.page-health-information__subtitle {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+}
+
+.page-health-information__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: var(--space-6);
+}
+
+.health-info-card {
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  border: var(--border-width) solid var(--color-border-light);
+}
+
+.health-info-card__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+  background: var(--color-primary-100);
+  color: var(--color-primary-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-4);
+}
+
+.health-info-card__title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.health-info-card__excerpt {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-4);
+}
+
+.health-info-card__link {
+  color: var(--color-primary-600);
+  font-weight: var(--font-weight-medium);
+}
+
+/* ==========================================================================
+   Messages Pages
+   ========================================================================== */
+
+.page-messages {
+  display: grid;
+  grid-template-columns: 350px 1fr;
+  gap: var(--space-6);
+  height: calc(100vh - var(--header-height));
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: var(--space-6);
+}
+
+.page-messages__sidebar {
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-xl);
+  border: var(--border-width) solid var(--color-border-light);
+  overflow: hidden;
+}
+
+.page-messages__header {
+  padding: var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border-light);
+}
+
+.page-messages__title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.page-messages__list {
+  height: calc(100% - 70px);
+  overflow-y: auto;
+}
+
+.page-messages__content {
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-xl);
+  border: var(--border-width) solid var(--color-border-light);
+  display: flex;
+  flex-direction: column;
+}
+
+.page-messages__thread-header {
+  padding: var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border-light);
+}
+
+.page-messages__thread-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.page-messages__thread-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+}
+
+.page-messages__composer {
+  padding: var(--space-4);
+  border-top: var(--border-width) solid var(--color-border-light);
+}
+
+@media (max-width: 1024px) {
+  .page-messages {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .page-messages__sidebar {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   Profile Pages
+   ========================================================================== */
+
+.page-profile {
+  padding: var(--space-6);
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.page-profile__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin-bottom: var(--space-8);
+  flex-wrap: wrap;
+}
+
+.page-profile__avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-400),
+    var(--color-primary-600)
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-bold);
+}
+
+.page-profile__info {
+  flex: 1;
+}
+
+.page-profile__name {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.page-profile__role {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-3);
+}
+
+.page-profile__content {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-6);
+}
+
+.page-profile__section {
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  border: var(--border-width) solid var(--color-border-light);
+}
+
+.page-profile__section-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border-light);
+}
+
+/* ==========================================================================
+   User Management Page
+   ========================================================================== */
+
+.page-user-management {
+  padding: var(--space-6);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-user-management__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.page-user-management__title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.page-user-management__content {
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  border: var(--border-width) solid var(--color-border-light);
+}
+
+/* ==========================================================================
+   Digital Papers Dashboard Page
+   ========================================================================== */
+
+.page-digital-papers {
+  padding: var(--space-6);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-digital-papers__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.page-digital-papers__title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.page-digital-papers__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-6);
+}
+
+.digital-paper-card {
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  border: var(--border-width) solid var(--color-border-light);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.digital-paper-card__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+  background: var(--color-primary-100);
+  color: var(--color-primary-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.digital-paper-card__title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.digital-paper-card__description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.digital-paper-card__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
+/* ==========================================================================
+   Responsive Adjustments for Pages
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .page-login__card,
+  .page-register__card,
+  .page-forgot-password__card {
+    padding: var(--space-6);
+  }
+
+  .page-guardian-dashboard,
+  .page-management-dashboard,
+  .page-analytics,
+  .page-appointments,
+  .page-infant-management,
+  .page-inventory,
+  .page-my-children,
+  .page-vaccination-records,
+  .page-health-information,
+  .page-profile,
+  .page-user-management,
+  .page-digital-papers {
+    padding: var(--space-4);
+  }
+
+  .page-guardian-dashboard__title,
+  .page-management-dashboard__title,
+  .page-analytics__title,
+  .page-appointments__title {
+    font-size: var(--font-size-xl);
+  }
+
+  .page-analytics__charts {
+    grid-template-columns: 1fr;
+  }
+
+  .page-analytics__chart-card {
+    padding: var(--space-4);
+  }
+
+  .page-appointments__content {
+    grid-template-columns: 1fr;
+  }
+
+  .page-inventory__stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .page-inventory__content {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-login__card,
+  .page-register__card,
+  .page-forgot-password__card {
+    padding: var(--space-4);
+  }
+
+  .page-login__logo {
+    width: 56px;
+    height: 56px;
+    font-size: var(--font-size-xl);
+  }
+
+  .page-login__title,
+  .page-register__title {
+    font-size: var(--font-size-xl);
+  }
+
+  .page-guardian-dashboard__grid,
+  .page-my-children__grid,
+  .page-infant-management__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .infant-card {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .page-profile__header {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .page-profile__avatar {
+    width: 80px;
+    height: 80px;
+    font-size: var(--font-size-2xl);
+  }
+}

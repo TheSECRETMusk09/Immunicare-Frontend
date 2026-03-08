@@ -1,0 +1,734 @@
+/* ==========================================================================
+    Container Queries - Component-Level Responsiveness
+    Immunicare Vaccination Management System
+    ========================================================================== */
+
+/* ==========================================================================
+    Container Query Base Setup
+    ========================================================================== */
+
+/* Base container with inline-size query type */
+.container-query {
+  container-type: inline-size;
+  container-name: base;
+}
+
+/* Card container */
+.container-card {
+  container-type: inline-size;
+  container-name: card;
+}
+
+/* Modal container */
+.container-modal {
+  container-type: inline-size;
+  container-name: modal;
+}
+
+/* Table container */
+.container-table {
+  container-type: inline-size;
+  container-name: table;
+}
+
+/* Form container */
+.container-form {
+  container-type: inline-size;
+  container-name: form;
+}
+
+/* Navigation container */
+.container-nav {
+  container-type: inline-size;
+  container-name: nav;
+}
+
+/* Dashboard container */
+.container-dashboard {
+  container-type: inline-size;
+  container-name: dashboard;
+}
+
+/* ==========================================================================
+    Named Container Sizes
+    ========================================================================== */
+
+/* XS Container (320px) */
+@container (min-width: 20rem) {
+  .cqd\:flex-row {
+    flex-direction: row;
+  }
+
+  .cqd\:grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .cqd\:hidden-xs {
+    display: none;
+  }
+}
+
+/* SM Container (480px) */
+@container (min-width: 30rem) {
+  .cqd\:text-base {
+    font-size: var(--font-size-base);
+  }
+
+  .cqd\:grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .cqd\:show-sidebar {
+    display: block;
+  }
+
+  .cqd\:hide-mobile-only {
+    display: none;
+  }
+}
+
+/* MD Container (768px) */
+@container (min-width: 48rem) {
+  .cqd\:grid-cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .cqd\:flex-row {
+    flex-direction: row;
+  }
+
+  .cqd\:text-lg {
+    font-size: var(--font-size-lg);
+  }
+
+  .cqd\:card-horizontal {
+    flex-direction: row;
+  }
+
+  .cqd\:form-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* LG Container (1024px) */
+@container (min-width: 64rem) {
+  .cqd\:grid-cols-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .cqd\:text-xl {
+    font-size: var(--font-size-xl);
+  }
+
+  .cqd\:show-full-nav {
+    display: flex;
+  }
+
+  .cqd\:dashboard-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* XL Container (1280px) */
+@container (min-width: 80rem) {
+  .cqd\:grid-cols-5 {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  .cqd\:text-2xl {
+    font-size: var(--font-size-2xl);
+  }
+
+  .cqd\:sidebar-visible {
+    display: block;
+  }
+
+  .cqd\:form-row-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ==========================================================================
+    Card Component Container Queries
+    ========================================================================== */
+
+@container card (min-width: 20rem) {
+  .card {
+    padding: var(--space-4);
+  }
+
+  .card__title {
+    font-size: var(--font-size-lg);
+  }
+
+  .card__actions {
+    flex-direction: row;
+  }
+}
+
+@container card (min-width: 30rem) {
+  .card {
+    padding: var(--space-5);
+  }
+
+  .card--horizontal {
+    flex-direction: row;
+  }
+
+  .card__image {
+    width: 120px;
+    height: 120px;
+  }
+}
+
+@container card (min-width: 40rem) {
+  .card {
+    padding: var(--space-6);
+  }
+
+  .card__title {
+    font-size: var(--font-size-xl);
+  }
+
+  .card__content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+  }
+}
+
+/* ==========================================================================
+    Modal Component Container Queries
+    ========================================================================== */
+
+@container modal (min-width: 20rem) {
+  .modal {
+    margin: var(--space-4);
+    max-width: calc(100% - var(--space-8));
+  }
+
+  .modal__header {
+    padding: var(--space-4);
+  }
+
+  .modal__body {
+    padding: var(--space-4);
+  }
+
+  .modal__footer {
+    padding: var(--space-4);
+    flex-direction: column-reverse;
+  }
+
+  .modal__footer .btn {
+    width: 100%;
+  }
+}
+
+@container modal (min-width: 40rem) {
+  .modal {
+    max-width: 500px;
+    border-radius: var(--radius-xl);
+  }
+
+  .modal__footer {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+
+  .modal__footer .btn {
+    width: auto;
+  }
+}
+
+@container modal (min-width: 60rem) {
+  .modal {
+    max-width: 700px;
+  }
+
+  .modal--wide {
+    max-width: 900px;
+  }
+
+  .modal__body {
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+}
+
+/* ==========================================================================
+    Form Component Container Queries
+    ========================================================================== */
+
+@container form (min-width: 20rem) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .form-group {
+    margin-bottom: var(--space-4);
+  }
+}
+
+@container form (min-width: 30rem) {
+  .form-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .form-row--full {
+    grid-template-columns: 1fr;
+  }
+}
+
+@container form (min-width: 48rem) {
+  .form-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .form-row--3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .form-row--4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ==========================================================================
+    Table Component Container Queries
+    ========================================================================== */
+
+@container table (min-width: 20rem) {
+  .table {
+    font-size: var(--font-size-sm);
+  }
+
+  .table th,
+  .table td {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .table--compact {
+    font-size: var(--font-size-xs);
+    padding: var(--space-2);
+  }
+}
+
+@container table (min-width: 48rem) {
+  .table {
+    font-size: var(--font-size-base);
+  }
+
+  .table th,
+  .table td {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .table--striped tbody tr:nth-child(odd) {
+    background: var(--color-bg-secondary);
+  }
+}
+
+/* ==========================================================================
+    Navigation Component Container Queries
+    ========================================================================== */
+
+@container nav (min-width: 20rem) {
+  .nav {
+    flex-direction: row;
+    justify-content: space-around;
+  }
+
+  .nav__item {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .nav__icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .nav__label {
+    font-size: var(--font-size-xs);
+  }
+}
+
+@container nav (min-width: 40rem) {
+  .nav {
+    justify-content: flex-start;
+    gap: var(--space-1);
+  }
+
+  .nav__item {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .nav__label {
+    font-size: var(--font-size-sm);
+  }
+}
+
+/* ==========================================================================
+    Dashboard Component Container Queries
+    ========================================================================== */
+
+@container dashboard (min-width: 20rem) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-metric {
+    padding: var(--space-4);
+  }
+
+  .dashboard-metric__value {
+    font-size: var(--font-size-2xl);
+  }
+
+  .dashboard-chart {
+    aspect-ratio: 16 / 9;
+  }
+}
+
+@container dashboard (min-width: 40rem) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .dashboard-metric__value {
+    font-size: var(--font-size-3xl);
+  }
+}
+
+@container dashboard (min-width: 60rem) {
+  .dashboard-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .dashboard-metric {
+    padding: var(--space-5);
+  }
+
+  .dashboard-chart {
+    aspect-ratio: 4 / 3;
+  }
+}
+
+@container dashboard (min-width: 80rem) {
+  .dashboard-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .dashboard-metric__value {
+    font-size: var(--font-size-4xl);
+  }
+
+  .dashboard-chart {
+    aspect-ratio: 3 / 2;
+  }
+}
+
+/* ==========================================================================
+    Card Grid Container Queries
+    ========================================================================== */
+
+@container card (min-width: 20rem) {
+  .card-grid {
+    grid-template-columns: repeat(1, 1fr);
+    gap: var(--space-4);
+  }
+}
+
+@container card (min-width: 30rem) {
+  .card-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-4);
+  }
+}
+
+@container card (min-width: 48rem) {
+  .card-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-5);
+  }
+}
+
+@container card (min-width: 64rem) {
+  .card-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-6);
+  }
+}
+
+@container card (min-width: 80rem) {
+  .card-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--space-6);
+  }
+}
+
+/* ==========================================================================
+    Responsive Typography Container Queries
+    ========================================================================== */
+
+@container (min-width: 20rem) {
+  .text-xs {
+    font-size: var(--font-size-xs);
+  }
+  .text-sm {
+    font-size: var(--font-size-sm);
+  }
+  .text-base {
+    font-size: var(--font-size-base);
+  }
+  .text-lg {
+    font-size: var(--font-size-lg);
+  }
+  .text-xl {
+    font-size: var(--font-size-xl);
+  }
+  .text-2xl {
+    font-size: var(--font-size-2xl);
+  }
+  .text-3xl {
+    font-size: var(--font-size-3xl);
+  }
+  .text-4xl {
+    font-size: var(--font-size-4xl);
+  }
+}
+
+@container (min-width: 30rem) {
+  .text-xs {
+    font-size: var(--font-size-fluid-xs);
+  }
+  .text-sm {
+    font-size: var(--font-size-fluid-sm);
+  }
+  .text-base {
+    font-size: var(--font-size-fluid-base);
+  }
+  .text-lg {
+    font-size: var(--font-size-fluid-lg);
+  }
+  .text-xl {
+    font-size: var(--font-size-fluid-xl);
+  }
+  .text-2xl {
+    font-size: var(--font-size-fluid-2xl);
+  }
+  .text-3xl {
+    font-size: var(--font-size-fluid-3xl);
+  }
+  .text-4xl {
+    font-size: var(--font-size-fluid-4xl);
+  }
+}
+
+/* ==========================================================================
+    Container Query Utility Classes
+    ========================================================================== */
+
+/* Show/Hide based on container size */
+.cqd\:hidden {
+  display: none;
+}
+.cqd\:block {
+  display: block;
+}
+.cqd\:inline-block {
+  display: inline-block;
+}
+.cqd\:flex {
+  display: flex;
+}
+.cqd\:grid {
+  display: grid;
+}
+
+@container (min-width: 20rem) {
+  .cqd\@xs\:hidden {
+    display: none;
+  }
+  .cqd\@xs\:block {
+    display: block;
+  }
+  .cqd\@xs\:flex {
+    display: flex;
+  }
+  .cqd\@xs\:grid {
+    display: grid;
+  }
+}
+
+@container (min-width: 30rem) {
+  .cqd\@sm\:hidden {
+    display: none;
+  }
+  .cqd\@sm\:block {
+    display: block;
+  }
+  .cqd\@sm\:flex {
+    display: flex;
+  }
+  .cqd\@sm\:grid {
+    display: grid;
+  }
+}
+
+@container (min-width: 48rem) {
+  .cqd\@md\:hidden {
+    display: none;
+  }
+  .cqd\@md\:block {
+    display: block;
+  }
+  .cqd\@md\:flex {
+    display: flex;
+  }
+  .cqd\@md\:grid {
+    display: grid;
+  }
+}
+
+@container (min-width: 64rem) {
+  .cqd\@lg\:hidden {
+    display: none;
+  }
+  .cqd\@lg\:block {
+    display: block;
+  }
+  .cqd\@lg\:flex {
+    display: flex;
+  }
+  .cqd\@lg\:grid {
+    display: grid;
+  }
+}
+
+@container (min-width: 80rem) {
+  .cqd\@xl\:hidden {
+    display: none;
+  }
+  .cqd\@xl\:block {
+    display: block;
+  }
+  .cqd\@xl\:flex {
+    display: flex;
+  }
+  .cqd\@xl\:grid {
+    display: grid;
+  }
+}
+
+/* ==========================================================================
+    Spacing Utilities for Container Queries
+    ========================================================================== */
+
+@container (min-width: 20rem) {
+  .cqd\@xs\:p-2 {
+    padding: var(--space-2);
+  }
+  .cqd\@xs\:p-4 {
+    padding: var(--space-4);
+  }
+  .cqd\@xs\:m-2 {
+    margin: var(--space-2);
+  }
+  .cqd\@xs\:m-4 {
+    margin: var(--space-4);
+  }
+  .cqd\@xs\:gap-2 {
+    gap: var(--space-2);
+  }
+  .cqd\@xs\:gap-4 {
+    gap: var(--space-4);
+  }
+}
+
+@container (min-width: 30rem) {
+  .cqd\@sm\:p-3 {
+    padding: var(--space-3);
+  }
+  .cqd\@sm\:p-5 {
+    padding: var(--space-5);
+  }
+  .cqd\@sm\:m-3 {
+    margin: var(--space-3);
+  }
+  .cqd\@sm\:m-5 {
+    margin: var(--space-5);
+  }
+  .cqd\@sm\:gap-3 {
+    gap: var(--space-3);
+  }
+  .cqd\@sm\:gap-5 {
+    gap: var(--space-5);
+  }
+}
+
+@container (min-width: 48rem) {
+  .cqd\@md\:p-4 {
+    padding: var(--space-4);
+  }
+  .cqd\@md\:p-6 {
+    padding: var(--space-6);
+  }
+  .cqd\@md\:m-4 {
+    margin: var(--space-4);
+  }
+  .cqd\@md\:m-6 {
+    margin: var(--space-6);
+  }
+  .cqd\@md\:gap-4 {
+    gap: var(--space-4);
+  }
+  .cqd\@md\:gap-6 {
+    gap: var(--space-6);
+  }
+}
+
+/* ==========================================================================
+    Aspect Ratio Utilities for Container Queries
+    ========================================================================== */
+
+@container (min-width: 20rem) {
+  .cqd\@xs\:aspect-video {
+    aspect-ratio: 16 / 9;
+  }
+  .cqd\@xs\:aspect-square {
+    aspect-ratio: 1 / 1;
+  }
+  .cqd\@xs\:aspect-photo {
+    aspect-ratio: 4 / 3;
+  }
+}
+
+@container (min-width: 40rem) {
+  .cqd\@sm\:aspect-video {
+    aspect-ratio: 4 / 3;
+  }
+  .cqd\:sm\:aspect-square {
+    aspect-ratio: 3 / 2;
+  }
+  .cqd\@sm\:aspect-photo {
+    aspect-ratio: 3 / 4;
+  }
+}
+
+/* ==========================================================================
+    Container Query Animation Controls
+    Note: Using @container with prefers-reduced-motion may cause validation warnings
+    in older validators. The property is valid CSS but not all validators recognize
+    media features inside container queries. Using standard @media query instead.
+    ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .container-query *,
+  .container-query *::before,
+  .container-query *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
