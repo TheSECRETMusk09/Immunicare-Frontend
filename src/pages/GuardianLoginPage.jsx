@@ -101,17 +101,20 @@ const GuardianLoginForm = ({
   onSubmit,
   touched,
   handleBlur,
+  showInlineHomeButton = true,
 }) => {
   return (
     <div className="w-full h-full bg-[#2d2b5c] flex flex-col justify-center text-white px-10 py-8 relative">
-      <Link
-        to="/"
-        className="absolute top-4 left-4 inline-flex items-center px-3.5 py-2 bg-white/10 backdrop-blur-md text-white rounded-xl hover:bg-white/20 transition-all focus:outline-none focus:ring-2 focus:ring-white border border-white/20 text-sm sm:text-base"
-        aria-label="Go to home page"
-      >
-        <Home className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2" aria-hidden="true" />
-        Home
-      </Link>
+      {showInlineHomeButton && (
+        <Link
+          to="/"
+          className="absolute top-4 left-4 inline-flex items-center px-3.5 py-2 bg-white/10 backdrop-blur-md text-white rounded-xl hover:bg-white/20 transition-all focus:outline-none focus:ring-2 focus:ring-white border border-white/20 text-sm sm:text-base"
+          aria-label="Go to home page"
+        >
+          <Home className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2" aria-hidden="true" />
+          Home
+        </Link>
+      )}
 
       <div className="max-w-sm mx-auto w-full">
         {/* Header */}
@@ -393,9 +396,18 @@ const GuardianLoginPage = () => {
   if (isMobile) {
     return (
       <div
-        className="min-h-screen flex items-center justify-center bg-[#2d2b5c] px-4 py-8"
+        className="min-h-screen flex items-center justify-center bg-[#2d2b5c] px-4 py-8 relative"
         data-theme="light"
       >
+        <Link
+          to="/"
+          className="absolute top-4 left-4 inline-flex items-center px-3.5 py-2 bg-white/10 backdrop-blur-md text-white rounded-xl hover:bg-white/20 transition-all focus:outline-none focus:ring-2 focus:ring-white border border-white/20 text-sm"
+          aria-label="Go to home page"
+        >
+          <Home className="w-4 h-4 mr-1.5" aria-hidden="true" />
+          Home
+        </Link>
+
         <div className="w-full max-w-sm">
           <GuardianLoginForm
             formData={formData}
@@ -406,6 +418,7 @@ const GuardianLoginPage = () => {
             onSubmit={handleSubmit}
             touched={touched}
             handleBlur={handleBlur}
+            showInlineHomeButton={false}
           />
         </div>
 

@@ -353,7 +353,7 @@ const Register = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 register-page">
+    <div className="min-h-screen flex items-start sm:items-center justify-center px-4 py-4 sm:py-12 bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 register-page relative">
       {/* Skip Link for Accessibility */}
       <a
         href="#main-content"
@@ -365,33 +365,33 @@ const Register = () => {
       {/* Home Button */}
       <Link
         to="/"
-        className="absolute top-4 left-4 inline-flex items-center px-4 py-2 bg-white/10 backdrop-blur-md text-white rounded-xl hover:bg-white/20 transition-all focus:outline-none focus:ring-2 focus:ring-white border border-white/20 home-button"
+        className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10 inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-white/10 backdrop-blur-md text-white rounded-xl hover:bg-white/20 transition-all focus:outline-none focus:ring-2 focus:ring-white border border-white/20 text-sm sm:text-base home-button"
         aria-label="Go to home page"
       >
-        <Home className="w-5 h-5 mr-2" />
+        <Home className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2" />
         Home
       </Link>
 
-      <main id="main-content" className="w-full max-w-2xl">
+      <main id="main-content" className="w-full max-w-2xl mt-10 sm:mt-0">
         {/* Logo / Brand Header */}
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl mb-4 shadow-xl border border-white/30">
-            <Plus className="w-10 h-10 text-white" strokeWidth={3} />
+        <div className="text-center mb-7 sm:mb-10">
+          <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-white/20 backdrop-blur-md rounded-2xl mb-3 sm:mb-4 shadow-xl border border-white/30">
+            <Plus className="w-7 h-7 sm:w-10 sm:h-10 text-white" strokeWidth={3} />
           </div>
-          <h1 className="text-4xl font-black text-white tracking-tight">
+          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
             IMMUNICARE
           </h1>
-          <p className="text-primary-100 text-sm mt-2 font-medium uppercase tracking-widest">
+          <p className="text-primary-100 text-xs sm:text-sm mt-1.5 sm:mt-2 font-medium uppercase tracking-[0.18em] sm:tracking-widest">
             Parent/Guardian Registration
           </p>
         </div>
 
         {/* Registration Form Card - Glassmorphism Style */}
-        <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] shadow-2xl p-8 md:p-12 border border-white/20 register-card">
-          <h2 className="text-2xl font-bold text-white mb-2">
+        <div className="bg-white/10 backdrop-blur-lg rounded-[1.5rem] sm:rounded-[2rem] shadow-2xl p-5 sm:p-8 md:p-12 border border-white/20 register-card">
+          <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
             Create Your Account
           </h2>
-          <p className="text-white/70 text-sm mb-10">
+          <p className="text-white/70 text-sm mb-6 sm:mb-10">
             Fill in the form below to register for Immunicare
           </p>
 
@@ -406,16 +406,16 @@ const Register = () => {
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-10 register-form">
+          <form onSubmit={handleSubmit} className="space-y-7 sm:space-y-10 register-form">
             {/* Personal Information */}
             <section>
-              <div className="flex items-center gap-2 mb-6 pb-2 border-b border-white/20">
+              <div className="flex items-center gap-2 mb-4 sm:mb-6 pb-2 border-b border-white/20">
                 <User className="w-5 h-5 text-white" />
-                <h3 className="text-lg font-bold text-white">
+                <h3 className="text-base sm:text-lg font-bold text-white">
                   Personal Information
                 </h3>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <TextInput
                   label="First Name"
                   id="firstName"
@@ -447,13 +447,13 @@ const Register = () => {
 
             {/* Contact Information */}
             <section>
-              <div className="flex items-center gap-2 mb-6 pb-2 border-b border-white/20">
+              <div className="flex items-center gap-2 mb-4 sm:mb-6 pb-2 border-b border-white/20">
                 <Mail className="w-5 h-5 text-white" />
-                <h3 className="text-lg font-bold text-white">
+                <h3 className="text-base sm:text-lg font-bold text-white">
                   Contact Information
                 </h3>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <TextInput
                   label="Email Address"
                   id="email"
@@ -484,7 +484,7 @@ const Register = () => {
                   className="bg-white/10 backdrop-blur-sm border-white/30 text-white placeholder-white/50"
                 />
               </div>
-              <div className="mt-6">
+              <div className="mt-4 sm:mt-6">
                 <label
                   htmlFor="address"
                   className="block text-sm font-bold text-white mb-2"
@@ -507,11 +507,11 @@ const Register = () => {
 
             {/* Security */}
             <section>
-              <div className="flex items-center gap-2 mb-6 pb-2 border-b border-white/20">
+              <div className="flex items-center gap-2 mb-4 sm:mb-6 pb-2 border-b border-white/20">
                 <Shield className="w-5 h-5 text-white" />
-                <h3 className="text-lg font-bold text-white">Security</h3>
+                <h3 className="text-base sm:text-lg font-bold text-white">Security</h3>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <PasswordInput
                   label="Password"
                   id="password"
@@ -546,15 +546,15 @@ const Register = () => {
               </div>
 
               {/* Password Strength Indicators */}
-              <div className="mt-6 p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
-                <p className="text-xs font-bold text-white/70 uppercase tracking-wider mb-3">
+              <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
+                <p className="text-[11px] sm:text-xs font-bold text-white/70 uppercase tracking-wider mb-2.5 sm:mb-3">
                   Password Requirements
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1.5 sm:gap-y-2">
                   {passwordStrength.results.map((check, index) => (
                     <div
                       key={index}
-                      className={`flex items-center text-xs font-medium ${
+                      className={`flex items-center text-[11px] sm:text-xs font-medium ${
                         check.passed ? "text-green-400" : "text-white/50"
                       }`}
                     >
@@ -572,20 +572,20 @@ const Register = () => {
 
             {/* Child Information */}
             <section>
-              <div className="flex items-center gap-2 mb-6 pb-2 border-b border-white/20">
+              <div className="flex items-center gap-2 mb-4 sm:mb-6 pb-2 border-b border-white/20">
                 <Baby className="w-5 h-5 text-white" />
-                <h3 className="text-lg font-bold text-white">
+                <h3 className="text-base sm:text-lg font-bold text-white">
                   Child Information{" "}
                   <span className="text-white/60 font-normal text-sm">
                     (optional)
                   </span>
                 </h3>
               </div>
-              <p className="text-sm text-white/70 mb-6">
+              <p className="text-sm text-white/70 mb-4 sm:mb-6">
                 Add your child's information to link their immunization records
                 to your account.
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <TextInput
                   label="Child's Name"
                   id="infantName"
@@ -635,21 +635,21 @@ const Register = () => {
             </section>
 
             {/* Submit Button */}
-            <div className="pt-6 text-center">
+            <div className="pt-4 sm:pt-6 text-center">
               <Button
                 type="submit"
                 disabled={loading}
                 loading={loading}
                 size="lg"
-                className="w-full sm:w-auto px-12 py-4 text-xl font-bold shadow-xl bg-green-600 text-white hover:bg-green-400"
+                className="w-full sm:w-auto px-6 sm:px-12 py-3 sm:py-4 text-base sm:text-xl font-bold shadow-xl bg-green-600 text-white hover:bg-green-400"
               >
                 Create Account
               </Button>
             </div>
 
             {/* Login Link */}
-            <div className="text-center pt-8 border-t border-white/20">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-center pt-6 sm:pt-8 border-t border-white/20">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
                 <button
                   type="button"
                   onClick={() => navigate(-1)}
@@ -673,8 +673,8 @@ const Register = () => {
         </div>
 
         {/* Footer */}
-        <footer className="mt-10 text-center">
-          <p className="text-white/60 text-xs font-medium uppercase tracking-widest">
+        <footer className="mt-6 sm:mt-10 text-center">
+          <p className="text-white/60 text-[11px] sm:text-xs font-medium uppercase tracking-[0.12em] sm:tracking-widest">
             © {new Date().getFullYear()} Immunicare System
           </p>
         </footer>

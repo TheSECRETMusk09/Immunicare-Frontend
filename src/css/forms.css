@@ -773,7 +773,7 @@
     flex-direction: column-reverse;
     gap: var(--space-3);
   }
-  
+
   .form-actions-standardized > * {
     width: 100%;
   }
@@ -2460,6 +2460,120 @@
 .register-card select:focus {
   border-color: #60a5fa;
   box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.3);
+}
+
+/* ========================================================================
+   Register Page Mobile Density Improvements
+   ======================================================================== */
+
+@media (max-width: 767px) {
+  .register-page {
+    padding: 0.75rem;
+  }
+
+  .register-card {
+    width: 100%;
+    padding: 1.25rem !important;
+    border-radius: 1.5rem !important;
+  }
+
+  .register-form {
+    gap: 1.5rem;
+  }
+
+  .register-form section {
+    margin-bottom: 0;
+  }
+
+  .register-form input,
+  .register-form textarea,
+  .register-form select,
+  .register-card .input-field,
+  .register-card .select-field,
+  .register-card .textarea-field {
+    min-height: 44px !important;
+    padding-top: 0.625rem !important;
+    padding-bottom: 0.625rem !important;
+    font-size: 16px !important;
+  }
+
+  .register-card [data-password-input="true"],
+  .register-form [data-password-input="true"] {
+    min-height: 44px !important;
+    padding-top: 0.625rem !important;
+    padding-bottom: 0.625rem !important;
+    padding-right: 3.5rem !important;
+  }
+
+  .register-form [data-password-toggle="true"],
+  .register-card [data-password-toggle="true"] {
+    width: 2.25rem !important;
+    height: 2.25rem !important;
+    min-width: 2.25rem !important;
+    min-height: 2.25rem !important;
+    right: 0.375rem !important;
+  }
+
+  .register-form .text-xs,
+  .register-card .text-xs {
+    font-size: 0.75rem;
+  }
+
+  .register-form .space-y-10,
+  .register-card .space-y-10 {
+    row-gap: 1.5rem !important;
+  }
+
+  .register-card .home-button {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 389px) {
+  .register-page {
+    padding: 0.5rem;
+  }
+
+  .register-card {
+    padding: 1rem !important;
+    border-radius: 1.25rem !important;
+  }
+
+  .register-form {
+    gap: 1.25rem;
+  }
+
+  .register-card h2 {
+    font-size: 1.125rem;
+    line-height: 1.3;
+  }
+
+  .register-form h3,
+  .register-card h3 {
+    font-size: 1rem;
+  }
+
+  .register-form input,
+  .register-form textarea,
+  .register-form select,
+  .register-card .input-field,
+  .register-card .select-field,
+  .register-card .textarea-field,
+  .register-card [data-password-input="true"],
+  .register-form [data-password-input="true"] {
+    min-height: 42px !important;
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+
+  .register-form [data-password-toggle="true"],
+  .register-card [data-password-toggle="true"] {
+    width: 2rem !important;
+    height: 2rem !important;
+    min-width: 2rem !important;
+    min-height: 2rem !important;
+    right: 0.25rem !important;
+  }
 }
 
 /* ==========================================================================
