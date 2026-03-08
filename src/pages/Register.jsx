@@ -365,33 +365,33 @@ const Register = () => {
       {/* Home Button */}
       <Link
         to="/"
-        className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10 inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-white/10 backdrop-blur-md text-white rounded-xl hover:bg-white/20 transition-all focus:outline-none focus:ring-2 focus:ring-white border border-white/20 text-sm sm:text-base home-button"
+        className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10 inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-white/10 backdrop-blur-md text-white rounded-xl hover:bg-white/20 transition-all focus:outline-none focus:ring-2 focus:ring-white border border-white/20 text-sm sm:text-base touch-manipulation home-button"
         aria-label="Go to home page"
       >
         <Home className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2" />
         Home
       </Link>
 
-      <main id="main-content" className="w-full max-w-2xl mt-10 sm:mt-0">
+      <main id="main-content" className="w-full max-w-2xl mt-12 sm:mt-0 register-main">
         {/* Logo / Brand Header */}
-        <div className="text-center mb-7 sm:mb-10">
+        <div className="text-center mb-7 sm:mb-10 register-brand-header">
           <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-white/20 backdrop-blur-md rounded-2xl mb-3 sm:mb-4 shadow-xl border border-white/30">
             <Plus className="w-7 h-7 sm:w-10 sm:h-10 text-white" strokeWidth={3} />
           </div>
           <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
             IMMUNICARE
           </h1>
-          <p className="text-primary-100 text-xs sm:text-sm mt-1.5 sm:mt-2 font-medium uppercase tracking-[0.18em] sm:tracking-widest">
+          <p className="text-primary-100 text-xs sm:text-sm mt-1.5 sm:mt-2 font-medium uppercase tracking-[0.16em] sm:tracking-widest register-brand-subtitle">
             Parent/Guardian Registration
           </p>
         </div>
 
         {/* Registration Form Card - Glassmorphism Style */}
         <div className="bg-white/10 backdrop-blur-lg rounded-[1.5rem] sm:rounded-[2rem] shadow-2xl p-5 sm:p-8 md:p-12 border border-white/20 register-card">
-          <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
+          <h2 id="register-form-title" className="text-xl sm:text-2xl font-bold text-white mb-2">
             Create Your Account
           </h2>
-          <p className="text-white/70 text-sm mb-6 sm:mb-10">
+          <p id="register-form-description" className="text-white/70 text-sm mb-6 sm:mb-10">
             Fill in the form below to register for Immunicare
           </p>
 
@@ -406,7 +406,12 @@ const Register = () => {
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-7 sm:space-y-10 register-form">
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-7 sm:space-y-10 register-form"
+            aria-labelledby="register-form-title"
+            aria-describedby="register-form-description"
+          >
             {/* Personal Information */}
             <section>
               <div className="flex items-center gap-2 mb-4 sm:mb-6 pb-2 border-b border-white/20">
@@ -546,7 +551,7 @@ const Register = () => {
               </div>
 
               {/* Password Strength Indicators */}
-              <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
+              <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 register-password-requirements">
                 <p className="text-[11px] sm:text-xs font-bold text-white/70 uppercase tracking-wider mb-2.5 sm:mb-3">
                   Password Requirements
                 </p>
@@ -576,7 +581,7 @@ const Register = () => {
                 <Baby className="w-5 h-5 text-white" />
                 <h3 className="text-base sm:text-lg font-bold text-white">
                   Child Information{" "}
-                  <span className="text-white/60 font-normal text-sm">
+                  <span className="text-white/60 font-normal text-sm inline-block mt-0.5 sm:mt-0">
                     (optional)
                   </span>
                 </h3>
@@ -635,7 +640,7 @@ const Register = () => {
             </section>
 
             {/* Submit Button */}
-            <div className="pt-4 sm:pt-6 text-center">
+            <div className="pt-4 sm:pt-6 text-center register-submit-row">
               <Button
                 type="submit"
                 disabled={loading}
@@ -648,8 +653,8 @@ const Register = () => {
             </div>
 
             {/* Login Link */}
-            <div className="text-center pt-6 sm:pt-8 border-t border-white/20">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+            <div className="text-center pt-6 sm:pt-8 border-t border-white/20 register-login-row">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 register-login-actions">
                 <button
                   type="button"
                   onClick={() => navigate(-1)}
