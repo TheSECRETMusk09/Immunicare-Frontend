@@ -24,6 +24,31 @@ button {
   flex-shrink: 0;
 }
 
+/* Guardian login: keep remember-me checkbox visually standard size (prevent global checkbox upscaling) */
+.remember-me-checkbox .remember-me-checkbox-control {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.remember-me-checkbox .remember-me-checkbox-input,
+input[data-remember-me-checkbox="true"] {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  max-width: 18px;
+  max-height: 18px;
+  margin: 0;
+}
+
+.remember-me-checkbox .remember-me-checkbox-label {
+  line-height: 1.2;
+}
+
+.remember-me-checkbox .remember-me-checkbox-description {
+  line-height: 1.2;
+}
+
 /* ==========================================================================
    Mobile Button Styles (< 768px)
    ========================================================================== */
@@ -100,6 +125,29 @@ button {
   .grid button,
   [class*="grid-cols"] button {
     min-height: 48px;
+  }
+
+  .remember-me-checkbox .remember-me-checkbox-control {
+    width: 1.625rem;
+    height: 1.625rem;
+  }
+
+  .remember-me-checkbox .remember-me-checkbox-input,
+  input[data-remember-me-checkbox="true"] {
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    min-height: 20px !important;
+    max-width: 20px;
+    max-height: 20px;
+  }
+
+  .remember-me-checkbox .remember-me-checkbox-label {
+    font-size: 1rem;
+  }
+
+  .remember-me-checkbox .remember-me-checkbox-description {
+    font-size: 0.875rem;
   }
 
 }
@@ -233,6 +281,17 @@ button .animate-spin {
 @media (hover: hover) and (pointer: fine) {
   button:hover:not(:disabled) {
     transform: translateY(-1px);
+  }
+
+  button[data-password-toggle="true"][data-password-toggle-context="input"],
+  button[data-password-toggle="true"][data-password-toggle-context="input"]:hover,
+  button[data-password-toggle="true"][data-password-toggle-context="input"]:focus,
+  button[data-password-toggle="true"][data-password-toggle-context="input"]:focus-visible,
+  button[data-password-toggle="true"][data-password-toggle-context="input"]:active {
+    transform: translateY(-50%) !important;
+    top: 50% !important;
+    right: 0.5rem !important;
+    margin: 0 !important;
   }
 
   button:active:not(:disabled) {

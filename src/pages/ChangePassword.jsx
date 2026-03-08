@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import apiClient from "../utils/api";
+import { PasswordInput } from "../components/UI";
 
 const ChangePassword = () => {
   const [form, setForm] = useState({
@@ -60,44 +61,41 @@ const ChangePassword = () => {
 
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-              Current Password
-            </label>
-            <input
-              type="password"
+            <PasswordInput
+              label="Current Password"
               name="currentPassword"
               value={form.currentPassword}
               onChange={onChange}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+              showPasswordAriaLabel="Show current password"
+              hidePasswordAriaLabel="Hide current password"
               autoComplete="current-password"
+              theme="admin"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-              New Password
-            </label>
-            <input
-              type="password"
+            <PasswordInput
+              label="New Password"
               name="newPassword"
               value={form.newPassword}
               onChange={onChange}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+              showPasswordAriaLabel="Show new password"
+              hidePasswordAriaLabel="Hide new password"
               autoComplete="new-password"
+              theme="admin"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-              Confirm New Password
-            </label>
-            <input
-              type="password"
+            <PasswordInput
+              label="Confirm New Password"
               name="confirmPassword"
               value={form.confirmPassword}
               onChange={onChange}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+              showPasswordAriaLabel="Show confirm new password"
+              hidePasswordAriaLabel="Hide confirm new password"
               autoComplete="new-password"
+              theme="admin"
             />
           </div>
 
@@ -123,4 +121,3 @@ const ChangePassword = () => {
 };
 
 export default ChangePassword;
-

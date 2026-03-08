@@ -128,8 +128,49 @@ const PasswordInput = memo(function PasswordInput(props) {
       .filter(Boolean)
       .join(" ") || undefined;
 
+  const wrapperClassName = ["password-input-field", containerClassName]
+    .filter(Boolean)
+    .join(" ");
+
+  const inputClassName = [
+    "w-full px-4 py-4 pr-14",
+    "border rounded-lg",
+    "text-base",
+    "bg-white dark:bg-white",
+    "border-gray-300 dark:border-gray-300",
+    "placeholder-gray-500 dark:placeholder-gray-500",
+    "text-gray-900 dark:text-gray-900",
+    "transition-all duration-200",
+    `focus:outline-none focus:ring-2 ${themeColors.focusRing}`,
+    "disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-gray-100",
+    error ? "border-red-500 focus:ring-red-500 focus:border-red-500" : "",
+    "min-h-[48px] touch-target min-w-0",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const toggleClassName = [
+    "absolute right-2 top-1/2 -translate-y-1/2",
+    "flex items-center justify-center",
+    "h-10 w-10 min-h-[40px] min-w-[40px]",
+    "rounded-md border border-transparent",
+    "bg-transparent",
+    `${themeColors.iconColor}`,
+    `${themeColors.buttonHover}`,
+    "hover:bg-gray-100 dark:hover:bg-gray-600",
+    "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
+    `${themeColors.focusRing}`,
+    "disabled:opacity-50 disabled:cursor-not-allowed",
+    "transition-colors duration-150",
+    "z-10",
+    "cursor-pointer",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className={`space-y-1 ${containerClassName}`}>
+    <div className={wrapperClassName} data-password-field="true">
       {label && (
         <label
           htmlFor={id}
@@ -147,7 +188,7 @@ const PasswordInput = memo(function PasswordInput(props) {
           {required && <span className="sr-only"> (required)</span>}
         </label>
       )}
-      <div className="relative w-full">
+      <div className="relative w-full" data-password-input-wrapper="true">
         <input
           ref={inputRef}
           id={id}
@@ -163,55 +204,21 @@ const PasswordInput = memo(function PasswordInput(props) {
           aria-invalid={error ? "true" : "false"}
           aria-describedby={describedByIds}
           aria-required={required}
-          className={`
-             w-full px-4 py-4 pr-14
-             border rounded-lg
-             text-base
-             bg-white dark:bg-white
-             border-gray-300 dark:border-gray-300
-             placeholder-gray-500 dark:placeholder-gray-500
-             text-gray-900 dark:text-gray-900
-             transition-all duration-200
-             focus:outline-none focus:ring-2 ${themeColors.focusRing}
-             disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-gray-100
-             ${error ? "border-red-500 focus:ring-red-500 focus:border-red-500" : ""}
-             min-h-[48px] touch-target min-w-0
-             ${className}
-           `}
+          className={inputClassName}
+          data-password-input="true"
           style={{ minHeight: "48px" }} // WCAG 2.5.5 Target Size
           {...rest}
         />
-        {/* Always show the eye toggle button - with enhanced visibility styles */}
+
         <PasswordToggleButton
           visible={showPassword}
           onToggle={toggleVisibility}
           disabled={disabled}
           showLabel={showPasswordAriaLabel}
           hideLabel={hidePasswordAriaLabel}
-          iconClassName={`w-6 h-6 ${themeColors.iconColor}`}
-           className={`
-             absolute right-1 top-1/2 -translate-y-1/2
-             p-2 rounded-lg
-             ${themeColors.buttonHover}
-             ${themeColors.iconColor}
-             focus:outline-none focus:ring-2 focus:ring-offset-1 ${themeColors.focusRing}
-             disabled:opacity-50 disabled:cursor-not-allowed
-             transition-colors duration-150
-             min-w-[40px] min-h-[40px]
-             flex items-center justify-center
-             bg-transparent dark:bg-gray-700/30
-             hover:bg-gray-100 dark:hover:bg-gray-600
-             z-50
-             cursor-pointer
-            visible
-            opacity-100
-          `}
-          style={{
-            visibility: "visible",
-            opacity: 1,
-            zIndex: 50,
-            right: "8px",
-          }}
+          iconClassName={`h-5 w-5 ${themeColors.iconColor}`}
+          className={toggleClassName}
+          data-password-toggle-context="input"
         />
       </div>
 

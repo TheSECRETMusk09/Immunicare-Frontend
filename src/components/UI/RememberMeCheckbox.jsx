@@ -30,29 +30,26 @@ const RememberMeCheckbox = ({
     onChange(e.target.checked);
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      onChange(!checked);
-    }
-  };
-
   const themeColors =
     theme === "guardian"
       ? {
           checkbox:
-            "checked:bg-orange-600 checked:border-orange-600 focus:ring-orange-500",
-          hover: "hover:border-orange-400",
+            "accent-amber-400 border-white/40 bg-white/10 focus:ring-amber-300/80",
+          hover: "hover:border-amber-300",
+          label: "text-white/90",
+          description: "text-white/60",
         }
       : {
           checkbox:
-            "checked:bg-blue-600 checked:border-blue-600 focus:ring-blue-600",
+            "accent-blue-600 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-blue-600",
           hover: "hover:border-blue-400",
+          label: "text-gray-700 dark:text-gray-300",
+          description: "text-gray-500 dark:text-gray-400",
         };
 
   return (
-    <div className={`flex items-start ${className}`}>
-      <div className="flex items-center h-5">
+    <div className={`remember-me-checkbox flex items-start gap-2.5 ${className}`}>
+      <div className="remember-me-checkbox-control flex items-center justify-center mt-0.5 flex-shrink-0">
         <input
           id={id}
           name="rememberMe"
@@ -60,43 +57,38 @@ const RememberMeCheckbox = ({
           checked={checked}
           onChange={handleChange}
           disabled={disabled}
-          aria-describedby={descriptionId}
+          aria-describedby={description ? descriptionId : undefined}
+          data-remember-me-checkbox="true"
           className={`
-            appearance-none -webkit-appearance-none
-            w-5 h-5
-            border-2 border-gray-300 dark:border-gray-600
-            rounded
-            bg-white dark:bg-gray-800
-            text-white
-            transition-all duration-150
-            focus:outline-none focus:ring-2 focus:ring-offset-2 ${themeColors.checkbox}
+            remember-me-checkbox-input
+            h-[18px] w-[18px] rounded-[4px] border
+            transition-colors duration-150
+            focus:outline-none focus:ring-2 focus:ring-offset-2
+            focus:ring-offset-transparent
+            ${themeColors.checkbox}
             disabled:opacity-50 disabled:cursor-not-allowed
             ${themeColors.hover}
             cursor-pointer
             flex-shrink-0
           `}
-          style={{
-            width: "20px",
-            height: "20px",
-            minWidth: "20px",
-            minHeight: "20px",
-          }}
         />
       </div>
-      <div className="ml-3 text-sm">
+      <div className="remember-me-checkbox-content min-w-0 text-sm leading-tight">
         <label
           htmlFor={id}
-          className="font-medium text-gray-700 dark:text-gray-300 cursor-pointer select-none"
+          className={`remember-me-checkbox-label font-medium cursor-pointer select-none ${themeColors.label}`}
           tabIndex={-1}
         >
           {label}
         </label>
-        <p
-          id={descriptionId}
-          className="text-gray-500 dark:text-gray-400 text-xs mt-0.5"
-        >
-          {description}
-        </p>
+        {description && (
+          <p
+            id={descriptionId}
+            className={`remember-me-checkbox-description text-xs mt-1 ${themeColors.description}`}
+          >
+            {description}
+          </p>
+        )}
       </div>
     </div>
   );

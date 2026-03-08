@@ -13,7 +13,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useNetworkStatus } from "../hooks/useNetworkStatus";
 import apiClient from "../utils/api";
-import { Button, TextInput, Alert } from "../components/UI";
+import { Button, TextInput, PasswordInput, Alert } from "../components/UI";
 import {
   Mail,
   ArrowLeft,
@@ -474,11 +474,10 @@ const ForgotPassword = () => {
                 onSubmit={handleResetPassword}
                 className="space-y-5 sm:space-y-6"
               >
-                <TextInput
+                <PasswordInput
                   label="New Password"
                   id="newPassword"
                   name="newPassword"
-                  type="password"
                   value={newPassword}
                   onChange={(e) => {
                     setNewPassword(e.target.value);
@@ -491,14 +490,14 @@ const ForgotPassword = () => {
                   autoComplete="new-password"
                   showPasswordAriaLabel="Show new password"
                   hidePasswordAriaLabel="Hide new password"
+                  theme="admin"
                   className="bg-white/10 backdrop-blur-sm border-white/30 text-white placeholder-white/50"
                 />
 
-                <TextInput
+                <PasswordInput
                   label="Confirm New Password"
                   id="confirmPassword"
                   name="confirmPassword"
-                  type="password"
                   value={confirmPassword}
                   onChange={(e) => {
                     setConfirmPassword(e.target.value);
@@ -511,6 +510,7 @@ const ForgotPassword = () => {
                   autoComplete="new-password"
                   showPasswordAriaLabel="Show confirm password"
                   hidePasswordAriaLabel="Hide confirm password"
+                  theme="admin"
                   className="bg-white/10 backdrop-blur-sm border-white/30 text-white placeholder-white/50"
                 />
 

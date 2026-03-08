@@ -12,6 +12,10 @@ const PasswordToggleButton = ({
   hideLabel = "Hide password",
   ...props
 }) => {
+  const mergedClassName = ["password-toggle-button", className]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <button
       type="button"
@@ -19,7 +23,8 @@ const PasswordToggleButton = ({
       disabled={disabled}
       aria-label={visible ? hideLabel : showLabel}
       aria-pressed={visible}
-      className={className}
+      className={mergedClassName}
+      data-password-toggle="true"
       {...props}
     >
       {visible ? (
