@@ -705,13 +705,29 @@
   color: #000000 !important;
 }
 
-/* Guardian Dashboard Specific Dark Mode Typography Enforcement */
+/* Guardian Dashboard Specific Dark Mode Typography Enforcement
+   Keep typography readable without forcing all nested <div> text to white,
+   which breaks light-surface dialogs (e.g., logout confirmation modal). */
 .dark .guardian-dashboard p,
-.dark .guardian-dashboard span,
-.dark .guardian-dashboard div:not(.badge):not(.btn) {
+.dark .guardian-dashboard span {
   color: #ffffff;
   font-weight: 700;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5); /* Added text shadow for better readability */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.dark .guardian-dashboard [role="dialog"] p,
+.dark .guardian-dashboard [role="dialog"] span,
+.dark .guardian-dashboard [role="dialog"] div,
+.dark .guardian-dashboard [role="dialog"] label,
+.dark .guardian-dashboard [role="dialog"] input,
+.dark .guardian-dashboard [role="dialog"] button,
+.dark .guardian-dashboard [role="dialog"] h1,
+.dark .guardian-dashboard [role="dialog"] h2,
+.dark .guardian-dashboard [role="dialog"] h3,
+.dark .guardian-dashboard [role="dialog"] h4,
+.dark .guardian-dashboard [role="dialog"] h5,
+.dark .guardian-dashboard [role="dialog"] h6 {
+  text-shadow: none;
 }
 
 /* Table Headers - White Bold Text Standard */

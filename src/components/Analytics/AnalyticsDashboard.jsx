@@ -295,6 +295,67 @@ const safeNum = (value) => {
   return Number.isFinite(numeric) ? numeric : 0;
 };
 
+const normalizeArray = (...candidates) => {
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate;
+    }
+  }
+
+  return [];
+};
+
+const normalizeObject = (...candidates) => {
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+      return candidate;
+    }
+  }
+
+  return {};
+};
+
+const toTitleCase = (value = "") => {
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+};
+
+const toDateLabel = (value) => {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return parsed.toLocaleDateString("en-PH", {
+    month: "short",
+    day: "numeric",
+  });
+};
+
+const normalizeResponsePayload = (response) => {
+  if (!response) return null;
+
+  if (response.success && response.data) {
+    return response.data;
+  }
+
+  if (response.data && typeof response.data === "object" && !Array.isArray(response.data)) {
+    return response.data;
+  }
+
+  if (typeof response === "object" && !Array.isArray(response)) {
+    return response;
+  }
+
+  return null;
+};
+
 const statusLabel = (value = "") => {
   const normalized = String(value).replace(/[_-]/g, " ").trim();
   if (!normalized) return "Unknown";
@@ -450,83 +511,203 @@ const DashboardLegend = ({ payload = [], chartAppearance, justifyContent = "cent
 };
 
 const mapDashboardPayload = (payload) => {
-  const summary = payload?.summary || {};
-  const vaccinationAnalytics = payload?.vaccinationAnalytics || {};
-  const appointmentFollowup = payload?.appointmentFollowup || {};
-  const inventory = payload?.inventory || {};
-  const reminders = payload?.reminders || {};
-  const demographics = payload?.demographics || {};
-  const trends = payload?.trends || {};
-  const metadata = payload?.metadata || {};
+  const summary = normalizeObject(payload?.summary, payload?.kpis, payload?.overview);
+  const vaccinationAnalytics = normalizeObject(
+    payload?.vaccinationAnalytics,
+    payload?.vaccinations,
+    payload?.immunization,
+  );
+  const appointmentFollowup = normalizeObject(
+    payload?.appointmentFollowup,
+    payload?.appointments,
+    payload?.followup,
+  );
+  const inventory = normalizeObject(payload?.inventory, payload?.stockInventory);
+  const reminders = normalizeObject(payload?.reminders, payload?.sms, payload?.notifications);
+  const demographics = normalizeObject(payload?.demographics, payload?.demographicAnalytics);
+  const trends = normalizeObject(payload?.trends, payload?.timeline, payload?.dailyTrends);
+  const metadata = normalizeObject(payload?.metadata, payload?.meta);
+
+  const summaryLowStock =
+    summary.lowStockVaccines ??
+    summary.lowStockCount ??
+    inventory.lowStockCount ??
+    inventory.lowStockVaccines;
+
+  const summaryAvailableDoses =
+    summary.totalAvailableVaccineDoses ??
+    summary.availableDoses ??
+    inventory.totalAvailableDoses ??
+    inventory.availableDoses;
+
+  const summaryPendingAppointments =
+    summary.pendingAppointments ??
+    summary.pendingAppointmentCount ??
+    appointmentFollowup.pending;
+
+  const summaryVaccinationsToday =
+    summary.vaccinationsCompletedToday ??
+    summary.vaccinationsToday ??
+    summary.completedToday;
+
+  const summaryDueForVaccination =
+    summary.infantsDueForVaccination ??
+    summary.dueForVaccination ??
+    summary.vaccinationsDue;
+
+  const summaryOverdueVaccinations =
+    summary.overdueVaccinations ??
+    summary.overdueVaccinationCount ??
+    summary.overdue;
+
+  const summaryTotalInfants =
+    summary.totalRegisteredInfants ??
+    summary.totalInfants ??
+    demographics?.coverage?.infants;
+
+  const summaryTotalGuardians =
+    summary.totalGuardians ??
+    summary.guardians ??
+    demographics?.coverage?.guardians;
 
   const kpis = {
-    totalInfants: safeNum(summary.totalRegisteredInfants),
-    totalGuardians: safeNum(summary.totalGuardians),
-    vaccinationsToday: safeNum(summary.vaccinationsCompletedToday),
-    dueForVaccination: safeNum(summary.infantsDueForVaccination),
-    overdueVaccinations: safeNum(summary.overdueVaccinations),
-    pendingAppointments: safeNum(summary.pendingAppointments),
-    lowStockVaccines: safeNum(summary.lowStockVaccines),
-    availableDoses: safeNum(summary.totalAvailableVaccineDoses),
+    totalInfants: safeNum(summaryTotalInfants),
+    totalGuardians: safeNum(summaryTotalGuardians),
+    vaccinationsToday: safeNum(summaryVaccinationsToday),
+    dueForVaccination: safeNum(summaryDueForVaccination),
+    overdueVaccinations: safeNum(summaryOverdueVaccinations),
+    pendingAppointments: safeNum(summaryPendingAppointments),
+    lowStockVaccines: safeNum(summaryLowStock),
+    availableDoses: safeNum(summaryAvailableDoses),
   };
 
-  const vaccineProgress = Array.isArray(vaccinationAnalytics.vaccineProgress)
-    ? vaccinationAnalytics.vaccineProgress
-    : [];
+  const vaccineProgress = normalizeArray(
+    vaccinationAnalytics.vaccineProgress,
+    vaccinationAnalytics.progress,
+    vaccinationAnalytics.byVaccine,
+    payload?.vaccineProgress,
+  ).map((item) => {
+    const dosesAdministered = item.dosesAdministered ?? item.administered ?? item.completed ?? item.count;
+    const dueCount = item.dueCount ?? item.due ?? item.pendingDue;
+    const overdueCount = item.overdueCount ?? item.overdue ?? item.overdueDue;
+    const infantsCovered = item.infantsCovered ?? item.coveredInfants ?? item.covered;
 
-  const vaccinationStatusBreakdown = Array.isArray(vaccinationAnalytics.statusBreakdown)
-    ? vaccinationAnalytics.statusBreakdown.map((item) => ({
+    const totalPopulation =
+      item.totalPopulation ??
+      item.targetPopulation ??
+      item.totalInfants ??
+      item.expected ??
+      null;
+
+    const inferredCoverageRate =
+      item.coverageRate ??
+      item.coverage_percentage ??
+      item.coveragePercent ??
+      (safeNum(totalPopulation) > 0
+        ? (safeNum(infantsCovered || dosesAdministered) / safeNum(totalPopulation)) * 100
+        : null);
+
+    return {
+      vaccineKey: item.vaccineKey || item.vaccine_code || item.vaccineId || item.vaccine || "",
+      vaccineName:
+        item.vaccineName ||
+        item.vaccine_label ||
+        item.name ||
+        toTitleCase(item.vaccine || item.vaccine_code || "Unknown"),
+      infantsCovered: safeNum(infantsCovered),
+      dosesAdministered: safeNum(dosesAdministered),
+      dueCount: safeNum(dueCount),
+      overdueCount: safeNum(overdueCount),
+      coverageRate: Math.max(0, Math.min(100, safeNum(inferredCoverageRate))),
+    };
+  });
+
+  const vaccinationStatusBreakdown = normalizeArray(
+    vaccinationAnalytics.statusBreakdown,
+    vaccinationAnalytics.status,
+    payload?.vaccinationStatusBreakdown,
+  ).map((item) => ({
         status: statusLabel(item.status),
-        count: safeNum(item.count),
-      }))
-    : [];
+        count: safeNum(item.count ?? item.value ?? item.total),
+      }));
 
-  const appointmentStatusBreakdown = Array.isArray(appointmentFollowup.statusBreakdown)
-    ? appointmentFollowup.statusBreakdown.map((item) => ({
+  const appointmentStatusBreakdown = normalizeArray(
+    appointmentFollowup.statusBreakdown,
+    appointmentFollowup.status,
+    payload?.appointmentStatusBreakdown,
+  ).map((item) => ({
         status: statusLabel(item.status),
-        count: safeNum(item.count),
-      }))
-    : [];
+        count: safeNum(item.count ?? item.value ?? item.total),
+      }));
 
-  const trendVaccinations = Array.isArray(trends.vaccination)
-    ? trends.vaccination.map((point) => ({
-        label: point.label || point.date,
-        date: point.date || null,
-        count: safeNum(point.count),
-      }))
-    : [];
+  const rawVaccinationTrend = normalizeArray(
+    trends.vaccination,
+    trends.vaccinations,
+    trends.vaccinationTrend,
+    payload?.vaccinationTrend,
+  );
 
-  const trendAppointments = Array.isArray(trends.appointments)
-    ? trends.appointments.map((point) => ({
-        label: point.label || point.date,
-        date: point.date || null,
-        count: safeNum(point.count),
-      }))
-    : [];
+  const rawAppointmentTrend = normalizeArray(
+    trends.appointments,
+    trends.appointment,
+    trends.appointmentTrend,
+    payload?.appointmentTrend,
+  );
 
-  const demographicsAgeGroups = Array.isArray(demographics.ageGroups)
-    ? demographics.ageGroups.map((item) => ({
+  const trendVaccinations = rawVaccinationTrend.map((point) => {
+    const dateValue = point.date || point.day || point.period || point.timestamp || null;
+    return {
+      label: point.label || point.name || toDateLabel(dateValue),
+      date: dateValue,
+      count: safeNum(point.count ?? point.total ?? point.value),
+    };
+  });
+
+  const trendAppointments = rawAppointmentTrend.map((point) => {
+    const dateValue = point.date || point.day || point.period || point.timestamp || null;
+    return {
+      label: point.label || point.name || toDateLabel(dateValue),
+      date: dateValue,
+      count: safeNum(point.count ?? point.total ?? point.value),
+    };
+  });
+
+  const demographicsAgeGroups = normalizeArray(
+    demographics.ageGroups,
+    demographics.ageDistribution,
+    demographics.byAge,
+  ).map((item) => ({
         group: item.label || "Unknown",
-        count: safeNum(item.count),
-      }))
-    : [];
+        count: safeNum(item.count ?? item.total ?? item.value),
+      }));
 
-  const demographicsGender = Array.isArray(demographics.genderBreakdown)
-    ? demographics.genderBreakdown.map((item) => ({
+  const demographicsGender = normalizeArray(
+    demographics.genderBreakdown,
+    demographics.gender,
+    demographics.genderDistribution,
+  ).map((item) => ({
         label: item.label || "Unknown",
-        count: safeNum(item.count),
-      }))
-    : [];
+        count: safeNum(item.count ?? item.total ?? item.value),
+      }));
 
-  const activity = Array.isArray(payload?.recentActivity) ? payload.recentActivity : [];
-  const alerts = Array.isArray(payload?.alerts) ? payload.alerts : [];
-  const reportShortcuts = Array.isArray(payload?.reportShortcuts) ? payload.reportShortcuts : [];
-  const inventoryByVaccine = Array.isArray(inventory.byVaccine) ? inventory.byVaccine : [];
+  const activity = normalizeArray(payload?.recentActivity, payload?.activity, payload?.activityFeed);
+  const alerts = normalizeArray(payload?.alerts, payload?.criticalAlerts);
+  const reportShortcuts = normalizeArray(payload?.reportShortcuts, payload?.reports);
+  const inventoryByVaccine = normalizeArray(inventory.byVaccine, inventory.vaccines, inventory.breakdown);
+
+  const normalizedScope =
+    metadata?.scope?.locality ||
+    metadata?.scopeLabel ||
+    payload?.scopeLabel ||
+    payload?.scope ||
+    "Barangay Health Center, Pasig City";
+
+  const normalizedGeneratedAt = metadata?.generatedAt || metadata?.generated_at || payload?.generatedAt || null;
 
   return {
     raw: payload,
-    scopeLabel: metadata?.scope?.locality || "Barangay Health Center, Pasig City",
-    generatedAt: metadata?.generatedAt || null,
+    scopeLabel: normalizedScope,
+    generatedAt: normalizedGeneratedAt,
     kpis,
     vaccineProgress,
     vaccinationStatusBreakdown,
@@ -536,40 +717,42 @@ const mapDashboardPayload = (payload) => {
     demographicsAgeGroups,
     demographicsGender,
     inventory: {
-      totalItems: safeNum(inventory.totalItems),
-      totalAvailableDoses: safeNum(inventory.totalAvailableDoses),
-      lowStockCount: safeNum(inventory.lowStockCount),
-      criticalStockCount: safeNum(inventory.criticalStockCount),
-      outOfStockCount: safeNum(inventory.outOfStockCount),
+      totalItems: safeNum(inventory.totalItems ?? inventory.count),
+      totalAvailableDoses: safeNum(inventory.totalAvailableDoses ?? inventory.availableDoses),
+      lowStockCount: safeNum(inventory.lowStockCount ?? inventory.lowStockVaccines),
+      criticalStockCount: safeNum(inventory.criticalStockCount ?? inventory.criticalStockVaccines),
+      outOfStockCount: safeNum(inventory.outOfStockCount ?? inventory.outOfStockVaccines),
       byVaccine: inventoryByVaccine.map((item) => ({
         vaccineName: item.vaccineName || item.vaccineKey || "Unknown",
-        availableDoses: safeNum(item.availableDoses),
+        availableDoses: safeNum(item.availableDoses ?? item.stock ?? item.count),
         lowStock: Boolean(item.lowStock),
         criticalStock: Boolean(item.criticalStock),
       })),
     },
     appointmentFollowup: {
-      totalInPeriod: safeNum(appointmentFollowup.totalInPeriod),
-      today: safeNum(appointmentFollowup.today),
-      attended: safeNum(appointmentFollowup.attended),
+      totalInPeriod: safeNum(appointmentFollowup.totalInPeriod ?? appointmentFollowup.total),
+      today: safeNum(appointmentFollowup.today ?? appointmentFollowup.todayCount),
+      attended: safeNum(appointmentFollowup.attended ?? appointmentFollowup.completed),
       pending: safeNum(appointmentFollowup.pending),
-      cancelled: safeNum(appointmentFollowup.cancelled),
-      upcoming7Days: safeNum(appointmentFollowup.upcoming7Days),
-      overdueFollowUps: safeNum(appointmentFollowup.overdueFollowUps),
-      followUpsToday: safeNum(appointmentFollowup.followUpsToday),
-      followUpsInPeriod: safeNum(appointmentFollowup.followUpsInPeriod),
+      cancelled: safeNum(appointmentFollowup.cancelled ?? appointmentFollowup.canceled),
+      upcoming7Days: safeNum(appointmentFollowup.upcoming7Days ?? appointmentFollowup.upcoming),
+      overdueFollowUps: safeNum(appointmentFollowup.overdueFollowUps ?? appointmentFollowup.overdue),
+      followUpsToday: safeNum(appointmentFollowup.followUpsToday ?? appointmentFollowup.followupToday),
+      followUpsInPeriod: safeNum(
+        appointmentFollowup.followUpsInPeriod ?? appointmentFollowup.followupInPeriod,
+      ),
     },
     reminders: {
-      smsSent: safeNum(reminders.smsSent),
-      smsDelivered: safeNum(reminders.smsDelivered),
-      smsFailed: safeNum(reminders.smsFailed),
-      deliveryRate: safeNum(reminders.deliveryRate),
-      unreadNotifications: safeNum(reminders.unreadNotifications),
-      failedSmsCount: safeNum(reminders.failedSmsCount),
+      smsSent: safeNum(reminders.smsSent ?? reminders.sent),
+      smsDelivered: safeNum(reminders.smsDelivered ?? reminders.delivered),
+      smsFailed: safeNum(reminders.smsFailed ?? reminders.failed),
+      deliveryRate: safeNum(reminders.deliveryRate ?? reminders.rate),
+      unreadNotifications: safeNum(reminders.unreadNotifications ?? reminders.unread),
+      failedSmsCount: safeNum(reminders.failedSmsCount ?? reminders.failed),
     },
     demographicsCoverage: {
-      infants: safeNum(demographics?.coverage?.infants),
-      guardians: safeNum(demographics?.coverage?.guardians),
+      infants: safeNum(demographics?.coverage?.infants ?? demographics?.coverageInfants),
+      guardians: safeNum(demographics?.coverage?.guardians ?? demographics?.coverageGuardians),
     },
     activity: activity.map((item) => ({
       id: item.id,
@@ -1513,8 +1696,8 @@ const TrendsSection = ({ data, loading, chartAppearance }) => {
   const vaxTrend = data?.trendVaccinations || [];
   const apptTrend = data?.trendAppointments || [];
 
-  const hasVaxData = vaxTrend.some((point) => safeNum(point?.count) > 0);
-  const hasApptData = apptTrend.some((point) => safeNum(point?.count) > 0);
+  const hasVaxData = vaxTrend.length > 0;
+  const hasApptData = apptTrend.length > 0;
 
   const axisTick = { fill: chartAppearance.axisTick, fontSize: 12, fontWeight: 500 };
   const axisLine = { stroke: chartAppearance.axisLine };
@@ -1883,6 +2066,7 @@ const AnalyticsDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [refreshWarning, setRefreshWarning] = useState("");
 
   const pollRef = useRef(null);
 
@@ -1892,18 +2076,28 @@ const AnalyticsDashboard = () => {
     }
 
     try {
-      setError("");
+      if (!silent) {
+        setError("");
+      }
+      setRefreshWarning("");
       const params = buildQueryParams(filters);
       const response = await apiClient.getAnalyticsDashboard(params);
 
-      if (!response?.success || !response?.data) {
+      const normalizedPayload = normalizeResponsePayload(response);
+      if (!normalizedPayload) {
         throw new Error(response?.error || "Failed to load analytics dashboard data");
       }
 
-      setDashboardData(mapDashboardPayload(response.data));
+      setDashboardData(mapDashboardPayload(normalizedPayload));
     } catch (fetchError) {
       console.error("Analytics dashboard fetch error:", fetchError);
-      setError(fetchError?.message || "Unable to load analytics data");
+      const message = fetchError?.message || "Unable to load analytics data";
+
+      if (silent) {
+        setRefreshWarning(`Auto-refresh failed: ${message}`);
+      } else {
+        setError(message);
+      }
     } finally {
       if (!silent) {
         setLoading(false);
@@ -2092,6 +2286,12 @@ const AnalyticsDashboard = () => {
             sx={{ mb: 2 }}
           >
             {error}
+          </Alert>
+        ) : null}
+
+        {refreshWarning ? (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            {refreshWarning}
           </Alert>
         ) : null}
 

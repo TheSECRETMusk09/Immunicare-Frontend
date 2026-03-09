@@ -34,6 +34,8 @@ const GuardianSidebar = memo(
     });
 
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+    const [logoutPending, setLogoutPending] = useState(false);
+    const [logoutError, setLogoutError] = useState("");
     const [childrenCount, setChildrenCount] = useState(0);
     const [notificationCount, setNotificationCount] = useState(0);
 
@@ -154,9 +156,19 @@ const GuardianSidebar = memo(
     }, []);
 
     // Handle logout with confirmation
-    const handleLogout = () => {
-      logout();
-      navigate("/");
+    const handleLogout = async () => {
+      setLogoutPending(true);
+      setLogoutError("");
+
+      try {
+        await Promise.resolve(logout());
+        navigate("/");
+      } catch (error) {
+        console.error("Failed to logout guardian user:", error);
+        setLogoutError("Unable to logout right now. Please try again.");
+      } finally {
+        setLogoutPending(false);
+      }
     };
 
     // Navigation items
@@ -465,7 +477,10 @@ const GuardianSidebar = memo(
 
             {/* Logout / User */}
             <button
-              onClick={() => setShowLogoutConfirm(true)}
+              onClick={() => {
+                setLogoutError("");
+                setShowLogoutConfirm(true);
+              }}
               title={isCollapsed ? "User / Logout" : undefined}
               aria-label={isCollapsed ? "User / Logout" : undefined}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-200 font-medium"
@@ -491,31 +506,52 @@ const GuardianSidebar = memo(
         {/* Logout Confirmation Modal */}
         {showLogoutConfirm && (
           <div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-[350]"
+            className="fixed inset-0 z-[350] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm dark:bg-black/70"
             role="dialog"
             aria-modal="true"
             aria-labelledby="guardian-logout-dialog-title"
           >
-            <div className="bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-xl">
-              <h3 id="guardian-logout-dialog-title" className="text-lg font-bold text-gray-900 mb-2">
+            <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-700 dark:bg-gray-800">
+              <h3
+                id="guardian-logout-dialog-title"
+                className="mb-2 text-lg font-bold text-gray-900 dark:text-gray-100"
+              >
                 Confirm Logout
               </h3>
-              <p className="text-gray-600 mb-4">Are you sure you want to log out?</p>
+              <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">
+                Are you sure you want to log out?
+              </p>
+
+              {logoutError && (
+                <p
+                  role="alert"
+                  className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:border-red-700/70 dark:bg-red-900/30 dark:text-red-200"
+                >
+                  {logoutError}
+                </p>
+              )}
+
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setShowLogoutConfirm(false)}
-                  className="flex-1 px-4 py-3 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors min-h-[48px] font-medium"
+                  onClick={() => {
+                    setLogoutError("");
+                    setShowLogoutConfirm(false);
+                  }}
+                  disabled={logoutPending}
+                  className="min-h-[48px] flex-1 rounded-xl border border-gray-200 bg-gray-100 px-4 py-3 font-medium text-gray-700 transition-colors hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="flex-1 px-4 py-3 text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors flex items-center justify-center gap-2 min-h-[48px] font-medium"
+                  disabled={logoutPending}
+                  aria-busy={logoutPending}
+                  className="min-h-[48px] flex-1 rounded-xl bg-red-600 px-4 py-3 font-medium text-white transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-red-500 dark:hover:bg-red-600 flex items-center justify-center gap-2"
                 >
                   <LogOut className="w-4 h-4" />
-                  Logout
+                  {logoutPending ? "Logging out..." : "Logout"}
                 </button>
               </div>
             </div>

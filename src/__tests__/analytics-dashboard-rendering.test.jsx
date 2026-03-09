@@ -4,6 +4,7 @@ import {
   screen,
   waitFor,
   fireEvent,
+  act,
   cleanup,
 } from "@testing-library/react";
 import "@testing-library/jest-dom";
@@ -284,5 +285,55 @@ describe("Analytics dashboard rendering and filter stability", () => {
     await waitFor(() => {
       expect(apiClient.getAnalyticsDashboard).toHaveBeenCalledTimes(2);
     });
+  });
+
+  test("normalizes wrapped and direct analytics payload responses so trend sections still render", async () => {
+    apiClient.getAnalyticsDashboard.mockResolvedValueOnce({
+      data: buildDashboardPayload(),
+    });
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalled();
+    });
+
+    expect(screen.getByText(/vaccination trend/i)).toBeInTheDocument();
+    expect(screen.getByText(/appointment trend/i)).toBeInTheDocument();
+    expect(screen.queryByText(/failed to load analytics dashboard data/i)).not.toBeInTheDocument();
+  });
+
+  test("shows auto-refresh warning without clearing existing rendered cards when silent refresh fails", async () => {
+    jest.useFakeTimers();
+    try {
+      apiClient.getAnalyticsDashboard
+        .mockResolvedValueOnce({
+          success: true,
+          data: buildDashboardPayload(),
+        })
+        .mockRejectedValueOnce(new Error("Network timeout"));
+
+      renderDashboard();
+
+      const totalInfantsTitle = await screen.findByText(/total registered infants/i);
+      expect(totalInfantsTitle).toBeInTheDocument();
+
+      await waitFor(() => {
+        expect(screen.queryAllByText("22").length).toBeGreaterThan(0);
+      });
+
+      await act(async () => {
+        jest.advanceTimersByTime(30000);
+        await Promise.resolve();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/auto-refresh failed: network timeout/i)).toBeInTheDocument();
+      });
+
+      expect(screen.queryAllByText("22").length).toBeGreaterThan(0);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

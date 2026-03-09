@@ -236,6 +236,11 @@ export default function GuardianAppointmentsPage() {
     const visibleStart = dateInfo?.view?.currentStart
       ? new Date(dateInfo.view.currentStart)
       : activeStart;
+    const calendarAnchorDate = dateInfo?.view?.calendar?.getDate?.();
+    const resolvedAnchorDate =
+      calendarAnchorDate instanceof Date && !Number.isNaN(calendarAnchorDate.getTime())
+        ? calendarAnchorDate
+        : visibleStart;
 
     setCalendarView((previous) =>
       viewType && previous !== viewType ? viewType : previous,
@@ -255,8 +260,8 @@ export default function GuardianAppointmentsPage() {
         : visibleStart,
     );
 
-    if (viewType === "timeGridDay") {
-      const visibleDayKey = toDateKey(visibleStart);
+    if (viewType === "timeGridDay" || viewType === "timeGridWeek") {
+      const visibleDayKey = toDateKey(resolvedAnchorDate);
       setSelectedDate((previous) =>
         previous === visibleDayKey ? previous : visibleDayKey,
       );
@@ -265,25 +270,30 @@ export default function GuardianAppointmentsPage() {
 
   // Handle view change (from Admin Dashboard)
   const handleViewChange = (viewName) => {
-    setCalendarView(viewName);
-    if (!calendarRef.current) return;
-
-    const calendarApi = calendarRef.current.getApi();
-
-    if (viewName === "timeGridDay") {
-      const selectedDateObject = fromDateKey(selectedDate);
-      const fallbackCalendarDate = calendarApi?.getDate?.();
-      const fallbackDate =
-        fallbackCalendarDate instanceof Date ? fallbackCalendarDate : new Date();
-      const targetDate = selectedDateObject || fallbackDate;
-
-      calendarApi.changeView(viewName, targetDate);
-      setCurrentDate(targetDate);
-      setSelectedDate(toDateKey(targetDate));
+    if (!calendarRef.current) {
+      setCalendarView(viewName);
       return;
     }
 
-    calendarApi.changeView(viewName);
+    const calendarApi = calendarRef.current.getApi();
+    const selectedDateObject = fromDateKey(selectedDate);
+    const calendarDate = calendarApi?.getDate?.();
+    const fallbackDate = currentDate instanceof Date ? currentDate : new Date();
+    const anchorDate =
+      selectedDateObject ||
+      (calendarDate instanceof Date ? calendarDate : fallbackDate);
+
+    if (viewName === "timeGridDay") {
+      calendarApi.changeView(viewName, anchorDate);
+      setCurrentDate(anchorDate);
+      setSelectedDate(toDateKey(anchorDate));
+      setCalendarView(viewName);
+      return;
+    }
+
+    calendarApi.changeView(viewName, anchorDate);
+    setCurrentDate(anchorDate);
+    setCalendarView(viewName);
   };
 
   // Navigate to previous period
