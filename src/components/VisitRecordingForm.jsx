@@ -366,12 +366,13 @@ export default function VisitRecordingForm({ infant, visit, onClose, onSave }) {
         <Button
           type="button"
           variant="cancel"
+          actionRole="cancel"
           onClick={onClose}
           disabled={loading}
         >
           Cancel
         </Button>
-        <Button type="submit" disabled={loading}>
+        <Button type="submit" actionRole="primary" disabled={loading}>
           {loading ? "Saving..." : "Save Visit Record"}
         </Button>
       </div>

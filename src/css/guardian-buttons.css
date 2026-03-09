@@ -84,18 +84,31 @@ input[data-remember-me-checkbox="true"] {
     padding: 12px 16px;
   }
 
-  /* Card action buttons */
+  /* Card action buttons (non-form cards only) */
   .card-action,
-  [class*="card"] button {
+  [class*="card"] button:not(.form-actions button):not(.form-actions-modern button):not(.form-actions-standardized button):not(.admin-modal-footer button):not(.admin-modal-actions button):not(.guardian-form-actions button) {
     min-height: 44px;
     width: 100%;
   }
 
-  /* Form submit buttons */
-  button[type="submit"],
-  .form-submit button {
+  /* Form submit buttons (respect standardized form action containers) */
+  button[type="submit"]:not(.form-actions button):not(.form-actions-modern button):not(.form-actions-standardized button):not(.admin-modal-footer button):not(.admin-modal-actions button):not(.guardian-form-actions button),
+  .form-submit button:not(.form-actions button):not(.form-actions-modern button):not(.form-actions-standardized button):not(.admin-modal-footer button):not(.admin-modal-actions button):not(.guardian-form-actions button) {
     min-height: 52px;
     width: 100%;
+  }
+
+  /* Standardized forms-only action bars: centered with controlled sizing */
+  .form-actions button,
+  .form-actions-modern button,
+  .form-actions-standardized button,
+  .admin-modal-footer button,
+  .admin-modal-actions button,
+  .guardian-form-actions button {
+    width: min(100%, 320px) !important;
+    min-width: 0 !important;
+    min-height: 44px !important;
+    margin-inline: auto;
   }
 
   /* Modal buttons (exclude admin modal footer and generic button wrappers) */
@@ -170,16 +183,27 @@ input[data-remember-me-checkbox="true"] {
     min-height: 80px;
   }
 
-  /* Card action buttons */
+  /* Card action buttons (non-form cards only) */
   .card-action,
-  [class*="card"] button {
+  [class*="card"] button:not(.form-actions button):not(.form-actions-modern button):not(.form-actions-standardized button):not(.admin-modal-footer button):not(.admin-modal-actions button):not(.guardian-form-actions button) {
     min-height: 44px;
   }
 
-  /* Form submit buttons */
-  button[type="submit"] {
+  /* Form submit buttons (respect standardized form action containers) */
+  button[type="submit"]:not(.form-actions button):not(.form-actions-modern button):not(.form-actions-standardized button):not(.admin-modal-footer button):not(.admin-modal-actions button):not(.guardian-form-actions button) {
     min-height: 48px;
     width: auto;
+  }
+
+  .form-actions button,
+  .form-actions-modern button,
+  .form-actions-standardized button,
+  .admin-modal-footer button,
+  .admin-modal-actions button,
+  .guardian-form-actions button {
+    min-height: 44px !important;
+    min-width: 132px !important;
+    width: auto !important;
   }
 }
 
@@ -199,17 +223,28 @@ input[data-remember-me-checkbox="true"] {
     min-height: 72px;
   }
 
-  /* Card action buttons */
+  /* Card action buttons (non-form cards only) */
   .card-action,
-  [class*="card"] button {
+  [class*="card"] button:not(.form-actions button):not(.form-actions-modern button):not(.form-actions-standardized button):not(.admin-modal-footer button):not(.admin-modal-actions button):not(.guardian-form-actions button) {
     min-height: 40px;
     width: auto;
   }
 
-  /* Form submit buttons */
-  button[type="submit"] {
+  /* Form submit buttons (respect standardized form action containers) */
+  button[type="submit"]:not(.form-actions button):not(.form-actions-modern button):not(.form-actions-standardized button):not(.admin-modal-footer button):not(.admin-modal-actions button):not(.guardian-form-actions button) {
     min-height: 44px;
     min-width: 120px;
+  }
+
+  .form-actions button,
+  .form-actions-modern button,
+  .form-actions-standardized button,
+  .admin-modal-footer button,
+  .admin-modal-actions button,
+  .guardian-form-actions button {
+    min-height: 44px !important;
+    min-width: 132px !important;
+    width: auto !important;
   }
 
   /* Modal buttons (exclude admin modal footer and generic button wrappers) */

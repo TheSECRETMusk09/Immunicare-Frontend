@@ -281,16 +281,18 @@ const NotificationSettings = ({ settings, onSave, onReset }) => {
       {/* Action Buttons */}
       <div className="form-actions-standardized">
         <button
+          type="button"
           onClick={handleReset}
-          className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center justify-center gap-2 min-h-[48px] sm:min-h-[40px] touch-manipulation"
+          className="form-action--cancel w-full sm:w-auto px-4 py-2.5 sm:py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center justify-center gap-2 min-h-[48px] sm:min-h-[40px] touch-manipulation"
         >
           <RotateCcw className="w-4 h-4" />
           Reset
         </button>
         <button
+          type="button"
           onClick={handleSave}
           disabled={saving}
-          className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 min-h-[48px] sm:min-h-[40px] touch-manipulation"
+          className="form-action--primary w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 min-h-[48px] sm:min-h-[40px] touch-manipulation"
         >
           {saving ? (
             <>

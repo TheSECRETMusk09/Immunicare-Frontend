@@ -432,10 +432,14 @@ export default function VaccineInventory() {
             }
             footer={
               <div className="form-actions-standardized">
-                <Button variant="cancel" onClick={() => setShowModal(false)}>
+                <Button
+                  variant="cancel"
+                  actionRole="cancel"
+                  onClick={() => setShowModal(false)}
+                >
                   Cancel
                 </Button>
-                <Button type="submit" form="inventoryForm">
+                <Button type="submit" actionRole="primary" form="inventoryForm">
                   {editingRecord ? "Update Record" : "Add Record"}
                 </Button>
               </div>

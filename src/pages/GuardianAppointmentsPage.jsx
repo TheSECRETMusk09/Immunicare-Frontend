@@ -1149,9 +1149,10 @@ export default function GuardianAppointmentsPage() {
             >
               <Button
                 type="submit"
+                actionRole="primary"
                 loading={formSubmitting}
                 disabled={availabilityFeedback ? !availabilityFeedback.available : false}
-                className="guardian-form-actions__primary"
+                className="guardian-form-actions__primary ui-form-action-btn ui-form-action-btn--primary"
                 data-testid="guardian-booking-submit-btn"
               >
                 {editingAppointment ? "Save Changes" : "Book Appointment"}
@@ -1159,8 +1160,9 @@ export default function GuardianAppointmentsPage() {
               <Button
                 type="button"
                 variant="cancel"
+                actionRole="cancel"
                 onClick={() => setShowBookingModal(false)}
-                className="guardian-form-actions__secondary"
+                className="guardian-form-actions__secondary ui-form-action-btn ui-form-action-btn--secondary"
                 data-testid="guardian-booking-close-btn"
               >
                 Close
@@ -1267,9 +1269,10 @@ export default function GuardianAppointmentsPage() {
               <Button
                 type="button"
                 variant="danger"
+                actionRole="primary"
                 loading={rowAction.id === cancelTarget?.id && rowAction.action === "cancel"}
                 onClick={handleCancelAppointment}
-                className="guardian-form-actions__primary"
+                className="guardian-form-actions__primary ui-form-action-btn ui-form-action-btn--primary"
                 data-testid="guardian-cancel-confirm-btn"
               >
                 Confirm Cancel
@@ -1277,12 +1280,13 @@ export default function GuardianAppointmentsPage() {
               <Button
                 type="button"
                 variant="cancel"
+                actionRole="cancel"
                 onClick={() => {
                   setShowCancelModal(false);
                   setCancelTarget(null);
                   setCancelReason("");
                 }}
-                className="guardian-form-actions__secondary"
+                className="guardian-form-actions__secondary ui-form-action-btn ui-form-action-btn--secondary"
                 data-testid="guardian-cancel-keep-btn"
               >
                 Keep Appointment

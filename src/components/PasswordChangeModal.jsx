@@ -112,13 +112,19 @@ export default function PasswordChangeModal({ isOpen, onClose, onSuccess }) {
           <Button
             type="button"
             variant="cancel"
+            actionRole="cancel"
             onClick={onClose}
             disabled={loading}
             className="w-full sm:w-auto"
           >
             Cancel
           </Button>
-          <Button type="submit" loading={loading} className="w-full sm:w-auto">
+          <Button
+            type="submit"
+            loading={loading}
+            actionRole="primary"
+            className="w-full sm:w-auto"
+          >
             Change Password
           </Button>
         </div>

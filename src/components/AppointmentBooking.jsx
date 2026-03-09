@@ -220,6 +220,7 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
           <Button
             type="button"
             variant="cancel"
+            actionRole="cancel"
             onClick={() => window.history.back()}
           >
             Cancel
@@ -227,6 +228,7 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
           <Button
             type="submit"
             variant="primary"
+            actionRole="primary"
             disabled={!selectedTime || loading}
             leftIcon={<Plus className="h-4 w-4" />}
           >

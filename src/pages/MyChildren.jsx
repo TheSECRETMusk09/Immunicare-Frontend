@@ -559,9 +559,10 @@ export default function MyChildren() {
           title="Register New Child"
           size="md"
           footer={
-            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 form-actions-modern">
+            <div className="form-actions-modern ui-form-actions ui-form-actions--stack-mobile">
               <Button
                 variant="cancel"
+                actionRole="cancel"
                 onClick={() => {
                   setShowRegisterModal(false);
                   setRegisterError(null);
@@ -571,16 +572,17 @@ export default function MyChildren() {
                   }
                 }}
                 disabled={isSubmitting}
-                className="w-full sm:w-auto"
+                className="ui-form-action-btn ui-form-action-btn--secondary"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
+                actionRole="primary"
                 form="registerChildForm"
                 disabled={isSubmitting}
                 loading={isSubmitting}
-                className="w-full sm:w-auto"
+                className="ui-form-action-btn ui-form-action-btn--primary"
               >
                 {isSubmitting ? "Registering..." : "Register Child"}
               </Button>
@@ -708,9 +710,10 @@ export default function MyChildren() {
           title="Edit Child Information"
           size="md"
           footer={
-            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 form-actions-modern">
+            <div className="form-actions-modern ui-form-actions ui-form-actions--stack-mobile">
               <Button
                 variant="cancel"
+                actionRole="cancel"
                 onClick={() => {
                   setShowEditModal(false);
                   setSelectedChild(null);
@@ -718,16 +721,17 @@ export default function MyChildren() {
                   setEditSuccess(null);
                 }}
                 disabled={isSubmitting}
-                className="w-full sm:w-auto"
+                className="ui-form-action-btn ui-form-action-btn--secondary"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
+                actionRole="primary"
                 form="editChildForm"
                 disabled={isSubmitting}
                 loading={isSubmitting}
-                className="w-full sm:w-auto"
+                className="ui-form-action-btn ui-form-action-btn--primary"
               >
                 {isSubmitting ? "Saving..." : "Save Changes"}
               </Button>
@@ -854,25 +858,27 @@ export default function MyChildren() {
           title="Delete Child"
           size="md"
           footer={
-            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 form-actions-modern">
+            <div className="form-actions-modern ui-form-actions ui-form-actions--stack-mobile">
               <Button
                 variant="cancel"
+                actionRole="cancel"
                 onClick={() => {
                   setShowDeleteModal(false);
                   setSelectedChild(null);
                   setDeleteError(null);
                 }}
                 disabled={isSubmitting}
-                className="w-full sm:w-auto"
+                className="ui-form-action-btn ui-form-action-btn--secondary"
               >
                 No, Keep Child
               </Button>
               <Button
                 variant="danger"
+                actionRole="primary"
                 onClick={handleConfirmDeleteChild}
                 loading={isSubmitting}
                 disabled={isSubmitting}
-                className="w-full sm:w-auto"
+                className="ui-form-action-btn ui-form-action-btn--primary"
               >
                 {isSubmitting ? "Deleting..." : "Yes, Delete"}
               </Button>

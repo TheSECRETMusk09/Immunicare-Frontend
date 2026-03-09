@@ -1123,7 +1123,11 @@ export default function InventoryReports() {
           </div>
 
           <div className="form-actions-standardized">
-            <Button variant="cancel" onClick={() => setShowExportModal(false)}>
+            <Button
+              variant="cancel"
+              actionRole="cancel"
+              onClick={() => setShowExportModal(false)}
+            >
               Close
             </Button>
           </div>
@@ -1240,7 +1244,11 @@ export default function InventoryReports() {
               </div>
             </div>
             <div className="flex justify-center pt-4 border-t">
-              <Button variant="cancel" onClick={() => setShowItemModal(false)}>
+              <Button
+                variant="cancel"
+                actionRole="cancel"
+                onClick={() => setShowItemModal(false)}
+              >
                 Close
               </Button>
             </div>

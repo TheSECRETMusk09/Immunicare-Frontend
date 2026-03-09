@@ -489,10 +489,14 @@ export const VaccineInventoryManagement = () => {
           </div>
 
           <div className="mt-6 flex justify-end space-x-3">
-            <Button variant="cancel" onClick={() => setShowModal(false)}>
+            <Button
+              variant="cancel"
+              actionRole="cancel"
+              onClick={() => setShowModal(false)}
+            >
               Cancel
             </Button>
-            <Button variant="primary" onClick={handleSaveItem}>
+            <Button variant="primary" actionRole="primary" onClick={handleSaveItem}>
               {isEditing ? "Update Inventory" : "Add Inventory"}
             </Button>
           </div>

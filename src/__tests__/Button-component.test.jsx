@@ -13,8 +13,10 @@
  * Testing Framework: Jest + React Testing Library
  */
 
+/* eslint-disable testing-library/no-container, testing-library/no-node-access */
+
 import React from "react";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import Button from "../components/UI/Button";
 
@@ -56,7 +58,9 @@ describe("Button Component - Variants", () => {
         </Button>
       );
 
-      const button = screen.getByRole('button', { name: /primary button/i });
+      const button = screen.getByRole("button", {
+        name: new RegExp(`${variant}\\s+Button`, "i"),
+      });
       expect(button).toBeInTheDocument();
     });
   });
@@ -69,7 +73,7 @@ describe("Button Component - Variants", () => {
     );
 
     const button = container.querySelector('button');
-    expect(button).toHaveClass('bg-primary-600');
+    expect(button).toHaveClass('bg-[var(--theme-primary)]');
   });
 });
 
@@ -94,13 +98,13 @@ describe("Button Component - Sizes", () => {
       <Button size="xs">Small</Button>
     );
     const smallButton = smallContainer.querySelector('button');
-    expect(smallButton).toHaveClass('px-2', 'py-1', 'text-xs');
+    expect(smallButton).toHaveClass('px-2.5', 'py-1.5', 'text-xs', 'min-h-[32px]');
 
     const { container: largeContainer } = render(
       <Button size="xl">Large</Button>
     );
     const largeButton = largeContainer.querySelector('button');
-    expect(largeButton).toHaveClass('px-4', 'py-2', 'text-base');
+    expect(largeButton).toHaveClass('px-6', 'py-3', 'text-base', 'min-h-[48px]');
   });
 });
 
@@ -137,7 +141,7 @@ describe("Button Component - States", () => {
     expect(button).toHaveAttribute('aria-busy', 'true');
 
     // Check loading spinner is present
-    const spinner = screen.getByRole('img', { hidden: true });
+    const spinner = button.querySelector('svg.animate-spin');
     expect(spinner).toBeInTheDocument();
   });
 
@@ -323,7 +327,7 @@ describe("Button Component - Props and Configuration", () => {
     );
 
     expect(screen.getByTestId('custom-button')).toBeInTheDocument();
-    expect(screen.getById('my-button')).toBeInTheDocument();
+    expect(document.getElementById('my-button')).toBeInTheDocument();
   });
 
   test('Button renders with icon', () => {
@@ -392,7 +396,7 @@ describe("Button Component - Visual States and Interactions", () => {
 
     const button = container.querySelector('button');
     // Primary button should have hover class
-    expect(button).toHaveClass('hover:bg-primary-700');
+    expect(button).toHaveClass('hover:bg-[var(--theme-primary-hover)]');
   });
 
   test('Button has active/pressed state styles', () => {
@@ -406,7 +410,7 @@ describe("Button Component - Visual States and Interactions", () => {
     const { container } = render(<Button>Transition Test</Button>);
 
     const button = container.querySelector('button');
-    expect(button).toHaveClass('transition-all', 'duration-150');
+    expect(button).toHaveClass('transition-colors', 'duration-150');
   });
 
   test('Button responds to mouse events', () => {
@@ -430,11 +434,11 @@ describe("Button Component - Visual States and Interactions", () => {
     expect(handleMouseLeave).toHaveBeenCalled();
   });
 
-  test('Button has proper shadow styles', () => {
-    const { container } = render(<Button>Shadow Test</Button>);
+  test('Button has core shape styles', () => {
+    const { container } = render(<Button>Shape Test</Button>);
 
     const button = container.querySelector('button');
-    expect(button).toHaveClass('shadow-sm');
+    expect(button).toHaveClass('rounded-lg', 'border', 'border-transparent');
   });
 });
 
@@ -487,15 +491,15 @@ describe("Button Component - Responsive Behavior", () => {
     const { container } = render(<Button>Touch Target</Button>);
 
     const button = container.querySelector('button');
-    // Medium button has min-h-[32px]
-    expect(button).toHaveClass('min-h-[32px]');
+    // Medium button has min-h-[40px]
+    expect(button).toHaveClass('min-h-[40px]');
   });
 
   test('Button size xs has minimum height', () => {
     const { container } = render(<Button size="xs">XS Button</Button>);
 
     const button = container.querySelector('button');
-    expect(button).toHaveClass('min-h-[24px]');
+    expect(button).toHaveClass('min-h-[32px]');
   });
 
   test('Button has proper gap for icon and text', () => {
@@ -507,7 +511,7 @@ describe("Button Component - Responsive Behavior", () => {
     );
 
     const button = container.querySelector('button');
-    expect(button).toHaveClass('gap-1.5');
+    expect(button).toHaveClass('gap-2');
   });
 });
 
@@ -564,31 +568,31 @@ describe("Button Component - Edge Cases", () => {
 });
 
 describe("Button Component - Dark Mode Compatibility", () => {
-  test('Secondary button has dark mode styles', () => {
+  test('Secondary button uses semantic color tokens', () => {
     const { container } = render(
       <Button variant="secondary">Dark Mode</Button>
     );
 
     const button = container.querySelector('button');
-    expect(button).toHaveClass('dark:bg-gray-700', 'dark:text-gray-100');
+    expect(button).toHaveClass('bg-[var(--color-bg-tertiary)]', 'text-[var(--color-text-primary)]');
   });
 
-  test('Outline button has dark mode styles', () => {
+  test('Outline button uses semantic theme token classes', () => {
     const { container } = render(
       <Button variant="outline">Outline Dark</Button>
     );
 
     const button = container.querySelector('button');
-    expect(button).toHaveClass('dark:border-primary-400', 'dark:text-white');
+    expect(button).toHaveClass('border-[var(--theme-primary)]', 'text-[var(--theme-primary)]');
   });
 
-  test('Ghost button has dark mode styles', () => {
+  test('Ghost button uses semantic neutral token classes', () => {
     const { container } = render(
       <Button variant="ghost">Ghost Dark</Button>
     );
 
     const button = container.querySelector('button');
-    expect(button).toHaveClass('dark:text-white', 'dark:hover:bg-gray-700/60');
+    expect(button).toHaveClass('text-[var(--color-text-primary)]', 'hover:bg-[var(--color-bg-secondary)]');
   });
 });
 

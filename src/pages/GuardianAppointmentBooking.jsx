@@ -741,13 +741,14 @@ export default function GuardianAppointmentBooking() {
           >
             <Button
               type="submit"
+              actionRole="primary"
               loading={submitting}
               disabled={
                 !selectedChild ||
                 !formData.scheduled_date ||
                 !formData.scheduled_time
               }
-              className="guardian-btn guardian-form-actions__primary"
+              className="guardian-btn guardian-form-actions__primary ui-form-action-btn ui-form-action-btn--primary"
               data-testid="guardian-booking-page-submit-btn"
             >
               <Calendar className="w-4 h-4 mr-2" />
@@ -756,8 +757,9 @@ export default function GuardianAppointmentBooking() {
             <Button
               type="button"
               variant="secondary"
+              actionRole="cancel"
               onClick={() => navigate(-1)}
-              className="guardian-btn guardian-form-actions__secondary"
+              className="guardian-btn guardian-form-actions__secondary ui-form-action-btn ui-form-action-btn--secondary"
               data-testid="guardian-booking-page-cancel-btn"
             >
               Cancel

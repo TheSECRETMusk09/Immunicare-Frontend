@@ -693,11 +693,12 @@ export default function VaccineInventoryLogbook() {
           <div className="form-actions-standardized">
             <Button
               variant="cancel"
+              actionRole="cancel"
               onClick={() => setShowTransactionModal(false)}
             >
               Cancel
             </Button>
-            <Button type="submit" form="transactionForm">
+            <Button type="submit" actionRole="primary" form="transactionForm">
               Add Transaction
             </Button>
           </div>

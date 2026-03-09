@@ -592,11 +592,16 @@ export const InventoryManagement = () => {
           )}
 
           <div className="form-actions-standardized">
-            <Button variant="cancel" onClick={() => setShowModal(false)}>
+            <Button
+              variant="cancel"
+              actionRole="cancel"
+              onClick={() => setShowModal(false)}
+            >
               Cancel
             </Button>
             <Button
               variant="primary"
+              actionRole="primary"
               onClick={handleSaveStock}
               disabled={
                 modalType === "transfer" &&

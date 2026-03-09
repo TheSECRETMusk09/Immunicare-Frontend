@@ -273,10 +273,14 @@ export default function PaperConfiguration({ onRefresh }) {
         size="lg"
         footer={
           <div className="form-actions-standardized">
-            <Button variant="cancel" onClick={() => setShowModal(false)}>
+            <Button
+              variant="cancel"
+              actionRole="cancel"
+              onClick={() => setShowModal(false)}
+            >
               Cancel
             </Button>
-            <Button type="submit" form="templateForm">
+            <Button type="submit" actionRole="primary" form="templateForm">
               {editingTemplate ? "Update Template" : "Add Template"}
             </Button>
           </div>

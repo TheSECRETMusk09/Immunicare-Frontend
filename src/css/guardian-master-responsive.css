@@ -164,13 +164,13 @@
     width: calc(100% + 2 * var(--guardian-inline-padding-mobile, 0.875rem));
     border-radius: 0;
   }
-  
+
   .guardian-top-header__inner {
     padding-left: 0.5rem;
     padding-right: 0.5rem;
     min-height: 56px;
   }
-  
+
   .guardian-top-header__left-spacer {
     width: 0;
     display: none;
@@ -1035,7 +1035,7 @@ body {
   .guardian-page-wrapper .guardian-form-actions button,
   .guardian-page-wrapper .guardian-form-actions .btn,
   .guardian-page-wrapper .guardian-form-actions .MuiButton-root {
-    width: 100%;
+    width: min(100%, 320px);
     min-height: 46px;
     font-size: 0.9rem;
   }
@@ -1390,16 +1390,16 @@ body {
     justify-content: center;
     align-items: center;
     width: 100%;
-    margin-top: 2rem;
-    gap: 1rem;
-    flex-direction: row;
+    margin-top: 1rem;
+    gap: 0.625rem;
+    flex-direction: column;
   }
 
   .guardian-form-actions button,
   .guardian-form-actions .btn,
   .guardian-form-actions .MuiButton-root {
-    min-width: 120px;
-    width: auto !important;
+    min-width: 0;
+    width: min(100%, 320px) !important;
   }
 
   .guardian-appointment-booking-mobile-ui .guardian-form-row-booking-mobile {
@@ -1881,12 +1881,12 @@ body {
     border-left: none;
     border-right: none;
   }
-  
+
   .guardian-profile-mobile-ui .guardian-top-header__inner {
     padding-left: 0.5rem;
     padding-right: 0.5rem;
   }
-  
+
   .guardian-profile-mobile-ui .guardian-top-header__left-spacer {
     width: 0;
     display: none;

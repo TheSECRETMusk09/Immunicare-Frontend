@@ -17,6 +17,8 @@ const Button = ({
   children,
   variant = "primary",
   size = "md",
+  actionRole,
+  leftIcon,
   disabled = false,
   loading = false,
   onClick,
@@ -61,7 +63,17 @@ const Button = ({
     xl: "px-6 py-3 text-base gap-2 h-12 min-h-[48px]",
   };
 
-  const classes = `${baseClasses} ${variants[variant]} ${sizes[size]} ${className}`;
+  const formActionPadding =
+    "ui-form-action-btn:px-4 ui-form-action-btn:py-2.5 ui-form-action-btn:h-auto ui-form-action-btn:min-h-[44px]";
+
+  const actionRoleClass =
+    actionRole === "primary"
+      ? "form-action--primary"
+      : actionRole === "cancel"
+        ? "form-action--cancel"
+        : "";
+
+  const classes = `${baseClasses} ${variants[variant]} ${sizes[size]} ${formActionPadding} ${actionRoleClass} ${className}`;
 
   return (
     <button
@@ -73,6 +85,7 @@ const Button = ({
       aria-disabled={disabled || loading}
       {...props}
     >
+      {!loading && leftIcon ? leftIcon : null}
       {loading && (
         <svg
           className="animate-spin -ml-0.5 mr-2 h-4 w-4"

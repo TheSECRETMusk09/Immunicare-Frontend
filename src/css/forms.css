@@ -99,7 +99,7 @@
   border-top: 1px solid var(--color-slate-200);
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: var(--space-3);
 }
 
@@ -761,21 +761,24 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-4);
-  margin-top: var(--space-6);
-  padding-top: var(--space-6);
-  padding-bottom: var(--space-1);
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  padding-bottom: 0;
   border-top: 1px solid var(--color-slate-200);
+  width: 100%;
+  flex-wrap: wrap;
 }
 
 /* Mobile responsive - buttons stack vertically */
 @media (max-width: 639px) {
   .form-actions-standardized {
-    flex-direction: column-reverse;
+    flex-direction: column;
     gap: var(--space-3);
   }
 
   .form-actions-standardized > * {
     width: 100%;
+    min-width: 0;
   }
 }
 
@@ -1997,20 +2000,341 @@
 .form-actions-modern {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: var(--space-3);
-  padding-top: var(--space-6);
-  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  margin-top: var(--space-5);
   border-top: 1px solid var(--color-slate-200);
+  width: 100%;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 639px) {
   .form-actions-modern {
-    flex-direction: column-reverse;
+    flex-direction: column;
   }
 
   .form-actions-modern > * {
     width: 100%;
+    min-width: 0;
+  }
+}
+
+/* ======================================================================
+   Forms-only remediation contract: unified shell + centered bottom actions
+   ====================================================================== */
+
+:root {
+  --ui-form-shell-max-width-sm: 32rem;
+  --ui-form-shell-max-width-md: 42rem;
+  --ui-form-shell-max-width-lg: 56rem;
+  --ui-form-shell-max-height: 56rem;
+  --ui-form-shell-radius: 1rem;
+  --ui-form-shell-viewport-gap: clamp(0.75rem, 2vw, 1.5rem);
+  --ui-form-shell-inline-pad: clamp(1rem, 1.5vw, 1.5rem);
+  --ui-form-shell-block-pad: clamp(1rem, 1.5vh, 1.25rem);
+  --ui-form-actions-gap: 0.75rem;
+  --ui-form-actions-top-pad: 1rem;
+  --ui-form-actions-min-width: 132px;
+  --ui-form-actions-mobile-max-width: 320px;
+}
+
+.form-shell,
+.ui-form-shell,
+.admin-form,
+.modal-form,
+.admin-modal-form,
+.guardian-form,
+.guardian-appointments-modal-form,
+.admin-modal-layout,
+.guardian-modal {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.form-shell {
+  max-width: var(--ui-form-shell-max-width-md);
+  max-height: min(
+    calc(100dvh - var(--ui-form-shell-viewport-gap) * 2),
+    var(--ui-form-shell-max-height)
+  );
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  border-radius: var(--ui-form-shell-radius);
+  overflow: hidden;
+}
+
+.form-shell--sm {
+  max-width: var(--ui-form-shell-max-width-sm);
+}
+
+.form-shell--md {
+  max-width: var(--ui-form-shell-max-width-md);
+}
+
+.form-shell--lg {
+  max-width: var(--ui-form-shell-max-width-lg);
+}
+
+.form-shell--full {
+  max-width: 95vw;
+}
+
+.admin-modal-layout,
+.modal-form,
+.guardian-modal,
+.admin-modal-form {
+  overflow: hidden;
+}
+
+.form-shell__header,
+.admin-modal-header,
+.modal-form-header {
+  padding: 1.25rem var(--ui-form-shell-inline-pad);
+  min-height: 4.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  box-sizing: border-box;
+}
+
+.form-shell__body,
+.admin-modal-body,
+.modal-form-body,
+.guardian-modal-body,
+.form-scroll-container,
+.modal-scroll-container {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--ui-form-shell-block-pad) var(--ui-form-shell-inline-pad);
+  box-sizing: border-box;
+}
+
+@supports (overflow: clip) {
+  .form-shell__body,
+  .admin-modal-body,
+  .modal-form-body,
+  .guardian-modal-body,
+  .form-scroll-container,
+  .modal-scroll-container {
+    overflow-x: clip;
+  }
+}
+
+.form-shell__footer,
+.admin-modal-footer,
+.modal-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: auto;
+  padding: var(--ui-form-actions-top-pad) var(--ui-form-shell-inline-pad)
+    max(1rem, env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--color-border-default, var(--color-slate-200));
+  box-sizing: border-box;
+}
+
+.ui-form-shell .form-row,
+.ui-form-shell .form-row-2,
+.ui-form-shell .form-row-3,
+.ui-form-shell .form-row-4,
+.admin-form-row,
+.admin-form-row-2,
+.admin-form-row-3,
+.admin-form-row-4,
+.guardian-form-grid,
+.guardian-form-row,
+.guardian-form-row-booking-mobile {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.ui-form-shell .input-field,
+.ui-form-shell .select-field,
+.ui-form-shell .textarea-field,
+.ui-form-shell .date-input,
+.admin-input,
+.admin-select,
+.admin-textarea,
+.guardian-form input,
+.guardian-form select,
+.guardian-form textarea,
+.guardian-form .guardian-input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.form-actions-unified,
+.ui-form-actions,
+.form-actions,
+.form-actions-standardized,
+.form-actions-modern,
+.admin-form-actions,
+.admin-modal-actions,
+.guardian-form-actions,
+.guardian-form-actions--booking-page,
+.guardian-form-actions--guardian-order {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-form-actions-gap);
+  width: 100%;
+  max-width: 100%;
+  margin-top: 1.25rem;
+  padding-top: var(--ui-form-actions-top-pad);
+  border-top: 1px solid var(--color-border-default, var(--color-slate-200));
+  box-sizing: border-box;
+  flex-wrap: wrap;
+}
+
+.admin-modal-footer .form-actions-unified,
+.admin-modal-footer .admin-modal-actions,
+.form-shell__footer .form-actions-unified,
+.form-shell__footer .admin-modal-actions,
+.modal-form-footer .form-actions-unified,
+.modal-form-footer .admin-modal-actions {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.ui-form-actions--row-mobile {
+  flex-direction: row;
+}
+
+.ui-form-actions--stack-mobile {
+  flex-direction: row;
+}
+
+.form-action--cancel {
+  order: 1;
+}
+
+.form-action--primary {
+  order: 2;
+}
+
+.form-actions-unified > :where(button, .btn, .c-btn, .MuiButton-root),
+.ui-form-actions > :where(button, .btn, .c-btn, .MuiButton-root),
+.form-actions > :where(button, .btn, .c-btn, .MuiButton-root),
+.form-actions-standardized > :where(button, .btn, .c-btn, .MuiButton-root),
+.form-actions-modern > :where(button, .btn, .c-btn, .MuiButton-root),
+.admin-form-actions > :where(button, .btn, .c-btn, .MuiButton-root),
+.admin-modal-actions > :where(button, .btn, .c-btn, .MuiButton-root),
+.guardian-form-actions > :where(button, .btn, .c-btn, .MuiButton-root) {
+  width: auto;
+  min-width: var(--ui-form-actions-min-width);
+  max-width: 100%;
+}
+
+.ui-form-action-btn,
+.form-actions-unified > .ui-form-action-btn,
+.ui-form-actions > .ui-form-action-btn,
+.form-actions > .ui-form-action-btn,
+.form-actions-standardized > .ui-form-action-btn,
+.form-actions-modern > .ui-form-action-btn,
+.admin-form-actions > .ui-form-action-btn,
+.admin-modal-actions > .ui-form-action-btn,
+.guardian-form-actions > .ui-form-action-btn {
+  min-height: 44px;
+  min-width: var(--ui-form-actions-min-width);
+  padding: 0.625rem 1rem;
+  line-height: 1.2;
+}
+
+@media (max-width: 639px) {
+  .ui-form-actions--stack-mobile,
+  .form-actions-unified,
+  .ui-form-actions,
+  .form-actions,
+  .form-actions-standardized,
+  .form-actions-modern,
+  .admin-form-actions,
+  .admin-modal-actions,
+  .guardian-form-actions,
+  .guardian-form-actions--booking-page,
+  .guardian-form-actions--guardian-order {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.625rem;
+    margin-top: 1rem;
+    padding-top: 0.875rem;
+  }
+
+  .ui-form-actions--row-mobile {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .form-action--primary {
+    order: 1;
+  }
+
+  .form-action--cancel {
+    order: 2;
+  }
+
+  .form-actions-unified > :where(button, .btn, .c-btn, .MuiButton-root),
+  .ui-form-actions > :where(button, .btn, .c-btn, .MuiButton-root),
+  .form-actions > :where(button, .btn, .c-btn, .MuiButton-root),
+  .form-actions-standardized > :where(button, .btn, .c-btn, .MuiButton-root),
+  .form-actions-modern > :where(button, .btn, .c-btn, .MuiButton-root),
+  .admin-form-actions > :where(button, .btn, .c-btn, .MuiButton-root),
+  .admin-modal-actions > :where(button, .btn, .c-btn, .MuiButton-root),
+  .guardian-form-actions > :where(button, .btn, .c-btn, .MuiButton-root) {
+    width: min(100%, var(--ui-form-actions-mobile-max-width));
+    min-width: 0;
+    margin-inline: auto;
+  }
+
+  .ui-form-action-btn,
+  .form-actions-unified > .ui-form-action-btn,
+  .ui-form-actions > .ui-form-action-btn,
+  .form-actions > .ui-form-action-btn,
+  .form-actions-standardized > .ui-form-action-btn,
+  .form-actions-modern > .ui-form-action-btn,
+  .admin-form-actions > .ui-form-action-btn,
+  .admin-modal-actions > .ui-form-action-btn,
+  .guardian-form-actions > .ui-form-action-btn {
+    width: min(100%, var(--ui-form-actions-mobile-max-width));
+    min-width: 0;
+    min-height: 44px;
+    margin-inline: auto;
+  }
+}
+
+@media (min-width: 640px) {
+  .form-actions-unified,
+  .ui-form-actions,
+  .form-actions,
+  .form-actions-standardized,
+  .form-actions-modern,
+  .admin-form-actions,
+  .admin-modal-actions,
+  .guardian-form-actions,
+  .guardian-form-actions--booking-page,
+  .guardian-form-actions--guardian-order,
+  .ui-form-actions--row-mobile,
+  .ui-form-actions--stack-mobile {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .form-action--cancel {
+    order: 1;
+  }
+
+  .form-action--primary {
+    order: 2;
   }
 }
 

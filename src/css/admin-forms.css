@@ -496,6 +496,7 @@
 .admin-modal-body {
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   overflow-x: hidden;
   overflow-y: auto;
   max-height: calc(90vh - 200px);
@@ -512,42 +513,42 @@
 
 /* Modal footer with buttons */
 .admin-modal-footer {
-  display: flex !important;
-  flex-direction: row !important;
-  flex-wrap: nowrap;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end !important;
-  gap: 0.75rem;
+  justify-content: center !important;
+  gap: var(--ui-form-actions-gap, 0.75rem);
   width: 100%;
   max-width: 100%;
-  padding: 1.25rem 1.5rem;
-  border-top: 1px solid var(--color-slate-200, #e2e8f0);
+  padding: var(--ui-form-actions-top-pad, 1rem) var(--ui-form-shell-inline-pad, 1.5rem);
+  border-top: 1px solid var(--color-border-default, var(--color-slate-200, #e2e8f0));
 }
 
 .admin-modal-footer > * {
-  width: auto !important;
-  flex: 0 0 auto;
+  width: auto;
+  flex: 0 1 auto;
   min-width: 0;
 }
 
 .admin-modal-footer button {
-  width: auto !important;
-  min-height: 40px !important;
+  width: auto;
+  min-height: 44px;
   white-space: nowrap;
 }
 
 .admin-modal-footer .admin-modal-actions {
   width: 100%;
-  justify-content: flex-end;
+  justify-content: center;
 }
 
 @media (min-width: 480px) {
   .admin-modal-footer {
-    justify-content: flex-end !important;
+    justify-content: center !important;
   }
 
   .admin-modal-footer button {
-    min-width: 120px;
+    min-width: var(--ui-form-actions-min-width, 132px);
   }
 }
 
@@ -558,22 +559,18 @@
 .admin-form-actions,
 .form-actions {
   display: flex;
-  flex-direction: row;
-  gap: 0.75rem;
+  gap: var(--ui-form-actions-gap, 0.75rem);
   width: 100%;
   max-width: 100%;
-  margin-top: 0;
-  padding-top: 0;
-  border-top: none;
   align-items: center;
-  justify-content: flex-end !important;
-  flex-wrap: nowrap;
+  justify-content: center !important;
+  flex-wrap: wrap;
 }
 
 @media (min-width: 480px) {
   .admin-form-actions,
   .form-actions {
-    flex-direction: row;
+    justify-content: center !important;
   }
 }
 
@@ -582,7 +579,34 @@
 .form-actions .btn,
 .form-actions button {
   width: auto;
-  min-width: 120px;
+  min-width: var(--ui-form-actions-min-width, 132px);
+}
+
+/* Force column stacking on compact screens for centered bottom actions */
+@media (max-width: 1023px) {
+  .admin-modal-footer,
+  .admin-form-actions,
+  .form-actions {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center !important;
+    gap: var(--ui-form-actions-gap, 0.625rem);
+  }
+
+  .admin-modal-footer > *,
+  .admin-form-actions > *,
+  .form-actions > * {
+    width: auto;
+    flex: 1 1 auto;
+  }
+
+  .admin-modal-footer button,
+  .admin-form-actions button,
+  .form-actions button {
+    width: min(100%, var(--ui-form-actions-mobile-max-width, 320px));
+    min-width: 0;
+    min-height: 44px;
+  }
 }
 
 @media (min-width: 480px) {
@@ -1200,11 +1224,11 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 1rem;
+  gap: var(--ui-form-actions-gap, 1rem);
   width: 100%;
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--color-slate-200, #e2e8f0);
+  margin-top: 1.25rem;
+  padding-top: var(--ui-form-actions-top-pad, 1rem);
+  border-top: 1px solid var(--color-border-default, var(--color-slate-200, #e2e8f0));
 }
 
 .dark .form-actions-standardized {

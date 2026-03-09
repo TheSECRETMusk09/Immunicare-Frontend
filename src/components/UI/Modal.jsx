@@ -162,7 +162,7 @@ const Modal = ({
           {(footer || onConfirm) && (
             <div
               className="
-                admin-modal-footer sticky bottom-0 z-10 mt-auto px-6 py-5 bg-[var(--color-bg-primary)]
+                admin-modal-footer mt-auto px-6 py-5 bg-[var(--color-bg-primary)]
                 border-t border-[var(--color-border-default)]
                 flex-shrink-0
               "
@@ -175,7 +175,9 @@ const Modal = ({
                     <Button
                       type="button"
                       variant="cancel"
+                      actionRole="cancel"
                       onClick={onClose}
+                      className="ui-form-action-btn ui-form-action-btn--secondary"
                     >
                       {cancelText}
                     </Button>
@@ -183,9 +185,11 @@ const Modal = ({
                   <Button
                     type="button"
                     variant={currentType.confirmVariant}
+                    actionRole="primary"
                     onClick={onConfirm}
                     loading={isLoading}
                     disabled={isLoading}
+                    className="ui-form-action-btn ui-form-action-btn--primary"
                   >
                     {confirmText}
                   </Button>

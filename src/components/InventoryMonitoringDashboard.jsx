@@ -488,7 +488,11 @@ export default function InventoryMonitoringDashboard() {
             </ul>
           </div>
           <div className="form-actions-standardized">
-            <Button variant="cancel" onClick={() => setShowBatchModal(false)}>
+            <Button
+              variant="cancel"
+              actionRole="cancel"
+              onClick={() => setShowBatchModal(false)}
+            >
               Close
             </Button>
           </div>
@@ -514,6 +518,7 @@ export default function InventoryMonitoringDashboard() {
           <div className="form-actions-standardized">
             <Button
               variant="cancel"
+              actionRole="cancel"
               onClick={() => setShowSupplierModal(false)}
             >
               Close

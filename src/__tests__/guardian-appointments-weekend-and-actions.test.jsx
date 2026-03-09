@@ -120,7 +120,7 @@ jest.mock("../components/UI", () => {
         {children}
       </div>
     ),
-    Button: ({ children, loading, variant, size, disabled, ...props }) => (
+    Button: ({ children, loading, variant, size, disabled, actionRole, ...props }) => (
       <button {...props} disabled={disabled || Boolean(loading)}>
         {children}
       </button>
