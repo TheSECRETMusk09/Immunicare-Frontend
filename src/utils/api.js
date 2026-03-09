@@ -568,6 +568,13 @@ class ApiClient {
     });
   }
 
+  async createGuardianInfant(infantData) {
+    return this.request("/infants/guardian", {
+      method: "POST",
+      data: infantData,
+    });
+  }
+
   async updateInfant(id, infantData) {
     return this.request(`/infants/${id}`, {
       method: "PUT",
@@ -575,8 +582,21 @@ class ApiClient {
     });
   }
 
+  async updateGuardianInfant(id, infantData) {
+    return this.request(`/infants/${id}/guardian`, {
+      method: "PUT",
+      data: infantData,
+    });
+  }
+
   async deleteInfant(id) {
     return this.request(`/infants/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  async deleteGuardianInfant(id) {
+    return this.request(`/infants/${id}/guardian`, {
       method: "DELETE",
     });
   }
@@ -1097,7 +1117,7 @@ class ApiClient {
   }
 
   async updateGuardianProfile(guardianId, profileData) {
-    return this.request(`/users/guardian/profile/${guardianId}`, {
+    return this.request(`/users/guardian/self/profile/${guardianId}`, {
       method: "PUT",
       data: profileData,
     });

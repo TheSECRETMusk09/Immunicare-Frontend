@@ -118,7 +118,7 @@ jest.mock("../utils/api", () => ({
       completedVaccinations: 10,
       pendingVaccinations: 3,
     }),
-    getNotifications: jest.fn().mockResolvedValue({ data: [] }),
+    getGuardianNotifications: jest.fn().mockResolvedValue({ data: [] }),
     getDashboardAppointments: jest.fn().mockResolvedValue([
       {
         id: 1,

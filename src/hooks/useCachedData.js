@@ -16,7 +16,7 @@ export const queryKeys = {
     children: (guardianId) => ["guardian", "children", guardianId],
     appointments: (guardianId) => ["guardian", "appointments", guardianId],
     stats: (guardianId) => ["guardian", "stats", guardianId],
-    notifications: ["guardian", "notifications"],
+    notifications: (guardianScope = "self") => ["guardian", "notifications", guardianScope],
   },
   vaccinations: {
     all: ["vaccinations", "all"],
@@ -231,14 +231,13 @@ export const useGuardianStats = (guardianId) => {
  */
 export const useGuardianNotifications = (limit = 10) => {
   return useQuery({
-    queryKey: [...queryKeys.guardian.notifications, limit],
+    queryKey: [...queryKeys.guardian.notifications(), limit],
     queryFn: async () => {
-      const response = await apiClient.getNotifications({ limit });
-      if (response?.data) {
-        if (Array.isArray(response.data)) return response.data;
-        return response.data.notifications || [];
-      }
-      if (Array.isArray(response)) return response;
+      const response = await apiClient.getGuardianNotifications({ limit });
+      const payload = response?.data ?? response;
+
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray(payload?.notifications)) return payload.notifications;
       return [];
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
@@ -315,9 +314,7 @@ export const useInvalidateDashboard = () => {
   };
 
   const invalidateGuardian = (guardianId) => {
-    if (guardianId) {
-      queryClient.invalidateQueries({ queryKey: ["guardian", guardianId] });
-    }
+    queryClient.invalidateQueries({ queryKey: ["guardian"] });
   };
 
   return { invalidateDashboard, invalidateGuardian };

@@ -189,15 +189,18 @@ const GuardianNotificationsPage = () => {
   }, [refresh]);
 
   // Handle filter change
-  const handleFilterChange = (type) => {
-    setActiveTab(type);
-    updateFilters({ type: type === 'all' ? null : type, unreadOnly: false });
-  };
+  const handleFilterChange = (tabId) => {
+    setActiveTab(tabId);
 
-  // Handle unread filter
-  const handleUnreadFilter = () => {
-    setActiveTab('unread');
-    updateFilters({ unreadOnly: true, type: null });
+    if (tabId === 'unread') {
+      updateFilters({ unreadOnly: true, type: null });
+      return;
+    }
+
+    updateFilters({
+      unreadOnly: false,
+      type: tabId === 'all' ? null : tabId,
+    });
   };
 
   // Group notifications by date
@@ -292,16 +295,7 @@ const GuardianNotificationsPage = () => {
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => {
-                  if (tab.id === 'unread') {
-                    setActiveTab('unread');
-                    updateFilters({ unreadOnly: true, type: null });
-                    handleUnreadFilter();
-                  } else {
-                    handleFilterChange(tab.id);
-                    updateFilters({ unreadOnly: false });
-                  }
-                }}
+                onClick={() => handleFilterChange(tab.id)}
                 className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   activeTab === tab.id
                     ? 'bg-primary-600 text-white shadow-sm'

@@ -96,6 +96,41 @@ const Register = () => {
 
   const passwordStrength = calculatePasswordStrength(formData.password);
 
+  const backendFieldToFrontendField = {
+    firstName: "firstName",
+    lastName: "lastName",
+    email: "email",
+    phone: "phone",
+    password: "password",
+    confirmPassword: "confirmPassword",
+    address: "address",
+    relationship: "relationship",
+    infantName: "infantName",
+    infantDob: "infantDob",
+  };
+
+  const parseBackendFieldErrors = (error) => {
+    const fields = error?.response?.data?.fields;
+    if (!fields || typeof fields !== "object") {
+      return {};
+    }
+
+    return Object.entries(fields).reduce((acc, [backendField, message]) => {
+      const frontendField = backendFieldToFrontendField[backendField];
+      if (!frontendField) {
+        return acc;
+      }
+
+      if (typeof message === "string" && message.trim()) {
+        acc[frontendField] = message;
+      } else if (Array.isArray(message) && message.length > 0) {
+        acc[frontendField] = String(message[0]);
+      }
+
+      return acc;
+    }, {});
+  };
+
   const validateField = (name, value) => {
     switch (name) {
       case "firstName":
@@ -265,6 +300,11 @@ const Register = () => {
       setSuccess(true);
     } catch (error) {
       console.error("Registration error:", error);
+
+      const backendFieldErrors = parseBackendFieldErrors(error);
+      if (Object.keys(backendFieldErrors).length > 0) {
+        setErrors((prev) => ({ ...prev, ...backendFieldErrors }));
+      }
 
       const responseStatus = error?.response?.status;
       const retryAfterSeconds =
@@ -614,7 +654,6 @@ const Register = () => {
                   error={errors.infantDob}
                   disabled={loading}
                   max={maxDate}
-                  required
                   className="bg-white/10 backdrop-blur-sm border-white/30 text-white"
                 />
                 <div className="md:col-span-2">

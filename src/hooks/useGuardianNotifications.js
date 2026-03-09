@@ -11,6 +11,30 @@ const useGuardianNotifications = (options = {}) => {
   const { limit = 20, pollingInterval = 60000, autoFetch = true } = options;
   const { guardianId, isGuardian } = useAuth();
 
+  const sanitizeFiltersForApi = useCallback((rawFilters = {}) => {
+    const next = {};
+
+    if (typeof rawFilters.type === "string") {
+      const trimmedType = rawFilters.type.trim();
+      if (trimmedType && trimmedType !== "all") {
+        next.type = trimmedType;
+      }
+    }
+
+    if (rawFilters.unreadOnly === true) {
+      next.unreadOnly = true;
+    }
+
+    if (typeof rawFilters.search === "string") {
+      const trimmedSearch = rawFilters.search.trim();
+      if (trimmedSearch) {
+        next.search = trimmedSearch;
+      }
+    }
+
+    return next;
+  }, []);
+
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -41,9 +65,11 @@ const useGuardianNotifications = (options = {}) => {
       // Only fetch for actual guardian users
       if (!guardianId || !isGuardian) return;
 
+      const queryFilters = sanitizeFiltersForApi(filters);
+
       // Skip if not forced and recently fetched (within last 5 seconds)
       // Note: We skip this check if filters change to ensure UI updates immediately
-      const requestKey = JSON.stringify({ limit, filters });
+      const requestKey = JSON.stringify({ limit, filters: queryFilters });
       if (!force && !shouldFetch() && requestKey === lastRequestKeyRef.current) {
         return;
       }
@@ -53,7 +79,7 @@ const useGuardianNotifications = (options = {}) => {
         setError(null);
 
         const [notificationsRes, countRes] = await Promise.all([
-          guardianNotificationService.getNotifications({ ...filters, limit }),
+          guardianNotificationService.getNotifications({ ...queryFilters, limit }),
           guardianNotificationService.getUnreadCount(),
         ]);
 
@@ -97,7 +123,7 @@ const useGuardianNotifications = (options = {}) => {
         }
       }
     },
-    [guardianId, isGuardian, limit, shouldFetch, filters],
+    [guardianId, isGuardian, limit, shouldFetch, filters, sanitizeFiltersForApi],
   );
 
   // Mark notification as read
@@ -195,7 +221,19 @@ const useGuardianNotifications = (options = {}) => {
   );
 
   const updateFilters = useCallback((newFilters) => {
-    setFilters(prev => ({ ...prev, ...newFilters }));
+    setFilters((prev) => {
+      const next = { ...prev, ...newFilters };
+
+      if (
+        next.type === prev.type &&
+        next.unreadOnly === prev.unreadOnly &&
+        next.search === prev.search
+      ) {
+        return prev;
+      }
+
+      return next;
+    });
   }, []);
 
   // Refresh notifications (force fetch regardless of cache)

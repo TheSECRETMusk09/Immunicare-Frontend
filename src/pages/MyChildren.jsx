@@ -24,6 +24,73 @@ import {
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 
+const getErrorFieldMap = (error) => {
+  if (!error || !error.response || !error.response.data) {
+    return {};
+  }
+
+  const fields = error.response.data.fields;
+  if (!fields || typeof fields !== "object") {
+    return {};
+  }
+
+  const normalized = {};
+  Object.entries(fields).forEach(([key, value]) => {
+    if (typeof value === "string" && value.trim()) {
+      normalized[key] = value;
+      return;
+    }
+
+    if (Array.isArray(value) && value.length > 0) {
+      normalized[key] = String(value[0]);
+    }
+  });
+
+  return normalized;
+};
+
+const mapInfantFieldErrors = (fields = {}) => {
+  const mapped = {};
+
+  if (fields.first_name) {
+    mapped.first_name = fields.first_name;
+  }
+  if (fields.last_name) {
+    mapped.last_name = fields.last_name;
+  }
+  if (fields.dob) {
+    mapped.dob = fields.dob;
+  }
+  if (fields.sex) {
+    mapped.sex = fields.sex;
+  }
+  if (fields.birth_weight) {
+    mapped.birth_weight = fields.birth_weight;
+  }
+  if (fields.birth_height) {
+    mapped.birth_length = fields.birth_height;
+  }
+  if (fields.place_of_birth) {
+    mapped.birthplace = fields.place_of_birth;
+  }
+
+  return mapped;
+};
+
+const hasFieldErrors = (errors = {}) => Object.keys(errors).length > 0;
+
+const getActionErrorMessage = (error, fallback) => {
+  if (error?.response?.data?.error && typeof error.response.data.error === "string") {
+    return error.response.data.error;
+  }
+
+  if (error?.response?.data?.message && typeof error.response.data.message === "string") {
+    return error.response.data.message;
+  }
+
+  return error?.message || fallback;
+};
+
 export default function MyChildren() {
   const { guardianId } = useAuth();
   const navigate = useNavigate();
@@ -41,6 +108,8 @@ export default function MyChildren() {
   const [editError, setEditError] = useState(null);
   const [editSuccess, setEditSuccess] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
+  const [registerFieldErrors, setRegisterFieldErrors] = useState({});
+  const [editFieldErrors, setEditFieldErrors] = useState({});
 
   // Check if we're on the "new" route
   const isNewRoute = location.pathname.endsWith("/new");
@@ -105,6 +174,14 @@ export default function MyChildren() {
       ...prev,
       [name]: value,
     }));
+
+    if (editFieldErrors[name]) {
+      setEditFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
   };
   const [formData, setFormData] = useState({
     first_name: "",
@@ -151,6 +228,7 @@ export default function MyChildren() {
     setIsSubmitting(true);
     setEditError(null);
     setEditSuccess(null);
+    setEditFieldErrors({});
 
     try {
       const infantData = {
@@ -163,7 +241,7 @@ export default function MyChildren() {
         place_of_birth: editFormData.birthplace || null,
       };
 
-      await apiClient.updateInfant(selectedChild.id, infantData);
+      await apiClient.updateGuardianInfant(selectedChild.id, infantData);
       setEditSuccess("Child information updated successfully!");
 
       // Refresh children list
@@ -176,7 +254,15 @@ export default function MyChildren() {
         setEditSuccess(null);
       }, 1500);
     } catch (err) {
-      setEditError(err.message || "Failed to update child. Please try again.");
+      const backendFields = getErrorFieldMap(err);
+      const mappedFields = mapInfantFieldErrors(backendFields);
+      if (hasFieldErrors(mappedFields)) {
+        setEditFieldErrors(mappedFields);
+      }
+
+      setEditError(
+        getActionErrorMessage(err, "Failed to update child. Please try again."),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -197,7 +283,7 @@ export default function MyChildren() {
     setDeleteError(null);
 
     try {
-      await apiClient.deleteInfant(selectedChild.id);
+      await apiClient.deleteGuardianInfant(selectedChild.id);
 
       // Optimistic UI update - remove child from list immediately
       setChildren(children.filter((c) => c.id !== selectedChild.id));
@@ -206,7 +292,7 @@ export default function MyChildren() {
       setSelectedChild(null);
     } catch (err) {
       setDeleteError(
-        err.message || "Failed to delete child. Please try again.",
+        getActionErrorMessage(err, "Failed to delete child. Please try again."),
       );
       // Refresh list on error to ensure consistency
       fetchChildren();
@@ -221,6 +307,14 @@ export default function MyChildren() {
       ...prev,
       [name]: value,
     }));
+
+    if (registerFieldErrors[name]) {
+      setRegisterFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
   };
 
   // Handle child registration
@@ -234,6 +328,7 @@ export default function MyChildren() {
     setIsSubmitting(true);
     setRegisterError(null);
     setRegisterSuccess(null);
+    setRegisterFieldErrors({});
 
     try {
       const infantData = {
@@ -247,7 +342,7 @@ export default function MyChildren() {
         place_of_birth: formData.birthplace || null,
       };
 
-      await apiClient.createInfant(infantData);
+      await apiClient.createGuardianInfant(infantData);
       setRegisterSuccess("Child registered successfully!");
 
       // Refresh children list
@@ -272,8 +367,14 @@ export default function MyChildren() {
         }
       }, 1500);
     } catch (err) {
+      const backendFields = getErrorFieldMap(err);
+      const mappedFields = mapInfantFieldErrors(backendFields);
+      if (hasFieldErrors(mappedFields)) {
+        setRegisterFieldErrors(mappedFields);
+      }
+
       setRegisterError(
-        err.message || "Failed to register child. Please try again.",
+        getActionErrorMessage(err, "Failed to register child. Please try again."),
       );
     } finally {
       setIsSubmitting(false);
@@ -621,6 +722,7 @@ export default function MyChildren() {
                 name="first_name"
                 value={formData.first_name}
                 onChange={handleRegisterChange}
+                error={registerFieldErrors.first_name}
                 required
                 placeholder="Enter first name"
               />
@@ -629,6 +731,7 @@ export default function MyChildren() {
                 name="last_name"
                 value={formData.last_name}
                 onChange={handleRegisterChange}
+                error={registerFieldErrors.last_name}
                 required
                 placeholder="Enter last name"
               />
@@ -641,6 +744,7 @@ export default function MyChildren() {
                 type="date"
                 value={formData.dob}
                 onChange={handleRegisterChange}
+                error={registerFieldErrors.dob}
                 required
               />
               <div className="space-y-2">
@@ -652,11 +756,16 @@ export default function MyChildren() {
                   value={formData.sex}
                   onChange={handleRegisterChange}
                   required
-                  className="w-full px-3 py-2 border border-white/20 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/10 text-white"
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/10 text-white ${
+                    registerFieldErrors.sex ? "border-red-400" : "border-white/20"
+                  }`}
                 >
                   <option value="M">Male</option>
                   <option value="F">Female</option>
                 </select>
+                {registerFieldErrors.sex && (
+                  <p className="text-xs text-red-300 mt-1">{registerFieldErrors.sex}</p>
+                )}
               </div>
             </div>
 
@@ -673,6 +782,7 @@ export default function MyChildren() {
                   step="0.01"
                   value={formData.birth_weight}
                   onChange={handleRegisterChange}
+                  error={registerFieldErrors.birth_weight}
                   placeholder="e.g., 3.2"
                 />
                 <Input
@@ -682,6 +792,7 @@ export default function MyChildren() {
                   step="0.1"
                   value={formData.birth_length}
                   onChange={handleRegisterChange}
+                  error={registerFieldErrors.birth_length}
                   placeholder="e.g., 50"
                 />
               </div>
@@ -691,6 +802,7 @@ export default function MyChildren() {
                   name="birthplace"
                   value={formData.birthplace}
                   onChange={handleRegisterChange}
+                  error={registerFieldErrors.birthplace}
                   placeholder="Hospital or address"
                 />
               </div>
@@ -770,6 +882,7 @@ export default function MyChildren() {
                 name="first_name"
                 value={editFormData.first_name}
                 onChange={handleEditChange}
+                error={editFieldErrors.first_name}
                 required
                 placeholder="Enter first name"
               />
@@ -778,6 +891,7 @@ export default function MyChildren() {
                 name="last_name"
                 value={editFormData.last_name}
                 onChange={handleEditChange}
+                error={editFieldErrors.last_name}
                 required
                 placeholder="Enter last name"
               />
@@ -790,6 +904,7 @@ export default function MyChildren() {
                 type="date"
                 value={editFormData.dob}
                 onChange={handleEditChange}
+                error={editFieldErrors.dob}
                 required
               />
               <div className="space-y-2">
@@ -801,11 +916,16 @@ export default function MyChildren() {
                   value={editFormData.sex}
                   onChange={handleEditChange}
                   required
-                  className="w-full px-3 py-2 border border-white/20 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/10 text-white"
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/10 text-white ${
+                    editFieldErrors.sex ? "border-red-400" : "border-white/20"
+                  }`}
                 >
                   <option value="M">Male</option>
                   <option value="F">Female</option>
                 </select>
+                {editFieldErrors.sex && (
+                  <p className="text-xs text-red-300 mt-1">{editFieldErrors.sex}</p>
+                )}
               </div>
             </div>
 
@@ -822,6 +942,7 @@ export default function MyChildren() {
                   step="0.01"
                   value={editFormData.birth_weight}
                   onChange={handleEditChange}
+                  error={editFieldErrors.birth_weight}
                   placeholder="e.g., 3.2"
                 />
                 <Input
@@ -831,6 +952,7 @@ export default function MyChildren() {
                   step="0.1"
                   value={editFormData.birth_length}
                   onChange={handleEditChange}
+                  error={editFieldErrors.birth_length}
                   placeholder="e.g., 50"
                 />
               </div>
@@ -840,6 +962,7 @@ export default function MyChildren() {
                   name="birthplace"
                   value={editFormData.birthplace}
                   onChange={handleEditChange}
+                  error={editFieldErrors.birthplace}
                   placeholder="Hospital or address"
                 />
               </div>

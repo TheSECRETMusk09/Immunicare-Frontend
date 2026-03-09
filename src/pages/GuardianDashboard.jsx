@@ -416,17 +416,16 @@ const GuardianDashboard = () => {
         notificationsResponse,
         statsResponse,
       ] = await Promise.allSettled([
-        // Backward-compatible fallback for test mocks or older API clients
-        // that may not yet expose getGuardianNotifications.
+        // Backward-compatible fallback for test mocks or older API clients.
+        // Use empty notifications fallback instead of generic notifications
+        // endpoint to preserve guardian-only contract boundaries.
         guardianId ? apiClient.getInfantsByGuardian(guardianId) : Promise.resolve({ data: [] }),
         guardianId ? apiClient.getGuardianAppointments(guardianId, { status: 'upcoming', limit: 5 }) : Promise.resolve({ data: [] }),
         !guardianId
           ? Promise.resolve({ data: [] })
           : typeof apiClient.getGuardianNotifications === 'function'
             ? apiClient.getGuardianNotifications({ limit: 10 })
-            : typeof apiClient.getNotifications === 'function'
-              ? apiClient.getNotifications({ limit: 10 })
-              : Promise.resolve({ data: [] }),
+            : Promise.resolve({ data: [] }),
         guardianId ? apiClient.getGuardianStats(guardianId) : Promise.resolve({ data: {} }),
       ]);
 
