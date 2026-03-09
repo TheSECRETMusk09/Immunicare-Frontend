@@ -782,9 +782,13 @@ const FilterBar = ({
   liveSyncEnabled,
   autoRefresh,
   onAutoRefreshToggle,
+  isDark,
 }) => {
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === 'dark';
+
   return (
-    <Card sx={{ mb: 3 }}>
+    <Card sx={{ mb: 3, bgcolor: isDarkMode ? 'background.default' : 'background.paper' }}>
       <CardContent>
         <Grid container spacing={2} alignItems="center">
           <Grid size={{ xs: 12, lg: 9 }}>
@@ -933,12 +937,14 @@ const FilterBar = ({
   );
 };
 
-const KpiCard = ({ title, value, subtitle, icon, color = "primary", loading }) => {
+const KpiCard = ({ title, value, subtitle, icon, color = "primary", loading, isDark }) => {
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === 'dark';
   const Icon = icon;
   const displayValue = typeof value === "number" ? safeNum(value).toLocaleString() : String(value ?? "0");
 
   return (
-    <Card sx={{ height: "100%" }}>
+    <Card sx={{ height: "100%", bgcolor: isDarkMode ? 'background.default' : 'background.paper' }}>
       <CardContent>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
           <Typography variant="body2" color="text.secondary">
@@ -969,7 +975,7 @@ const KpiCard = ({ title, value, subtitle, icon, color = "primary", loading }) =
   );
 };
 
-const KpiSummaryGrid = ({ data, loading }) => {
+const KpiSummaryGrid = ({ data, loading, isDark }) => {
   const kpis = data?.kpis || {};
   const reminders = data?.reminders || {};
 
@@ -983,6 +989,7 @@ const KpiSummaryGrid = ({ data, loading }) => {
           icon={People}
           color="primary"
           loading={loading}
+          isDark={isDark}
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -993,6 +1000,7 @@ const KpiSummaryGrid = ({ data, loading }) => {
           icon={People}
           color="info"
           loading={loading}
+          isDark={isDark}
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -1003,6 +1011,7 @@ const KpiSummaryGrid = ({ data, loading }) => {
           icon={LocalHospital}
           color="success"
           loading={loading}
+          isDark={isDark}
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -1013,6 +1022,7 @@ const KpiSummaryGrid = ({ data, loading }) => {
           icon={Warning}
           color="warning"
           loading={loading}
+          isDark={isDark}
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -1023,6 +1033,7 @@ const KpiSummaryGrid = ({ data, loading }) => {
           icon={CalendarToday}
           color="info"
           loading={loading}
+          isDark={isDark}
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -1033,6 +1044,7 @@ const KpiSummaryGrid = ({ data, loading }) => {
           icon={Inventory2}
           color="error"
           loading={loading}
+          isDark={isDark}
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -1043,6 +1055,7 @@ const KpiSummaryGrid = ({ data, loading }) => {
           icon={Inventory2}
           color="success"
           loading={loading}
+          isDark={isDark}
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -1053,6 +1066,7 @@ const KpiSummaryGrid = ({ data, loading }) => {
           icon={Assessment}
           color="primary"
           loading={loading}
+          isDark={isDark}
         />
       </Grid>
     </Grid>
@@ -1256,6 +1270,8 @@ const VaccineProgressSection = ({ data, loading, chartAppearance }) => {
 };
 
 const AppointmentAndFollowupSection = ({ data, loading, chartAppearance }) => {
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === 'dark';
   const appointment = data?.appointmentFollowup || {};
   const statusData = data?.appointmentStatusBreakdown || [];
   const appointmentTotal = statusData.reduce((total, entry) => total + safeNum(entry.count), 0);
@@ -1263,7 +1279,7 @@ const AppointmentAndFollowupSection = ({ data, loading, chartAppearance }) => {
   return (
     <Grid container spacing={2} sx={{ mb: 3 }}>
       <Grid size={{ xs: 12, md: 6 }}>
-        <Card sx={{ height: "100%" }}>
+        <Card sx={{ height: "100%", bgcolor: isDarkMode ? 'background.default' : 'background.paper' }}>
           <CardContent>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               Appointment and Follow-up Summary
@@ -1367,6 +1383,8 @@ const AppointmentAndFollowupSection = ({ data, loading, chartAppearance }) => {
 };
 
 const InventorySection = ({ data, loading, chartAppearance, viewportWidth }) => {
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === 'dark';
   const inventory = data?.inventory || {};
   const rows = inventory.byVaccine || [];
   const axisTick = { fill: chartAppearance.axisTick, fontSize: 12, fontWeight: 500 };
@@ -1377,7 +1395,7 @@ const InventorySection = ({ data, loading, chartAppearance, viewportWidth }) => 
   return (
     <Grid container spacing={2} sx={{ mb: 3 }}>
       <Grid size={{ xs: 12, md: 5 }}>
-        <Card sx={{ height: "100%" }}>
+        <Card sx={{ height: "100%", bgcolor: isDarkMode ? 'background.default' : 'background.paper' }}>
           <CardContent>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               Vaccine Inventory Summary
@@ -1489,6 +1507,8 @@ const InventorySection = ({ data, loading, chartAppearance, viewportWidth }) => 
 };
 
 const SmsAndDemographicsSection = ({ data, loading, chartAppearance, showGenderChart = false }) => {
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === 'dark';
   const reminder = data?.reminders || {};
   const coverage = data?.demographicsCoverage || {};
   const ageData = data?.demographicsAgeGroups || [];
@@ -1534,7 +1554,7 @@ const SmsAndDemographicsSection = ({ data, loading, chartAppearance, showGenderC
   return (
     <Grid container spacing={2} sx={{ mb: 3 }}>
       <Grid size={summaryGridSize}>
-        <Card sx={{ height: "100%" }}>
+        <Card sx={{ height: "100%", bgcolor: isDarkMode ? 'background.default' : 'background.paper' }}>
           <CardContent>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               SMS Reminder Analytics
@@ -1838,6 +1858,8 @@ const TrendsSection = ({ data, loading, chartAppearance }) => {
 };
 
 const AlertsActivityReportsSection = ({ data, loading }) => {
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === 'dark';
   const alerts = data?.alerts || [];
   const activity = data?.activity || [];
   const reports = data?.reportShortcuts || [];
@@ -1845,7 +1867,7 @@ const AlertsActivityReportsSection = ({ data, loading }) => {
   return (
     <Grid container spacing={2}>
       <Grid size={{ xs: 12, lg: 4 }}>
-        <Card sx={{ height: "100%" }}>
+        <Card sx={{ height: "100%", bgcolor: isDarkMode ? 'background.default' : 'background.paper' }}>
           <CardContent>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               Critical Alerts
@@ -1881,7 +1903,7 @@ const AlertsActivityReportsSection = ({ data, loading }) => {
       </Grid>
 
       <Grid size={{ xs: 12, lg: 5 }}>
-        <Card sx={{ height: "100%" }}>
+        <Card sx={{ height: "100%", bgcolor: isDarkMode ? 'background.default' : 'background.paper' }}>
           <CardContent>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               Recent Activity Feed
@@ -1933,7 +1955,7 @@ const AlertsActivityReportsSection = ({ data, loading }) => {
       </Grid>
 
       <Grid size={{ xs: 12, lg: 3 }}>
-        <Card sx={{ height: "100%" }}>
+        <Card sx={{ height: "100%", bgcolor: isDarkMode ? 'background.default' : 'background.paper' }}>
           <CardContent>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               Report Shortcuts
@@ -1980,14 +2002,18 @@ const AlertsActivityReportsSection = ({ data, loading }) => {
 };
 
 const SummaryMiniCard = ({ label, value, error = false }) => {
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === 'dark';
+
   return (
     <Box
       sx={{
         border: "1px solid",
-        borderColor: "divider",
+        borderColor: isDarkMode ? 'rgba(148,163,184,0.22)' : 'divider',
         borderRadius: 2,
         p: 1.5,
         minHeight: 72,
+        bgcolor: isDarkMode ? 'rgba(30,41,59,0.5)' : 'transparent',
       }}
     >
       <Typography variant="caption" color="text.secondary" display="block">
@@ -2048,6 +2074,7 @@ const exportRowsToCsv = ({ data, filters }) => {
 
 const AnalyticsDashboard = () => {
   const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isTabletDown = useMediaQuery(theme.breakpoints.down("md"));
   const viewportWidth = isMobile ? 560 : isTabletDown ? 840 : 1200;
@@ -2246,7 +2273,12 @@ const AnalyticsDashboard = () => {
   const tabs = ANALYTICS_TAB_CONFIG;
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
+    <Box sx={{
+      p: { xs: 2, sm: 2.5, md: 3 },
+      bgcolor: isDark ? 'background.default' : 'transparent',
+      minHeight: '100vh',
+      borderRadius: isDark ? 2 : 0,
+    }}>
         <FilterBar
           filters={filters}
           onChange={handleFilterChange}
@@ -2256,6 +2288,7 @@ const AnalyticsDashboard = () => {
           liveSyncEnabled={liveSyncEnabled}
           autoRefresh={autoRefresh}
           onAutoRefreshToggle={setAutoRefresh}
+          isDark={isDark}
         />
 
         <Tabs
@@ -2263,7 +2296,18 @@ const AnalyticsDashboard = () => {
           onChange={handleTabChange}
           variant={isMobile ? "scrollable" : "standard"}
           scrollButtons="auto"
-          sx={{ mb: 2 }}
+          sx={{
+            mb: 2,
+            '& .MuiTab-root': {
+              color: isDark ? '#94A3B8' : '#64748B',
+              '&.Mui-selected': {
+                color: isDark ? '#F8FAFC' : '#0F172A',
+              },
+            },
+            '& .MuiTabs-indicator': {
+              backgroundColor: isDark ? '#5B8DEF' : '#5B8DEF',
+            },
+          }}
           aria-label="Analytics content sections"
         >
           {tabs.map((tabConfig) => (
@@ -2302,14 +2346,14 @@ const AnalyticsDashboard = () => {
 
         {tab === 0 && (
           <>
-            <KpiSummaryGrid data={dashboardData} loading={loading} />
+            <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
             <TrendsSection data={dashboardData} loading={loading} chartAppearance={chartAppearance} />
           </>
         )}
 
         {tab === 1 && (
           <>
-            <KpiSummaryGrid data={dashboardData} loading={loading} />
+            <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
             <Divider sx={{ mb: 3 }} />
             <VaccineProgressSection data={dashboardData} loading={loading} chartAppearance={chartAppearance} />
           </>
@@ -2317,7 +2361,7 @@ const AnalyticsDashboard = () => {
 
         {tab === 2 && (
           <>
-            <KpiSummaryGrid data={dashboardData} loading={loading} />
+            <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
             <Divider sx={{ mb: 3 }} />
             <AppointmentAndFollowupSection
               data={dashboardData}
@@ -2329,7 +2373,7 @@ const AnalyticsDashboard = () => {
 
         {tab === 3 && (
           <>
-            <KpiSummaryGrid data={dashboardData} loading={loading} />
+            <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
             <Divider sx={{ mb: 3 }} />
             <InventorySection
               data={dashboardData}
@@ -2343,7 +2387,7 @@ const AnalyticsDashboard = () => {
 
         {tab === 4 && (
           <>
-            <KpiSummaryGrid data={dashboardData} loading={loading} />
+            <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
             <Divider sx={{ mb: 3 }} />
             <SmsAndDemographicsSection
               data={dashboardData}
@@ -2375,3 +2419,4 @@ const AnalyticsDashboard = () => {
 };
 
 export default AnalyticsDashboard;
+

@@ -417,9 +417,76 @@ export default function InventoryManagement() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
 
-      // Initialize inventory data
-      initializeInventory();
+      // Try to fetch inventory data from API
+      try {
+        const inventoryData = await apiClient.getVaccineInventory();
+
+        // Handle both wrapped and unwrapped response formats
+        let apiInventory = [];
+        if (inventoryData && inventoryData.success !== undefined) {
+          apiInventory = inventoryData.data || inventoryData.inventory || [];
+        } else if (Array.isArray(inventoryData)) {
+          apiInventory = inventoryData;
+        } else if (inventoryData?.inventory) {
+          apiInventory = inventoryData.inventory;
+        }
+
+        if (apiInventory.length > 0) {
+          // Map API data to component format
+          const mappedInventory = vaccineItems.map((item) => {
+            // Find matching inventory record from API
+            const apiRecord = apiInventory.find(
+              (inv) => inv.vaccine_name === item.name || inv.vaccine_id === item.id
+            );
+
+            if (apiRecord) {
+              return {
+                ...item,
+                beginning_balance: apiRecord.beginning_balance || 0,
+                received: apiRecord.received_during_period || 0,
+                lot_batch_number: apiRecord.lot_batch_number || '',
+                transferred_in: apiRecord.transferred_in || 0,
+                transferred_out: apiRecord.transferred_out || 0,
+                expired_wasted: apiRecord.expired_wasted || 0,
+                issuance: apiRecord.issuance || 0,
+                total_available: (apiRecord.beginning_balance || 0) + (apiRecord.received_during_period || 0),
+                stock_on_hand:
+                  (apiRecord.beginning_balance || 0) +
+                  (apiRecord.received_during_period || 0) +
+                  (apiRecord.transferred_in || 0) -
+                  (apiRecord.transferred_out || 0) -
+                  (apiRecord.expired_wasted || 0) -
+                  (apiRecord.issuance || 0),
+                _apiId: apiRecord.id,
+              };
+            }
+
+            // Return default values if no API record found
+            return {
+              ...item,
+              beginning_balance: 0,
+              received: 0,
+              lot_batch_number: '',
+              transferred_in: 0,
+              transferred_out: 0,
+              expired_wasted: 0,
+              issuance: 0,
+              total_available: 0,
+              stock_on_hand: 0,
+            };
+          });
+          setInventory(mappedInventory);
+        } else {
+          // No API data, initialize with zeros
+          initializeInventory();
+        }
+      } catch (apiErr) {
+        // API call failed, initialize with zeros
+        console.log("Using local inventory data (API unavailable)", apiErr.message);
+        initializeInventory();
+      }
 
       // Try to fetch facility info from API
       try {
@@ -452,7 +519,7 @@ export default function InventoryManagement() {
       setError(err.message);
       setLoading(false);
     }
-  }, [initializeInventory]);
+  }, [initializeInventory, vaccineItems]);
 
   useEffect(() => {
     fetchData();

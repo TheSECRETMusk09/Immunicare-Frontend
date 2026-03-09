@@ -116,7 +116,7 @@ export default function GuardianImmunizationChartPage() {
   }
 
   return (
-    <div className="guardian-page-wrapper min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+    <div className="guardian-page-wrapper min-h-screen bg-theme-bg-primary transition-colors duration-200">
       <GuardianModuleHeader
         title="Immunization Chart"
         subtitle="View your child's vaccination records and schedule"
@@ -129,19 +129,19 @@ export default function GuardianImmunizationChartPage() {
         <div className="relative">
           <button
             onClick={() => setShowDropdown(!showDropdown)}
-            className="w-full flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700"
+            className="w-full flex items-center justify-between p-4 bg-theme-bg-card rounded-xl shadow-sm border border-theme-border-primary"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-theme-bg-secondary flex items-center justify-center">
                 <span className="text-lg">
                   {selectedChild?.sex === "M" ? "👦" : "👧"}
                 </span>
               </div>
               <div className="text-left">
-                <p className="font-medium text-gray-900 dark:text-white">
+                <p className="font-medium text-theme-primary">
                   {selectedChild?.first_name} {selectedChild?.last_name}
                 </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-theme-secondary">
                   Click to select a different child
                 </p>
               </div>
@@ -154,7 +154,7 @@ export default function GuardianImmunizationChartPage() {
           </button>
 
           {showDropdown && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 z-10 overflow-hidden">
+            <div className="absolute top-full left-0 right-0 mt-2 bg-theme-bg-card rounded-xl shadow-lg border border-theme-border-primary z-10 overflow-hidden">
               {children.map((child) => (
                 <button
                   key={child.id}
@@ -162,16 +162,16 @@ export default function GuardianImmunizationChartPage() {
                     setSelectedChild(child);
                     setShowDropdown(false);
                   }}
-                  className={`w-full flex items-center gap-3 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+                  className={`w-full flex items-center gap-3 p-4 hover:bg-theme-bg-hover transition-colors ${
                     selectedChild?.id === child.id
-                      ? "bg-primary-50 dark:bg-primary-900/20"
+                      ? "bg-theme-bg-active"
                       : ""
                   }`}
                 >
-                  <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-theme-bg-secondary flex items-center justify-center">
                     <span>{child.sex === "M" ? "👦" : "👧"}</span>
                   </div>
-                  <span className="font-medium text-gray-900 dark:text-white">
+                  <span className="font-medium text-theme-primary">
                     {child.first_name} {child.last_name}
                   </span>
                 </button>
@@ -183,7 +183,7 @@ export default function GuardianImmunizationChartPage() {
 
       {/* Immunization Chart */}
       {selectedChild && (
-        <div className="guardian-chart-scroll-container bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <div className="guardian-chart-scroll-container bg-theme-bg-card rounded-xl shadow-sm border border-theme-border-primary p-4">
           <GuardianImmunizationChart infantId={selectedChild.id} />
         </div>
       )}

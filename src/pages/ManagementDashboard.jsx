@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, PageHeader, PageContainer } from "../components/UI";
 import { useAuth } from "../contexts/AuthContext";
-import { LayoutDashboard } from "lucide-react";
+import { LayoutDashboard, User, Calendar, BookOpen, BarChart2, ArrowLeft, Search } from "lucide-react";
 import HolidayDisplay from "../components/Dashboard/HolidayDisplay";
 import UserManagement from "./UserManagement";
 import InfantManagement from "./InfantManagement";
@@ -14,11 +14,70 @@ import Announcements from "./Announcements";
 import Notifications from "./Notifications";
 import Settings from "./Settings";
 import HealthInformation from "./HealthInformation";
+import infantService from "../services/infantService";
+import { normalizeInfantsResponse } from "../utils/adminDataAdapters";
+import VaccineScheduleBooklet from "../components/VaccineScheduleBooklet";
+import ImmunizationRecordBooklet from "../components/ImmunizationRecordBooklet";
+import InfantPersonalRecord from "../components/InfantPersonalRecord";
+import ImmunizationChart from "../components/ImmunizationChart";
+import { Input } from "../components/UI";
 
 export default function ManagementDashboard() {
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState("overview");
+
+  // State for infant selection and action buttons
+  const [infants, setInfants] = useState([]);
+  const [infantsLoading, setInfantsLoading] = useState(false);
+  const [selectedInfant, setSelectedInfant] = useState(null);
+  const [activeInfantView, setActiveInfantView] = useState(null); // 'personal', 'details', 'records', 'chart'
+  const [infantSearchQuery, setInfantSearchQuery] = useState("");
+
+  // Fetch infants for the action buttons
+  const fetchInfants = useCallback(async () => {
+    try {
+      setInfantsLoading(true);
+      const result = await infantService.getAll();
+      const infantsData = normalizeInfantsResponse(result?.data ?? result);
+      setInfants(infantsData);
+    } catch (err) {
+      console.error("[ManagementDashboard] Error fetching infants:", err);
+    } finally {
+      setInfantsLoading(false);
+    }
+  }, []);
+
+  // Filter infants based on search
+  const filteredInfants = infants.filter(
+    (infant) =>
+      infant.first_name?.toLowerCase().includes(infantSearchQuery.toLowerCase()) ||
+      infant.last_name?.toLowerCase().includes(infantSearchQuery.toLowerCase()) ||
+      infant.control_number?.toLowerCase().includes(infantSearchQuery.toLowerCase())
+  );
+
+  // Handle infant selection
+  const handleSelectInfant = (infant) => {
+    setSelectedInfant(infant);
+    setActiveInfantView("personal"); // Default to personal view
+  };
+
+  // Handle back to infant list
+  const handleBackToInfantList = () => {
+    setSelectedInfant(null);
+    setActiveInfantView(null);
+    fetchInfants();
+  };
+
+  // Handle personal update
+  const handlePersonalUpdate = () => {
+    fetchInfants();
+  };
+
+  // Fetch infants on component mount
+  useEffect(() => {
+    fetchInfants();
+  }, [fetchInfants]);
 
   const navItems = [
     { id: "overview", name: "Overview", icon: "📊" },
@@ -38,6 +97,114 @@ export default function ManagementDashboard() {
   ];
 
   const renderSection = () => {
+    // If an infant is selected, show the infant details view with action buttons
+    if (selectedInfant && activeInfantView) {
+      return (
+        <div className="space-y-8">
+          {/* Header with back button and infant info */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleBackToInfantList}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back to List
+              </Button>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {selectedInfant.first_name} {selectedInfant.last_name}
+                </h2>
+                <p className="text-xs mt-1 font-mono text-gray-600 dark:text-gray-300">
+                  Infant Control Number: {selectedInfant.control_number || "Pending"}
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons - Personal, Details, Records, Chart view */}
+            <div className="flex flex-wrap gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
+              <button
+                onClick={() => setActiveInfantView("personal")}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                  activeInfantView === "personal"
+                    ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                }`}
+              >
+                <User className="w-4 h-4 inline-block mr-1.5" />
+                Personal
+              </button>
+              <button
+                onClick={() => setActiveInfantView("details")}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                  activeInfantView === "details"
+                    ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                }`}
+              >
+                <Calendar className="w-4 h-4 inline-block mr-1.5" />
+                Details
+              </button>
+              <button
+                onClick={() => setActiveInfantView("records")}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                  activeInfantView === "records"
+                    ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                }`}
+              >
+                <BookOpen className="w-4 h-4 inline-block mr-1.5" />
+                Records
+              </button>
+              <button
+                onClick={() => setActiveInfantView("chart")}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                  activeInfantView === "chart"
+                    ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                }`}
+              >
+                <BarChart2 className="w-4 h-4 inline-block mr-1.5" />
+                Chart view
+              </button>
+            </div>
+          </div>
+
+          {/* Content based on active infant view */}
+          <PageContainer
+            title={
+              activeInfantView === "personal"
+                ? "Personal Information Record"
+                : activeInfantView === "details"
+                  ? "Vaccine Schedule Booklet"
+                  : activeInfantView === "records"
+                    ? "Immunization Record Booklet"
+                    : "Immunization Chart"
+            }
+          >
+            <div className="animate-fade-in">
+              {activeInfantView === "details" && (
+                <VaccineScheduleBooklet infantId={selectedInfant.id} />
+              )}
+              {activeInfantView === "records" && (
+                <ImmunizationRecordBooklet infantId={selectedInfant.id} />
+              )}
+              {activeInfantView === "personal" && (
+                <InfantPersonalRecord
+                  infantId={selectedInfant.id}
+                  onUpdate={handlePersonalUpdate}
+                />
+              )}
+              {activeInfantView === "chart" && (
+                <ImmunizationChart infantId={selectedInfant.id} />
+              )}
+            </div>
+          </PageContainer>
+        </div>
+      );
+    }
+
     switch (activeSection) {
       case "users":
         return <UserManagement />;
@@ -86,6 +253,125 @@ export default function ManagementDashboard() {
             {/* Philippine Holidays Display */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <HolidayDisplay />
+            </div>
+
+            {/* Infant Quick Access - Action Buttons */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                  <User className="w-5 h-5" />
+                  Quick Infant Access
+                </h3>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setActiveSection("infants")}
+                >
+                  View All Infants
+                </Button>
+              </div>
+
+              {/* Search */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Input
+                  placeholder="Search infants by name or control number..."
+                  value={infantSearchQuery}
+                  onChange={(e) => setInfantSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+
+              {/* Infants List */}
+              {infantsLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full mx-auto"></div>
+                  <p className="text-gray-500 mt-2">Loading infants...</p>
+                </div>
+              ) : filteredInfants.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  {infantSearchQuery ? "No infants match your search" : "No infants registered yet"}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredInfants.slice(0, 6).map((infant) => (
+                    <div
+                      key={infant.id}
+                      className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => handleSelectInfant(infant)}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                          <User className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 dark:text-gray-100 truncate">
+                            {infant.first_name} {infant.last_name}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                            {infant.control_number || "Pending"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-3">
+                        <Button
+                          variant="primary"
+                          size="xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectInfant(infant);
+                            setActiveInfantView("personal");
+                          }}
+                          className="flex-1"
+                        >
+                          <User className="w-3 h-3 mr-1" /> Personal
+                        </Button>
+                        <Button
+                          variant="success"
+                          size="xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectInfant(infant);
+                            setActiveInfantView("details");
+                          }}
+                          className="flex-1"
+                        >
+                          <Calendar className="w-3 h-3 mr-1" /> Details
+                        </Button>
+                        <Button
+                          variant="info"
+                          size="xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectInfant(infant);
+                            setActiveInfantView("records");
+                          }}
+                          className="flex-1"
+                        >
+                          <BookOpen className="w-3 h-3 mr-1" /> Records
+                        </Button>
+                        <Button
+                          variant="warning"
+                          size="xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectInfant(infant);
+                            setActiveInfantView("chart");
+                          }}
+                          className="flex-1"
+                        >
+                          <BarChart2 className="w-3 h-3 mr-1" /> Chart
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {filteredInfants.length > 6 && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-4 text-center">
+                  Showing 6 of {filteredInfants.length} infants. Use search to find more or click "View All Infants".
+                </p>
+              )}
             </div>
 
             {/* Quick Stats - Top Row */}

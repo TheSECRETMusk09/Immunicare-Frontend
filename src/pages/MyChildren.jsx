@@ -382,8 +382,8 @@ export default function MyChildren() {
   };
 
   return (
-    <div className="guardian-page-wrapper min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-      <div className="lg:hidden sticky top-0 z-30 w-full bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm transition-colors duration-200">
+    <div className="guardian-page-wrapper min-h-screen bg-theme-bg-primary transition-colors duration-200">
+      <div className="lg:hidden sticky top-0 z-30 w-full bg-theme-bg-primary border-b border-theme-border-primary shadow-sm transition-colors duration-200">
         <GuardianTopHeader
           title=""
           onRefresh={fetchChildren}
@@ -447,21 +447,21 @@ export default function MyChildren() {
         )}
 
         {loading ? (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 sm:p-12 border border-gray-100 dark:border-gray-700 text-center shadow-sm transition-all duration-300">
+          <div className="bg-theme-bg-card rounded-2xl p-8 sm:p-12 border border-theme-border-primary text-center shadow-sm transition-all duration-300">
             <Loader2 className="h-10 w-10 animate-spin text-indigo-500 mx-auto" />
-            <p className="mt-4 text-gray-600 dark:text-gray-300 font-medium">
+            <p className="mt-4 text-theme-secondary font-medium">
               Loading children records...
             </p>
           </div>
         ) : children.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 sm:p-12 border border-gray-100 dark:border-gray-700 text-center shadow-sm transition-all duration-300">
+          <div className="bg-theme-bg-card rounded-2xl p-8 sm:p-12 border border-theme-border-primary text-center shadow-sm transition-all duration-300">
             <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500/30 to-purple-600/30 backdrop-blur-sm flex items-center justify-center mx-auto mb-6 transition-colors duration-300">
               <Baby className="w-12 h-12 text-blue-600 dark:text-blue-400" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 transition-colors duration-300">
+            <h3 className="text-xl font-bold text-theme-primary mb-2 transition-colors duration-300">
               No Children Registered
             </h3>
-            <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-8 transition-colors duration-300">
+            <p className="text-theme-secondary max-w-md mx-auto mb-8 transition-colors duration-300">
               You haven't registered any children yet. Add your first child to
               get started with tracking their health journey.
             </p>
@@ -589,9 +589,9 @@ export default function MyChildren() {
 
         {/* Quick Actions */}
         {children.length > 0 && (
-          <section className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-5 border border-gray-100 dark:border-gray-700 shadow-sm">
+          <section className="bg-theme-bg-card rounded-2xl p-4 sm:p-5 border border-theme-border-primary shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Quick Actions</h3>
+              <h3 className="text-base sm:text-lg font-bold text-theme-primary">Quick Actions</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Button
@@ -748,7 +748,7 @@ export default function MyChildren() {
                 required
               />
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-white/80">
+                <label className="block text-sm font-medium text-theme-secondary">
                   Gender *
                 </label>
                 <select
@@ -756,8 +756,8 @@ export default function MyChildren() {
                   value={formData.sex}
                   onChange={handleRegisterChange}
                   required
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/10 text-white ${
-                    registerFieldErrors.sex ? "border-red-400" : "border-white/20"
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-theme-bg-input text-theme-primary ${
+                    registerFieldErrors.sex ? "border-red-400" : "border-theme-border-primary"
                   }`}
                 >
                   <option value="M">Male</option>
@@ -770,8 +770,8 @@ export default function MyChildren() {
             </div>
 
             {/* Birth Information */}
-            <div className="border-t border-white/20 pt-4 mt-4">
-              <h4 className="text-sm font-medium text-white/80 mb-3">
+            <div className="border-t border-theme-border-primary pt-4 mt-4">
+              <h4 className="text-sm font-medium text-theme-secondary mb-3">
                 Birth Information (Optional)
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -908,7 +908,7 @@ export default function MyChildren() {
                 required
               />
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-white/80">
+                <label className="block text-sm font-medium text-theme-secondary">
                   Gender *
                 </label>
                 <select
@@ -916,8 +916,8 @@ export default function MyChildren() {
                   value={editFormData.sex}
                   onChange={handleEditChange}
                   required
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/10 text-white ${
-                    editFieldErrors.sex ? "border-red-400" : "border-white/20"
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-theme-bg-input text-theme-primary ${
+                    editFieldErrors.sex ? "border-red-400" : "border-theme-border-primary"
                   }`}
                 >
                   <option value="M">Male</option>
@@ -930,8 +930,8 @@ export default function MyChildren() {
             </div>
 
             {/* Birth Information */}
-            <div className="border-t border-white/20 pt-4 mt-4">
-              <h4 className="text-sm font-medium text-white/80 mb-3">
+            <div className="border-t border-theme-border-primary pt-4 mt-4">
+              <h4 className="text-sm font-medium text-theme-secondary mb-3">
                 Birth Information (Optional)
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1022,24 +1022,24 @@ export default function MyChildren() {
             <div className="w-16 h-16 mx-auto bg-gradient-to-br from-red-400/30 to-pink-500/30 backdrop-blur-sm rounded-full flex items-center justify-center mb-4">
               <AlertTriangle className="w-8 h-8 text-red-300" />
             </div>
-            <h3 className="text-lg font-semibold text-white mb-2">
+            <h3 className="text-lg font-semibold text-theme-primary mb-2">
               Are you sure you want to delete this child?
             </h3>
-            <p className="text-white/70">
+            <p className="text-theme-secondary">
               This action cannot be undone. All records associated with this child
               will be permanently removed.
             </p>
           </div>
 
           {selectedChild && (
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+            <div className="bg-theme-bg-tertiary rounded-lg p-4">
               <div className="text-center flex items-center justify-center">
                 {selectedChild.sex === "M" ? (
                   <User className="w-6 h-6 text-blue-300 mr-2" />
                 ) : (
                   <User className="w-6 h-6 text-pink-300 mr-2" />
                 )}
-                <span className="font-semibold text-white">
+                <span className="font-semibold text-theme-primary">
                   {selectedChild.first_name} {selectedChild.last_name}
                 </span>
               </div>

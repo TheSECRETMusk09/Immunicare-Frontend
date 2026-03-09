@@ -20,30 +20,30 @@
    ========================================================================== */
 
 :root {
-  /* Background Colors - Light Mode */
-  --theme-bg-primary: #ffffff;
-  --theme-bg-secondary: #f9fafb;
-  --theme-bg-tertiary: #f3f4f6;
+  /* Background Colors - Light Mode (Improved Contrast) */
+  --theme-bg-primary: #f9fafb; /* Slightly off-white */
+  --theme-bg-secondary: #f3f4f6;
+  --theme-bg-tertiary: #e5e7eb;
   --theme-bg-elevated: #ffffff;
   --theme-bg-sidebar: #ffffff;
   --theme-bg-header: #ffffff;
   --theme-bg-card: #ffffff;
-  --theme-bg-input: #f9fafb;
-  --theme-bg-hover: #f3f4f6;
-  --theme-bg-active: #e5e7eb;
-  --theme-bg-overlay: rgba(0, 0, 0, 0.5);
+  --theme-bg-input: #ffffff;
+  --theme-bg-hover: #f0fdf4; /* Light green for hover */
+  --theme-bg-active: #dcfce7; /* Darker green for active */
+  --theme-bg-overlay: rgba(0, 0, 0, 0.4);
 
-  /* Text Colors - Light Mode */
-  --theme-text-primary: #111827;
-  --theme-text-secondary: #6b7280;
-  --theme-text-tertiary: #9ca3af;
-  --theme-text-muted: #9ca3af;
-  --theme-text-placeholder: #9ca3af;
+  /* Text Colors - Light Mode (Improved Contrast) */
+  --theme-text-primary: #18181b; /* Near black */
+  --theme-text-secondary: #52525b;
+  --theme-text-tertiary: #71717a;
+  --theme-text-muted: #a1a1aa;
+  --theme-text-placeholder: #a1a1aa;
   --theme-text-inverse: #ffffff;
 
-  /* Border Colors - Light Mode */
-  --theme-border-primary: #e5e7eb;
-  --theme-border-secondary: #d1d5db;
+  /* Border Colors - Light Mode (Improved Contrast) */
+  --theme-border-primary: #d4d4d8;
+  --theme-border-secondary: #a1a1aa;
   --theme-border-focus: #10b981;
   --theme-border-error: #ef4444;
 
@@ -56,9 +56,9 @@
 
   /* Shadow Colors */
   --theme-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --theme-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  --theme-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  --theme-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  --theme-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --theme-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --theme-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
 
   /* Transition Timing */
   --theme-transition-fast: 150ms ease;
@@ -71,30 +71,30 @@
    ========================================================================== */
 
 .dark {
-  /* Background Colors - Dark Mode */
-  --theme-bg-primary: #111827;
-  --theme-bg-secondary: #1f2937;
-  --theme-bg-tertiary: #374151;
-  --theme-bg-elevated: #1f2937;
-  --theme-bg-sidebar: #111827;
-  --theme-bg-header: #111827;
-  --theme-bg-card: #1f2937;
-  --theme-bg-input: #374151;
-  --theme-bg-hover: #374151;
-  --theme-bg-active: #4b5563;
-  --theme-bg-overlay: rgba(0, 0, 0, 0.7);
+  /* Background Colors - Dark Mode (Improved Contrast) */
+  --theme-bg-primary: #0a0a0a; /* Near black */
+  --theme-bg-secondary: #18181b;
+  --theme-bg-tertiary: #27272a;
+  --theme-bg-elevated: #18181b;
+  --theme-bg-sidebar: #0a0a0a;
+  --theme-bg-header: #18181b;
+  --theme-bg-card: #18181b;
+  --theme-bg-input: #27272a;
+  --theme-bg-hover: #27272a;
+  --theme-bg-active: #3f3f46;
+  --theme-bg-overlay: rgba(0, 0, 0, 0.8);
 
-  /* Text Colors - Dark Mode */
-  --theme-text-primary: #f9fafb;
-  --theme-text-secondary: #d1d5db;
-  --theme-text-tertiary: #9ca3af;
-  --theme-text-muted: #6b7280;
-  --theme-text-placeholder: #6b7280;
-  --theme-text-inverse: #111827;
+  /* Text Colors - Dark Mode (Improved Contrast) */
+  --theme-text-primary: #fafafa; /* Near white */
+  --theme-text-secondary: #e5e5e5;
+  --theme-text-tertiary: #a3a3a3;
+  --theme-text-muted: #737373;
+  --theme-text-placeholder: #737373;
+  --theme-text-inverse: #18181b;
 
-  /* Border Colors - Dark Mode */
-  --theme-border-primary: #374151;
-  --theme-border-secondary: #4b5563;
+  /* Border Colors - Dark Mode (Improved Contrast) */
+  --theme-border-primary: #27272a;
+  --theme-border-secondary: #3f3f46;
   --theme-border-focus: #10b981;
   --theme-border-error: #ef4444;
 
@@ -1024,6 +1024,116 @@ button[class*="secondary"]:hover {
 .guardian-layout-wrapper.dark *:focus-visible {
   outline: 2px solid #10b981;
   outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Immunization Chart Styles
+   ========================================================================== */
+
+.immunization-scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: var(--theme-accent-primary) transparent;
+}
+
+.immunization-scroll-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.immunization-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.immunization-scroll-container::-webkit-scrollbar-thumb {
+  background-color: var(--theme-accent-primary);
+  border-radius: 3px;
+}
+
+.immunization-card {
+  background-color: var(--theme-bg-card);
+  border-color: var(--theme-border-primary);
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+.dark .immunization-card {
+  background-color: var(--theme-bg-card);
+  border-color: var(--theme-border-primary);
+}
+
+.immunization-card .status-icon {
+  transition: background-color var(--theme-transition-fast), color var(--theme-transition-fast);
+}
+
+/* Completed Status */
+.immunization-card.status-completed .status-icon,
+.immunization-card.status-completed .status-label {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: var(--theme-accent-primary);
+}
+.immunization-card.status-completed .status-text {
+  color: var(--theme-accent-primary);
+}
+.dark .immunization-card.status-completed .status-icon,
+.dark .immunization-card.status-completed .status-label {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+.dark .immunization-card.status-completed .status-text {
+  color: #34d399;
+}
+
+/* Upcoming Status */
+.immunization-card.status-upcoming .status-icon,
+.immunization-card.status-upcoming .status-label {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: var(--theme-accent-warning);
+}
+.immunization-card.status-upcoming .status-text {
+  color: var(--theme-accent-warning);
+}
+.dark .immunization-card.status-upcoming .status-icon,
+.dark .immunization-card.status-upcoming .status-label {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+.dark .immunization-card.status-upcoming .status-text {
+  color: #fbbf24;
+}
+
+/* Overdue Status */
+.immunization-card.status-overdue .status-icon,
+.immunization-card.status-overdue .status-label {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--theme-accent-danger);
+}
+.immunization-card.status-overdue .status-text {
+  color: var(--theme-accent-danger);
+}
+.dark .immunization-card.status-overdue .status-icon,
+.dark .immunization-card.status-overdue .status-label {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+.dark .immunization-card.status-overdue .status-text {
+  color: #f87171;
+}
+
+/* Missed Status */
+.immunization-card.status-missed .status-icon,
+.immunization-card.status-missed .status-label {
+  background-color: var(--theme-bg-tertiary);
+  color: var(--theme-text-muted);
+}
+.immunization-card.status-missed .status-text {
+  color: var(--theme-text-muted);
+}
+.dark .immunization-card.status-missed .status-icon,
+.dark .immunization-card.status-missed .status-label {
+  background-color: var(--theme-bg-tertiary);
+  color: var(--theme-text-muted);
+}
+.dark .immunization-card.status-missed .status-text {
+  color: var(--theme-text-muted);
 }
 
 /* ==========================================================================
