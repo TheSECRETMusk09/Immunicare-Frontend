@@ -696,7 +696,7 @@ const GuardianDashboard = () => {
                   </p>
                 </div>
                 <button
-                  onClick={() => navigate('/guardian/appointments/book')}
+                  onClick={() => navigate('/guardian/appointments/new')}
                   className={`flex-shrink-0 px-4 py-2 text-sm font-bold rounded-lg transition-colors shadow-sm ${
                     stats.overdueCount > 0
                       ? 'bg-red-600 hover:bg-red-700 text-white'
@@ -758,7 +758,7 @@ const GuardianDashboard = () => {
                     bgColor="bg-red-100"
                     iconBgColor="bg-red-200"
                     textColor="text-red-700"
-                    onClick={() => navigate('/guardian/appointments/book')}
+                    onClick={() => navigate('/guardian/appointments/new')}
                   />
                 ) : (
                   <StatCard
@@ -816,7 +816,7 @@ const GuardianDashboard = () => {
                 <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Due Vaccines</h2>
               </div>
               <button
-                onClick={() => navigate('/guardian/appointments/book')}
+                onClick={() => navigate('/guardian/appointments/new')}
                 className="text-sm font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 flex items-center gap-1 transition-colors"
               >
                 Book Appointment
@@ -832,7 +832,7 @@ const GuardianDashboard = () => {
                   dueDate={vaccine.dueDate}
                   daysUntilDue={vaccine.daysUntilDue}
                   status={vaccine.status}
-                  onBook={() => navigate('/guardian/appointments/book')}
+                  onBook={() => navigate('/guardian/appointments/new')}
                 />
               ))}
             </div>

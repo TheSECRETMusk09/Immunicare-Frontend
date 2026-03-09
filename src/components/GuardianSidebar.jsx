@@ -217,7 +217,7 @@ const GuardianSidebar = memo(
         hasSubItems: true,
         subItems: [
           { name: "All Health Records", icon: FileText, path: "/guardian/health-records" },
-          { name: "Growth Charts", icon: Activity, path: "/guardian/growth-charts" },
+          { name: "Growth Charts", icon: Activity, path: "/guardian/health-charts" },
         ],
       },
 
