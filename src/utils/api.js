@@ -314,6 +314,13 @@ class ApiClient {
     });
   }
 
+  async verifyGuardianRegistration(phone, otp) {
+    return this.request("/auth/register/guardian/verify", {
+      method: "POST",
+      data: { phone, otp },
+    });
+  }
+
   async forgotPassword(email) {
     return this.request("/auth/forgot-password", {
       method: "POST",

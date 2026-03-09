@@ -21,6 +21,7 @@ const PersonalInfoCard = ({
   onSave,
   onCancel,
   loading = false,
+  fieldErrors = {},
 }) => {
   const fields = [
     {
@@ -82,6 +83,7 @@ const PersonalInfoCard = ({
           {fields.map((field) => {
             const Icon = field.icon;
             const value = formData[field.key] || "";
+            const fieldError = fieldErrors?.[field.key];
 
             return (
               <div key={field.key} className="space-y-2">
@@ -99,6 +101,7 @@ const PersonalInfoCard = ({
                     name={field.key}
                     value={value}
                     onChange={onChange}
+                    error={fieldError}
                     placeholder={field.placeholder}
                     disabled={loading}
                     className="w-full min-h-[48px] sm:min-h-[44px] text-base sm:text-sm"

@@ -53,6 +53,7 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Modal states
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -65,11 +66,28 @@ export default function Profile() {
     vaccinationCount: 0,
   });
 
+  const parseBackendFieldErrors = useCallback((err) => {
+    const fields = err?.response?.data?.fields;
+    if (!fields || typeof fields !== "object") {
+      return {};
+    }
+
+    return Object.entries(fields).reduce((acc, [field, message]) => {
+      if (typeof message === "string" && message.trim()) {
+        acc[field] = message;
+      } else if (Array.isArray(message) && message.length > 0) {
+        acc[field] = String(message[0]);
+      }
+      return acc;
+    }, {});
+  }, []);
+
   // Fetch profile data
   const fetchProfileData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+      setFieldErrors({});
 
       const profileGuardianId = guardianId || user?.guardian_id || user?.id;
 
@@ -135,6 +153,10 @@ export default function Profile() {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: null }));
+    }
   };
 
   // Save profile changes
@@ -143,6 +165,7 @@ export default function Profile() {
       setSaving(true);
       setError(null);
       setSuccess(null);
+      setFieldErrors({});
 
       const profileGuardianId = guardianId || user?.guardian_id || user?.id;
 
@@ -159,6 +182,17 @@ export default function Profile() {
       setTimeout(() => setSuccess(null), 5000);
     } catch (err) {
       console.error("Error saving profile:", err);
+
+      const backendFieldErrors = parseBackendFieldErrors(err);
+      if (Object.keys(backendFieldErrors).length > 0) {
+        setFieldErrors(backendFieldErrors);
+        setError(
+          err?.response?.data?.error ||
+            "Please correct the highlighted profile fields.",
+        );
+        return;
+      }
+
       setError(err.message || "Failed to save profile. Please try again.");
     } finally {
       setSaving(false);
@@ -170,6 +204,7 @@ export default function Profile() {
     setIsEditing(false);
     fetchProfileData(); // Reload original data
     setError(null);
+    setFieldErrors({});
   };
 
   // Toggle edit mode
@@ -180,6 +215,7 @@ export default function Profile() {
       setIsEditing(true);
       setSuccess(null);
       setError(null);
+      setFieldErrors({});
     }
   };
 
@@ -342,6 +378,7 @@ export default function Profile() {
                 onSave={handleSave}
                 onCancel={handleCancel}
                 loading={saving}
+                fieldErrors={fieldErrors}
               />
 
               {/* Emergency Contact */}
@@ -352,6 +389,7 @@ export default function Profile() {
                 onSave={handleSave}
                 onCancel={handleCancel}
                 loading={saving}
+                fieldErrors={fieldErrors}
               />
 
               {/* Children Summary (Guardians only) */}

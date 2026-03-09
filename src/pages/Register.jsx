@@ -15,6 +15,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useNetworkStatus } from "../hooks/useNetworkStatus";
 import apiClient from "../utils/api";
+import OTPVerification from "../components/SMS/OTPVerification";
 import {
   Button,
   TextInput,
@@ -51,6 +52,10 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [pendingVerification, setPendingVerification] = useState(null);
+  const [registrationPayload, setRegistrationPayload] = useState(null);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError, setOtpError] = useState(null);
   const [isOffline, setIsOffline] = useState(false);
 
   // Calculate maximum date (today) for infantDob - birth date cannot be in the future
@@ -130,6 +135,12 @@ const Register = () => {
       return acc;
     }, {});
   };
+
+  const normalizePhoneForVerification = useCallback((phoneValue) => {
+    return String(phoneValue || "")
+      .replace(/[\s\-()]/g, "")
+      .trim();
+  }, []);
 
   const validateField = (name, value) => {
     switch (name) {
@@ -260,6 +271,7 @@ const Register = () => {
 
     setLoading(true);
     setServerError(null);
+    setOtpError(null);
 
     try {
       // Check network connectivity
@@ -294,10 +306,20 @@ const Register = () => {
       };
 
       // Make API call using centralized apiClient
-      await apiClient.register(registrationData);
+      const response = await apiClient.register(registrationData);
 
-      // Success
-      setSuccess(true);
+      const verificationPhone = normalizePhoneForVerification(
+        response?.data?.phone || registrationData.phone,
+      );
+
+      setRegistrationPayload(registrationData);
+      setPendingVerification({
+        phone: verificationPhone,
+        expiresIn:
+          Number.parseInt(response?.data?.expiresInSeconds, 10) || 10 * 60,
+      });
+
+      setSuccess(false);
     } catch (error) {
       console.error("Registration error:", error);
 
@@ -307,9 +329,21 @@ const Register = () => {
       }
 
       const responseStatus = error?.response?.status;
+      const responseCode = error?.response?.data?.code;
       const retryAfterSeconds =
         Number.parseInt(error?.response?.headers?.["retry-after"], 10) ||
         error?.response?.data?.retryAfter;
+
+      if (responseStatus === 409 && responseCode === "EMAIL_EXISTS") {
+        setErrors((prev) => ({
+          ...prev,
+          email:
+            error?.response?.data?.error ||
+            "Email already registered. Please use another email.",
+        }));
+        setServerError("This email is already registered. Please sign in instead.");
+        return;
+      }
 
       if (responseStatus === 429) {
         const waitSuffix = Number.isFinite(retryAfterSeconds)
@@ -329,6 +363,71 @@ const Register = () => {
       setLoading(false);
     }
   };
+
+  const handleVerifyOtp = useCallback(
+    async (otpCode) => {
+      const verificationPhone = normalizePhoneForVerification(
+        pendingVerification?.phone || formData.phone,
+      );
+
+      if (!verificationPhone) {
+        const missingPhoneError = new Error("Missing phone number for OTP verification.");
+        setOtpError(missingPhoneError.message);
+        throw missingPhoneError;
+      }
+
+      setOtpLoading(true);
+      setOtpError(null);
+
+      try {
+        await apiClient.verifyGuardianRegistration(verificationPhone, otpCode);
+        setPendingVerification(null);
+        setSuccess(true);
+      } catch (error) {
+        const message =
+          error?.response?.data?.error ||
+          error?.message ||
+          "Invalid or expired OTP. Please try again.";
+        setOtpError(message);
+        throw error;
+      } finally {
+        setOtpLoading(false);
+      }
+    },
+    [formData.phone, normalizePhoneForVerification, pendingVerification?.phone],
+  );
+
+  const handleResendOtp = useCallback(async () => {
+    if (!registrationPayload) {
+      const payloadError = new Error("Registration session expired. Please register again.");
+      setOtpError(payloadError.message);
+      throw payloadError;
+    }
+
+    setOtpLoading(true);
+    setOtpError(null);
+
+    try {
+      const response = await apiClient.register(registrationPayload);
+      const verificationPhone = normalizePhoneForVerification(
+        response?.data?.phone || registrationPayload.phone,
+      );
+      const expiresIn =
+        Number.parseInt(response?.data?.expiresInSeconds, 10) || 10 * 60;
+
+      setPendingVerification({ phone: verificationPhone, expiresIn });
+      return { expiresIn };
+    } catch (error) {
+      const message =
+        error?.response?.data?.error ||
+        error?.message ||
+        "Failed to resend OTP. Please try again.";
+      setOtpError(message);
+      throw error;
+    } finally {
+      setOtpLoading(false);
+    }
+  }, [normalizePhoneForVerification, registrationPayload]);
 
   // Offline state UI
   if (isOffline) {
@@ -358,6 +457,31 @@ const Register = () => {
     );
   }
 
+  // OTP verification state
+  if (pendingVerification && !success) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900">
+        <div className="w-full max-w-md">
+          <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] shadow-2xl p-6 sm:p-8 border border-white/20">
+            <OTPVerification
+              phoneNumber={pendingVerification.phone}
+              purpose="verification"
+              onVerify={handleVerifyOtp}
+              onResend={handleResendOtp}
+              onCancel={() => {
+                setPendingVerification(null);
+                setOtpError(null);
+              }}
+              expiresIn={pendingVerification.expiresIn}
+              loading={otpLoading}
+              error={otpError}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Success state
   if (success) {
     return (
@@ -368,16 +492,14 @@ const Register = () => {
               <CheckCircle className="h-10 w-10 text-green-400" />
             </div>
             <h2 className="text-3xl font-bold text-white mb-4">
-              Registration Successful!
+              Verification Successful!
             </h2>
             <p className="text-white/70 mb-6 leading-relaxed">
-              Thank you for registering. We've sent a verification email to{" "}
-              <strong className="text-white">{formData.email}</strong>. Please
-              check your email and click the verification link to activate your
-              account.
+              Your guardian account has been successfully verified and activated.
+              You can now sign in and manage your child immunization records.
             </p>
             <p className="text-sm text-white/50 mb-10">
-              If you don't see the email, check your spam folder.
+              Thank you for completing the registration process.
             </p>
             <Button
               onClick={() => navigate("/login")}
@@ -665,6 +787,7 @@ const Register = () => {
                     onChange={handleChange}
                     disabled={loading}
                     required
+                    error={errors.relationship}
                     className="bg-white/10 backdrop-blur-md border border-white/30 text-white rounded-xl shadow-lg"
                   >
                     <option value="">Select relationship</option>

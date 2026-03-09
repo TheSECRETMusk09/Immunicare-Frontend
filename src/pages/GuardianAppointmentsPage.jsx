@@ -802,7 +802,6 @@ export default function GuardianAppointmentsPage() {
               <FullCalendar
                 ref={calendarRef}
                 plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                className="guardian-appointments-fullcalendar"
                 initialView="dayGridMonth"
                 viewDidMount={(info) => {
                   setCalendarView(info.view.type);

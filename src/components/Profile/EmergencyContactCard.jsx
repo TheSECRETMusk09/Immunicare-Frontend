@@ -21,6 +21,7 @@ const EmergencyContactCard = ({
   onSave,
   onCancel,
   loading = false,
+  fieldErrors = {},
 }) => {
   const emergencyFields = [
     {
@@ -64,6 +65,7 @@ const EmergencyContactCard = ({
           {emergencyFields.map((field) => {
             const Icon = field.icon;
             const value = formData[field.key] || "";
+            const fieldError = fieldErrors?.[field.key];
 
             return (
               <div key={field.key} className="space-y-2">
@@ -78,6 +80,7 @@ const EmergencyContactCard = ({
                     name={field.key}
                     value={value}
                     onChange={onChange}
+                    error={fieldError}
                     placeholder={field.placeholder}
                     disabled={loading}
                     className="w-full min-h-[48px] sm:min-h-[44px] text-base sm:text-sm"
