@@ -181,7 +181,12 @@ const GuardianNotificationBell = () => {
       }
 
       if (countRes?.success) {
-        setUnreadCount(countRes.count || 0);
+        const unreadCount =
+          countRes?.data?.count ??
+          countRes?.count ??
+          countRes?.data?.data?.count ??
+          0;
+        setUnreadCount(unreadCount);
       }
     } catch (err) {
       console.error("Error fetching notifications:", err);

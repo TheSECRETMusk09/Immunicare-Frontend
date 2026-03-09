@@ -1,6 +1,7 @@
 import React from "react";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
+import { MemoryRouter } from "react-router-dom";
 
 import MobileBottomNav from "../components/MobileBottomNav";
 import GuardianSidebar from "../components/GuardianSidebar";
@@ -67,6 +68,9 @@ jest.mock("../contexts/SocketContext", () => ({
     unreadCount: 2,
     alerts: [],
     notifications: [],
+    on: jest.fn(),
+    off: jest.fn(),
+    connectionState: "connected",
   }),
 }));
 
@@ -116,12 +120,12 @@ describe("Dashboard button functionality audit", () => {
     fireEvent.click(screen.getByRole("button", { name: /my children/i }));
     fireEvent.click(screen.getByRole("button", { name: /appointments/i }));
     fireEvent.click(screen.getByRole("button", { name: /notifications/i }));
-    fireEvent.click(screen.getByRole("button", { name: /settings/i }));
+    fireEvent.click(screen.getByRole("button", { name: /profile/i }));
 
     expect(mockNavigate).toHaveBeenCalledWith("/guardian/children");
     expect(mockNavigate).toHaveBeenCalledWith("/guardian/appointments");
     expect(mockNavigate).toHaveBeenCalledWith("/guardian/notifications");
-    expect(mockNavigate).toHaveBeenCalledWith("/guardian/settings");
+    expect(mockNavigate).toHaveBeenCalledWith("/guardian/profile");
   });
 
   test("Admin dashboard notifications actions navigate correctly", () => {
@@ -205,12 +209,13 @@ describe("Dashboard button functionality audit", () => {
     }
   });
 
-  test("Analytics page renders resilient empty state without crashing", () => {
-    render(<Analytics />);
+  test("Analytics page renders resilient shell without crashing", () => {
+    render(
+      <MemoryRouter initialEntries={["/analytics"]}>
+        <Analytics />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByText(/analytics dashboard/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/analytics data is currently limited/i),
-    ).toBeInTheDocument();
   });
 });

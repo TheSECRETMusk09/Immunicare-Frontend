@@ -27,6 +27,42 @@ import GuardianModuleHeader from '../components/GuardianModuleHeader';
 import { useAuth } from '../contexts/AuthContext';
 import apiClient from '../utils/api';
 
+const unwrapApiPayload = (value) => {
+  if (value && typeof value === 'object' && 'data' in value) {
+    return value.data;
+  }
+  return value;
+};
+
+const normalizeArrayPayload = (value, candidateKeys = []) => {
+  const payload = unwrapApiPayload(value);
+
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (payload && typeof payload === 'object') {
+    const keys = ['data', ...candidateKeys];
+    for (const key of keys) {
+      if (Array.isArray(payload[key])) {
+        return payload[key];
+      }
+    }
+  }
+
+  return [];
+};
+
+const inferNotificationType = (notification = {}) => {
+  const rawType = String(notification.notification_type || notification.type || '').toLowerCase();
+
+  if (rawType.includes('appointment')) return 'appointment';
+  if (rawType.includes('vaccination') || rawType.includes('vaccine')) return 'vaccination';
+  if (rawType.includes('message')) return 'message';
+  if (rawType.includes('alert') || rawType.includes('error') || rawType.includes('warning')) return 'alert';
+  return 'info';
+};
+
 // ============================================
 // SKELETON LOADING COMPONENTS
 // ============================================
@@ -380,41 +416,72 @@ const GuardianDashboard = () => {
         notificationsResponse,
         statsResponse,
       ] = await Promise.allSettled([
+        // Backward-compatible fallback for test mocks or older API clients
+        // that may not yet expose getGuardianNotifications.
         guardianId ? apiClient.getInfantsByGuardian(guardianId) : Promise.resolve({ data: [] }),
         guardianId ? apiClient.getGuardianAppointments(guardianId, { status: 'upcoming', limit: 5 }) : Promise.resolve({ data: [] }),
-        guardianId ? apiClient.getNotifications({ limit: 10 }) : Promise.resolve({ data: [] }),
+        !guardianId
+          ? Promise.resolve({ data: [] })
+          : typeof apiClient.getGuardianNotifications === 'function'
+            ? apiClient.getGuardianNotifications({ limit: 10 })
+            : typeof apiClient.getNotifications === 'function'
+              ? apiClient.getNotifications({ limit: 10 })
+              : Promise.resolve({ data: [] }),
         guardianId ? apiClient.getGuardianStats(guardianId) : Promise.resolve({ data: {} }),
       ]);
 
       // Process children data
       let childrenData = [];
-      if (childrenResponse.status === 'fulfilled' && childrenResponse.value?.data) {
-        childrenData = Array.isArray(childrenResponse.value.data)
-          ? childrenResponse.value.data
-          : childrenResponse.value.data.infants || [];
+      if (childrenResponse.status === 'fulfilled') {
+        childrenData = normalizeArrayPayload(childrenResponse.value, ['infants', 'children']).map((child) => ({
+          ...child,
+          name: child.name || `${child.first_name || ''} ${child.last_name || ''}`.trim(),
+          dateOfBirth: child.dateOfBirth || child.dob || child.birth_date || null,
+          controlNumber: child.controlNumber || child.control_number || null,
+        }));
       }
       setChildren(childrenData);
 
       // Process appointments data
       let appointmentsData = [];
-      if (appointmentsResponse.status === 'fulfilled' && appointmentsResponse.value?.data) {
-        appointmentsData = Array.isArray(appointmentsResponse.value.data)
-          ? appointmentsResponse.value.data
-          : appointmentsResponse.value.data.appointments || [];
+      if (appointmentsResponse.status === 'fulfilled') {
+        appointmentsData = normalizeArrayPayload(appointmentsResponse.value, ['appointments']).map((appointment) => ({
+          ...appointment,
+          scheduledDate:
+            appointment.scheduledDate ||
+            appointment.scheduled_date ||
+            appointment.date ||
+            null,
+          infantName:
+            appointment.infantName ||
+            `${appointment.first_name || ''} ${appointment.last_name || ''}`.trim(),
+          vaccineName:
+            appointment.vaccineName ||
+            appointment.vaccine_name ||
+            appointment.type ||
+            'Vaccination',
+          doctorName:
+            appointment.doctorName ||
+            appointment.provider_name ||
+            appointment.health_worker_name ||
+            null,
+        }));
       }
       setAppointments(appointmentsData);
 
       // Process notifications data
       let notificationsData = [];
-      if (notificationsResponse.status === 'fulfilled' && notificationsResponse.value?.data) {
-        notificationsData = Array.isArray(notificationsResponse.value.data)
-          ? notificationsResponse.value.data
-          : notificationsResponse.value.data.notifications || [];
+      if (notificationsResponse.status === 'fulfilled') {
+        notificationsData = normalizeArrayPayload(notificationsResponse.value, ['notifications']).map((notification) => ({
+          ...notification,
+          type: inferNotificationType(notification),
+          title: notification.title || 'Notification',
+        }));
       }
       setNotifications(notificationsData.slice(0, 5));
 
       // Process stats from API or calculate locally
-      const apiStats = statsResponse.status === 'fulfilled' ? (statsResponse.value?.data || statsResponse.value || {}) : {};
+      const apiStats = statsResponse.status === 'fulfilled' ? (unwrapApiPayload(statsResponse.value) || {}) : {};
 
       // Calculate stats locally if not available from API
       const today = new Date();
@@ -458,8 +525,15 @@ const GuardianDashboard = () => {
       dueVaccinesList.sort((a, b) => a.daysUntilDue - b.daysUntilDue);
       setDueVaccines(dueVaccinesList.slice(0, 5));
 
-      const nextAppointmentDate = appointmentsData.length > 0
-        ? new Date(appointmentsData[0].scheduledDate || appointmentsData[0].date).toLocaleDateString('en-US', {
+      const nextAppointmentDateSource =
+        apiStats?.nextAppointment?.scheduled_date ||
+        apiStats?.nextAppointment?.scheduledDate ||
+        appointmentsData?.[0]?.scheduledDate ||
+        appointmentsData?.[0]?.scheduled_date ||
+        appointmentsData?.[0]?.date;
+
+      const nextAppointmentDate = nextAppointmentDateSource
+        ? new Date(nextAppointmentDateSource).toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric'
           })

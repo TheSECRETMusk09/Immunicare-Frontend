@@ -665,6 +665,43 @@ export const useGuardianDashboard = (guardianId) => {
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  const unwrapApiPayload = useCallback((value) => {
+    if (value && typeof value === "object" && "data" in value) {
+      return value.data;
+    }
+    return value;
+  }, []);
+
+  const normalizeArrayPayload = useCallback(
+    (value, candidateKeys = []) => {
+      const payload = unwrapApiPayload(value);
+
+      if (Array.isArray(payload)) {
+        return payload;
+      }
+
+      if (payload && typeof payload === "object") {
+        const keys = ["data", ...candidateKeys];
+        for (const key of keys) {
+          if (Array.isArray(payload[key])) {
+            return payload[key];
+          }
+        }
+      }
+
+      return [];
+    },
+    [unwrapApiPayload],
+  );
+
+  const extractGuardianStats = useCallback(
+    (value) => {
+      const payload = unwrapApiPayload(value);
+      return payload && typeof payload === "object" ? payload : {};
+    },
+    [unwrapApiPayload],
+  );
+
   const fetchWithTimeout = useCallback(async (promise, timeout = 10000) => {
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error("Request timeout")), timeout),
@@ -685,7 +722,7 @@ export const useGuardianDashboard = (guardianId) => {
       const fetchChildren = fetchWithTimeout(
         apiClient.getInfantsByGuardian(guardianId),
       )
-        .then((res) => res.data || [])
+        .then((res) => normalizeArrayPayload(res, ["infants", "children"]))
         .catch((err) => {
           console.warn("Children fetch failed:", err.message);
           return [];
@@ -694,7 +731,7 @@ export const useGuardianDashboard = (guardianId) => {
       const fetchAppointments = fetchWithTimeout(
         apiClient.getGuardianAppointments(guardianId, { limit: 10 }),
       )
-        .then((res) => res.data || [])
+        .then((res) => normalizeArrayPayload(res, ["appointments"]))
         .catch((err) => {
           console.warn("Appointments fetch failed:", err.message);
           return [];
@@ -703,19 +740,16 @@ export const useGuardianDashboard = (guardianId) => {
       const fetchStats = fetchWithTimeout(
         apiClient.getGuardianStats(guardianId),
       )
-        .then((res) => res.data || {})
+        .then((res) => extractGuardianStats(res))
         .catch((err) => {
           console.warn("Stats fetch failed:", err.message);
           return {};
         });
 
       const fetchNotifications = fetchWithTimeout(
-        apiClient.getNotifications({ limit: 5 }),
+        apiClient.getGuardianNotifications({ limit: 5 }),
       )
-        .then((res) => {
-          if (Array.isArray(res.data)) return res.data;
-          return res.data?.notifications || [];
-        })
+        .then((res) => normalizeArrayPayload(res, ["notifications"]))
         .catch((err) => {
           console.warn("Notifications fetch failed:", err.message);
           return [];
@@ -750,7 +784,14 @@ export const useGuardianDashboard = (guardianId) => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [guardianId, fetchWithTimeout, children.length, appointments.length]);
+  }, [
+    guardianId,
+    fetchWithTimeout,
+    normalizeArrayPayload,
+    extractGuardianStats,
+    children.length,
+    appointments.length,
+  ]);
 
   useEffect(() => {
     fetchDashboardData();

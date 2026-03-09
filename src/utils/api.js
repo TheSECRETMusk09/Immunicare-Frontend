@@ -372,10 +372,16 @@ class ApiClient {
   }
 
   async getGuardianAppointments(guardianId, filters = {}) {
-    const params = new URLSearchParams(filters);
-    return this.request(
-      `/dashboard/guardian/${guardianId}/appointments?${params}`,
-    );
+    const params = new URLSearchParams();
+
+    Object.entries(filters || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        params.append(key, value);
+      }
+    });
+
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return this.request(`/dashboard/guardian/${guardianId}/appointments${suffix}`);
   }
 
   async getActivityFeed(limit = 10) {
@@ -1155,6 +1161,51 @@ class ApiClient {
         action,
         sourceContext,
       },
+    });
+  }
+
+  // Guardian-specific notifications endpoints
+  async getGuardianNotifications(filters = {}) {
+    const params = new URLSearchParams();
+    Object.entries(filters || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        params.append(key, value);
+      }
+    });
+
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return this.request(`/guardian/notifications${suffix}`);
+  }
+
+  async getGuardianUnreadNotificationCount() {
+    return this.request(`/guardian/notifications/unread-count`);
+  }
+
+  async getGuardianNotificationStats() {
+    return this.request(`/guardian/notifications/stats/summary`);
+  }
+
+  async markGuardianNotificationAsRead(id) {
+    return this.request(`/guardian/notifications/${id}/read`, {
+      method: "PATCH",
+    });
+  }
+
+  async markGuardianNotificationAsUnread(id) {
+    return this.request(`/guardian/notifications/${id}/unread`, {
+      method: "PATCH",
+    });
+  }
+
+  async markAllGuardianNotificationsAsRead() {
+    return this.request(`/guardian/notifications/read-all`, {
+      method: "PATCH",
+    });
+  }
+
+  async deleteGuardianNotification(id) {
+    return this.request(`/guardian/notifications/${id}`, {
+      method: "DELETE",
     });
   }
 

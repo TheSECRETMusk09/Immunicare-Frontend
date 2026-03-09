@@ -26,6 +26,7 @@ const useGuardianNotifications = (options = {}) => {
   const lastFetchTimeRef = useRef(0);
   const cachedNotificationsRef = useRef([]);
   const cachedCountRef = useRef(0);
+  const lastRequestKeyRef = useRef("");
 
   // Check if we should fetch (prevent redundant fetches)
   const shouldFetch = useCallback(() => {
@@ -42,7 +43,8 @@ const useGuardianNotifications = (options = {}) => {
 
       // Skip if not forced and recently fetched (within last 5 seconds)
       // Note: We skip this check if filters change to ensure UI updates immediately
-      if (!force && !shouldFetch() && filters === cachedNotificationsRef.current._filters) {
+      const requestKey = JSON.stringify({ limit, filters });
+      if (!force && !shouldFetch() && requestKey === lastRequestKeyRef.current) {
         return;
       }
 
@@ -64,13 +66,16 @@ const useGuardianNotifications = (options = {}) => {
               JSON.stringify(cachedNotificationsRef.current)
             ) {
               cachedNotificationsRef.current = newNotifications;
-              cachedNotificationsRef.current._filters = filters; // Store filters to invalidate cache on change
               setNotifications(newNotifications);
             }
           }
 
           if (countRes?.success) {
-            const newCount = countRes.count || 0;
+            const newCount =
+              countRes?.data?.count ??
+              countRes?.count ??
+              countRes?.data?.data?.count ??
+              0;
             // Only update if count has changed
             if (newCount !== cachedCountRef.current) {
               cachedCountRef.current = newCount;
@@ -79,6 +84,7 @@ const useGuardianNotifications = (options = {}) => {
           }
 
           lastFetchTimeRef.current = Date.now();
+          lastRequestKeyRef.current = requestKey;
         }
       } catch (err) {
         console.error("Error fetching notifications:", err);

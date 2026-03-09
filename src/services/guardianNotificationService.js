@@ -5,6 +5,7 @@
  */
 
 import apiClient from "../utils/api";
+import { handleApiResponse } from "./baseService";
 
 const guardianNotificationService = {
   /**
@@ -14,22 +15,10 @@ const guardianNotificationService = {
    */
   async getNotifications(options = {}) {
     const { limit = 50, offset = 0, unreadOnly = false, type, search } = options;
-    const params = new URLSearchParams();
-
-    if (limit) params.append("limit", limit);
-    if (offset) params.append("offset", offset);
-    if (unreadOnly) params.append("unreadOnly", "true");
-    if (type) params.append("type", type);
-    if (search) params.append("search", search);
-
-    const queryString = params.toString();
-    const url = `/guardian/notifications${queryString ? `?${queryString}` : ""}`;
-
-    const response = await apiClient.customRequest(url, {
-      method: "GET",
-    });
-
-    return response.data;
+    return handleApiResponse(
+      apiClient.getGuardianNotifications({ limit, offset, unreadOnly, type, search }),
+      "Fetch guardian notifications",
+    );
   },
 
   /**
@@ -37,14 +26,10 @@ const guardianNotificationService = {
    * @returns {Promise<Object>}
    */
   async getUnreadCount() {
-    const response = await apiClient.customRequest(
-      "/guardian/notifications/unread-count",
-      {
-        method: "GET",
-      },
+    return handleApiResponse(
+      apiClient.getGuardianUnreadNotificationCount(),
+      "Fetch guardian unread notification count",
     );
-
-    return response.data;
   },
 
   /**
@@ -52,14 +37,10 @@ const guardianNotificationService = {
    * @returns {Promise<Object>}
    */
   async getStats() {
-    const response = await apiClient.customRequest(
-      "/guardian/notifications/stats/summary",
-      {
-        method: "GET",
-      },
+    return handleApiResponse(
+      apiClient.getGuardianNotificationStats(),
+      "Fetch guardian notification statistics",
     );
-
-    return response.data;
   },
 
   /**
@@ -68,14 +49,22 @@ const guardianNotificationService = {
    * @returns {Promise<Object>}
    */
   async markAsRead(id) {
-    const response = await apiClient.customRequest(
-      `/guardian/notifications/${id}/read`,
-      {
-        method: "PATCH",
-      },
+    return handleApiResponse(
+      apiClient.markGuardianNotificationAsRead(id),
+      `Mark guardian notification ${id} as read`,
     );
+  },
 
-    return response.data;
+  /**
+   * Mark a notification as unread
+   * @param {string|number} id - Notification ID
+   * @returns {Promise<Object>}
+   */
+  async markAsUnread(id) {
+    return handleApiResponse(
+      apiClient.markGuardianNotificationAsUnread(id),
+      `Mark guardian notification ${id} as unread`,
+    );
   },
 
   /**
@@ -83,14 +72,10 @@ const guardianNotificationService = {
    * @returns {Promise<Object>}
    */
   async markAllAsRead() {
-    const response = await apiClient.customRequest(
-      "/guardian/notifications/read-all",
-      {
-        method: "PATCH",
-      },
+    return handleApiResponse(
+      apiClient.markAllGuardianNotificationsAsRead(),
+      "Mark all guardian notifications as read",
     );
-
-    return response.data;
   },
 
   /**
@@ -99,14 +84,10 @@ const guardianNotificationService = {
    * @returns {Promise<Object>}
    */
   async deleteNotification(id) {
-    const response = await apiClient.customRequest(
-      `/guardian/notifications/${id}`,
-      {
-        method: "DELETE",
-      },
+    return handleApiResponse(
+      apiClient.deleteGuardianNotification(id),
+      `Delete guardian notification ${id}`,
     );
-
-    return response.data;
   },
 };
 
