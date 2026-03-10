@@ -392,6 +392,11 @@ export default function UserManagement() {
 
       return {
         ...guardian,
+        username:
+          guardian.username ||
+          guardian.user_username ||
+          guardian.account_username ||
+          "N/A",
         name:
           guardian.name || guardian.full_name || guardian.guardian_name || "N/A",
         phone,
@@ -523,7 +528,7 @@ export default function UserManagement() {
         {};
 
       setFormData({
-        name: guardianRecord.name || guardianRecord.username || "",
+        name: guardianRecord.name || "",
         phone:
           guardianRecord.phone ||
           guardianRecord.contact ||
@@ -1170,6 +1175,16 @@ export default function UserManagement() {
   );
 
   const guardianColumns = [
+    {
+      key: "username",
+      label: "Username",
+      nowrap: true,
+      headerClassName: "min-w-[12rem]",
+      cellClassName: "min-w-[12rem]",
+      render: (val) => (
+        <div className="font-medium text-gray-900 dark:text-gray-100">{val}</div>
+      ),
+    },
     {
       key: "name",
       label: "Name",

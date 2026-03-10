@@ -976,6 +976,67 @@ class ApiClient {
     });
   }
 
+  async archiveAnnouncement(id) {
+    return this.request(`/announcements/${id}/archive`, {
+      method: "PUT",
+    });
+  }
+
+  async getAnnouncementDeliverySummary(announcementId) {
+    return this.request(`/announcements/${announcementId}/delivery-summary`);
+  }
+
+  async getAnnouncementDeliveries(announcementId, filters = {}) {
+    const params = new URLSearchParams();
+    Object.entries(filters || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        params.append(key, value);
+      }
+    });
+
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return this.request(`/announcements/${announcementId}/deliveries${suffix}`);
+  }
+
+  async getAnnouncementDeliverySummaryForMany(announcementIds = []) {
+    if (!Array.isArray(announcementIds) || announcementIds.length === 0) {
+      return {};
+    }
+
+    const normalizedIds = [...new Set(
+      announcementIds
+        .map((id) => parseInt(id, 10))
+        .filter((id) => Number.isInteger(id) && id > 0),
+    )];
+
+    if (normalizedIds.length === 0) {
+      return {};
+    }
+
+    const params = new URLSearchParams({
+      announcement_ids: normalizedIds.join(","),
+    });
+    return this.request(`/announcements/delivery/summary?${params.toString()}`);
+  }
+
+  async getMyAnnouncements() {
+    return this.request("/announcements", {
+      method: "GET",
+    });
+  }
+
+  async getAnnouncementCategories() {
+    return ["system", "inventory", "vaccination", "policy", "event", "training"];
+  }
+
+  async acknowledgeAnnouncement(_announcementId) {
+    // Backend does not currently expose announcement acknowledgment endpoint.
+    // Keep method for API-contract compatibility and fail fast with explicit intent.
+    const error = new Error("Announcement acknowledgment endpoint is not available");
+    error.code = "ANNOUNCEMENT_ACK_NOT_SUPPORTED";
+    throw error;
+  }
+
   async getActiveAnnouncements(audience) {
     return this.request(`/announcements/active/${audience}`);
   }

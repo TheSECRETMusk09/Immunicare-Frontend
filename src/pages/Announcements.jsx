@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   AdminModalActions,
   Card,
@@ -25,6 +25,17 @@ const AUDIENCE_OPTIONS = ["all", "patients", "staff"];
 const PRIORITY_OPTIONS = ["low", "medium", "high", "urgent"];
 const STATUS_OPTIONS = ["draft", "published", "archived"];
 
+const EMPTY_DELIVERY_SUMMARY = {
+  total_recipients: 0,
+  pending_count: 0,
+  queued_count: 0,
+  sent_count: 0,
+  delivered_count: 0,
+  read_count: 0,
+  failed_count: 0,
+  cancelled_count: 0,
+};
+
 const Announcements = () => {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +43,17 @@ const Announcements = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState({});
+  const [deliverySummaryByAnnouncement, setDeliverySummaryByAnnouncement] =
+    useState({});
+  const [deliverySummaryLoading, setDeliverySummaryLoading] = useState(false);
+  const [isPublishingAnnouncementId, setIsPublishingAnnouncementId] =
+    useState(null);
+  const [isArchivingAnnouncementId, setIsArchivingAnnouncementId] =
+    useState(null);
+  const [deliveryModalAnnouncement, setDeliveryModalAnnouncement] =
+    useState(null);
+  const [deliveryRows, setDeliveryRows] = useState([]);
+  const [deliveryRowsLoading, setDeliveryRowsLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     content: "",
@@ -41,22 +63,47 @@ const Announcements = () => {
   });
 
   // Fetch announcements from API
-  useEffect(() => {
-    fetchAnnouncements();
+  const fetchDeliverySummaries = useCallback(async (announcementRows = []) => {
+    const ids = (announcementRows || [])
+      .map((announcement) => announcement.id)
+      .filter((id) => Number.isInteger(parseInt(id, 10)));
+
+    if (ids.length === 0) {
+      setDeliverySummaryByAnnouncement({});
+      return;
+    }
+
+    try {
+      setDeliverySummaryLoading(true);
+      const summaries =
+        await apiClient.getAnnouncementDeliverySummaryForMany(ids);
+      setDeliverySummaryByAnnouncement(summaries || {});
+    } catch (_error) {
+      setDeliverySummaryByAnnouncement({});
+    } finally {
+      setDeliverySummaryLoading(false);
+    }
   }, []);
 
-  const fetchAnnouncements = async () => {
+  const fetchAnnouncements = useCallback(async () => {
     try {
       setLoading(true);
       const data = await apiClient.getAnnouncements();
-      setAnnouncements(Array.isArray(data) ? data : []);
+      const normalized = Array.isArray(data) ? data : [];
+      setAnnouncements(normalized);
+      await fetchDeliverySummaries(normalized);
     } catch (err) {
       setError(err.message);
       console.error("Error fetching announcements:", err);
+      setDeliverySummaryByAnnouncement({});
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchDeliverySummaries]);
+
+  useEffect(() => {
+    fetchAnnouncements();
+  }, [fetchAnnouncements]);
 
   const handleCreateAnnouncement = async (event) => {
     event.preventDefault();
@@ -153,7 +200,12 @@ const Announcements = () => {
         status,
       };
       const newAnnouncement = await apiClient.createAnnouncement(payload);
-      setAnnouncements([newAnnouncement, ...announcements]);
+
+      if (status === "published" && newAnnouncement?.id) {
+        await apiClient.publishAnnouncement(newAnnouncement.id);
+      }
+
+      await fetchAnnouncements();
       setShowCreateModal(false);
       setFormData({
         title: "",
@@ -178,6 +230,49 @@ const Announcements = () => {
     }
   };
 
+  const handlePublishAnnouncement = async (announcement) => {
+    try {
+      setIsPublishingAnnouncementId(announcement.id);
+      setError(null);
+      await apiClient.publishAnnouncement(announcement.id);
+      await fetchAnnouncements();
+    } catch (err) {
+      setError(err.message || "Failed to publish announcement");
+    } finally {
+      setIsPublishingAnnouncementId(null);
+    }
+  };
+
+  const handleArchiveAnnouncement = async (announcement) => {
+    try {
+      setIsArchivingAnnouncementId(announcement.id);
+      setError(null);
+      await apiClient.archiveAnnouncement(announcement.id);
+      await fetchAnnouncements();
+    } catch (err) {
+      setError(err.message || "Failed to archive announcement");
+    } finally {
+      setIsArchivingAnnouncementId(null);
+    }
+  };
+
+  const openDeliveryModal = async (announcement) => {
+    try {
+      setDeliveryModalAnnouncement(announcement);
+      setDeliveryRows([]);
+      setDeliveryRowsLoading(true);
+      const result = await apiClient.getAnnouncementDeliveries(announcement.id, {
+        limit: 200,
+        offset: 0,
+      });
+      setDeliveryRows(Array.isArray(result?.rows) ? result.rows : []);
+    } catch (err) {
+      setError(err.message || "Failed to load delivery details");
+    } finally {
+      setDeliveryRowsLoading(false);
+    }
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -195,6 +290,28 @@ const Announcements = () => {
       default:
         return "secondary";
     }
+  };
+
+  const getStatusVariant = (status) => {
+    switch (String(status || "").toLowerCase()) {
+      case "published":
+        return "success";
+      case "archived":
+        return "secondary";
+      case "draft":
+      default:
+        return "warning";
+    }
+  };
+
+  const getDeliverySummary = (announcementId) => {
+    const summary =
+      deliverySummaryByAnnouncement?.[String(announcementId)] ||
+      EMPTY_DELIVERY_SUMMARY;
+    return {
+      ...EMPTY_DELIVERY_SUMMARY,
+      ...summary,
+    };
   };
 
   if (loading) {
@@ -251,11 +368,19 @@ const Announcements = () => {
         <div className="grid grid-cols-1 gap-4">
           {announcements.map((announcement) => (
             <Card key={announcement.id}>
-              <div className="flex justify-between items-start">
+              <div className="flex justify-between items-start gap-4">
                 <div className="flex-1">
-                  <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">
-                    {announcement.title}
-                  </h3>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">
+                      {announcement.title}
+                    </h3>
+                    <Badge variant={getStatusVariant(announcement.status)}>
+                      {announcement.status || "draft"}
+                    </Badge>
+                    <Badge variant="secondary">
+                      {announcement.target_audience || "all"}
+                    </Badge>
+                  </div>
                   <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">
                     {announcement.content}
                   </p>
@@ -265,10 +390,66 @@ const Announcements = () => {
                       announcement.created_at || announcement.date,
                     ).toLocaleDateString()}
                   </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                    {deliverySummaryLoading ? (
+                      <span className="text-gray-500">Loading delivery summary...</span>
+                    ) : (
+                      <>
+                        <Badge variant="secondary">
+                          Recipients: {getDeliverySummary(announcement.id).total_recipients}
+                        </Badge>
+                        <Badge variant="success">
+                          Delivered: {getDeliverySummary(announcement.id).delivered_count}
+                        </Badge>
+                        <Badge variant="warning">
+                          Pending: {getDeliverySummary(announcement.id).pending_count}
+                        </Badge>
+                        <Badge variant="info">
+                          Read: {getDeliverySummary(announcement.id).read_count}
+                        </Badge>
+                        <Badge variant="danger">
+                          Failed: {getDeliverySummary(announcement.id).failed_count}
+                        </Badge>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <Badge variant={getPriorityVariant(announcement.priority)}>
-                  {announcement.priority}
-                </Badge>
+                <div className="flex flex-col items-end gap-2">
+                  <Badge variant={getPriorityVariant(announcement.priority)}>
+                    {announcement.priority}
+                  </Badge>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {announcement.status === "draft" && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handlePublishAnnouncement(announcement)}
+                        disabled={isPublishingAnnouncementId === announcement.id}
+                        loading={isPublishingAnnouncementId === announcement.id}
+                      >
+                        Publish
+                      </Button>
+                    )}
+                    {announcement.status === "published" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleArchiveAnnouncement(announcement)}
+                        disabled={isArchivingAnnouncementId === announcement.id}
+                        loading={isArchivingAnnouncementId === announcement.id}
+                      >
+                        Archive
+                      </Button>
+                    )}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => openDeliveryModal(announcement)}
+                    >
+                      Delivery Details
+                    </Button>
+                  </div>
+                </div>
               </div>
             </Card>
           ))}
@@ -394,6 +575,69 @@ const Announcements = () => {
             </div>
           </div>
         </form>
+      </Modal>
+
+      {/* Delivery details modal */}
+      <Modal
+        isOpen={Boolean(deliveryModalAnnouncement)}
+        onClose={() => setDeliveryModalAnnouncement(null)}
+        title={`Delivery Details${deliveryModalAnnouncement ? `: ${deliveryModalAnnouncement.title}` : ""}`}
+        size="lg"
+        footer={
+          <AdminModalActions>
+            <Button
+              variant="cancel"
+              type="button"
+              onClick={() => setDeliveryModalAnnouncement(null)}
+            >
+              Close
+            </Button>
+          </AdminModalActions>
+        }
+      >
+        {deliveryRowsLoading ? (
+          <div className="py-6 text-sm text-gray-500">Loading delivery details...</div>
+        ) : deliveryRows.length === 0 ? (
+          <div className="py-6 text-sm text-gray-500">
+            No delivery records found for this announcement.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left border-b border-gray-200 dark:border-gray-700">
+                  <th className="py-2 pr-3">Recipient</th>
+                  <th className="py-2 pr-3">Audience</th>
+                  <th className="py-2 pr-3">Status</th>
+                  <th className="py-2 pr-3">Attempts</th>
+                  <th className="py-2 pr-3">Delivered At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deliveryRows.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="border-b border-gray-100 dark:border-gray-800"
+                  >
+                    <td className="py-2 pr-3">{row.recipient_label || "N/A"}</td>
+                    <td className="py-2 pr-3">{row.resolved_target_audience || "N/A"}</td>
+                    <td className="py-2 pr-3">
+                      <Badge variant={getStatusVariant(row.delivery_status)}>
+                        {row.delivery_status || "pending"}
+                      </Badge>
+                    </td>
+                    <td className="py-2 pr-3">{row.delivery_attempts ?? 0}</td>
+                    <td className="py-2 pr-3">
+                      {row.delivered_at
+                        ? new Date(row.delivered_at).toLocaleString()
+                        : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Modal>
     </div>
   );
