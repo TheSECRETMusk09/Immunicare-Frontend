@@ -19,6 +19,9 @@ const ProtectedRoute = ({
   }
 
   if (!isAuthenticated) {
+    if (adminOnly || requireSystemAdmin) {
+      return <Navigate to="/admin/login" replace />;
+    }
     return <Navigate to="/guardian/login" replace />;
   }
 

@@ -110,6 +110,15 @@ const smsService = {
   },
 
   /**
+   * Delete guardian phone number
+   * @param {number} guardianId - Guardian ID
+   * @param {number} phoneId - Phone row ID
+   */
+  async deletePhone(guardianId, phoneId) {
+    return apiClient.delete(`/sms/phone/${guardianId}/${phoneId}`);
+  },
+
+  /**
    * Get SMS delivery logs (admin only)
    * @param {object} params - Query parameters
    */

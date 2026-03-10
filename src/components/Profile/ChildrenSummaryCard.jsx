@@ -16,6 +16,29 @@ const ChildrenSummaryCard = ({ guardianId, loading: parentLoading = false }) => 
   const [children, setChildren] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const normalizeChild = (child) => {
+    if (!child || typeof child !== "object") {
+      return {
+        id: null,
+        name: "",
+        dateOfBirth: null,
+        controlNumber: null,
+      };
+    }
+
+    const firstName = child.first_name || child.firstName || "";
+    const lastName = child.last_name || child.lastName || "";
+    const fallbackName = [firstName, lastName].filter(Boolean).join(" ").trim();
+
+    return {
+      ...child,
+      id: child.id,
+      name: child.name || fallbackName || "",
+      dateOfBirth: child.dateOfBirth || child.dob || null,
+      controlNumber: child.controlNumber || child.control_number || null,
+    };
+  };
+
   useEffect(() => {
     const fetchChildren = async () => {
       if (!guardianId) {
@@ -29,7 +52,7 @@ const ChildrenSummaryCard = ({ guardianId, loading: parentLoading = false }) => 
         const childrenData = Array.isArray(response)
           ? response
           : response?.data || [];
-        setChildren(childrenData.slice(0, 3)); // Show max 3 children
+        setChildren(childrenData.map(normalizeChild).slice(0, 3)); // Show max 3 children
       } catch (err) {
         console.error("Error fetching children:", err);
       } finally {
@@ -113,7 +136,7 @@ const ChildrenSummaryCard = ({ guardianId, loading: parentLoading = false }) => 
               Add your first child to get started
             </p>
             <button
-              onClick={() => navigate("/guardian/children/add")}
+              onClick={() => navigate("/guardian/children/new")}
               className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors min-h-[44px]"
             >
               <Plus className="w-4 h-4" />

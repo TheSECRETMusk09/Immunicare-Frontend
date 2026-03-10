@@ -258,6 +258,37 @@ class ApiClient {
     }
   }
 
+  // Generic HTTP helpers for backward compatibility across service modules
+  async get(endpoint, config = {}) {
+    return this.request(endpoint, {
+      method: "GET",
+      ...config,
+    });
+  }
+
+  async post(endpoint, data, config = {}) {
+    return this.request(endpoint, {
+      method: "POST",
+      data,
+      ...config,
+    });
+  }
+
+  async put(endpoint, data, config = {}) {
+    return this.request(endpoint, {
+      method: "PUT",
+      data,
+      ...config,
+    });
+  }
+
+  async delete(endpoint, config = {}) {
+    return this.request(endpoint, {
+      method: "DELETE",
+      ...config,
+    });
+  }
+
   // Custom request method for non-standard endpoints
   async customRequest(url, options = {}) {
     try {

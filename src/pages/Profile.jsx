@@ -122,7 +122,12 @@ export default function Profile() {
         });
       } else {
         // Fetch regular user profile
-        const response = await apiClient.getUserProfile();
+        if (!user?.id) {
+          setError("Unable to load profile data. User session is missing.");
+          return;
+        }
+
+        const response = await apiClient.getUserProfile(user.id);
         if (response.data) {
           setFormData({
             name: response.data.name || response.data.username || "",

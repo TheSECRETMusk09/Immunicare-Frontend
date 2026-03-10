@@ -23,6 +23,13 @@ import {
 
 export default function UserProfile() {
   const { user, updateUser, logout } = useAuth();
+  const normalizedRoleType = String(user?.role_type || "").toUpperCase();
+  const normalizedRole = String(user?.role || "").toUpperCase();
+  const normalizedLegacyRole = String(user?.legacy_role || "").toUpperCase();
+  const isGuardianRole =
+    normalizedRoleType === "GUARDIAN" ||
+    normalizedRole === "GUARDIAN" ||
+    normalizedLegacyRole === "GUARDIAN";
   const [profile, setProfile] = useState({
     username: "",
     email: "",
@@ -38,7 +45,12 @@ export default function UserProfile() {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.getUserProfile();
+      if (!user?.id) {
+        setError("Unable to load profile. User session is missing.");
+        return;
+      }
+
+      const response = await apiClient.getUserProfile(user.id);
       setProfile(response.data || {});
     } catch (err) {
       setError(err.message);
@@ -73,7 +85,12 @@ export default function UserProfile() {
         return;
       }
 
-      const response = await apiClient.updateUserProfile(profile);
+      if (!user?.id) {
+        setError("Unable to update profile. User session is missing.");
+        return;
+      }
+
+      const response = await apiClient.updateUserProfile(user.id, profile);
       setSuccess("Profile updated successfully!");
       updateUser(response.data);
       setTimeout(() => setSuccess(null), 5000);
@@ -205,7 +222,7 @@ export default function UserProfile() {
                 {profile.username || user?.username || "User"}
               </h4>
               <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-1">
-                {user?.role === "guardian" ? "Parent/Guardian" : "System User"}
+                {isGuardianRole ? "Parent/Guardian" : "System User"}
               </p>
             </div>
 

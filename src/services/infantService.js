@@ -6,6 +6,14 @@
 import apiClient from "../utils/api";
 import { handleApiResponse } from "./baseService";
 
+const requestApi = (endpoint, options = {}) =>
+  apiClient.request(endpoint, {
+    method: options.method || "GET",
+    data: options.data,
+    params: options.params,
+    ...options,
+  });
+
 const infantService = {
   /**
    * Get all infants
@@ -31,7 +39,7 @@ const infantService = {
    */
   async getByControlNumber(controlNumber) {
     return handleApiResponse(
-      apiClient.get(`/api/infants/control-number/${controlNumber}`),
+      requestApi(`/infants/control-number/${controlNumber}`),
       "Fetch infant by control number",
     );
   },
@@ -96,7 +104,7 @@ const infantService = {
    */
   async getAllergies(infantId) {
     return handleApiResponse(
-      apiClient.get(`/api/infant-allergies/${infantId}`),
+      requestApi(`/infant-allergies/${infantId}`),
       "Fetch infant allergies",
     );
   },
@@ -108,7 +116,10 @@ const infantService = {
    */
   async addAllergy(allergyData) {
     return handleApiResponse(
-      apiClient.post(`/api/infant-allergies`, allergyData),
+      requestApi(`/infant-allergies`, {
+        method: "POST",
+        data: allergyData,
+      }),
       "Add infant allergy",
     );
   },
@@ -121,7 +132,10 @@ const infantService = {
    */
   async updateAllergy(allergyId, allergyData) {
     return handleApiResponse(
-      apiClient.put(`/api/infant-allergies/${allergyId}`, allergyData),
+      requestApi(`/infant-allergies/${allergyId}`, {
+        method: "PUT",
+        data: allergyData,
+      }),
       "Update infant allergy",
     );
   },
@@ -133,7 +147,9 @@ const infantService = {
    */
   async deleteAllergy(allergyId) {
     return handleApiResponse(
-      apiClient.delete(`/api/infant-allergies/${allergyId}`),
+      requestApi(`/infant-allergies/${allergyId}`, {
+        method: "DELETE",
+      }),
       "Delete infant allergy",
     );
   },
@@ -146,9 +162,7 @@ const infantService = {
    */
   async checkVaccineAllergy(infantId, vaccineId) {
     return handleApiResponse(
-      apiClient.get(
-        `/api/infant-allergies/${infantId}/vaccine-check/${vaccineId}`,
-      ),
+      requestApi(`/infant-allergies/${infantId}/vaccine-check/${vaccineId}`),
       "Check vaccine allergy",
     );
   },
@@ -163,7 +177,7 @@ const infantService = {
    */
   async getStats() {
     return handleApiResponse(
-      apiClient.get(`/api/infants/stats/overview`),
+      requestApi(`/infants/stats/overview`),
       "Fetch infant statistics",
     );
   },
@@ -174,7 +188,7 @@ const infantService = {
    */
   async getUpcomingVaccinations() {
     return handleApiResponse(
-      apiClient.get(`/api/infants/upcoming-vaccinations`),
+      requestApi(`/infants/upcoming-vaccinations`),
       "Fetch upcoming vaccinations",
     );
   },
@@ -187,7 +201,7 @@ const infantService = {
    */
   async getByAgeRange(minAge, maxAge) {
     return handleApiResponse(
-      apiClient.get(`/api/infants/age-range/${minAge}/${maxAge}`),
+      requestApi(`/infants/age-range/${minAge}/${maxAge}`),
       "Fetch infants by age range",
     );
   },

@@ -57,6 +57,36 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import { format } from "date-fns";
 import useSocket from "../../hooks/useSocket";
+import apiClient from "../../utils/api";
+
+const PRIORITY_WEIGHT = {
+  urgent: 5,
+  high: 4,
+  normal: 3,
+  medium: 3,
+  low: 2,
+  info: 1,
+};
+
+const toPriorityWeight = (value) => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(1, Math.min(5, value));
+  }
+
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+
+  return PRIORITY_WEIGHT[normalized] || 1;
+};
+
+const toPriorityLabel = (value) => {
+  const weight = toPriorityWeight(value);
+  if (weight >= 5) return "Critical";
+  if (weight >= 4) return "High";
+  if (weight >= 3) return "Medium";
+  return "Low";
+};
 
 const EnhancedNotificationsDashboard = () => {
   useAuth(); // Keep hook call for authentication context initialization
@@ -113,11 +143,10 @@ const EnhancedNotificationsDashboard = () => {
 
         // Try enhanced endpoint first, fall back to regular endpoint
         try {
-          const response = await fetch(
-            `/api/notifications-enhanced?${params.toString()}`,
+          const data = await apiClient.get(
+            `/notifications-enhanced?${params.toString()}`,
           );
-          if (response.ok) {
-            const data = await response.json();
+          if (data) {
             setNotifications(data.notifications || []);
           } else {
             throw new Error("Enhanced endpoint failed");
@@ -128,11 +157,10 @@ const EnhancedNotificationsDashboard = () => {
             "Enhanced notifications failed, using fallback:",
             enhancedError,
           );
-          const fallbackResponse = await fetch(
-            `/api/notifications?${params.toString()}`,
+          const fallbackData = await apiClient.get(
+            `/notifications?${params.toString()}`,
           );
-          if (fallbackResponse.ok) {
-            const fallbackData = await fallbackResponse.json();
+          if (fallbackData) {
             setNotifications(Array.isArray(fallbackData) ? fallbackData : []);
           } else {
             // Set empty array as final fallback
@@ -142,11 +170,8 @@ const EnhancedNotificationsDashboard = () => {
 
         // Fetch alerts with fallback
         try {
-          const alertsResponse = await fetch(
-            "/api/notifications-enhanced/alerts",
-          );
-          if (alertsResponse.ok) {
-            const alertsData = await alertsResponse.json();
+          const alertsData = await apiClient.get("/notifications-enhanced/alerts");
+          if (alertsData) {
             setAlerts(Array.isArray(alertsData) ? alertsData : []);
           } else {
             setAlerts([]);
@@ -158,11 +183,8 @@ const EnhancedNotificationsDashboard = () => {
 
         // Fetch notification preferences with fallback
         try {
-          const prefsResponse = await fetch(
-            "/api/notifications-enhanced/preferences",
-          );
-          if (prefsResponse.ok) {
-            const prefsData = await prefsResponse.json();
+          const prefsData = await apiClient.get("/notifications-enhanced/preferences");
+          if (prefsData) {
             setPreferences(prefsData);
           } else {
             // Set default preferences
@@ -255,21 +277,16 @@ const EnhancedNotificationsDashboard = () => {
 
   const handleMarkAsRead = async (id) => {
     try {
-      const response = await fetch(`/api/notifications-enhanced/${id}/read`, {
+      await apiClient.customRequest(`/notifications-enhanced/${id}/read`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
       });
 
-      if (response.ok) {
-        setNotifications((prev) =>
-          prev.map((notif) =>
-            notif.id === id ? { ...notif, isRead: true } : notif,
-          ),
-        );
-        markNotificationAsRead(id);
-      }
+      setNotifications((prev) =>
+        prev.map((notif) =>
+          notif.id === id ? { ...notif, isRead: true, is_read: true } : notif,
+        ),
+      );
+      markNotificationAsRead(id);
     } catch (error) {
       console.error("Failed to mark notification as read:", error);
     }
@@ -277,18 +294,13 @@ const EnhancedNotificationsDashboard = () => {
 
   const handleMarkAllAsRead = async () => {
     try {
-      const response = await fetch("/api/notifications-enhanced/read-all", {
+      await apiClient.customRequest("/notifications-enhanced/read-all", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
       });
 
-      if (response.ok) {
-        setNotifications((prev) =>
-          prev.map((notif) => ({ ...notif, isRead: true })),
-        );
-      }
+      setNotifications((prev) =>
+        prev.map((notif) => ({ ...notif, isRead: true, is_read: true })),
+      );
     } catch (error) {
       console.error("Failed to mark all notifications as read:", error);
     }
@@ -296,20 +308,12 @@ const EnhancedNotificationsDashboard = () => {
 
   const handleDismiss = async (id) => {
     try {
-      const response = await fetch(
-        `/api/notifications-enhanced/${id}/dismiss`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        },
-      );
+      await apiClient.customRequest(`/notifications-enhanced/${id}/dismiss`, {
+        method: "PATCH",
+      });
 
-      if (response.ok) {
-        setNotifications((prev) => prev.filter((notif) => notif.id !== id));
-        dismissNotification(id);
-      }
+      setNotifications((prev) => prev.filter((notif) => notif.id !== id));
+      dismissNotification(id);
     } catch (error) {
       console.error("Failed to dismiss notification:", error);
     }
@@ -317,12 +321,9 @@ const EnhancedNotificationsDashboard = () => {
 
   const handleTrackClick = async (id, actionType) => {
     try {
-      await fetch(`/api/notifications-enhanced/${id}/click`, {
+      await apiClient.customRequest(`/notifications-enhanced/${id}/click`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ actionType }),
+        data: { actionType },
       });
     } catch (error) {
       console.error("Failed to track click:", error);
@@ -375,11 +376,10 @@ const EnhancedNotificationsDashboard = () => {
 
   const handleFetchAnalytics = async () => {
     try {
-      const response = await fetch(
-        "/api/notifications-enhanced/analytics?timeRange=30days",
+      const data = await apiClient.get(
+        "/notifications-enhanced/analytics?timeRange=30days",
       );
-      if (response.ok) {
-        const data = await response.json();
+      if (data) {
         setAnalytics(data);
       }
     } catch (error) {
@@ -389,19 +389,18 @@ const EnhancedNotificationsDashboard = () => {
 
   const handleSavePreferences = async () => {
     try {
-      const response = await fetch("/api/notifications-enhanced/preferences", {
+      const updatedPrefs = await apiClient.customRequest(
+        "/notifications-enhanced/preferences",
+        {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(preferences),
-      });
+        data: preferences,
+      },
+      );
 
-      if (response.ok) {
-        const updatedPrefs = await response.json();
-        setPreferences(updatedPrefs);
-        setPreferencesDialogOpen(false);
+      if (updatedPrefs?.data) {
+        setPreferences(updatedPrefs.data);
       }
+      setPreferencesDialogOpen(false);
     } catch (error) {
       console.error("Error saving preferences:", error);
     }
@@ -436,17 +435,15 @@ const EnhancedNotificationsDashboard = () => {
   };
 
   const getPriorityColor = (priority) => {
-    if (priority >= 4) return "error";
-    if (priority >= 3) return "warning";
-    if (priority >= 2) return "info";
+    const weight = toPriorityWeight(priority);
+    if (weight >= 4) return "error";
+    if (weight >= 3) return "warning";
+    if (weight >= 2) return "info";
     return "default";
   };
 
   const getPriorityLabel = (priority) => {
-    if (priority >= 4) return "Critical";
-    if (priority >= 3) return "High";
-    if (priority >= 2) return "Medium";
-    return "Low";
+    return toPriorityLabel(priority);
   };
 
   // Sort notifications
@@ -454,7 +451,7 @@ const EnhancedNotificationsDashboard = () => {
     let comparison = 0;
     switch (sortBy) {
       case "priority":
-        comparison = b.priority - a.priority;
+        comparison = toPriorityWeight(b.priority) - toPriorityWeight(a.priority);
         break;
       case "date":
         comparison = new Date(b.createdAt) - new Date(a.createdAt);
@@ -470,9 +467,10 @@ const EnhancedNotificationsDashboard = () => {
 
   // Filter notifications
   const filteredNotifications = sortedNotifications.filter((notif) => {
-    if (filters.minPriority && notif.priority < filters.minPriority)
+    const priorityWeight = toPriorityWeight(notif.priority);
+    if (filters.minPriority && priorityWeight < filters.minPriority)
       return false;
-    if (filters.maxPriority && notif.priority > filters.maxPriority)
+    if (filters.maxPriority && priorityWeight > filters.maxPriority)
       return false;
     return true;
   });

@@ -45,8 +45,14 @@ const GuardianLayout = memo(function GuardianLayout({ children }) {
   const previousDesktopRef = useRef(initialDesktopState);
   const sidebarVisible = isDesktop ? true : sidebarOpen;
 
-  // Check if user is a guardian
-  const isGuardian = user?.role === 'guardian' || user?.role_type === 'guardian';
+  // Check if user is a guardian (canonical role model)
+  const normalizedRoleType = String(user?.role_type || '').toUpperCase();
+  const normalizedRole = String(user?.role || '').toUpperCase();
+  const normalizedLegacyRole = String(user?.legacy_role || '').toUpperCase();
+  const isGuardian =
+    normalizedRoleType === 'GUARDIAN' ||
+    normalizedRole === 'GUARDIAN' ||
+    normalizedLegacyRole === 'GUARDIAN';
 
   // Detect screen size
   useEffect(() => {

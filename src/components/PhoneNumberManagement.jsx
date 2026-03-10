@@ -34,26 +34,41 @@ const PhoneNumberManagement = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [phoneToDelete, setPhoneToDelete] = useState(null);
 
+  const extractPayload = (response) => {
+    if (response && typeof response === "object" && "data" in response) {
+      return response.data;
+    }
+    return response;
+  };
+
+  const guardianIdAsNumber = Number.parseInt(guardianId, 10);
+
   useEffect(() => {
     fetchPhoneNumbers();
   }, [fetchPhoneNumbers]);
 
   const fetchPhoneNumbers = useCallback(async () => {
-    if (!guardianId) return;
+    if (Number.isNaN(guardianIdAsNumber) || guardianIdAsNumber <= 0) return;
 
     try {
       setLoading(true);
-      const response = await smsService.getGuardianPhones(guardianId);
-      setPhoneNumbers(response.data || []);
+      const response = await smsService.getGuardianPhones(guardianIdAsNumber);
+      const payload = extractPayload(response);
+      setPhoneNumbers(Array.isArray(payload) ? payload : []);
     } catch (err) {
       console.error("Error fetching phone numbers:", err);
       setError("Failed to load phone numbers");
     } finally {
       setLoading(false);
     }
-  }, [guardianId]);
+  }, [guardianIdAsNumber]);
 
   const handleAddPhone = async () => {
+    if (Number.isNaN(guardianIdAsNumber) || guardianIdAsNumber <= 0) {
+      setError("Guardian account is not properly linked. Please sign in again.");
+      return;
+    }
+
     if (!newPhone) {
       setError("Please enter a phone number");
       return;
@@ -68,28 +83,34 @@ const PhoneNumberManagement = () => {
       setError(null);
       setIsAddingPhone(true);
 
-      const response = await smsService.updatePhone(guardianId, newPhone, true);
+      const response = await smsService.updatePhone(guardianIdAsNumber, newPhone, true);
+      const payload = extractPayload(response);
 
-      if (response.data.code === "VERIFICATION_SENT") {
+      if (payload?.code === "VERIFICATION_SENT") {
         setPendingPhone(newPhone);
         setSuccess(
           "Verification code sent. Please enter the code to verify your phone number.",
         );
       } else {
         setSuccess("Phone number added successfully");
-        fetchPhoneNumbers();
+        await fetchPhoneNumbers();
       }
 
       setNewPhone("");
     } catch (err) {
       console.error("Error adding phone:", err);
-      setError(err.response?.data?.error || "Failed to add phone number");
+      setError(err?.data?.error || err?.response?.data?.error || "Failed to add phone number");
     } finally {
       setIsAddingPhone(false);
     }
   };
 
   const handleVerifyPhone = async () => {
+    if (Number.isNaN(guardianIdAsNumber) || guardianIdAsNumber <= 0) {
+      setError("Guardian account is not properly linked. Please sign in again.");
+      return;
+    }
+
     if (!verificationCode) {
       setError("Please enter the verification code");
       return;
@@ -100,7 +121,7 @@ const PhoneNumberManagement = () => {
       setIsVerifying(true);
 
       await smsService.verifyPhoneChange(
-        guardianId,
+        guardianIdAsNumber,
         pendingPhone,
         verificationCode,
       );
@@ -108,10 +129,10 @@ const PhoneNumberManagement = () => {
       setSuccess("Phone number verified successfully!");
       setPendingPhone(null);
       setVerificationCode("");
-      fetchPhoneNumbers();
+      await fetchPhoneNumbers();
     } catch (err) {
       console.error("Error verifying phone:", err);
-      setError(err.response?.data?.error || "Invalid verification code");
+      setError(err?.data?.error || err?.response?.data?.error || "Invalid verification code");
     } finally {
       setIsVerifying(false);
     }
@@ -127,7 +148,7 @@ const PhoneNumberManagement = () => {
       setSuccess("New verification code sent");
     } catch (err) {
       console.error("Error sending code:", err);
-      setError(err.response?.data?.error || "Failed to send verification code");
+      setError(err?.data?.error || err?.response?.data?.error || "Failed to send verification code");
     } finally {
       setIsAddingPhone(false);
     }
@@ -137,14 +158,20 @@ const PhoneNumberManagement = () => {
     if (!phoneToDelete) return;
 
     try {
-      // Note: This would require an API endpoint to delete
-      // For now, we'll just close the modal
+      setError(null);
+      if (Number.isNaN(guardianIdAsNumber) || guardianIdAsNumber <= 0) {
+        setError("Guardian account is not properly linked. Please sign in again.");
+        return;
+      }
+
+      await smsService.deletePhone(guardianIdAsNumber, phoneToDelete.id);
       setShowDeleteModal(false);
       setPhoneToDelete(null);
       setSuccess("Phone number removed");
+      await fetchPhoneNumbers();
     } catch (err) {
       console.error("Error deleting phone:", err);
-      setError(err.response?.data?.error || "Failed to delete phone number");
+      setError(err?.data?.error || err?.response?.data?.error || "Failed to delete phone number");
     }
   };
 

@@ -69,7 +69,7 @@ describe("Auth + role routing regression", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.change(screen.getByPlaceholderText(/email, username, or guardian id/i), {
+    fireEvent.change(screen.getByPlaceholderText(/email or patient id/i), {
       target: { name: "guardian_id", value: "guardian_09123456789" },
     });
     fireEvent.change(screen.getByPlaceholderText(/^password$/i), {

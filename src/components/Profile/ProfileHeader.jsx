@@ -15,7 +15,16 @@ import { Button } from "../UI";
  */
 const ProfileHeader = ({ user, isEditing, onEditToggle, loading = false }) => {
   const userName = user?.name || user?.username || "Guardian";
-  const userRole = user?.role === "guardian" ? "Parent/Guardian" : user?.role || "User";
+  const normalizedRoleType = String(user?.role_type || "").toUpperCase();
+  const normalizedRole = String(user?.role || "").toUpperCase();
+  const normalizedLegacyRole = String(user?.legacy_role || "").toUpperCase();
+  const isGuardianRole =
+    normalizedRoleType === "GUARDIAN" ||
+    normalizedRole === "GUARDIAN" ||
+    normalizedLegacyRole === "GUARDIAN";
+  const userRole = isGuardianRole
+    ? "Parent/Guardian"
+    : user?.role || user?.role_type || "User";
   const memberSince = user?.created_at
     ? new Date(user.created_at).toLocaleDateString("en-US", { month: "short", year: "numeric" })
     : "N/A";

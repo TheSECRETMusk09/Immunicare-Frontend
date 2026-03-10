@@ -165,7 +165,7 @@ function AppContent() {
   });
 
   const loginRedirectElement = useMemo(
-    () => <Navigate to="/" replace />,
+    () => <Navigate to="/guardian/login" replace />,
     [],
   );
 
