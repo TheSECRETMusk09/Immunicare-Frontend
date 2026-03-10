@@ -55,6 +55,7 @@ import { format } from "date-fns";
 import { useSearchParams } from "react-router-dom";
 import apiClient from "../../utils/api";
 import { useSocket } from "../../contexts/SocketContext";
+import { useTheme as useAppTheme } from "../../contexts/ThemeContext";
 import { safeLocalStorage, safeSessionStorage } from "../../utils/safeStorage";
 
 const VACCINE_OPTIONS = [
@@ -261,33 +262,50 @@ const PIE_COLORS = [
 ];
 
 const SELECT_MENU_PROPS = {
-  disablePortal: true,
-  keepMounted: true,
+  // Keep default portal behavior so Menu anchors remain in document layout
+  // across tab switches and route unmounts.
+  disablePortal: false,
+  keepMounted: false,
   hideBackdrop: true,
   disableScrollLock: true,
-  disableAutoFocusItem: true,
-  disableEnforceFocus: true,
-  disableRestoreFocus: true,
+  transitionDuration: 0,
   slotProps: {
     backdrop: {
       invisible: true,
     },
     paper: {
-      sx: {
+      sx: (theme) => ({
         maxHeight: 320,
         zIndex: (theme) => theme.zIndex.modal + 2,
-      },
+        bgcolor: theme.palette.mode === 'dark' ? 'rgba(15,23,42,0.95)' : 'background.paper',
+        border: '1px solid',
+        borderColor: theme.palette.mode === 'dark' ? 'rgba(148,163,184,0.3)' : 'divider',
+      }),
     },
   },
   BackdropProps: {
     invisible: true,
   },
   PaperProps: {
-    sx: {
+    sx: (theme) => ({
       maxHeight: 320,
       zIndex: (theme) => theme.zIndex.modal + 2,
-    },
+      bgcolor: theme.palette.mode === 'dark' ? 'rgba(15,23,42,0.95)' : 'background.paper',
+      border: '1px solid',
+      borderColor: theme.palette.mode === 'dark' ? 'rgba(148,163,184,0.3)' : 'divider',
+    }),
   },
+};
+
+const blurActiveElementIfNeeded = () => {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const activeElement = document.activeElement;
+  if (activeElement && typeof activeElement.blur === "function") {
+    activeElement.blur();
+  }
 };
 
 const safeNum = (value) => {
@@ -377,8 +395,7 @@ const toShortDateTime = (value) => {
   });
 };
 
-const resolveChartAppearance = (theme) => {
-  const isDark = theme.palette.mode === "dark";
+const resolveChartAppearance = (isDark) => {
 
   return {
     isDark,
@@ -677,8 +694,8 @@ const mapDashboardPayload = (payload) => {
     demographics.ageDistribution,
     demographics.byAge,
   ).map((item) => ({
-        group: item.label || "Unknown",
-        count: safeNum(item.count ?? item.total ?? item.value),
+        group: item.label || item.group || item.age_group || item.ageGroup || "Unknown",
+        count: safeNum(item.count ?? item.total ?? item.value ?? item.infants),
       }));
 
   const demographicsGender = normalizeArray(
@@ -686,8 +703,8 @@ const mapDashboardPayload = (payload) => {
     demographics.gender,
     demographics.genderDistribution,
   ).map((item) => ({
-        label: item.label || "Unknown",
-        count: safeNum(item.count ?? item.total ?? item.value),
+        label: item.label || item.gender || item.sex || item.name || "Unknown",
+        count: safeNum(item.count ?? item.total ?? item.value ?? item.infants),
       }));
 
   const activity = normalizeArray(payload?.recentActivity, payload?.activity, payload?.activityFeed);
@@ -754,20 +771,20 @@ const mapDashboardPayload = (payload) => {
       infants: safeNum(demographics?.coverage?.infants ?? demographics?.coverageInfants),
       guardians: safeNum(demographics?.coverage?.guardians ?? demographics?.coverageGuardians),
     },
-    activity: activity.map((item) => ({
-      id: item.id,
-      type: item.type,
-      title: item.title,
-      description: item.description,
-      severity: item.severity,
-      timestamp: item.timestamp,
+    activity: activity.map((item, index) => ({
+      id: item.id || `activity-${index}`,
+      type: item.type || item.category || "activity",
+      title: item.title || item.name || statusLabel(item.type || item.category || "Activity"),
+      description: item.description || item.message || item.details || "",
+      severity: item.severity || item.level || "info",
+      timestamp: item.timestamp || item.activity_at || item.createdAt || item.updatedAt || null,
     })),
-    alerts: alerts.map((item) => ({
-      id: item.id,
-      severity: item.severity,
-      type: item.type,
-      message: item.message,
-      timestamp: item.timestamp,
+    alerts: alerts.map((item, index) => ({
+      id: item.id || `alert-${index}`,
+      severity: item.severity || item.level || "warning",
+      type: item.type || item.category || "alert",
+      message: item.message || item.description || item.title || "Alert",
+      timestamp: item.timestamp || item.alert_at || item.createdAt || null,
     })),
     reportShortcuts,
   };
@@ -784,11 +801,11 @@ const FilterBar = ({
   onAutoRefreshToggle,
   isDark,
 }) => {
-  const theme = useTheme();
-  const isDarkMode = theme.palette.mode === 'dark';
+  const surfaceBg = isDark ? "rgba(15,23,42,0.72)" : "background.paper";
+  const surfaceBorder = isDark ? "rgba(148,163,184,0.22)" : "divider";
 
   return (
-    <Card sx={{ mb: 3, bgcolor: isDarkMode ? 'background.default' : 'background.paper' }}>
+    <Card sx={{ mb: 3, bgcolor: surfaceBg, border: "1px solid", borderColor: surfaceBorder }}>
       <CardContent>
         <Grid container spacing={2} alignItems="center">
           <Grid size={{ xs: 12, lg: 9 }}>
@@ -938,16 +955,19 @@ const FilterBar = ({
 };
 
 const KpiCard = ({ title, value, subtitle, icon, color = "primary", loading, isDark }) => {
-  const theme = useTheme();
-  const isDarkMode = theme.palette.mode === 'dark';
   const Icon = icon;
   const displayValue = typeof value === "number" ? safeNum(value).toLocaleString() : String(value ?? "0");
+  const surfaceBg = isDark ? "rgba(15,23,42,0.72)" : "background.paper";
+  const surfaceBorder = isDark ? "rgba(148,163,184,0.22)" : "divider";
+  const titleColor = isDark ? '#94A3B8' : 'text.secondary';
+  const subtitleColor = isDark ? '#64748B' : 'text.secondary';
+  const valueColor = isDark ? '#F8FAFC' : 'text.primary';
 
   return (
-    <Card sx={{ height: "100%", bgcolor: isDarkMode ? 'background.default' : 'background.paper' }}>
+    <Card sx={{ height: "100%", bgcolor: surfaceBg, border: "1px solid", borderColor: surfaceBorder }}>
       <CardContent>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: titleColor }}>
             {title}
           </Typography>
           <Icon color={color} fontSize="small" />
@@ -960,11 +980,11 @@ const KpiCard = ({ title, value, subtitle, icon, color = "primary", loading, isD
           </>
         ) : (
           <>
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: valueColor }}>
               {displayValue}
             </Typography>
             {subtitle ? (
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" sx={{ color: subtitleColor }}>
                 {subtitle}
               </Typography>
             ) : null}
@@ -1097,11 +1117,11 @@ const ChartCard = ({
       }}
     >
       <CardContent sx={{ p: { xs: 2, sm: 2.25 } }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: "-0.01em" }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: "-0.01em", color: chartAppearance.isDark ? '#FFFFFF' : 'text.primary' }}>
           {title}
         </Typography>
         {subtitle ? (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2, lineHeight: 1.5 }}>
+          <Typography variant="body2" sx={{ mb: 2, lineHeight: 1.5, color: chartAppearance.isDark ? '#94A3B8' : 'text.secondary' }}>
             {subtitle}
           </Typography>
         ) : (
@@ -1270,18 +1290,18 @@ const VaccineProgressSection = ({ data, loading, chartAppearance }) => {
 };
 
 const AppointmentAndFollowupSection = ({ data, loading, chartAppearance }) => {
-  const theme = useTheme();
-  const isDarkMode = theme.palette.mode === 'dark';
   const appointment = data?.appointmentFollowup || {};
   const statusData = data?.appointmentStatusBreakdown || [];
   const appointmentTotal = statusData.reduce((total, entry) => total + safeNum(entry.count), 0);
+  const surfaceBg = chartAppearance.isDark ? "rgba(15,23,42,0.72)" : "background.paper";
+  const surfaceBorder = chartAppearance.isDark ? "rgba(148,163,184,0.22)" : "divider";
 
   return (
     <Grid container spacing={2} sx={{ mb: 3 }}>
       <Grid size={{ xs: 12, md: 6 }}>
-        <Card sx={{ height: "100%", bgcolor: isDarkMode ? 'background.default' : 'background.paper' }}>
+        <Card sx={{ height: "100%", bgcolor: surfaceBg, border: "1px solid", borderColor: surfaceBorder }}>
           <CardContent>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: chartAppearance.isDark ? '#FFFFFF' : 'text.primary' }}>
               Appointment and Follow-up Summary
             </Typography>
 
@@ -1296,22 +1316,22 @@ const AppointmentAndFollowupSection = ({ data, loading, chartAppearance }) => {
             ) : (
               <Grid container spacing={1.5}>
                 <Grid size={6}>
-                  <SummaryMiniCard label="Total In Period" value={appointment.totalInPeriod} />
+                  <SummaryMiniCard label="Total In Period" value={appointment.totalInPeriod} isDark={chartAppearance.isDark} />
                 </Grid>
                 <Grid size={6}>
-                  <SummaryMiniCard label="Today" value={appointment.today} />
+                  <SummaryMiniCard label="Today" value={appointment.today} isDark={chartAppearance.isDark} />
                 </Grid>
                 <Grid size={6}>
-                  <SummaryMiniCard label="Upcoming (7 Days)" value={appointment.upcoming7Days} />
+                  <SummaryMiniCard label="Upcoming (7 Days)" value={appointment.upcoming7Days} isDark={chartAppearance.isDark} />
                 </Grid>
                 <Grid size={6}>
-                  <SummaryMiniCard label="Overdue Follow-ups" value={appointment.overdueFollowUps} error />
+                  <SummaryMiniCard label="Overdue Follow-ups" value={appointment.overdueFollowUps} error isDark={chartAppearance.isDark} />
                 </Grid>
                 <Grid size={6}>
-                  <SummaryMiniCard label="Follow-ups Today" value={appointment.followUpsToday} />
+                  <SummaryMiniCard label="Follow-ups Today" value={appointment.followUpsToday} isDark={chartAppearance.isDark} />
                 </Grid>
                 <Grid size={6}>
-                  <SummaryMiniCard label="Follow-ups in Period" value={appointment.followUpsInPeriod} />
+                  <SummaryMiniCard label="Follow-ups in Period" value={appointment.followUpsInPeriod} isDark={chartAppearance.isDark} />
                 </Grid>
               </Grid>
             )}
@@ -1383,23 +1403,22 @@ const AppointmentAndFollowupSection = ({ data, loading, chartAppearance }) => {
 };
 
 const InventorySection = ({ data, loading, chartAppearance, viewportWidth }) => {
-  const theme = useTheme();
-  const isDarkMode = theme.palette.mode === 'dark';
   const inventory = data?.inventory || {};
   const rows = inventory.byVaccine || [];
   const axisTick = { fill: chartAppearance.axisTick, fontSize: 12, fontWeight: 500 };
   const axisLine = { stroke: chartAppearance.axisLine };
   const mobileLayout = viewportWidth < 640;
   const tabletLayout = viewportWidth >= 640 && viewportWidth < 960;
+  const surfaceBg = chartAppearance.isDark ? "rgba(15,23,42,0.72)" : "background.paper";
+  const surfaceBorder = chartAppearance.isDark ? "rgba(148,163,184,0.22)" : "divider";
 
   return (
     <Grid container spacing={2} sx={{ mb: 3 }}>
       <Grid size={{ xs: 12, md: 5 }}>
-        <Card sx={{ height: "100%", bgcolor: isDarkMode ? 'background.default' : 'background.paper' }}>
+        <Card sx={{ height: "100%", bgcolor: surfaceBg, border: "1px solid", borderColor: surfaceBorder }}>
           <CardContent>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-              Vaccine Inventory Summary
-            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: chartAppearance.isDark ? '#FFFFFF' : 'text.primary' }}>
+              Vaccine Inventory Summary            </Typography>
             {loading ? (
               <>
                 <Skeleton height={80} />
@@ -1409,19 +1428,19 @@ const InventorySection = ({ data, loading, chartAppearance, viewportWidth }) => 
             ) : (
               <Grid container spacing={1.5}>
                 <Grid size={6}>
-                  <SummaryMiniCard label="Total Inventory Items" value={inventory.totalItems} />
+                  <SummaryMiniCard label="Total Inventory Items" value={inventory.totalItems} isDark={chartAppearance.isDark} />
                 </Grid>
                 <Grid size={6}>
-                  <SummaryMiniCard label="Available Doses" value={inventory.totalAvailableDoses} />
+                  <SummaryMiniCard label="Available Doses" value={inventory.totalAvailableDoses} isDark={chartAppearance.isDark} />
                 </Grid>
                 <Grid size={6}>
-                  <SummaryMiniCard label="Low-stock" value={inventory.lowStockCount} error />
+                  <SummaryMiniCard label="Low-stock" value={inventory.lowStockCount} error isDark={chartAppearance.isDark} />
                 </Grid>
                 <Grid size={6}>
-                  <SummaryMiniCard label="Critical-stock" value={inventory.criticalStockCount} error />
+                  <SummaryMiniCard label="Critical-stock" value={inventory.criticalStockCount} error isDark={chartAppearance.isDark} />
                 </Grid>
                 <Grid size={12}>
-                  <SummaryMiniCard label="Out-of-stock" value={inventory.outOfStockCount} error />
+                  <SummaryMiniCard label="Out-of-stock" value={inventory.outOfStockCount} error isDark={chartAppearance.isDark} />
                 </Grid>
               </Grid>
             )}
@@ -1507,18 +1526,16 @@ const InventorySection = ({ data, loading, chartAppearance, viewportWidth }) => 
 };
 
 const SmsAndDemographicsSection = ({ data, loading, chartAppearance, showGenderChart = false }) => {
-  const theme = useTheme();
-  const isDarkMode = theme.palette.mode === 'dark';
   const reminder = data?.reminders || {};
   const coverage = data?.demographicsCoverage || {};
   const ageData = data?.demographicsAgeGroups || [];
   const genderData = (data?.demographicsGender || [])
     .map((item, index) => {
       const rawLabel = String(item.label || "Unknown").trim();
-      const normalized = rawLabel.toLowerCase();
-      const label = normalized.includes("female")
+      const normalized = rawLabel.toLowerCase().replace(/\./g, "").trim();
+      const label = normalized === "f" || normalized.startsWith("fem")
         ? "Female"
-        : normalized.includes("male")
+        : normalized === "m" || normalized.startsWith("mal")
           ? "Male"
           : rawLabel || "Unknown";
 
@@ -1550,15 +1567,16 @@ const SmsAndDemographicsSection = ({ data, loading, chartAppearance, showGenderC
 
   const summaryGridSize = showGenderChart ? { xs: 12, lg: 4 } : { xs: 12, md: 5 };
   const ageChartGridSize = showGenderChart ? { xs: 12, md: 6, lg: 4 } : { xs: 12, md: 7 };
+  const surfaceBg = chartAppearance.isDark ? "rgba(15,23,42,0.72)" : "background.paper";
+  const surfaceBorder = chartAppearance.isDark ? "rgba(148,163,184,0.22)" : "divider";
 
   return (
     <Grid container spacing={2} sx={{ mb: 3 }}>
       <Grid size={summaryGridSize}>
-        <Card sx={{ height: "100%", bgcolor: isDarkMode ? 'background.default' : 'background.paper' }}>
+        <Card sx={{ height: "100%", bgcolor: surfaceBg, border: "1px solid", borderColor: surfaceBorder }}>
           <CardContent>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-              SMS Reminder Analytics
-            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: chartAppearance.isDark ? '#FFFFFF' : 'text.primary' }}>
+              SMS Reminder Analytics            </Typography>
             {loading ? (
               <>
                 <Skeleton height={64} />
@@ -1569,22 +1587,22 @@ const SmsAndDemographicsSection = ({ data, loading, chartAppearance, showGenderC
             ) : (
               <Grid container spacing={1.5}>
                 <Grid size={6}>
-                  <SummaryMiniCard label="SMS Sent" value={reminder.smsSent} />
+                  <SummaryMiniCard label="SMS Sent" value={reminder.smsSent} isDark={chartAppearance.isDark} />
                 </Grid>
                 <Grid size={6}>
-                  <SummaryMiniCard label="SMS Delivered" value={reminder.smsDelivered} />
+                  <SummaryMiniCard label="SMS Delivered" value={reminder.smsDelivered} isDark={chartAppearance.isDark} />
                 </Grid>
                 <Grid size={6}>
-                  <SummaryMiniCard label="SMS Failed" value={reminder.smsFailed} error />
+                  <SummaryMiniCard label="SMS Failed" value={reminder.smsFailed} error isDark={chartAppearance.isDark} />
                 </Grid>
                 <Grid size={6}>
-                  <SummaryMiniCard label="Delivery Rate" value={`${safeNum(reminder.deliveryRate).toFixed(1)}%`} />
+                  <SummaryMiniCard label="Delivery Rate" value={`${safeNum(reminder.deliveryRate).toFixed(1)}%`} isDark={chartAppearance.isDark} />
                 </Grid>
                 <Grid size={6}>
-                  <SummaryMiniCard label="Unread Notifications" value={reminder.unreadNotifications} />
+                  <SummaryMiniCard label="Unread Notifications" value={reminder.unreadNotifications} isDark={chartAppearance.isDark} />
                 </Grid>
                 <Grid size={6}>
-                  <SummaryMiniCard label="Failed SMS Count" value={reminder.failedSmsCount} error />
+                  <SummaryMiniCard label="Failed SMS Count" value={reminder.failedSmsCount} error isDark={chartAppearance.isDark} />
                 </Grid>
               </Grid>
             )}
@@ -1857,17 +1875,17 @@ const TrendsSection = ({ data, loading, chartAppearance }) => {
   );
 };
 
-const AlertsActivityReportsSection = ({ data, loading }) => {
-  const theme = useTheme();
-  const isDarkMode = theme.palette.mode === 'dark';
+const AlertsActivityReportsSection = ({ data, loading, isDark }) => {
   const alerts = data?.alerts || [];
   const activity = data?.activity || [];
   const reports = data?.reportShortcuts || [];
+  const surfaceBg = isDark ? "rgba(15,23,42,0.72)" : "background.paper";
+  const surfaceBorder = isDark ? "rgba(148,163,184,0.22)" : "divider";
 
   return (
     <Grid container spacing={2}>
       <Grid size={{ xs: 12, lg: 4 }}>
-        <Card sx={{ height: "100%", bgcolor: isDarkMode ? 'background.default' : 'background.paper' }}>
+        <Card sx={{ height: "100%", bgcolor: surfaceBg, border: "1px solid", borderColor: surfaceBorder }}>
           <CardContent>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               Critical Alerts
@@ -1891,7 +1909,7 @@ const AlertsActivityReportsSection = ({ data, loading }) => {
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
                       {item.message}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" sx={{ color: isDark ? '#64748B' : 'text.secondary' }}>
                       {toShortDateTime(item.timestamp)}
                     </Typography>
                   </Alert>
@@ -1903,7 +1921,7 @@ const AlertsActivityReportsSection = ({ data, loading }) => {
       </Grid>
 
       <Grid size={{ xs: 12, lg: 5 }}>
-        <Card sx={{ height: "100%", bgcolor: isDarkMode ? 'background.default' : 'background.paper' }}>
+        <Card sx={{ height: "100%", bgcolor: surfaceBg, border: "1px solid", borderColor: surfaceBorder }}>
           <CardContent>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               Recent Activity Feed
@@ -1940,7 +1958,7 @@ const AlertsActivityReportsSection = ({ data, loading }) => {
                         sx={{ height: 22 }}
                       />
                     </Box>
-                    <Typography variant="caption" color="text.secondary" display="block">
+                    <Typography variant="caption" display="block" sx={{ color: isDark ? '#94A3B8' : 'text.secondary' }}>
                       {item.description}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
@@ -1955,7 +1973,7 @@ const AlertsActivityReportsSection = ({ data, loading }) => {
       </Grid>
 
       <Grid size={{ xs: 12, lg: 3 }}>
-        <Card sx={{ height: "100%", bgcolor: isDarkMode ? 'background.default' : 'background.paper' }}>
+        <Card sx={{ height: "100%", bgcolor: surfaceBg, border: "1px solid", borderColor: surfaceBorder }}>
           <CardContent>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               Report Shortcuts
@@ -1986,7 +2004,7 @@ const AlertsActivityReportsSection = ({ data, loading }) => {
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
                         {report.title}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" sx={{ color: isDark ? '#64748B' : 'text.secondary' }}>
                         {String(report.format || "").toUpperCase()}
                       </Typography>
                     </Box>
@@ -2001,25 +2019,25 @@ const AlertsActivityReportsSection = ({ data, loading }) => {
   );
 };
 
-const SummaryMiniCard = ({ label, value, error = false }) => {
-  const theme = useTheme();
-  const isDarkMode = theme.palette.mode === 'dark';
+const SummaryMiniCard = ({ label, value, error = false, isDark = false }) => {
+  const labelColor = isDark ? '#94A3B8' : 'text.secondary';
+  const valueColor = error ? 'error.main' : (isDark ? '#F8FAFC' : 'text.primary');
 
   return (
     <Box
       sx={{
         border: "1px solid",
-        borderColor: isDarkMode ? 'rgba(148,163,184,0.22)' : 'divider',
+        borderColor: isDark ? 'rgba(148,163,184,0.22)' : 'divider',
         borderRadius: 2,
         p: 1.5,
         minHeight: 72,
-        bgcolor: isDarkMode ? 'rgba(30,41,59,0.5)' : 'transparent',
+        bgcolor: isDark ? 'rgba(30,41,59,0.5)' : 'transparent',
       }}
     >
-      <Typography variant="caption" color="text.secondary" display="block">
+      <Typography variant="caption" sx={{ color: labelColor, display: "block" }}>
         {label}
       </Typography>
-      <Typography variant="h6" sx={{ fontWeight: 700 }} color={error ? "error.main" : "text.primary"}>
+      <Typography variant="h6" sx={{ fontWeight: 700, color: valueColor }}>
         {typeof value === "number" ? safeNum(value).toLocaleString() : value}
       </Typography>
     </Box>
@@ -2074,7 +2092,8 @@ const exportRowsToCsv = ({ data, filters }) => {
 
 const AnalyticsDashboard = () => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const { darkMode } = useAppTheme();
+  const isDark = darkMode;
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isTabletDown = useMediaQuery(theme.breakpoints.down("md"));
   const viewportWidth = isMobile ? 560 : isTabletDown ? 840 : 1200;
@@ -2204,6 +2223,12 @@ const AnalyticsDashboard = () => {
     };
   }, [fetchDashboard, on, off, connectionState]);
 
+  useEffect(() => {
+    return () => {
+      blurActiveElementIfNeeded();
+    };
+  }, []);
+
   const handleFilterChange = (field, value) => {
     setFilters((previous) => ({ ...previous, [field]: value }));
   };
@@ -2234,7 +2259,7 @@ const AnalyticsDashboard = () => {
   };
 
   const liveSyncEnabled = useMemo(() => connectionState === "connected", [connectionState]);
-  const chartAppearance = useMemo(() => resolveChartAppearance(theme), [theme]);
+  const chartAppearance = useMemo(() => resolveChartAppearance(isDark), [isDark]);
   const tabFromUrl = normalizeAnalyticsTabKey(searchParams.get("tab"));
 
   const activeTabKey = useMemo(
@@ -2261,6 +2286,7 @@ const AnalyticsDashboard = () => {
 
   const handleTabChange = useCallback(
     (_event, nextTabIndex) => {
+      blurActiveElementIfNeeded();
       const nextTabKey = ANALYTICS_TAB_CONFIG[nextTabIndex]?.key || ANALYTICS_DEFAULT_TAB_KEY;
       const nextParams = new URLSearchParams(searchParams);
       nextParams.set("tab", nextTabKey);
@@ -2299,9 +2325,11 @@ const AnalyticsDashboard = () => {
           sx={{
             mb: 2,
             '& .MuiTab-root': {
-              color: isDark ? '#94A3B8' : '#64748B',
+              color: isDark ? '#FFFFFF' : '#64748B',
+              fontWeight: 700,
               '&.Mui-selected': {
-                color: isDark ? '#F8FAFC' : '#0F172A',
+                color: isDark ? '#FFFFFF' : '#0F172A',
+                fontWeight: 700,
               },
             },
             '& .MuiTabs-indicator': {
@@ -2339,7 +2367,7 @@ const AnalyticsDashboard = () => {
           </Alert>
         ) : null}
 
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+        <Typography variant="caption" sx={{ display: "block", mb: 2, color: isDark ? '#64748B' : 'text.secondary' }}>
           Scope: {dashboardData?.scopeLabel || "Barangay Health Center, Pasig City"}
           {dashboardData?.generatedAt ? ` • Last generated: ${toShortDateTime(dashboardData.generatedAt)}` : ""}
         </Typography>
@@ -2395,7 +2423,7 @@ const AnalyticsDashboard = () => {
               chartAppearance={chartAppearance}
               showGenderChart
             />
-            <AlertsActivityReportsSection data={dashboardData} loading={loading} />
+            <AlertsActivityReportsSection data={dashboardData} loading={loading} isDark={isDark} />
           </>
         )}
 
@@ -2419,4 +2447,3 @@ const AnalyticsDashboard = () => {
 };
 
 export default AnalyticsDashboard;
-

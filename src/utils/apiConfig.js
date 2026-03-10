@@ -37,12 +37,28 @@ export const normalizeApiBaseUrl = (
   }
 };
 
-export const API_BASE_URL = normalizeApiBaseUrl();
+// Production API base URL configuration
+const getProductionApiUrl = () => {
+  // Default to production API subdomain for production environment
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://api.immunicareph.site/api';
+  }
+  return normalizeApiBaseUrl();
+};
+
+export const API_BASE_URL = getProductionApiUrl();
 
 export const getAllowedFrontendOrigins = () => {
-  return parseConfiguredOrigins(
-    process.env.REACT_APP_FRONTEND_URL,
-    process.env.REACT_APP_APP_URL,
-  );
+  const productionOrigins = ['https://immunicareph.site', 'https://www.immunicareph.site'];
+
+  // For development, use configured origins or defaults
+  if (process.env.NODE_ENV === 'development') {
+    return parseConfiguredOrigins(
+      process.env.REACT_APP_FRONTEND_URL,
+      process.env.REACT_APP_APP_URL,
+    );
+  }
+
+  return productionOrigins;
 };
 

@@ -119,22 +119,22 @@ const NotificationSkeleton = () => (
 // ENHANCED STAT CARD COMPONENT
 // ============================================
 
-const StatCard = ({ label, value, subLabel, icon: Icon, bgColor, iconBgColor, textColor, onClick }) => (
+const StatCard = ({ label, value, subLabel, icon: Icon, variant = 'emerald', onClick }) => (
   <div
-    className={`${bgColor} rounded-2xl p-4 sm:p-5 relative overflow-hidden min-h-[100px] sm:min-h-[120px] transition-all duration-200 hover:shadow-md ${onClick ? 'cursor-pointer hover:-translate-y-1' : ''}`}
+    className={`guardian-stat-card guardian-stat-card--${variant} rounded-2xl p-4 sm:p-5 relative overflow-hidden min-h-[100px] sm:min-h-[120px] transition-all duration-200 hover:shadow-md ${onClick ? 'cursor-pointer hover:-translate-y-1' : ''}`}
     onClick={onClick}
   >
     {/* Background decoration */}
-    <div className={`absolute top-2 right-2 sm:top-3 sm:right-3 w-10 h-10 sm:w-12 sm:h-12 ${iconBgColor} rounded-xl flex items-center justify-center opacity-80`}>
-      <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${textColor}`} />
+    <div className="absolute top-2 right-2 sm:top-3 sm:right-3 w-10 h-10 sm:w-12 sm:h-12 guardian-stat-card__icon-wrap rounded-xl flex items-center justify-center opacity-80">
+      <Icon className="w-5 h-5 sm:w-6 sm:h-6 guardian-stat-card__icon" />
     </div>
     <div className="relative z-10">
-      <p className={`text-[10px] sm:text-xs font-bold ${textColor} uppercase tracking-wider mb-1 sm:mb-2 opacity-90`}>{label}</p>
-      <p className={`text-2xl sm:text-3xl font-bold ${textColor} mb-0.5 sm:mb-1`}>{value}</p>
+      <p className="text-[10px] sm:text-xs font-bold guardian-stat-card__label uppercase tracking-wider mb-1 sm:mb-2 opacity-90">{label}</p>
+      <p className="text-2xl sm:text-3xl font-bold guardian-stat-card__value mb-0.5 sm:mb-1">{value}</p>
       {subLabel && (
         <div className="flex items-center gap-1">
-          <TrendingUp className={`w-3 h-3 ${textColor} opacity-70`} />
-          <span className={`text-[10px] sm:text-xs ${textColor} opacity-80 font-medium`}>{subLabel}</span>
+          <TrendingUp className="w-3 h-3 guardian-stat-card__trend-icon opacity-70" />
+          <span className="text-[10px] sm:text-xs guardian-stat-card__trend-text opacity-80 font-medium">{subLabel}</span>
         </div>
       )}
     </div>
@@ -148,62 +148,29 @@ const StatCard = ({ label, value, subLabel, icon: Icon, bgColor, iconBgColor, te
 const ProgressCard = ({ title, completed, pending, total, icon: Icon, color = 'emerald' }) => {
   const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-  const colorClasses = {
-    emerald: {
-      bg: 'bg-emerald-100',
-      iconBg: 'bg-emerald-200',
-      text: 'text-emerald-700',
-      progressBg: 'bg-emerald-200',
-      progressFill: 'bg-emerald-500',
-    },
-    blue: {
-      bg: 'bg-blue-100',
-      iconBg: 'bg-blue-200',
-      text: 'text-blue-700',
-      progressBg: 'bg-blue-200',
-      progressFill: 'bg-blue-500',
-    },
-    purple: {
-      bg: 'bg-purple-100',
-      iconBg: 'bg-purple-200',
-      text: 'text-purple-700',
-      progressBg: 'bg-purple-200',
-      progressFill: 'bg-purple-500',
-    },
-    amber: {
-      bg: 'bg-amber-100',
-      iconBg: 'bg-amber-200',
-      text: 'text-amber-700',
-      progressBg: 'bg-amber-200',
-      progressFill: 'bg-amber-500',
-    },
-  };
-
-  const colors = colorClasses[color] || colorClasses.emerald;
-
   return (
-    <div className={`${colors.bg} rounded-2xl p-4 sm:p-5`}>
+    <div className={`guardian-progress-card guardian-progress-card--${color} rounded-2xl p-4 sm:p-5`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className={`${colors.iconBg} rounded-lg p-1.5`}>
-            <Icon className={`w-4 h-4 ${colors.text}`} />
+          <div className="guardian-progress-card__icon-wrap rounded-lg p-1.5">
+            <Icon className="w-4 h-4 guardian-progress-card__icon" />
           </div>
-          <span className={`text-sm font-bold ${colors.text}`}>{title}</span>
+          <span className="text-sm font-bold guardian-progress-card__title">{title}</span>
         </div>
-        <span className={`text-lg font-bold ${colors.text}`}>{percentage}%</span>
+        <span className="text-lg font-bold guardian-progress-card__percentage">{percentage}%</span>
       </div>
 
       {/* Progress bar */}
-      <div className={`h-2 ${colors.progressBg} rounded-full overflow-hidden mb-2`}>
+      <div className="h-2 guardian-progress-card__track rounded-full overflow-hidden mb-2">
         <div
-          className={`h-full ${colors.progressFill} rounded-full transition-all duration-500`}
+          className="h-full guardian-progress-card__fill rounded-full transition-all duration-500"
           style={{ width: `${percentage}%` }}
         />
       </div>
 
       <div className="flex items-center justify-between text-xs">
-        <span className={`${colors.text} opacity-80`}>{completed} completed</span>
-        <span className={`${colors.text} opacity-80`}>{pending} pending</span>
+        <span className="guardian-progress-card__meta opacity-80">{completed} completed</span>
+        <span className="guardian-progress-card__meta opacity-80">{pending} pending</span>
       </div>
     </div>
   );
@@ -726,18 +693,14 @@ const GuardianDashboard = () => {
                   label="MY CHILDREN"
                   value={stats.childrenCount}
                   icon={Users}
-                  bgColor="bg-emerald-100"
-                  iconBgColor="bg-emerald-200"
-                  textColor="text-emerald-700"
+                  variant="emerald"
                   onClick={() => navigate('/guardian/children')}
                 />
                 <StatCard
                   label="NEXT APPT"
                   value={stats.nextAppointment}
                   icon={Calendar}
-                  bgColor="bg-blue-100"
-                  iconBgColor="bg-blue-200"
-                  textColor="text-blue-700"
+                  variant="blue"
                   onClick={() => navigate('/guardian/appointments')}
                 />
                 <StatCard
@@ -745,9 +708,7 @@ const GuardianDashboard = () => {
                   value={stats.vaccinatedCount}
                   subLabel="Completed"
                   icon={Syringe}
-                  bgColor="bg-purple-100"
-                  iconBgColor="bg-purple-200"
-                  textColor="text-purple-700"
+                  variant="purple"
                   onClick={() => navigate('/guardian/vaccination-records')}
                 />
                 {stats.overdueCount > 0 ? (
@@ -755,9 +716,7 @@ const GuardianDashboard = () => {
                     label="OVERDUE"
                     value={stats.overdueCount}
                     icon={AlertCircle}
-                    bgColor="bg-red-100"
-                    iconBgColor="bg-red-200"
-                    textColor="text-red-700"
+                    variant="red"
                     onClick={() => navigate('/guardian/appointments/new')}
                   />
                 ) : (
@@ -765,9 +724,7 @@ const GuardianDashboard = () => {
                     label="PENDING"
                     value={stats.pendingCount}
                     icon={Clock}
-                    bgColor="bg-amber-100"
-                    iconBgColor="bg-amber-200"
-                    textColor="text-amber-700"
+                    variant="amber"
                   />
                 )}
               </>
@@ -850,31 +807,31 @@ const GuardianDashboard = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <button
               onClick={() => navigate('/guardian/appointments')}
-              className="guardian-quick-action-btn flex flex-col items-center justify-center p-4 sm:p-5 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 min-h-[100px] sm:min-h-[120px]"
+              className="guardian-quick-action-btn guardian-dashboard-quick-action flex flex-col items-center justify-center p-4 sm:p-5 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 min-h-[100px] sm:min-h-[120px]"
             >
-              <Calendar className="w-6 h-6 sm:w-7 sm:h-7 text-white mb-2" />
-              <span className="text-xs sm:text-sm font-semibold text-white text-center">Appointments</span>
+              <Calendar className="w-6 h-6 sm:w-7 sm:h-7 guardian-dashboard-quick-action__icon mb-2" />
+              <span className="text-xs sm:text-sm font-semibold guardian-dashboard-quick-action__label text-center">Appointments</span>
             </button>
             <button
               onClick={() => navigate('/guardian/children')}
-              className="guardian-quick-action-btn flex flex-col items-center justify-center p-4 sm:p-5 bg-gradient-to-br from-emerald-500 to-emerald-600 dark:from-emerald-600 dark:to-emerald-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 min-h-[100px] sm:min-h-[120px]"
+              className="guardian-quick-action-btn guardian-dashboard-quick-action flex flex-col items-center justify-center p-4 sm:p-5 bg-gradient-to-br from-emerald-500 to-emerald-600 dark:from-emerald-600 dark:to-emerald-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 min-h-[100px] sm:min-h-[120px]"
             >
-              <Users className="w-6 h-6 sm:w-7 sm:h-7 text-white mb-2" />
-              <span className="text-xs sm:text-sm font-semibold text-white text-center">My Children</span>
+              <Users className="w-6 h-6 sm:w-7 sm:h-7 guardian-dashboard-quick-action__icon mb-2" />
+              <span className="text-xs sm:text-sm font-semibold guardian-dashboard-quick-action__label text-center">My Children</span>
             </button>
             <button
               onClick={() => navigate('/guardian/immunization-chart')}
-              className="guardian-quick-action-btn flex flex-col items-center justify-center p-4 sm:p-5 bg-gradient-to-br from-violet-500 to-violet-600 dark:from-violet-600 dark:to-violet-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 min-h-[100px] sm:min-h-[120px]"
+              className="guardian-quick-action-btn guardian-dashboard-quick-action flex flex-col items-center justify-center p-4 sm:p-5 bg-gradient-to-br from-violet-500 to-violet-600 dark:from-violet-600 dark:to-violet-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 min-h-[100px] sm:min-h-[120px]"
             >
-              <Syringe className="w-6 h-6 sm:w-7 sm:h-7 text-white mb-2" />
-              <span className="text-xs sm:text-sm font-semibold text-white text-center">Immunization</span>
+              <Syringe className="w-6 h-6 sm:w-7 sm:h-7 guardian-dashboard-quick-action__icon mb-2" />
+              <span className="text-xs sm:text-sm font-semibold guardian-dashboard-quick-action__label text-center">Immunization</span>
             </button>
             <button
               onClick={() => navigate('/guardian/vaccination-records')}
-              className="guardian-quick-action-btn flex flex-col items-center justify-center p-4 sm:p-5 bg-gradient-to-br from-amber-500 to-amber-600 dark:from-amber-600 dark:to-amber-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 min-h-[100px] sm:min-h-[120px]"
+              className="guardian-quick-action-btn guardian-dashboard-quick-action flex flex-col items-center justify-center p-4 sm:p-5 bg-gradient-to-br from-amber-500 to-amber-600 dark:from-amber-600 dark:to-amber-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 min-h-[100px] sm:min-h-[120px]"
             >
-              <FileText className="w-6 h-6 sm:w-7 sm:h-7 text-white mb-2" />
-              <span className="text-xs sm:text-sm font-semibold text-white text-center">Records</span>
+              <FileText className="w-6 h-6 sm:w-7 sm:h-7 guardian-dashboard-quick-action__icon mb-2" />
+              <span className="text-xs sm:text-sm font-semibold guardian-dashboard-quick-action__label text-center">Records</span>
             </button>
           </div>
         </div>

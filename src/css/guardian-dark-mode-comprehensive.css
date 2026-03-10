@@ -1141,13 +1141,302 @@ button[class*="secondary"]:hover {
     Ensure proper contrast and visibility in light mode
     ========================================================================== */
 
+/* ==========================================================================
+   TARGETED CARD TOKEN PARITY (Guardian Dashboard + My Children)
+   ========================================================================== */
+
+.guardian-theme-card {
+  color: var(--theme-text-primary);
+}
+
+.guardian-card-text-primary {
+  color: var(--theme-text-primary) !important;
+}
+
+.guardian-card-text-secondary {
+  color: var(--theme-text-secondary) !important;
+}
+
+.guardian-card-chip {
+  background: color-mix(in srgb, var(--theme-bg-elevated) 78%, transparent);
+  border: 1px solid var(--theme-border-primary);
+}
+
+.guardian-card-icon-accent {
+  opacity: 1;
+}
+
+.guardian-card-icon-accent--blue {
+  color: #60a5fa;
+}
+
+.guardian-card-icon-accent--pink {
+  color: #f9a8d4;
+}
+
+.guardian-card-icon-accent--emerald {
+  color: #34d399;
+}
+
+.guardian-card-icon-accent--purple {
+  color: #c084fc;
+}
+
+.guardian-status-pill {
+  border: 1px solid transparent;
+}
+
+.guardian-status-pill--active {
+  background: color-mix(in srgb, #10b981 18%, transparent);
+  border-color: color-mix(in srgb, #10b981 38%, transparent);
+  color: #10b981;
+}
+
+.guardian-card-action {
+  border: 1px solid transparent;
+  color: var(--theme-text-primary);
+  transition: background-color var(--theme-transition-fast),
+              border-color var(--theme-transition-fast),
+              color var(--theme-transition-fast),
+              box-shadow var(--theme-transition-fast);
+}
+
+.guardian-card-action:focus-visible {
+  outline: 2px solid var(--theme-border-focus);
+  outline-offset: 2px;
+}
+
+.guardian-card-action--neutral {
+  background-color: color-mix(in srgb, var(--theme-bg-secondary) 90%, transparent);
+  border-color: var(--theme-border-primary);
+  color: var(--theme-text-primary);
+}
+
+.guardian-card-action--neutral:hover:not(:disabled) {
+  background-color: var(--theme-bg-hover);
+  border-color: var(--theme-border-secondary);
+}
+
+.guardian-card-action--edit {
+  color: #60a5fa;
+}
+
+.guardian-card-action--edit:hover:not(:disabled) {
+  background: color-mix(in srgb, #3b82f6 18%, transparent);
+}
+
+.guardian-card-action--delete {
+  color: #f87171;
+}
+
+.guardian-card-action--delete:hover:not(:disabled) {
+  background: color-mix(in srgb, #ef4444 18%, transparent);
+}
+
+.guardian-card-action:disabled,
+.guardian-quick-action-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.guardian-quick-action-card {
+  border: 1px solid var(--theme-border-primary) !important;
+  background-color: color-mix(in srgb, var(--theme-bg-secondary) 86%, transparent) !important;
+  transition: background-color var(--theme-transition-fast),
+              border-color var(--theme-transition-fast),
+              transform var(--theme-transition-fast);
+}
+
+.guardian-quick-action-card:hover:not(:disabled) {
+  border-color: var(--theme-border-secondary) !important;
+  transform: translateY(-1px);
+}
+
+.guardian-quick-action-card:focus-visible {
+  outline: 2px solid var(--theme-border-focus);
+  outline-offset: 2px;
+}
+
+.guardian-quick-action-card--blue:hover:not(:disabled) {
+  background: color-mix(in srgb, #3b82f6 16%, transparent) !important;
+}
+
+.guardian-quick-action-card--emerald:hover:not(:disabled) {
+  background: color-mix(in srgb, #10b981 16%, transparent) !important;
+}
+
+.guardian-quick-action-card--purple:hover:not(:disabled) {
+  background: color-mix(in srgb, #8b5cf6 16%, transparent) !important;
+}
+
+.guardian-quick-action-title {
+  color: var(--theme-text-primary) !important;
+}
+
+.guardian-quick-action-description {
+  color: var(--theme-text-secondary) !important;
+}
+
+.guardian-stat-card {
+  border: 1px solid transparent;
+}
+
+.guardian-stat-card__icon-wrap,
+.guardian-progress-card__icon-wrap {
+  background: color-mix(in srgb, var(--theme-bg-elevated) 88%, transparent);
+}
+
+.guardian-stat-card__label,
+.guardian-stat-card__value,
+.guardian-stat-card__icon,
+.guardian-stat-card__trend-icon,
+.guardian-stat-card__trend-text,
+.guardian-progress-card__title,
+.guardian-progress-card__percentage,
+.guardian-progress-card__icon,
+.guardian-progress-card__meta {
+  color: var(--theme-text-primary);
+}
+
+.guardian-progress-card__track {
+  background: color-mix(in srgb, var(--theme-bg-elevated) 74%, transparent);
+}
+
+.guardian-progress-card__fill {
+  background: var(--theme-accent-primary);
+}
+
+.guardian-stat-card--emerald,
+.guardian-progress-card--emerald {
+  background: color-mix(in srgb, #10b981 45%, var(--theme-bg-card));
+  border: 1px solid #10b981;
+}
+
+.guardian-stat-card--blue,
+.guardian-progress-card--blue {
+  background: color-mix(in srgb, #3b82f6 45%, var(--theme-bg-card));
+  border: 1px solid #3b82f6;
+}
+
+.guardian-stat-card--purple,
+.guardian-progress-card--purple {
+  background: color-mix(in srgb, #8b5cf6 45%, var(--theme-bg-card));
+  border: 1px solid #8b5cf6;
+}
+
+.guardian-stat-card--amber,
+.guardian-progress-card--amber {
+  background: color-mix(in srgb, #f59e0b 45%, var(--theme-bg-card));
+  border: 1px solid #f59e0b;
+}
+
+.guardian-stat-card--red,
+.guardian-progress-card--red {
+  background: color-mix(in srgb, #ef4444 45%, var(--theme-bg-card));
+  border: 1px solid #ef4444;
+}
+
+/* Enhanced text contrast for stat cards */
+.guardian-stat-card--emerald .guardian-stat-card__label,
+.guardian-stat-card--emerald .guardian-stat-card__value,
+.guardian-stat-card--emerald .guardian-stat-card__icon,
+.guardian-stat-card--emerald .guardian-stat-card__trend-icon,
+.guardian-stat-card--emerald .guardian-stat-card__trend-text {
+  color: #065f46;
+}
+
+.guardian-stat-card--blue .guardian-stat-card__label,
+.guardian-stat-card--blue .guardian-stat-card__value,
+.guardian-stat-card--blue .guardian-stat-card__icon,
+.guardian-stat-card--blue .guardian-stat-card__trend-icon,
+.guardian-stat-card--blue .guardian-stat-card__trend-text {
+  color: #1e40af;
+}
+
+.guardian-stat-card--purple .guardian-stat-card__label,
+.guardian-stat-card--purple .guardian-stat-card__value,
+.guardian-stat-card--purple .guardian-stat-card__icon,
+.guardian-stat-card--purple .guardian-stat-card__trend-icon,
+.guardian-stat-card--purple .guardian-stat-card__trend-text {
+  color: #5b21b6;
+}
+
+.guardian-stat-card--amber .guardian-stat-card__label,
+.guardian-stat-card--amber .guardian-stat-card__value,
+.guardian-stat-card--amber .guardian-stat-card__icon,
+.guardian-stat-card--amber .guardian-stat-card__trend-icon,
+.guardian-stat-card--amber .guardian-stat-card__trend-text {
+  color: #92400e;
+}
+
+.guardian-stat-card--red .guardian-stat-card__label,
+.guardian-stat-card--red .guardian-stat-card__value,
+.guardian-stat-card--red .guardian-stat-card__icon,
+.guardian-stat-card--red .guardian-stat-card__trend-icon,
+.guardian-stat-card--red .guardian-stat-card__trend-text {
+  color: #991b1b;
+}
+
+/* Dark mode text contrast */
+.dark .guardian-stat-card--emerald .guardian-stat-card__label,
+.dark .guardian-stat-card--emerald .guardian-stat-card__value,
+.dark .guardian-stat-card--emerald .guardian-stat-card__icon,
+.dark .guardian-stat-card--emerald .guardian-stat-card__trend-icon,
+.dark .guardian-stat-card--emerald .guardian-stat-card__trend-text {
+  color: #34d399;
+}
+
+.dark .guardian-stat-card--blue .guardian-stat-card__label,
+.dark .guardian-stat-card--blue .guardian-stat-card__value,
+.dark .guardian-stat-card--blue .guardian-stat-card__icon,
+.dark .guardian-stat-card--blue .guardian-stat-card__trend-icon,
+.dark .guardian-stat-card--blue .guardian-stat-card__trend-text {
+  color: #60a5fa;
+}
+
+.dark .guardian-stat-card--purple .guardian-stat-card__label,
+.dark .guardian-stat-card--purple .guardian-stat-card__value,
+.dark .guardian-stat-card--purple .guardian-stat-card__icon,
+.dark .guardian-stat-card--purple .guardian-stat-card__trend-icon,
+.dark .guardian-stat-card--purple .guardian-stat-card__trend-text {
+  color: #a78bfa;
+}
+
+.dark .guardian-stat-card--amber .guardian-stat-card__label,
+.dark .guardian-stat-card--amber .guardian-stat-card__value,
+.dark .guardian-stat-card--amber .guardian-stat-card__icon,
+.dark .guardian-stat-card--amber .guardian-stat-card__trend-icon,
+.dark .guardian-stat-card--amber .guardian-stat-card__trend-text {
+  color: #fbbf24;
+}
+
+.dark .guardian-stat-card--red .guardian-stat-card__label,
+.dark .guardian-stat-card--red .guardian-stat-card__value,
+.dark .guardian-stat-card--red .guardian-stat-card__icon,
+.dark .guardian-stat-card--red .guardian-stat-card__trend-icon,
+.dark .guardian-stat-card--red .guardian-stat-card__trend-text {
+  color: #f87171;
+}
+
+.guardian-dashboard-quick-action__icon,
+.guardian-dashboard-quick-action__label {
+  color: #fff !important;
+}
+
+.guardian-dashboard .guardian-dashboard-quick-action__icon,
+.guardian-dashboard .guardian-dashboard-quick-action__label,
+.dark .guardian-dashboard .guardian-dashboard-quick-action__icon,
+.dark .guardian-dashboard .guardian-dashboard-quick-action__label {
+  color: #fff !important;
+}
+
 /* Light mode card backgrounds */
 .guardian-dashboard .bg-white:not(.dark .bg-white) {
   background-color: #ffffff !important;
 }
 
 /* Light mode text colors - ensure proper contrast */
-.guardian-dashboard:not(.dark) .text-white {
+.guardian-dashboard:not(.dark) .text-white:not(.guardian-dashboard-quick-action__icon):not(.guardian-dashboard-quick-action__label) {
   color: #111827 !important;
 }
 

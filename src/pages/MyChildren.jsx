@@ -474,46 +474,46 @@ export default function MyChildren() {
             {children.map((child) => (
               <div
                 key={child.id}
-                className="guardian-child-card glassmorphism-card rounded-xl border border-transparent backdrop-blur-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group overflow-hidden bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-blue-500/10"
+                className="guardian-child-card guardian-theme-card glassmorphism-card rounded-xl border border-transparent backdrop-blur-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group overflow-hidden bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-blue-500/10"
               >
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div className="w-14 h-14 bg-gradient-to-br from-blue-400/30 to-purple-500/30 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
                       {child.sex === "M" ? (
-                        <User className="w-8 h-8 text-blue-300" />
+                        <User className="w-8 h-8 guardian-card-icon-accent guardian-card-icon-accent--blue" />
                       ) : (
-                        <User className="w-8 h-8 text-pink-300" />
+                        <User className="w-8 h-8 guardian-card-icon-accent guardian-card-icon-accent--pink" />
                       )}
                     </div>
-                    <span className="px-3 py-1 bg-emerald-500/20 backdrop-blur-sm text-emerald-200 text-xs font-bold rounded-full uppercase tracking-wider">
+                    <span className="guardian-status-pill guardian-status-pill--active px-3 py-1 text-xs font-bold rounded-full uppercase tracking-wider">
                       Active
                     </span>
                   </div>
 
-                  <h3 className="text-xl font-bold text-white mb-4">
+                  <h3 className="text-xl font-bold guardian-card-text-primary mb-4">
                     {child.first_name} {child.last_name}
                   </h3>
 
                   {child.control_number && (
-                    <div className="mb-4 inline-block px-3 py-1 rounded bg-white/10 border border-white/20 backdrop-blur-md">
-                      <span className="text-xs text-white/80 font-mono tracking-wider">
+                    <div className="mb-4 inline-block px-3 py-1 rounded guardian-card-chip">
+                      <span className="text-xs guardian-card-text-secondary font-mono tracking-wider">
                         Infant Control Number: {child.control_number}
                       </span>
                     </div>
                   )}
 
                   <div className="space-y-3 text-sm">
-                    <div className="flex justify-between items-center py-2 border-b border-white/10">
-                      <span className="text-white/70">
+                    <div className="flex justify-between items-center py-2 border-b border-theme-border-primary">
+                      <span className="guardian-card-text-secondary">
                         Date of Birth
                       </span>
-                      <span className="font-semibold text-white">
+                      <span className="font-semibold guardian-card-text-primary">
                         {formatDate(child.dob)}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-white/10">
-                      <span className="text-white/70">Age</span>
-                      <span className="font-semibold text-white">
+                    <div className="flex justify-between items-center py-2 border-b border-theme-border-primary">
+                      <span className="guardian-card-text-secondary">Age</span>
+                      <span className="font-semibold guardian-card-text-primary">
                         {Math.floor(
                           (new Date() - new Date(child.dob)) /
                             (1000 * 60 * 60 * 24 * 365),
@@ -521,17 +521,17 @@ export default function MyChildren() {
                         years
                       </span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-white/10">
-                      <span className="text-white/70">Sex</span>
-                      <span className="font-semibold text-white">
+                    <div className="flex justify-between items-center py-2 border-b border-theme-border-primary">
+                      <span className="guardian-card-text-secondary">Sex</span>
+                      <span className="font-semibold guardian-card-text-primary">
                         {child.sex === "M" ? "Male" : "Female"}
                       </span>
                     </div>
                     <div className="flex justify-between items-center py-2">
-                      <span className="text-white/70">
+                      <span className="guardian-card-text-secondary">
                         Health Center
                       </span>
-                      <span className="font-semibold text-white truncate max-w-[150px]">
+                      <span className="font-semibold guardian-card-text-primary truncate max-w-[150px]">
                         {child.health_center || "Not specified"}
                       </span>
                     </div>
@@ -542,7 +542,7 @@ export default function MyChildren() {
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="flex-1 justify-center bg-white/10 backdrop-blur-sm text-white hover:bg-white/20"
+                    className="flex-1 justify-center guardian-card-action guardian-card-action--neutral"
                     onClick={() =>
                       navigate(`/guardian/vaccination-records/${child.id}`)
                     }
@@ -553,7 +553,7 @@ export default function MyChildren() {
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="flex-1 justify-center bg-white/10 backdrop-blur-sm text-white hover:bg-white/20"
+                    className="flex-1 justify-center guardian-card-action guardian-card-action--neutral"
                     onClick={() =>
                       navigate(`/guardian/appointments/new?childId=${child.id}`)
                     }
@@ -566,7 +566,7 @@ export default function MyChildren() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="flex-1 justify-center text-blue-300 hover:bg-blue-500/20"
+                    className="flex-1 justify-center guardian-card-action guardian-card-action--edit"
                     onClick={() => handleEditChild(child)}
                   >
                     <Edit2 className="w-4 h-4 mr-1" />
@@ -575,7 +575,7 @@ export default function MyChildren() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="flex-1 justify-center text-red-300 hover:bg-red-500/20"
+                    className="flex-1 justify-center guardian-card-action guardian-card-action--delete"
                     onClick={() => handleDeleteChildClick(child)}
                   >
                     <Trash2 className="w-4 h-4 mr-1" />
@@ -596,48 +596,48 @@ export default function MyChildren() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Button
                 variant="secondary"
-                className="p-6 h-auto flex-col items-center text-center hover:bg-blue-500/20 transition-colors border border-white/20 backdrop-blur-sm"
+                className="p-6 h-auto flex-col items-center text-center guardian-quick-action-card guardian-quick-action-card--blue"
                 onClick={() => navigate("/guardian/vaccination-records")}
               >
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400/30 to-purple-500/30 backdrop-blur-sm flex items-center justify-center mb-3">
-                  <FileText className="w-6 h-6 text-blue-300" />
+                  <FileText className="w-6 h-6 guardian-card-icon-accent guardian-card-icon-accent--blue" />
                 </div>
-                <span className="font-bold text-white">
+                <span className="font-bold guardian-quick-action-title">
                   View All Records
                 </span>
-                <span className="text-xs text-white/60 mt-1">
+                <span className="text-xs guardian-quick-action-description mt-1">
                   Complete history for all children
                 </span>
               </Button>
 
               <Button
                 variant="secondary"
-                className="p-6 h-auto flex-col items-center text-center hover:bg-emerald-500/20 transition-colors border border-white/20 backdrop-blur-sm"
+                className="p-6 h-auto flex-col items-center text-center guardian-quick-action-card guardian-quick-action-card--emerald"
                 onClick={() => navigate("/guardian/appointments/new")}
               >
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400/30 to-teal-500/30 backdrop-blur-sm flex items-center justify-center mb-3">
-                  <Calendar className="w-6 h-6 text-emerald-300" />
+                  <Calendar className="w-6 h-6 guardian-card-icon-accent guardian-card-icon-accent--emerald" />
                 </div>
-                <span className="font-bold text-white">
+                <span className="font-bold guardian-quick-action-title">
                   Book Appointment
                 </span>
-                <span className="text-xs text-white/60 mt-1">
+                <span className="text-xs guardian-quick-action-description mt-1">
                   Schedule a new vaccination visit
                 </span>
               </Button>
 
               <Button
                 variant="secondary"
-                className="p-6 h-auto flex-col items-center text-center hover:bg-purple-500/20 transition-colors border border-white/20 backdrop-blur-sm"
+                className="p-6 h-auto flex-col items-center text-center guardian-quick-action-card guardian-quick-action-card--purple"
                 onClick={() => navigate("/guardian/vaccination-records")}
               >
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400/30 to-pink-500/30 backdrop-blur-sm flex items-center justify-center mb-3">
-                  <FileText className="w-6 h-6 text-purple-300" />
+                  <FileText className="w-6 h-6 guardian-card-icon-accent guardian-card-icon-accent--purple" />
                 </div>
-                <span className="font-bold text-white">
+                <span className="font-bold guardian-quick-action-title">
                   Download Documents
                 </span>
-                <span className="text-xs text-white/60 mt-1">
+                <span className="text-xs guardian-quick-action-description mt-1">
                   Get PDF certificates and records
                 </span>
               </Button>
