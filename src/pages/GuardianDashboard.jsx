@@ -68,48 +68,48 @@ const inferNotificationType = (notification = {}) => {
 // ============================================
 
 const StatCardSkeleton = () => (
-  <div className="bg-gray-100 rounded-2xl p-5 animate-pulse min-h-[120px]">
+  <div className="bg-theme-bg-secondary rounded-2xl p-5 animate-pulse min-h-[120px]">
     <div className="flex justify-between items-start">
       <div className="space-y-2">
-        <div className="h-3 bg-gray-200 rounded w-20"></div>
-        <div className="h-8 bg-gray-200 rounded w-12"></div>
+        <div className="h-3 bg-theme-bg-tertiary rounded w-20"></div>
+        <div className="h-8 bg-theme-bg-tertiary rounded w-12"></div>
       </div>
-      <div className="w-10 h-10 bg-gray-200 rounded-xl"></div>
+      <div className="w-10 h-10 bg-theme-bg-tertiary rounded-xl"></div>
     </div>
   </div>
 );
 
 const ChildCardSkeleton = () => (
-  <div className="bg-gray-100 rounded-2xl p-6 animate-pulse">
+  <div className="bg-theme-bg-secondary rounded-2xl p-6 animate-pulse">
     <div className="flex items-center gap-4">
-      <div className="w-14 h-14 bg-gray-200 rounded-full"></div>
+      <div className="w-14 h-14 bg-theme-bg-tertiary rounded-full"></div>
       <div className="space-y-2 flex-1">
-        <div className="h-4 bg-gray-200 rounded w-32"></div>
-        <div className="h-3 bg-gray-200 rounded w-24"></div>
+        <div className="h-4 bg-theme-bg-tertiary rounded w-32"></div>
+        <div className="h-3 bg-theme-bg-tertiary rounded w-24"></div>
       </div>
     </div>
   </div>
 );
 
 const AppointmentCardSkeleton = () => (
-  <div className="bg-gray-100 rounded-2xl p-5 animate-pulse">
+  <div className="bg-theme-bg-secondary rounded-2xl p-5 animate-pulse">
     <div className="flex items-center gap-4">
-      <div className="w-12 h-12 bg-gray-200 rounded-xl"></div>
+      <div className="w-12 h-12 bg-theme-bg-tertiary rounded-xl"></div>
       <div className="space-y-2 flex-1">
-        <div className="h-4 bg-gray-200 rounded w-40"></div>
-        <div className="h-3 bg-gray-200 rounded w-24"></div>
+        <div className="h-4 bg-theme-bg-tertiary rounded w-40"></div>
+        <div className="h-3 bg-theme-bg-tertiary rounded w-24"></div>
       </div>
     </div>
   </div>
 );
 
 const NotificationSkeleton = () => (
-  <div className="bg-gray-100 rounded-xl p-4 animate-pulse">
+  <div className="bg-theme-bg-secondary rounded-xl p-4 animate-pulse">
     <div className="flex items-start gap-3">
-      <div className="w-8 h-8 bg-gray-200 rounded-full"></div>
+      <div className="w-8 h-8 bg-theme-bg-tertiary rounded-full"></div>
       <div className="flex-1 space-y-2">
-        <div className="h-3 bg-gray-200 rounded w-3/4"></div>
-        <div className="h-2 bg-gray-200 rounded w-1/2"></div>
+        <div className="h-3 bg-theme-bg-tertiary rounded w-3/4"></div>
+        <div className="h-2 bg-theme-bg-tertiary rounded w-1/2"></div>
       </div>
     </div>
   </div>
@@ -235,8 +235,8 @@ const DueVaccineCard = ({ vaccine, infantName, dueDate, daysUntilDue, status, on
             <Calendar className="w-4 h-4 text-blue-500" />
           )}
           <div>
-            <p className="text-sm font-semibold text-gray-900 dark:text-white">{vaccine}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">{infantName}</p>
+            <p className="text-sm font-semibold text-theme-primary">{vaccine}</p>
+            <p className="text-xs text-theme-secondary">{infantName}</p>
           </div>
         </div>
         <div className="text-right">
@@ -305,15 +305,15 @@ const NotificationItem = ({ notification, onDismiss }) => {
   const colorClass = getColor(notification.type || 'info');
 
   return (
-    <div className="flex items-start gap-3 p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 hover:shadow-sm transition-shadow">
+    <div className="flex items-start gap-3 p-3 rounded-xl bg-theme-bg-card border border-theme-border-primary hover:shadow-sm transition-shadow">
       <div className={`p-2 rounded-lg ${colorClass} flex-shrink-0`}>
         <Icon className="w-4 h-4" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+        <p className="text-sm font-medium text-theme-primary truncate">
           {notification.title || notification.message?.substring(0, 50)}
         </p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
+        <p className="text-xs text-theme-secondary mt-0.5 line-clamp-2">
           {notification.message}
         </p>
         <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
@@ -337,14 +337,14 @@ const NotificationItem = ({ notification, onDismiss }) => {
 // ============================================
 
 const EmptyState = ({ icon: Icon, title, description, actionLabel, onAction, variant = 'default' }) => (
-  <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 sm:p-8 border border-gray-100 dark:border-gray-700 text-center shadow-sm">
+  <div className="bg-theme-bg-card rounded-2xl p-6 sm:p-8 border border-theme-border-primary text-center shadow-sm">
     {Icon && (
-      <div className="w-16 h-16 bg-gray-50 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-        <Icon className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+      <div className="w-16 h-16 bg-theme-bg-secondary rounded-full flex items-center justify-center mx-auto mb-4">
+        <Icon className="w-8 h-8 text-theme-tertiary" />
       </div>
     )}
-    <h3 className="text-base font-bold text-gray-900 dark:text-white mb-2">{title}</h3>
-    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 max-w-xs mx-auto">{description}</p>
+    <h3 className="text-base font-bold text-theme-primary mb-2">{title}</h3>
+    <p className="text-sm text-theme-secondary mb-4 max-w-xs mx-auto">{description}</p>
     {actionLabel && onAction && (
       <button
         onClick={onAction}
@@ -594,8 +594,8 @@ const GuardianDashboard = () => {
   }, [stats.vaccinatedCount, stats.pendingCount]);
 
   return (
-    <div className="guardian-page-wrapper min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 w-full bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm transition-colors duration-200">
+    <div className="guardian-page-wrapper min-h-screen bg-theme-bg-primary transition-colors duration-200">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 w-full bg-theme-bg-primary border-b border-theme-border-primary shadow-sm transition-colors duration-200">
         <GuardianTopHeader
           title=""
           onRefresh={handleRetry}
@@ -782,7 +782,7 @@ const GuardianDashboard = () => {
               <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
                 <BarChart3 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
               </div>
-              <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Vaccination Progress</h2>
+              <h2 className="text-base sm:text-lg font-bold text-theme-primary">Vaccination Progress</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ProgressCard
@@ -813,7 +813,7 @@ const GuardianDashboard = () => {
                 <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
                   <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                 </div>
-                <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Due Vaccines</h2>
+                <h2 className="text-base sm:text-lg font-bold text-theme-primary">Due Vaccines</h2>
               </div>
               <button
                 onClick={() => navigate('/guardian/appointments/new')}
@@ -845,7 +845,7 @@ const GuardianDashboard = () => {
             <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
               <Activity className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             </div>
-            <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Quick Actions</h2>
+            <h2 className="text-base sm:text-lg font-bold text-theme-primary">Quick Actions</h2>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <button
@@ -888,11 +888,11 @@ const GuardianDashboard = () => {
                   <div className="w-8 h-8 bg-teal-100 dark:bg-teal-900/30 rounded-lg flex items-center justify-center">
                     <Baby className="w-4 h-4 text-teal-600 dark:text-teal-400" />
                   </div>
-                  <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">My Children</h2>
+                  <h2 className="text-base sm:text-lg font-bold text-theme-primary">My Children</h2>
                 </div>
                 <button
                   onClick={() => navigate('/guardian/children')}
-                  className="text-sm font-bold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-1 transition-colors"
+                  className="text-sm font-bold text-theme-secondary hover:text-theme-primary flex items-center gap-1 transition-colors"
                 >
                   View All
                   <ChevronRight className="w-4 h-4" />
@@ -918,17 +918,17 @@ const GuardianDashboard = () => {
                     <div
                       key={child.id}
                       onClick={() => navigate(`/guardian/children/${child.id}`)}
-                      className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-5 border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                      className="bg-theme-bg-card rounded-2xl p-4 sm:p-5 border border-theme-border-primary shadow-sm hover:shadow-md transition-all cursor-pointer"
                     >
                       <div className="flex items-center gap-3 sm:gap-4">
                         <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white text-lg sm:text-xl font-bold">
                           {(child.name || `${child.first_name} ${child.last_name}`.trim())?.charAt(0) || '?'}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-gray-900 dark:text-white truncate">
+                          <h3 className="font-bold text-theme-primary truncate">
                             {child.name || `${child.first_name} ${child.last_name}`.trim()}
                           </h3>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                          <p className="text-sm text-theme-secondary">
                             {child.dateOfBirth || child.dob
                               ? new Date(child.dateOfBirth || child.dob).toLocaleDateString('en-US', {
                                   year: 'numeric',
@@ -951,7 +951,7 @@ const GuardianDashboard = () => {
                   {children.length > 2 && (
                     <button
                       onClick={() => navigate('/guardian/children')}
-                      className="w-full py-3 text-sm font-bold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                      className="w-full py-3 text-sm font-bold text-theme-secondary hover:text-theme-primary transition-colors"
                     >
                       + {children.length - 2} more children
                     </button>
@@ -967,11 +967,11 @@ const GuardianDashboard = () => {
                   <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
                     <Calendar className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   </div>
-                  <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Appointments</h2>
+                  <h2 className="text-base sm:text-lg font-bold text-theme-primary">Appointments</h2>
                 </div>
                 <button
                   onClick={() => navigate('/guardian/appointments')}
-                  className="text-sm font-bold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-1 transition-colors"
+                  className="text-sm font-bold text-theme-secondary hover:text-theme-primary flex items-center gap-1 transition-colors"
                 >
                   View All
                   <ChevronRight className="w-4 h-4" />
@@ -996,7 +996,7 @@ const GuardianDashboard = () => {
                       <div
                         key={appointment.id}
                         onClick={() => navigate(`/guardian/appointments/${appointment.id}`)}
-                        className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-5 border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                        className="bg-theme-bg-card rounded-2xl p-4 sm:p-5 border border-theme-border-primary shadow-sm hover:shadow-md transition-all cursor-pointer"
                       >
                         <div className="flex items-center gap-3 sm:gap-4">
                           <div className="w-12 h-12 sm:w-14 sm:h-14 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl flex flex-col items-center justify-center border border-emerald-100 dark:border-emerald-800 flex-shrink-0">
@@ -1004,10 +1004,10 @@ const GuardianDashboard = () => {
                             <span className="text-lg sm:text-xl font-bold text-emerald-700 dark:text-emerald-300">{dateInfo.day}</span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-bold text-gray-900 dark:text-white truncate">
+                            <h3 className="font-bold text-theme-primary truncate">
                               {appointment.type || appointment.vaccineName || 'Vaccination'}
                             </h3>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                            <p className="text-sm text-theme-secondary">
                               {dateInfo.time} • {appointment.doctorName || 'Dr. Smith'}
                             </p>
                             {appointment.infantName && (
@@ -1034,11 +1034,11 @@ const GuardianDashboard = () => {
                   <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
                     <Bell className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   </div>
-                  <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Notifications</h2>
+                  <h2 className="text-base sm:text-lg font-bold text-theme-primary">Notifications</h2>
                 </div>
                 <button
                   onClick={() => navigate('/guardian/notifications')}
-                  className="text-sm font-bold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-1 transition-colors"
+                  className="text-sm font-bold text-theme-secondary hover:text-theme-primary flex items-center gap-1 transition-colors"
                 >
                   View All
                   <ChevronRight className="w-4 h-4" />
@@ -1070,7 +1070,7 @@ const GuardianDashboard = () => {
                   {notifications.length > 4 && (
                     <button
                       onClick={() => navigate('/guardian/notifications')}
-                      className="w-full py-3 text-sm font-bold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                      className="w-full py-3 text-sm font-bold text-theme-secondary hover:text-theme-primary transition-colors"
                     >
                       + {notifications.length - 4} more notifications
                     </button>
