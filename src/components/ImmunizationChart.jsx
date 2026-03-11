@@ -43,7 +43,8 @@ export default function ImmunizationChart({ infantId }) {
   const [growthRecords, setGrowthRecords] = useState([]);
   const [vaccinations, setVaccinations] = useState([]);
   const [loading, setLoading] = useState(Boolean(infantId));
-  const [error, setError] = useState(null);
+  const [loadError, setLoadError] = useState(null);
+  const [loadWarning, setLoadWarning] = useState(null);
   const [selectedVisit, setSelectedVisit] = useState(null);
   const [showVisitModal, setShowVisitModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -163,14 +164,16 @@ export default function ImmunizationChart({ infantId }) {
       setAppointments([]);
       setGrowthRecords([]);
       setVaccinations([]);
-      setError(null);
+      setLoadError(null);
+      setLoadWarning(null);
       setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
-      setError(null);
+      setLoadError(null);
+      setLoadWarning(null);
       const [
         infantResult,
         appointmentsResult,
@@ -225,7 +228,7 @@ export default function ImmunizationChart({ infantId }) {
       setVaccinations(normalizedVaccinations);
 
       if (partialFailures.length > 0) {
-        setError(
+        setLoadWarning(
           `Some chart data could not be loaded (${partialFailures.join(", ")}). Showing available information.`,
         );
       }
@@ -234,7 +237,8 @@ export default function ImmunizationChart({ infantId }) {
         return;
       }
 
-      setError(err.message || "Failed to load immunization chart.");
+      setLoadError(err.message || "Failed to load immunization chart.");
+      setLoadWarning(null);
       setInfant(null);
       setAppointments([]);
       setGrowthRecords([]);
@@ -254,7 +258,8 @@ export default function ImmunizationChart({ infantId }) {
       setAppointments([]);
       setGrowthRecords([]);
       setVaccinations([]);
-      setError(null);
+      setLoadError(null);
+      setLoadWarning(null);
       setLoading(false);
       return;
     }
@@ -426,8 +431,8 @@ export default function ImmunizationChart({ infantId }) {
     );
   }
 
-  if (error) {
-    return <div className="text-center py-8 text-red-600">Error: {error}</div>;
+  if (loadError) {
+    return <div className="text-center py-8 text-red-600">Error: {loadError}</div>;
   }
 
   if (!infant) {
@@ -458,6 +463,13 @@ export default function ImmunizationChart({ infantId }) {
             <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
               <p className="text-sm text-red-600 dark:text-red-400">
                 {saveError}
+              </p>
+            </div>
+          )}
+          {loadWarning && (
+            <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                {loadWarning}
               </p>
             </div>
           )}
