@@ -62,7 +62,7 @@ const isEmptyData = (data) => {
 
 const getHeaderClassName = (column = {}) => {
   const baseClassName =
-    "px-6 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] dark:text-white uppercase tracking-wider";
+    "px-3 py-2 text-left text-xs font-semibold text-[var(--color-text-secondary)] dark:text-white uppercase tracking-wider";
 
   return `${baseClassName} ${column.headerClassName || ""}`.trim();
 };
@@ -72,7 +72,7 @@ const getCellClassName = (column = {}, row, rowIndex) => {
     ? "whitespace-nowrap"
     : "whitespace-normal break-words";
 
-  const baseClassName = `px-6 py-4 text-sm text-[var(--color-text-primary)] align-top ${wrapClassName}`;
+  const baseClassName = `px-3 py-2.5 text-sm text-[var(--color-text-primary)] align-top ${wrapClassName}`;
 
   const customClassName =
     typeof column.cellClassName === "function"
@@ -200,7 +200,7 @@ const DataTable = ({
                 <th
                   scope="col"
                   data-column="true"
-                  className={`px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] dark:text-white uppercase tracking-wider ${actionsHeaderClassName}`.trim()}
+                  className={`px-3 py-2 text-left text-xs font-semibold text-[var(--color-text-secondary)] dark:text-white uppercase tracking-wider ${actionsHeaderClassName}`.trim()}
                 >
                   Actions
                 </th>
@@ -229,7 +229,7 @@ const DataTable = ({
                 ))}
                 {actions && (
                   <td
-                    className={`px-4 py-4 text-sm font-medium align-top whitespace-nowrap ${actionsCellClassName}`.trim()}
+                    className={`px-3 py-2.5 text-sm font-medium align-top whitespace-nowrap ${actionsCellClassName}`.trim()}
                   >
                     {actions(row)}
                   </td>

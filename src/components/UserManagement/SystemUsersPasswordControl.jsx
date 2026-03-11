@@ -6,14 +6,14 @@ export default function SystemUsersPasswordControl({ onResetPassword, disabled =
   return (
     <Button
       variant="info"
-      size="sm"
+      size="xs"
       onClick={onResetPassword}
-      className="whitespace-nowrap gap-1.5"
+      className="p-1.5"
       title="Reset Password"
+      aria-label="Reset password"
       disabled={disabled}
     >
-      <Key className="w-4 h-4 flex-shrink-0" />
-      <span>Reset</span>
+      <Key className="w-3.5 h-3.5" />
     </Button>
   );
 }

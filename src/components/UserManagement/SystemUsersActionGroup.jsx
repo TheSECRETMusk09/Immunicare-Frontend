@@ -16,49 +16,44 @@ export default function SystemUsersActionGroup({
   const isCurrentUser = String(user?.id) === String(currentUserId);
 
   return (
-    <div className="flex flex-wrap md:flex-nowrap items-center justify-start gap-1.5 min-w-[14rem]">
+    <div className="flex items-center justify-start gap-1">
       <Button
         variant={isActive ? "warning" : "success"}
-        size="sm"
+        size="xs"
         onClick={() => onToggleActive?.(user)}
-        className="whitespace-nowrap gap-1.5 justify-center min-w-[92px]"
+        className="p-1.5"
         title={isCurrentUser ? "You cannot disable your own account" : (isActive ? "Disable User" : "Enable User")}
         disabled={isTogglingActive || isCurrentUser}
+        aria-label={isActive ? "Disable user" : "Enable user"}
       >
         {isActive ? (
-          <>
-            <PowerOff className="w-4 h-4 flex-shrink-0" />
-            <span>Disable</span>
-          </>
+          <PowerOff className="w-3.5 h-3.5" />
         ) : (
-          <>
-            <Power className="w-4 h-4 flex-shrink-0" />
-            <span>Enable</span>
-          </>
+          <Power className="w-3.5 h-3.5" />
         )}
       </Button>
       <Button
         variant="success"
-        size="sm"
+        size="xs"
         onClick={() => onEdit?.(user)}
-        className="whitespace-nowrap gap-1.5 justify-center min-w-[92px]"
+        className="p-1.5"
+        title="Edit User"
+        aria-label="Edit user"
       >
-        <Edit className="w-4 h-4 flex-shrink-0" />
-        <span>Edit</span>
+        <Edit className="w-3.5 h-3.5" />
       </Button>
 
       <LoadingButton
         variant="danger"
-        size="sm"
+        size="xs"
         onClick={() => onDelete?.(user)}
         loading={isDeleting}
-        className="whitespace-nowrap gap-1.5 justify-center min-w-[92px]"
-        loadingText="Deleting..."
+        className="p-1.5"
         title={isCurrentUser ? "You cannot delete your own account" : "Delete User"}
+        aria-label={isCurrentUser ? "Cannot delete own account" : "Delete user"}
         disabled={isCurrentUser}
       >
-        <Trash2 className="w-4 h-4 flex-shrink-0" />
-        <span>Delete</span>
+        <Trash2 className="w-3.5 h-3.5" />
       </LoadingButton>
     </div>
   );

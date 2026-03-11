@@ -1141,61 +1141,57 @@ export default function UserManagement() {
   ];
 
   const adminActions = (row) => (
-    <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+    <div className="flex items-center justify-start gap-1">
       <Button
         variant={row.is_active ? "warning" : "success"}
-        size="sm"
+        size="xs"
         onClick={() => handleToggleUserActive(row)}
-        className="whitespace-nowrap gap-1.5"
+        className="p-1.5"
         title={row.is_active ? "Disable User" : "Enable User"}
         disabled={isTogglingActive}
+        aria-label={row.is_active ? "Disable user" : "Enable user"}
       >
         {row.is_active ? (
-          <>
-            <PowerOff className="w-4 h-4 flex-shrink-0" />
-            <span>Disable</span>
-          </>
+          <PowerOff className="w-3.5 h-3.5" />
         ) : (
-          <>
-            <Power className="w-4 h-4 flex-shrink-0" />
-            <span>Enable</span>
-          </>
+          <Power className="w-3.5 h-3.5" />
         )}
       </Button>
       <Button
         variant="info"
-        size="sm"
+        size="xs"
         onClick={() => {
           setSelectedUserForPassword(row);
           setShowPasswordModal(true);
         }}
-        className="whitespace-nowrap gap-1.5"
+        className="p-1.5"
         title="Reset Password"
+        aria-label="Reset password"
         disabled={isResettingPassword}
       >
-        <Key className="w-4 h-4 flex-shrink-0" />
-        <span>Reset</span>
+        <Key className="w-3.5 h-3.5" />
       </Button>
       <Button
         variant="success"
-        size="sm"
+        size="xs"
         onClick={() => handleEditUser(row, "admin")}
-        className="whitespace-nowrap gap-1.5"
+        className="p-1.5"
+        title="Edit User"
+        aria-label="Edit user"
       >
-        <Edit className="w-4 h-4 flex-shrink-0" />
-        <span>Edit</span>
+        <Edit className="w-3.5 h-3.5" />
       </Button>
       {isSuperAdmin && (
         <LoadingButton
           variant="danger"
-          size="sm"
+          size="xs"
           onClick={() => handleDeleteUser(row, "admin")}
           loading={isDeleting}
-          className="whitespace-nowrap gap-1.5"
-          loadingText="Deleting..."
+          className="p-1.5"
+          title="Delete User"
+          aria-label="Delete user"
         >
-          <Trash2 className="w-4 h-4 flex-shrink-0" />
-          <span>Remove</span>
+          <Trash2 className="w-3.5 h-3.5" />
         </LoadingButton>
       )}
     </div>
@@ -1205,21 +1201,23 @@ export default function UserManagement() {
     {
       key: "username",
       label: "Username",
-      nowrap: true,
-      headerClassName: "min-w-[12rem]",
-      cellClassName: "min-w-[12rem]",
+      width: "12%",
+      headerClassName: "min-w-[100px]",
+      cellClassName: "min-w-[100px]",
       render: (val) => (
-        <div className="font-medium text-gray-900 dark:text-gray-100">{val}</div>
+        <div className="font-medium text-gray-900 dark:text-gray-100 truncate" title={val}>
+          {val}
+        </div>
       ),
     },
     {
       key: "name",
       label: "Name",
-      nowrap: true,
-      headerClassName: "min-w-[14rem]",
-      cellClassName: "min-w-[14rem]",
+      width: "14%",
+      headerClassName: "min-w-[120px]",
+      cellClassName: "min-w-[120px]",
       render: (val) => (
-        <div className="font-medium text-gray-900 dark:text-gray-100">
+        <div className="font-medium text-gray-900 dark:text-gray-100 truncate" title={val}>
           {val}
         </div>
       ),
@@ -1227,12 +1225,12 @@ export default function UserManagement() {
     {
       key: "phone",
       label: "Phone",
-      nowrap: true,
-      headerClassName: "min-w-[12rem]",
-      cellClassName: "min-w-[12rem]",
+      width: "10%",
+      headerClassName: "min-w-[90px] w-[90px]",
+      cellClassName: "min-w-[90px] w-[90px]",
       render: (val) =>
         val ? (
-          <span className="text-gray-700 dark:text-gray-200">{val}</span>
+          <span className="text-gray-700 dark:text-gray-200 whitespace-nowrap">{val}</span>
         ) : (
           <span className="text-gray-400 italic">N/A</span>
         ),
@@ -1240,11 +1238,14 @@ export default function UserManagement() {
     {
       key: "email",
       label: "Email",
-      headerClassName: "min-w-[14rem]",
-      cellClassName: "max-w-[18rem] break-all",
+      width: "16%",
+      headerClassName: "min-w-[140px] max-w-[180px]",
+      cellClassName: "min-w-[140px] max-w-[180px]",
       render: (val) =>
         val ? (
-          <span className="text-gray-700 dark:text-gray-200 break-all">{val}</span>
+          <span className="text-gray-700 dark:text-gray-200 truncate block" title={val}>
+            {val}
+          </span>
         ) : (
           <span className="text-gray-400 italic">N/A</span>
         ),
@@ -1252,11 +1253,11 @@ export default function UserManagement() {
     {
       key: "relationship",
       label: "Relationship",
-      nowrap: true,
-      headerClassName: "min-w-[10rem]",
-      cellClassName: "min-w-[10rem]",
+      width: "9%",
+      headerClassName: "min-w-[80px] w-[80px]",
+      cellClassName: "min-w-[80px] w-[80px]",
       render: (val) => (
-        <Badge variant="secondary" className="capitalize">
+        <Badge variant="secondary" className="capitalize text-xs px-2 py-0.5">
           {String(val || "Parent")}
         </Badge>
       ),
@@ -1264,31 +1265,31 @@ export default function UserManagement() {
     {
       key: "infant_count",
       label: "Infants",
-      nowrap: true,
-      headerClassName: "min-w-[8rem]",
-      cellClassName: "min-w-[8rem]",
+      width: "7%",
+      headerClassName: "min-w-[60px] w-[60px]",
+      cellClassName: "min-w-[60px] w-[60px]",
       render: (val) => {
         const infantCount = Number.isFinite(Number(val)) ? Number(val) : 0;
         return (
-          <Badge variant="info">
-            {infantCount} {infantCount === 1 ? "infant" : "infants"}
+          <Badge variant="info" className="text-xs px-2 py-0.5">
+            {infantCount}
           </Badge>
         );
       },
     },
     {
       key: "is_password_set",
-      label: "Password Status",
-      nowrap: true,
-      headerClassName: "min-w-[10rem]",
-      cellClassName: "min-w-[10rem]",
+      label: "Password",
+      width: "8%",
+      headerClassName: "min-w-[70px] w-[70px]",
+      cellClassName: "min-w-[70px] w-[70px]",
       render: (val) =>
         val ? (
-          <Badge variant="success" className="flex items-center gap-1">
+          <Badge variant="success" className="text-xs px-2 py-0.5 flex items-center gap-1">
             <Key className="w-3 h-3" /> Set
           </Badge>
         ) : (
-          <Badge variant="warning" className="flex items-center gap-1">
+          <Badge variant="warning" className="text-xs px-2 py-0.5">
             Not Set
           </Badge>
         ),
@@ -1296,13 +1297,14 @@ export default function UserManagement() {
     {
       key: "address",
       label: "Address",
-      headerClassName: "min-w-[15rem]",
-      cellClassName: "max-w-[22rem]",
+      width: "14%",
+      headerClassName: "min-w-[120px] max-w-[160px]",
+      cellClassName: "min-w-[120px] max-w-[160px]",
       render: (val) => {
         const address = typeof val === "string" ? val : "";
         return (
           <div
-            className="text-gray-500 dark:text-gray-400 whitespace-normal break-words"
+            className="text-gray-500 dark:text-gray-400 truncate block text-xs"
             title={address || "No address provided"}
           >
             {address || <span className="text-gray-400 italic">N/A</span>}
@@ -1313,40 +1315,41 @@ export default function UserManagement() {
   ];
 
   const guardianActions = (row) => (
-    <div className="flex flex-wrap items-center gap-1.5 min-w-[11rem]">
+    <div className="flex items-center justify-start gap-1">
       <Button
         variant="info"
-        size="sm"
+        size="xs"
         onClick={() => {
           setSelectedUserForPassword(row);
           setShowPasswordModal(true);
         }}
-        className="whitespace-nowrap gap-1.5"
+        className="p-1.5"
         title="Reset Password"
+        aria-label="Reset password"
         disabled={isResettingPassword}
       >
-        <Key className="w-4 h-4 flex-shrink-0" />
-        <span>Reset</span>
+        <Key className="w-3.5 h-3.5" />
       </Button>
       <Button
         variant="success"
-        size="sm"
+        size="xs"
         onClick={() => handleEditUser(row, "guardian")}
-        className="whitespace-nowrap gap-1.5"
+        className="p-1.5"
+        title="Edit Guardian"
+        aria-label="Edit guardian"
       >
-        <Edit className="w-4 h-4 flex-shrink-0" />
-        <span>Edit</span>
+        <Edit className="w-3.5 h-3.5" />
       </Button>
       <LoadingButton
         variant="danger"
-        size="sm"
+        size="xs"
         onClick={() => handleDeleteUser(row, "guardian")}
         loading={isDeleting}
-        className="whitespace-nowrap gap-1.5"
-        loadingText="Deleting..."
+        className="p-1.5"
+        title="Delete Guardian"
+        aria-label="Delete guardian"
       >
-        <Trash2 className="w-4 h-4 flex-shrink-0" />
-        <span>Delete</span>
+        <Trash2 className="w-3.5 h-3.5" />
       </LoadingButton>
     </div>
   );
@@ -1728,8 +1731,8 @@ export default function UserManagement() {
             columns={guardianColumns}
             actions={guardianActions}
             getRowKey={(row) => `guardian:${String(row?.id)}`}
-            actionsHeaderClassName="min-w-[11rem]"
-            actionsCellClassName="min-w-[11rem]"
+            actionsHeaderClassName="w-[100px] min-w-[100px]"
+            actionsCellClassName="w-[100px] min-w-[100px]"
             emptyMessage="No guardians registered yet."
             emptyIcon={<span className="text-4xl">👥</span>}
           />

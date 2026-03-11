@@ -27,27 +27,29 @@ export default function SystemUsersTable({
     {
       key: "username",
       label: "Username",
-      nowrap: true,
-      headerClassName: "min-w-[14rem]",
-      cellClassName: "min-w-[14rem]",
+      width: "14%",
+      headerClassName: "min-w-[100px]",
+      cellClassName: "min-w-[100px]",
       render: (value) => (
-        <div className="font-medium text-gray-900 dark:text-gray-100">{value}</div>
+        <div className="font-medium text-gray-900 dark:text-gray-100 truncate" title={value}>
+          {value}
+        </div>
       ),
     },
     {
       key: "role_name",
       label: "Role",
-      nowrap: true,
-      headerClassName: "min-w-[11rem]",
-      cellClassName: "min-w-[11rem]",
+      width: "11%",
+      headerClassName: "min-w-[90px]",
+      cellClassName: "min-w-[90px]",
       render: (_value, row) => <SystemUsersRoleBadge user={row} />,
     },
     {
       key: "password_control",
       label: "Password",
-      nowrap: true,
-      headerClassName: "min-w-[10rem]",
-      cellClassName: "min-w-[10rem]",
+      width: "10%",
+      headerClassName: "min-w-[80px]",
+      cellClassName: "min-w-[80px]",
       render: (_value, row) => (
         row?.is_guardian_account ? (
           renderGuardianManagedNotice()
@@ -62,11 +64,12 @@ export default function SystemUsersTable({
     {
       key: "clinic_name",
       label: "Clinic",
-      headerClassName: "min-w-[12rem]",
-      cellClassName: "max-w-[14rem]",
+      width: "14%",
+      headerClassName: "min-w-[100px] max-w-[140px]",
+      cellClassName: "min-w-[100px] max-w-[140px]",
       render: (value) =>
         value ? (
-          <span className="text-gray-700 dark:text-gray-200 whitespace-normal break-words">
+          <span className="text-gray-700 dark:text-gray-200 truncate block" title={value}>
             {value}
           </span>
         ) : (
@@ -76,11 +79,14 @@ export default function SystemUsersTable({
     {
       key: "contact",
       label: "Contact",
-      headerClassName: "min-w-[12rem]",
-      cellClassName: "max-w-[14rem] break-all",
+      width: "14%",
+      headerClassName: "min-w-[100px] max-w-[140px]",
+      cellClassName: "min-w-[100px] max-w-[140px] break-all",
       render: (value) =>
         value ? (
-          <span className="text-gray-700 dark:text-gray-200 break-all">{value}</span>
+          <span className="text-gray-700 dark:text-gray-200 truncate block" title={value}>
+            {value}
+          </span>
         ) : (
           <span className="text-gray-400 italic">N/A</span>
         ),
@@ -88,16 +94,16 @@ export default function SystemUsersTable({
     {
       key: "is_active",
       label: "Status",
-      nowrap: true,
-      headerClassName: "min-w-[8rem]",
-      cellClassName: "min-w-[8rem]",
+      width: "8%",
+      headerClassName: "min-w-[70px] w-[70px]",
+      cellClassName: "min-w-[70px] w-[70px]",
       render: (value) =>
         value ? (
-          <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-sm bg-[var(--theme-success-bg)] text-[var(--theme-success)]">
+          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs bg-[var(--theme-success-bg)] text-[var(--theme-success)]">
             Active
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-sm bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)]">
+          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)]">
             Disabled
           </span>
         ),
@@ -124,8 +130,8 @@ export default function SystemUsersTable({
         )
       )}
       getRowKey={getSystemUserRowKey}
-      actionsHeaderClassName="min-w-[14rem]"
-      actionsCellClassName="min-w-[14rem]"
+      actionsHeaderClassName="w-[100px] min-w-[100px]"
+      actionsCellClassName="w-[100px] min-w-[100px]"
       emptyMessage="No users found."
       emptyIcon={<span className="text-4xl">🛡️</span>}
     />
