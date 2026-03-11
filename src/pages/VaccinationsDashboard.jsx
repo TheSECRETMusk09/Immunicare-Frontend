@@ -21,6 +21,7 @@ import {
   normalizeVaccinationSchedulesResponse,
   normalizeInfantsResponse,
   normalizeVaccinesResponse,
+  normalizeVaccineInventoryResponse,
   normalizeVaccinationRecordResponse,
   computeVaccinationComplianceSummary,
 } from "../utils/adminDataAdapters";
@@ -42,13 +43,18 @@ const DEFAULT_FORM = {
 };
 
 const VaccinationsDashboard = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
+  const scopedClinicId = useMemo(
+    () => Number(user?.clinic_id || user?.facility_id || 0) || null,
+    [user?.clinic_id, user?.facility_id],
+  );
 
   const [activeTab, setActiveTab] = useState("schedule");
   const [vaccinationRecords, setVaccinationRecords] = useState([]);
   const [vaccinationSchedules, setVaccinationSchedules] = useState([]);
   const [infants, setInfants] = useState([]);
   const [vaccines, setVaccines] = useState([]);
+  const [inventoryRecords, setInventoryRecords] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -84,12 +90,15 @@ const VaccinationsDashboard = () => {
 
         setError(null);
 
-        const [recordsData, schedulesData, infantsData, vaccinesData] =
+        const [recordsData, schedulesData, infantsData, vaccinesData, inventoryData] =
           await Promise.all([
             apiClient.getVaccinationRecords(),
             apiClient.getVaccinationSchedules(),
             apiClient.getInfants(),
             apiClient.getVaccines(),
+            apiClient.getVaccineInventory(
+              scopedClinicId ? { clinic_id: scopedClinicId } : {},
+            ),
           ]);
 
         const normalizedRecords = normalizeVaccinationRecordsResponse(recordsData);
@@ -97,11 +106,13 @@ const VaccinationsDashboard = () => {
           normalizeVaccinationSchedulesResponse(schedulesData);
         const normalizedInfants = normalizeInfantsResponse(infantsData);
         const normalizedVaccines = normalizeVaccinesResponse(vaccinesData);
+        const normalizedInventory = normalizeVaccineInventoryResponse(inventoryData);
 
         setVaccinationRecords(normalizedRecords);
         setVaccinationSchedules(normalizedSchedules);
         setInfants(normalizedInfants);
         setVaccines(normalizedVaccines);
+        setInventoryRecords(normalizedInventory);
 
         if (selectedInfantId) {
           const exists = normalizedInfants.some((entry) => entry.id === selectedInfantId);
@@ -115,12 +126,13 @@ const VaccinationsDashboard = () => {
         setVaccinationSchedules([]);
         setInfants([]);
         setVaccines([]);
+        setInventoryRecords([]);
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [selectedInfantId],
+    [selectedInfantId, scopedClinicId],
   );
 
   useEffect(() => {
@@ -259,14 +271,20 @@ const VaccinationsDashboard = () => {
 
   const dashboardStats = useMemo(() => {
     const completed = vaccinationRecords.filter(
-      (record) => record.status === "completed" || Boolean(record.admin_date),
+      (record) =>
+        record.status === "completed" ||
+        record.status === "attended" ||
+        Boolean(record.admin_date),
     ).length;
     const pending = vaccinationRecords.filter(
-      (record) => (record.status || "pending") === "pending" && !record.admin_date,
+      (record) =>
+        (record.status === "pending" || !record.status) &&
+        !record.admin_date &&
+        record.status !== "overdue",
     ).length;
 
     const overdue = vaccinationRecords.filter((record) => {
-      if ((record.status || "").toLowerCase() === "overdue") return true;
+      if (record.status === "overdue") return true;
       if (!record.next_due_date || record.admin_date) return false;
 
       const dueDate = new Date(record.next_due_date);
@@ -299,6 +317,36 @@ const VaccinationsDashboard = () => {
       };
     });
   }, [infants, vaccinationRecords, vaccinationSchedules]);
+
+  const availableVaccinesForClinic = useMemo(() => {
+    const scopedInventory = inventoryRecords.filter((record) => {
+      const recordClinicId = Number(record.clinic_id || 0) || null;
+      return (
+        Number(record.stock_on_hand || 0) > 0 &&
+        (!scopedClinicId || recordClinicId === scopedClinicId)
+      );
+    });
+
+    const uniqueByVaccine = new Map();
+    scopedInventory.forEach((record) => {
+      const vaccineId = Number(record.vaccine_id || 0) || null;
+      if (!vaccineId || uniqueByVaccine.has(vaccineId)) return;
+
+      const catalogMatch = vaccines.find((vaccine) => vaccine.id === vaccineId);
+      uniqueByVaccine.set(vaccineId, {
+        id: vaccineId,
+        name:
+          catalogMatch?.name ||
+          record.vaccine_name ||
+          `Vaccine #${vaccineId}`,
+        code: catalogMatch?.code || record.vaccine_code || "",
+      });
+    });
+
+    return Array.from(uniqueByVaccine.values()).sort((left, right) =>
+      String(left.name || "").localeCompare(String(right.name || "")),
+    );
+  }, [inventoryRecords, scopedClinicId, vaccines]);
 
   if (loading && vaccinationRecords.length === 0) {
     return (
@@ -838,12 +886,18 @@ const VaccinationsDashboard = () => {
                   required
                 >
                   <option value="">Select Vaccine</option>
-                  {vaccines.map((vaccine) => (
+                  {availableVaccinesForClinic.map((vaccine) => (
                     <option key={vaccine.id} value={vaccine.id}>
                       {vaccine.name}
+                      {vaccine.code ? ` (${vaccine.code})` : ""}
                     </option>
                   ))}
                 </select>
+                {vaccinationForm.vaccine_id === "" && availableVaccinesForClinic.length === 0 && (
+                  <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                    No available vaccine stock was found for Barangay San Nicolas Health Center.
+                  </p>
+                )}
               </div>
             </div>
           </div>

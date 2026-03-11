@@ -374,6 +374,59 @@ const normalizeResponsePayload = (response) => {
   return null;
 };
 
+const ensureDefaultAgeGroups = (ageGroups = []) => {
+  const defaultOrder = [
+    "0-5 months",
+    "6-11 months",
+    "12-23 months",
+    "24+ months",
+  ];
+
+  const normalizedByKey = new Map(
+    (Array.isArray(ageGroups) ? ageGroups : []).map((item) => [
+      String(item?.group || "").trim().toLowerCase(),
+      {
+        group: item?.group || "Unknown",
+        count: safeNum(item?.count),
+      },
+    ]),
+  );
+
+  return defaultOrder.map((group) => {
+    const matched = normalizedByKey.get(group.toLowerCase());
+    return matched || { group, count: 0 };
+  });
+};
+
+const ensureDefaultGenderGroups = (genderRows = []) => {
+  const defaults = [
+    { label: "Male", count: 0 },
+    { label: "Female", count: 0 },
+    { label: "Other / Not specified", count: 0 },
+  ];
+
+  const map = new Map();
+
+  (Array.isArray(genderRows) ? genderRows : []).forEach((item) => {
+    const rawLabel = String(item?.label || "Unknown").trim();
+    const normalized = rawLabel.toLowerCase().replace(/\./g, "").trim();
+    const canonicalLabel =
+      normalized === "m" || normalized.startsWith("mal")
+        ? "Male"
+        : normalized === "f" || normalized.startsWith("fem")
+          ? "Female"
+          : rawLabel || "Other / Not specified";
+
+    const previous = map.get(canonicalLabel) || 0;
+    map.set(canonicalLabel, previous + safeNum(item?.count));
+  });
+
+  return defaults.map((entry) => ({
+    label: entry.label,
+    count: map.has(entry.label) ? safeNum(map.get(entry.label)) : entry.count,
+  }));
+};
+
 const statusLabel = (value = "") => {
   const normalized = String(value).replace(/[_-]/g, " ").trim();
   if (!normalized) return "Unknown";
@@ -707,6 +760,9 @@ const mapDashboardPayload = (payload) => {
         count: safeNum(item.count ?? item.total ?? item.value ?? item.infants),
       }));
 
+  const normalizedAgeGroups = ensureDefaultAgeGroups(demographicsAgeGroups);
+  const normalizedGenderGroups = ensureDefaultGenderGroups(demographicsGender);
+
   const activity = normalizeArray(payload?.recentActivity, payload?.activity, payload?.activityFeed);
   const alerts = normalizeArray(payload?.alerts, payload?.criticalAlerts);
   const reportShortcuts = normalizeArray(payload?.reportShortcuts, payload?.reports);
@@ -731,8 +787,8 @@ const mapDashboardPayload = (payload) => {
     appointmentStatusBreakdown,
     trendVaccinations,
     trendAppointments,
-    demographicsAgeGroups,
-    demographicsGender,
+    demographicsAgeGroups: normalizedAgeGroups,
+    demographicsGender: normalizedGenderGroups,
     inventory: {
       totalItems: safeNum(inventory.totalItems ?? inventory.count),
       totalAvailableDoses: safeNum(inventory.totalAvailableDoses ?? inventory.availableDoses),
@@ -1528,7 +1584,11 @@ const InventorySection = ({ data, loading, chartAppearance, viewportWidth }) => 
 const SmsAndDemographicsSection = ({ data, loading, chartAppearance, showGenderChart = false }) => {
   const reminder = data?.reminders || {};
   const coverage = data?.demographicsCoverage || {};
-  const ageData = data?.demographicsAgeGroups || [];
+  const ageData = (data?.demographicsAgeGroups || []).map((item) => ({
+    group: item.group,
+    count: safeNum(item.count),
+  }));
+  const ageHasActualValues = ageData.some((item) => safeNum(item.count) > 0);
   const genderData = (data?.demographicsGender || [])
     .map((item, index) => {
       const rawLabel = String(item.label || "Unknown").trim();
@@ -1551,8 +1611,9 @@ const SmsAndDemographicsSection = ({ data, loading, chartAppearance, showGenderC
         count: safeNum(item.count),
         color,
       };
-    })
-    .filter((item) => item.count > 0);
+    });
+
+  const genderHasActualValues = genderData.some((item) => safeNum(item.count) > 0);
 
   const genderTotal = genderData.reduce((total, item) => total + safeNum(item.count), 0);
   const maleCount = genderData.find((item) => item.label === "Male")?.count || 0;
@@ -1616,41 +1677,69 @@ const SmsAndDemographicsSection = ({ data, loading, chartAppearance, showGenderC
           subtitle={`Registered infants: ${safeNum(coverage.infants)} • Guardians: ${safeNum(coverage.guardians)}`}
           loading={loading}
           empty={ageData.length === 0}
+          emptyMessage="0 data: no demographic age-group records yet for the current filters."
           ariaLabel="Line chart of infant age-group distribution"
           chartAppearance={chartAppearance}
           chartHeight={300}
         >
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={ageData} margin={CHART_THEME.layout.margin}>
-              <CartesianGrid
-                stroke={chartAppearance.gridStroke}
-                strokeDasharray={CHART_THEME.layout.gridDash}
-                vertical={false}
-              />
-              <XAxis dataKey="group" tick={axisTick} axisLine={axisLine} tickLine={axisLine} />
-              <YAxis allowDecimals={false} tick={axisTick} axisLine={axisLine} tickLine={axisLine} />
-              <RechartsTooltip
-                cursor={{ stroke: CHART_THEME.palette.primary, strokeOpacity: 0.3 }}
-                content={<DashboardChartTooltip chartAppearance={chartAppearance} />}
-              />
-              <Line
-                type="monotone"
-                dataKey="count"
-                name="Infants"
-                stroke={CHART_THEME.palette.primary}
-                strokeWidth={3}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                dot={{
-                  r: 3,
-                  stroke: chartAppearance.plotBackground,
-                  strokeWidth: 2,
-                  fill: CHART_THEME.palette.primary,
+          <Box sx={{ position: "relative", width: "100%", height: 300 }}>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={ageData} margin={CHART_THEME.layout.margin}>
+                <CartesianGrid
+                  stroke={chartAppearance.gridStroke}
+                  strokeDasharray={CHART_THEME.layout.gridDash}
+                  vertical={false}
+                />
+                <XAxis dataKey="group" tick={axisTick} axisLine={axisLine} tickLine={axisLine} />
+                <YAxis allowDecimals={false} tick={axisTick} axisLine={axisLine} tickLine={axisLine} />
+                <RechartsTooltip
+                  cursor={{ stroke: CHART_THEME.palette.primary, strokeOpacity: 0.3 }}
+                  content={<DashboardChartTooltip chartAppearance={chartAppearance} />}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="count"
+                  name="Infants"
+                  stroke={CHART_THEME.palette.primary}
+                  strokeWidth={3}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  dot={{
+                    r: 3,
+                    stroke: chartAppearance.plotBackground,
+                    strokeWidth: 2,
+                    fill: CHART_THEME.palette.primary,
+                  }}
+                  activeDot={{ r: 6, fill: CHART_THEME.palette.primary, strokeWidth: 0 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+
+            {!loading && !ageHasActualValues ? (
+              <Box
+                sx={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  pointerEvents: "none",
                 }}
-                activeDot={{ r: 6, fill: CHART_THEME.palette.primary, strokeWidth: 0 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+              >
+                <Chip
+                  size="small"
+                  label="0 data"
+                  sx={{
+                    bgcolor: chartAppearance.isDark ? "rgba(15,23,42,0.85)" : "rgba(255,255,255,0.9)",
+                    border: "1px solid",
+                    borderColor: chartAppearance.plotBorder,
+                    color: chartAppearance.axisTick,
+                    fontWeight: 700,
+                  }}
+                />
+              </Box>
+            ) : null}
+          </Box>
         </ChartCard>
       </Grid>
 
@@ -1661,68 +1750,96 @@ const SmsAndDemographicsSection = ({ data, loading, chartAppearance, showGenderC
             subtitle="Registered infant gender composition"
             loading={loading}
             empty={genderData.length === 0}
+            emptyMessage="0 data: no gender-distribution records yet for the current filters."
             ariaLabel="Rounded doughnut chart comparing male and female infant counts"
             chartAppearance={chartAppearance}
             chartHeight={300}
           >
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={genderData}
-                  dataKey="count"
-                  nameKey="label"
-                  innerRadius={72}
-                  outerRadius={108}
-                  paddingAngle={3}
-                  cornerRadius={12}
-                  stroke={chartAppearance.plotBackground}
-                  strokeWidth={2}
+            <Box sx={{ position: "relative", width: "100%", height: 300 }}>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={genderData}
+                    dataKey="count"
+                    nameKey="label"
+                    innerRadius={72}
+                    outerRadius={108}
+                    paddingAngle={3}
+                    cornerRadius={12}
+                    stroke={chartAppearance.plotBackground}
+                    strokeWidth={2}
+                  >
+                    {genderData.map((entry, index) => (
+                      <Cell key={`gender-distribution-${entry.label}-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip content={<DashboardChartTooltip chartAppearance={chartAppearance} />} />
+                  <Legend
+                    verticalAlign="bottom"
+                    align="center"
+                    content={(legendProps) => <DashboardLegend {...legendProps} chartAppearance={chartAppearance} />}
+                  />
+                  <text
+                    x="50%"
+                    y="44%"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill={chartAppearance.centerLabel}
+                    fontSize="12"
+                    fontWeight="600"
+                  >
+                    Infants
+                  </text>
+                  <text
+                    x="50%"
+                    y="54%"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill={chartAppearance.centerValue}
+                    fontSize="24"
+                    fontWeight="700"
+                  >
+                    {genderTotal.toLocaleString()}
+                  </text>
+                  <text
+                    x="50%"
+                    y="64%"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill={chartAppearance.centerLabel}
+                    fontSize="11"
+                    fontWeight="600"
+                  >
+                    {genderBreakdownLabel}
+                  </text>
+                </PieChart>
+              </ResponsiveContainer>
+
+              {!loading && !genderHasActualValues ? (
+                <Box
+                  sx={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    pointerEvents: "none",
+                  }}
                 >
-                  {genderData.map((entry, index) => (
-                    <Cell key={`gender-distribution-${entry.label}-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <RechartsTooltip content={<DashboardChartTooltip chartAppearance={chartAppearance} />} />
-                <Legend
-                  verticalAlign="bottom"
-                  align="center"
-                  content={(legendProps) => <DashboardLegend {...legendProps} chartAppearance={chartAppearance} />}
-                />
-                <text
-                  x="50%"
-                  y="44%"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fill={chartAppearance.centerLabel}
-                  fontSize="12"
-                  fontWeight="600"
-                >
-                  Infants
-                </text>
-                <text
-                  x="50%"
-                  y="54%"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fill={chartAppearance.centerValue}
-                  fontSize="24"
-                  fontWeight="700"
-                >
-                  {genderTotal.toLocaleString()}
-                </text>
-                <text
-                  x="50%"
-                  y="64%"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fill={chartAppearance.centerLabel}
-                  fontSize="11"
-                  fontWeight="600"
-                >
-                  {genderBreakdownLabel}
-                </text>
-              </PieChart>
-            </ResponsiveContainer>
+                  <Chip
+                    size="small"
+                    label="0 data"
+                    sx={{
+                      bgcolor: chartAppearance.isDark ? "rgba(15,23,42,0.85)" : "rgba(255,255,255,0.9)",
+                      border: "1px solid",
+                      borderColor: chartAppearance.plotBorder,
+                      color: chartAppearance.axisTick,
+                      fontWeight: 700,
+                    }}
+                  />
+                </Box>
+              ) : null}
+            </Box>
           </ChartCard>
         </Grid>
       ) : null}

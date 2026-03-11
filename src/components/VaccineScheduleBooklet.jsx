@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import apiClient from "../utils/api";
 import { Button, Alert, LoadingSpinner } from "./UI";
 import {
@@ -51,10 +51,33 @@ const parseVisitAge = (entry) => {
 
 export default function VaccineScheduleBooklet({ infantId }) {
   const [scheduleTimeline, setScheduleTimeline] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(infantId));
   const [error, setError] = useState(null);
 
+  const isMountedRef = useRef(true);
+  const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const fetchData = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+
+    if (!infantId) {
+      if (!isMountedRef.current || requestId !== requestIdRef.current) {
+        return;
+      }
+
+      setScheduleTimeline([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -75,28 +98,49 @@ export default function VaccineScheduleBooklet({ infantId }) {
         infantDob: normalizedInfant?.dob,
       });
 
-      setScheduleTimeline(timeline);
+      if (!isMountedRef.current || requestId !== requestIdRef.current) {
+        return;
+      }
+
+      setScheduleTimeline(Array.isArray(timeline) ? timeline : []);
     } catch (err) {
+      if (!isMountedRef.current || requestId !== requestIdRef.current) {
+        return;
+      }
+
       setError(err.message || "Failed to load vaccine schedule.");
       setScheduleTimeline([]);
     } finally {
+      if (!isMountedRef.current || requestId !== requestIdRef.current) {
+        return;
+      }
+
       setLoading(false);
     }
   }, [infantId]);
 
   useEffect(() => {
-    if (infantId) {
-      fetchData();
+    if (!infantId) {
+      setScheduleTimeline([]);
+      setError(null);
+      setLoading(false);
+      return;
     }
+
+    void fetchData();
   }, [infantId, fetchData]);
 
   useEffect(() => {
+    if (!infantId) {
+      return undefined;
+    }
+
     const intervalId = window.setInterval(() => {
       void fetchData();
     }, 60000);
 
     return () => window.clearInterval(intervalId);
-  }, [fetchData]);
+  }, [infantId, fetchData]);
 
   const handlePrint = () => {
     const printContent = document.getElementById("vaccine-schedule-print");

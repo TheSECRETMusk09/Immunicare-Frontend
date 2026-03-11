@@ -30,10 +30,13 @@ import {
   BarChart3,
   ArrowDownUp,
 } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
 
 const pollingIntervalMs = 60000;
 
 const VaccineTracking = () => {
+  const { user } = useAuth();
+  const scopedClinicId = user?.clinic_id || user?.facility_id || null;
   const [vaccines, setVaccines] = useState([]);
   const [vaccinationRecords, setVaccinationRecords] = useState([]);
   const [inventory, setInventory] = useState([]);
@@ -62,9 +65,16 @@ const VaccineTracking = () => {
           await Promise.all([
             apiClient.getVaccines(),
             apiClient.getVaccinationRecords(),
-            apiClient.getVaccineInventory(),
-            apiClient.getVaccineInventoryTransactions(),
-            apiClient.getVaccineStockAlerts({ status: "ACTIVE" }),
+            apiClient.getVaccineInventory({
+              ...(scopedClinicId ? { clinic_id: scopedClinicId } : {}),
+            }),
+            apiClient.getVaccineInventoryTransactions(null, {
+              ...(scopedClinicId ? { clinic_id: scopedClinicId } : {}),
+            }),
+            apiClient.getVaccineStockAlerts({
+              status: "ACTIVE",
+              ...(scopedClinicId ? { clinic_id: scopedClinicId } : {}),
+            }),
           ]);
 
         setVaccines(normalizeVaccinesResponse(vaccinesData));
@@ -85,7 +95,7 @@ const VaccineTracking = () => {
         setRefreshing(false);
       }
     },
-    [],
+    [scopedClinicId],
   );
 
   useEffect(() => {

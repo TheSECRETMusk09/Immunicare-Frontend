@@ -330,9 +330,18 @@ export default function DashboardOverview() {
                 key={`apt-${apt.id || apt.infant_id || apt.patient_name || Math.random()}`}
                 className="rounded-lg border border-gray-200 dark:border-gray-700 p-2 text-sm flex items-center justify-between gap-2"
               >
-                <span className="truncate font-medium">
-                  {apt.patient_name || apt.infantName || apt.infant_name || "Infant"}
-                </span>
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-gray-900 dark:text-gray-100">
+                    {apt.patient_name ||
+                      apt.infantName ||
+                      apt.infant_name ||
+                      `${apt.first_name || ""} ${apt.last_name || ""}`.trim() ||
+                      "Infant"}
+                  </p>
+                  <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                    Guardian: {apt.guardian_name || apt.guardianName || "Guardian unavailable"}
+                  </p>
+                </div>
                 <span className="text-gray-500 whitespace-nowrap">
                   {formatDate(apt.scheduled_date || apt.scheduledDate)}
                 </span>

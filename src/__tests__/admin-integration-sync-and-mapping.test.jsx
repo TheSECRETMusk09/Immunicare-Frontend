@@ -40,11 +40,13 @@ jest.mock("../utils/api", () => ({
   },
 }));
 
+const mockUseAuth = jest.fn(() => ({
+  isAdmin: true,
+  user: { id: 100, role_type: "SYSTEM_ADMIN" },
+}));
+
 jest.mock("../contexts/AuthContext", () => ({
-  useAuth: () => ({
-    isAdmin: true,
-    user: { id: 100, role_type: "SYSTEM_ADMIN" },
-  }),
+  useAuth: () => mockUseAuth(),
 }));
 
 jest.mock("../contexts/SocketContext", () => ({
@@ -145,6 +147,10 @@ const vaccinationRecordRows = [
 describe("Admin integration sync and mapping checks", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      isAdmin: true,
+      user: { id: 100, role_type: "SYSTEM_ADMIN", clinic_id: 7, facility_id: 7 },
+    });
   });
 
   test("normalized adapters handle wrapped payloads for records and transactions", () => {
@@ -344,6 +350,15 @@ describe("Admin integration sync and mapping checks", () => {
         expect(apiClient.getVaccineInventory).toHaveBeenCalledTimes(1);
       });
 
+      expect(apiClient.getVaccineInventory).toHaveBeenCalledWith({ clinic_id: 7 });
+      expect(apiClient.getVaccineInventoryTransactions).toHaveBeenCalledWith(null, {
+        clinic_id: 7,
+      });
+      expect(apiClient.getVaccineStockAlerts).toHaveBeenCalledWith({
+        status: "ACTIVE",
+        clinic_id: 7,
+      });
+
       expect(mockSocketOn).toHaveBeenCalled();
       expect(mockSocketOn).toHaveBeenCalledWith(
         "vaccination_created",
@@ -369,6 +384,29 @@ describe("Admin integration sync and mapping checks", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  test("vaccine tracking falls back to unscoped fetch when clinic context is unavailable", async () => {
+    mockUseAuth.mockReturnValue({
+      isAdmin: true,
+      user: { id: 100, role_type: "SYSTEM_ADMIN", clinic_id: null, facility_id: null },
+    });
+
+    apiClient.getVaccines.mockResolvedValue(vaccineRows);
+    apiClient.getVaccinationRecords.mockResolvedValue(vaccinationRecordRows);
+    apiClient.getVaccineInventory.mockResolvedValue([]);
+    apiClient.getVaccineInventoryTransactions.mockResolvedValue([]);
+    apiClient.getVaccineStockAlerts.mockResolvedValue([]);
+
+    renderVaccineTracking();
+
+    await waitFor(() => {
+      expect(apiClient.getVaccineInventory).toHaveBeenCalled();
+    });
+
+    expect(apiClient.getVaccineInventory).toHaveBeenCalledWith({});
+    expect(apiClient.getVaccineInventoryTransactions).toHaveBeenCalledWith(null, {});
+    expect(apiClient.getVaccineStockAlerts).toHaveBeenCalledWith({ status: "ACTIVE" });
   });
 
   test("vaccine tracking acknowledges active alert via real API action", async () => {

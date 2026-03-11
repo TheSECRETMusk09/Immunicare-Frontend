@@ -94,6 +94,11 @@ const hasOnlyAsciiCharacters = (value = "") =>
     .split("")
     .every((character) => character.charCodeAt(0) <= 127);
 
+const normalizeGuardianUsernameForDisplay = (value = "") =>
+  String(value || "")
+    .trim()
+    .toLowerCase();
+
 export default function UserManagement() {
   const {
     guardians,
@@ -366,8 +371,29 @@ export default function UserManagement() {
     { value: "other", label: "Other" },
   ];
 
+  const normalizedSystemUsers = useMemo(() => {
+    if (!Array.isArray(localSystemUsers)) {
+      return [];
+    }
+
+    return localSystemUsers.map((user) => {
+      const isGuardianAccount =
+        Boolean(user?.guardian_id) ||
+        Boolean(user?.is_guardian_account) ||
+        String(user?.role_name || "").toLowerCase() === "guardian";
+
+      return {
+        ...user,
+        is_guardian_account: isGuardianAccount,
+        username: isGuardianAccount
+          ? normalizeGuardianUsernameForDisplay(user?.username)
+          : user?.username || "",
+      };
+    });
+  }, [localSystemUsers]);
+
   // Filter admins from system users (role_id 1 = super_admin, 2 = admin)
-  const admins = localSystemUsers.filter(
+  const admins = normalizedSystemUsers.filter(
     (user) => user.role_id === 1 || user.role_id === 2,
   );
   const normalizedGuardians = useMemo(() => {
@@ -392,11 +418,12 @@ export default function UserManagement() {
 
       return {
         ...guardian,
-        username:
+        username: normalizeGuardianUsernameForDisplay(
           guardian.username ||
-          guardian.user_username ||
-          guardian.account_username ||
-          "N/A",
+            guardian.user_username ||
+            guardian.account_username ||
+            "",
+        ),
         name:
           guardian.name || guardian.full_name || guardian.guardian_name || "N/A",
         phone,
@@ -1436,7 +1463,7 @@ export default function UserManagement() {
           >
             <span className="text-lg">🛡️</span>
             System Users (
-            {localSystemUsers ? localSystemUsers.length : 0})
+            {normalizedSystemUsers ? normalizedSystemUsers.length : 0})
           </button>
           <button
             onClick={() => handleTabChange("guardians")}
@@ -1656,9 +1683,9 @@ export default function UserManagement() {
           )
         ) : activeTab === "system" ? (
           isAdmin ? (
-            localSystemUsers && localSystemUsers.length > 0 ? (
+            normalizedSystemUsers && normalizedSystemUsers.length > 0 ? (
               <SystemUsersTable
-                users={localSystemUsers}
+                users={normalizedSystemUsers}
                 isTogglingActive={isTogglingActive}
                 isResettingPassword={isResettingPassword}
                 isDeleting={isDeleting}

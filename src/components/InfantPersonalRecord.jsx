@@ -1,8 +1,20 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import apiClient from "../utils/api";
 import { Button, Input, Alert, LoadingSpinner } from "./UI";
 import { useAuth } from "../contexts/AuthContext";
 import { normalizeInfantResponse } from "../utils/adminDataAdapters";
+
+const formatControlNumberDisplay = (controlNumber, dobValue) => {
+  const base = String(controlNumber || "").trim();
+  if (!base) return "Not assigned";
+
+  const dob = dobValue ? new Date(dobValue) : null;
+  if (!dob || Number.isNaN(dob.getTime())) {
+    return base;
+  }
+
+  return `${base}-${dob.getMonth() + 1}/${dob.getDate()}/${dob.getFullYear()}`;
+};
 
 export default function InfantPersonalRecord({
   infantId,
@@ -18,17 +30,42 @@ export default function InfantPersonalRecord({
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({});
 
-  const fetchInfant = React.useCallback(async () => {
+  const isMountedRef = useRef(true);
+  const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const fetchInfant = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+
     try {
       setLoading(true);
       setError(null);
       const data = await apiClient.getInfant(infantId);
       const normalizedInfant = normalizeInfantResponse(data);
+
+      if (!isMountedRef.current || requestId !== requestIdRef.current) {
+        return;
+      }
+
       setInfant(normalizedInfant);
       setFormData(normalizedInfant);
     } catch (err) {
+      if (!isMountedRef.current || requestId !== requestIdRef.current) {
+        return;
+      }
+
       setError(err.message || "Failed to load infant record.");
     } finally {
+      if (!isMountedRef.current || requestId !== requestIdRef.current) {
+        return;
+      }
+
       setLoading(false);
     }
   }, [infantId]);
@@ -58,15 +95,33 @@ export default function InfantPersonalRecord({
     try {
       const updateResponse = await apiClient.updateInfant(infantId, formData);
       const updatedInfant = normalizeInfantResponse(updateResponse);
+
+      if (!isMountedRef.current) {
+        return;
+      }
+
       setInfant(updatedInfant);
       setFormData(updatedInfant);
       // Refresh the infant data from server to get the updated values
       await fetchInfant();
+
+      if (!isMountedRef.current) {
+        return;
+      }
+
       setIsEditing(false);
       if (onUpdate) onUpdate();
     } catch (err) {
+      if (!isMountedRef.current) {
+        return;
+      }
+
       setSaveError(err.message || "Failed to save changes. Please try again.");
     } finally {
+      if (!isMountedRef.current) {
+        return;
+      }
+
       setSaving(false);
     }
   };
@@ -396,7 +451,7 @@ export default function InfantPersonalRecord({
                   {/* Control Number is always read-only, even in edit mode */}
                   {
                     <p className="text-gray-900 dark:text-gray-100 font-mono">
-                      {infant.control_number || "Not assigned"}
+                      {formatControlNumberDisplay(infant.control_number, infant.dob)}
                     </p>
                   }
                 </div>

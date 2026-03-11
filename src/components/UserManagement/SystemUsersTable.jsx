@@ -17,6 +17,12 @@ export default function SystemUsersTable({
   onDelete,
   currentUserId,
 }) {
+  const renderGuardianManagedNotice = () => (
+    <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+      Managed in Guardians tab
+    </span>
+  );
+
   const columns = [
     {
       key: "username",
@@ -43,10 +49,14 @@ export default function SystemUsersTable({
       headerClassName: "min-w-[10rem]",
       cellClassName: "min-w-[10rem]",
       render: (_value, row) => (
-        <SystemUsersPasswordControl
-          onResetPassword={() => onResetPassword?.(row)}
-          disabled={isResettingPassword}
-        />
+        row?.is_guardian_account ? (
+          renderGuardianManagedNotice()
+        ) : (
+          <SystemUsersPasswordControl
+            onResetPassword={() => onResetPassword?.(row)}
+            disabled={isResettingPassword}
+          />
+        )
       ),
     },
     {
@@ -99,15 +109,19 @@ export default function SystemUsersTable({
       data={users}
       columns={columns}
       actions={(row) => (
-        <SystemUsersActionGroup
-          user={row}
-          isTogglingActive={isTogglingActive}
-          isDeleting={isDeleting}
-          onToggleActive={onToggleActive}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          currentUserId={currentUserId}
-        />
+        row?.is_guardian_account ? (
+          renderGuardianManagedNotice()
+        ) : (
+          <SystemUsersActionGroup
+            user={row}
+            isTogglingActive={isTogglingActive}
+            isDeleting={isDeleting}
+            onToggleActive={onToggleActive}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            currentUserId={currentUserId}
+          />
+        )
       )}
       getRowKey={getSystemUserRowKey}
       actionsHeaderClassName="min-w-[14rem]"

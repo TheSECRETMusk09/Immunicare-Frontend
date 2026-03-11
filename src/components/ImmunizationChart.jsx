@@ -1,20 +1,68 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import apiClient from "../utils/api";
 import { Button, Modal } from "./UI";
 import VisitRecordingForm from "./VisitRecordingForm";
+import {
+  normalizeInfantResponse,
+  normalizeVaccinationRecordsResponse,
+  toArrayPayload,
+} from "../utils/adminDataAdapters";
+
+const toFiniteNumber = (value, fallback = null) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const normalizeAppointmentsResponse = (response) =>
+  toArrayPayload(response, ["appointments"]).map((entry) => ({
+    ...entry,
+    id: toFiniteNumber(entry?.id),
+    type: entry?.type ?? entry?.appointment_type ?? "",
+    scheduled_date:
+      entry?.scheduled_date ?? entry?.appointment_date ?? entry?.date ?? null,
+    status: entry?.status ?? "pending",
+    notes: entry?.notes ?? entry?.remarks ?? "",
+  }));
+
+const normalizeGrowthRecordsResponse = (response) =>
+  toArrayPayload(response, ["growthRecords", "records", "growth"]).map((entry) => ({
+    ...entry,
+    id: toFiniteNumber(entry?.id),
+    age_in_days: toFiniteNumber(entry?.age_in_days, 0),
+    heart_rate: toFiniteNumber(entry?.heart_rate, null),
+    respiratory_rate: toFiniteNumber(entry?.respiratory_rate, null),
+    temperature_celsius: toFiniteNumber(entry?.temperature_celsius, null),
+    length_cm: toFiniteNumber(entry?.length_cm, null),
+    weight_kg: toFiniteNumber(entry?.weight_kg, null),
+    feeding_status: entry?.feeding_status ?? null,
+  }));
 
 export default function ImmunizationChart({ infantId }) {
   const [infant, setInfant] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [growthRecords, setGrowthRecords] = useState([]);
   const [vaccinations, setVaccinations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(infantId));
   const [error, setError] = useState(null);
   const [selectedVisit, setSelectedVisit] = useState(null);
   const [showVisitModal, setShowVisitModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const isMountedRef = useRef(true);
+  const requestIdRef = useRef(0);
+  const saveSuccessTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (saveSuccessTimeoutRef.current) {
+        window.clearTimeout(saveSuccessTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const visitTemplates = [
     {
@@ -104,8 +152,25 @@ export default function ImmunizationChart({ infantId }) {
   ];
 
   const fetchData = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+
+    if (!infantId) {
+      if (!isMountedRef.current || requestId !== requestIdRef.current) {
+        return;
+      }
+
+      setInfant(null);
+      setAppointments([]);
+      setGrowthRecords([]);
+      setVaccinations([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
+      setError(null);
       const [infantData, appointmentsData, growthData, vaccinationData] =
         await Promise.all([
           apiClient.getInfant(infantId),
@@ -113,21 +178,51 @@ export default function ImmunizationChart({ infantId }) {
           apiClient.getGrowthRecordsByInfant(infantId),
           apiClient.getVaccinationRecordsByInfant(infantId),
         ]);
-      setInfant(infantData);
-      setAppointments(appointmentsData);
-      setGrowthRecords(growthData);
-      setVaccinations(vaccinationData);
+
+      const normalizedInfant = normalizeInfantResponse(infantData);
+      const normalizedAppointments = normalizeAppointmentsResponse(appointmentsData);
+      const normalizedGrowthRecords = normalizeGrowthRecordsResponse(growthData);
+      const normalizedVaccinations = normalizeVaccinationRecordsResponse(vaccinationData);
+
+      if (!isMountedRef.current || requestId !== requestIdRef.current) {
+        return;
+      }
+
+      setInfant(normalizedInfant);
+      setAppointments(normalizedAppointments);
+      setGrowthRecords(normalizedGrowthRecords);
+      setVaccinations(normalizedVaccinations);
     } catch (err) {
-      setError(err.message);
+      if (!isMountedRef.current || requestId !== requestIdRef.current) {
+        return;
+      }
+
+      setError(err.message || "Failed to load immunization chart.");
+      setInfant(null);
+      setAppointments([]);
+      setGrowthRecords([]);
+      setVaccinations([]);
     } finally {
+      if (!isMountedRef.current || requestId !== requestIdRef.current) {
+        return;
+      }
+
       setLoading(false);
     }
   }, [infantId]);
 
   useEffect(() => {
-    if (infantId) {
-      fetchData();
+    if (!infantId) {
+      setInfant(null);
+      setAppointments([]);
+      setGrowthRecords([]);
+      setVaccinations([]);
+      setError(null);
+      setLoading(false);
+      return;
     }
+
+    void fetchData();
   }, [infantId, fetchData]);
 
   const getVisitData = (visitAge) => {
@@ -184,6 +279,10 @@ export default function ImmunizationChart({ infantId }) {
   };
 
   const handleVisitSave = async (visitData) => {
+    if (!isMountedRef.current) {
+      return;
+    }
+
     setSaving(true);
     setSaveError(null);
     setSaveSuccess(false);
@@ -215,10 +314,11 @@ export default function ImmunizationChart({ infantId }) {
 
       // Save vaccination records
       if (visitData.vaccines && visitData.vaccines.length > 0) {
+        const vaccines = toArrayPayload(await apiClient.getVaccines(), ["vaccines"]);
+        const batches = toArrayPayload(await apiClient.getVaccineBatches(), ["batches"]);
+
         for (const vaccineName of visitData.vaccines) {
           if (vaccineName.administered) {
-            // Find vaccine in database
-            const vaccines = await apiClient.getVaccines();
             const vaccine = vaccines.find((v) =>
               v.name
                 .toLowerCase()
@@ -226,8 +326,6 @@ export default function ImmunizationChart({ infantId }) {
             );
 
             if (vaccine) {
-              // Find available batch
-              const batches = await apiClient.getVaccineBatches();
               const batch = batches.find(
                 (b) => b.vaccine_id === vaccine.id && b.qty_current > 0,
               );
@@ -250,16 +348,37 @@ export default function ImmunizationChart({ infantId }) {
 
       // Refresh data
       await fetchData();
+
+      if (!isMountedRef.current) {
+        return;
+      }
+
       setShowVisitModal(false);
       setSaveSuccess(true);
       // Auto-hide success message after 3 seconds
-      setTimeout(() => setSaveSuccess(false), 3000);
+      if (saveSuccessTimeoutRef.current) {
+        window.clearTimeout(saveSuccessTimeoutRef.current);
+      }
+      saveSuccessTimeoutRef.current = window.setTimeout(() => {
+        if (isMountedRef.current) {
+          setSaveSuccess(false);
+        }
+      }, 3000);
     } catch (error) {
       console.error("Error saving visit record:", error);
+
+      if (!isMountedRef.current) {
+        return;
+      }
+
       setSaveError(
         error.message || "Failed to save visit record. Please try again.",
       );
     } finally {
+      if (!isMountedRef.current) {
+        return;
+      }
+
       setSaving(false);
     }
   };

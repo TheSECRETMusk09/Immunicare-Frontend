@@ -98,6 +98,7 @@ export default function InjectVaccineModal({
   onSuccess = () => {},
 }) {
   const { isAdmin, user } = useAuth();
+  const scopedClinicId = user?.clinic_id || user?.facility_id || null;
 
   const [vaccines, setVaccines] = useState([]);
   const [infants, setInfants] = useState([]);
@@ -119,7 +120,9 @@ export default function InjectVaccineModal({
         await Promise.all([
           apiClient.getVaccines(),
           apiClient.getInfants(),
-          apiClient.getVaccineInventory(),
+          apiClient.getVaccineInventory({
+            ...(scopedClinicId ? { clinic_id: scopedClinicId } : {}),
+          }),
         ]);
 
       const normalizedVaccines = normalizeVaccinesResponse(vaccinesResponse);
@@ -135,7 +138,7 @@ export default function InjectVaccineModal({
       setInfants([]);
       setInventoryRecords([]);
     }
-  }, []);
+  }, [scopedClinicId]);
 
   const fetchVaccinationHistory = useCallback(async (targetInfantId) => {
     if (!targetInfantId) {
@@ -185,9 +188,10 @@ export default function InjectVaccineModal({
     return inventoryRecords.filter(
       (record) =>
         record.vaccine_id === Number(formData.vaccine_id) &&
+        (!scopedClinicId || record.clinic_id === Number(scopedClinicId)) &&
         Number(record.stock_on_hand || 0) > 0,
     );
-  }, [inventoryRecords, formData.vaccine_id]);
+  }, [inventoryRecords, formData.vaccine_id, scopedClinicId]);
 
   const selectedInventoryRecord = useMemo(
     () =>
@@ -426,16 +430,26 @@ export default function InjectVaccineModal({
               }));
             }}
             options={[
-              { value: "", label: "Select inventory source" },
+              {
+                value: "",
+                label: vaccineInventoryOptions.length
+                  ? "Select inventory source"
+                  : "No San Nicolas inventory available",
+              },
               ...vaccineInventoryOptions.map((record) => ({
                 value: record.id,
-                label: `${record.facility_name || "Facility"} • Stock ${
+                label: `${record.facility_name || "Barangay San Nicolas Health Center"} • Stock ${
                   record.stock_on_hand
                 } • Lot ${record.lot_batch_number || "N/A"}`,
               })),
             ]}
             required
           />
+          {!vaccineInventoryOptions.length && formData.vaccine_id && (
+            <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+              No available stock was found for the selected vaccine in Barangay San Nicolas Health Center inventory.
+            </p>
+          )}
         </div>
 
         {selectedVaccine && (

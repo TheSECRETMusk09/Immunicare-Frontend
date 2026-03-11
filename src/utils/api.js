@@ -779,8 +779,20 @@ class ApiClient {
   }
 
   // Vaccine Inventory Management endpoints (based on ITEMS_vaccines.docx structure)
-  async getVaccineInventory(url = "/inventory/vaccine-inventory") {
-    return this.request(url);
+  async getVaccineInventory(options = "/inventory/vaccine-inventory") {
+    if (typeof options === "string") {
+      return this.request(options);
+    }
+
+    const params = new URLSearchParams();
+    Object.entries(options || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        params.append(key, String(value));
+      }
+    });
+
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return this.request(`/inventory/vaccine-inventory${suffix}`);
   }
 
   async getVaccineInventoryByClinic(clinicId, filters = {}) {

@@ -229,7 +229,7 @@ describe("Analytics dashboard rendering and filter stability", () => {
     expect(screen.queryByText(/no timeline points available/i)).not.toBeInTheDocument();
   });
 
-  test("shows informative demographics and gender empty state when backend has no records", async () => {
+  test("shows explicit zero-data demographics state when backend has no records", async () => {
     apiClient.getAnalyticsDashboard.mockResolvedValueOnce({
       success: true,
       data: buildDashboardPayload({
@@ -252,10 +252,16 @@ describe("Analytics dashboard rendering and filter stability", () => {
     await waitFor(() => {
       expect(screen.getByText(/demographic coverage \(age groups\)/i)).toBeInTheDocument();
     });
-    expect(screen.getByText(/male vs female distribution/i)).toBeInTheDocument();
 
-    const emptyMessages = screen.getAllByText(/no records available for current filters/i);
-    expect(emptyMessages.length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/male vs female distribution/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/line chart of infant age-group distribution/i)).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/rounded doughnut chart comparing male and female infant counts/i),
+    ).toBeInTheDocument();
+
+    const zeroDataBadges = screen.getAllByText(/^0 data$/i);
+    expect(zeroDataBadges.length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText(/no records available for current filters/i)).not.toBeInTheDocument();
   });
 
   test("inventory labels and dropdown filters remain interactive without screen blackout", async () => {

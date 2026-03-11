@@ -26,6 +26,19 @@ import {
   validateRequired,
 } from "../utils/adminFormValidation";
 
+// Control number display formatter - consistent with InfantManagement and InfantPersonalRecord
+const formatControlNumberDisplay = (controlNumber, dateValue) => {
+  const base = String(controlNumber || "").trim();
+  if (!base) return "Pending";
+
+  const parsedDate = dateValue ? new Date(dateValue) : null;
+  if (!parsedDate || Number.isNaN(parsedDate.getTime())) {
+    return base;
+  }
+
+  return `${base}-${parsedDate.getMonth() + 1}/${parsedDate.getDate()}/${parsedDate.getFullYear()}`;
+};
+
 // Calendar utility functions (matching GuardianAppointmentsPage)
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -362,6 +375,15 @@ export default function Appointments() {
           </Badge>
         );
       },
+    },
+    {
+      key: "control_number",
+      label: "Control Number",
+      render: (val, row) => (
+        <span className="font-mono text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-gray-600 dark:text-gray-300">
+          {formatControlNumberDisplay(val, row.scheduled_date)}
+        </span>
+      ),
     },
   ];
 

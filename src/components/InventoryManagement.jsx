@@ -973,14 +973,18 @@ export default function InventoryManagement() {
     printReport();
   };
 
-  // Stock alerts calculation
+  // Stock alerts calculation - now includes expiring vaccines
   const getStockAlerts = useCallback(() => {
     const alerts = {
       critical: [],
       low: [],
       unused: [],
       wasted: [],
+      expiring: [], // Nearly expiring (within 30 days)
     };
+
+    const now = new Date();
+    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     inventory.forEach((item) => {
       if (item.stock_on_hand === 0) {
@@ -1002,6 +1006,20 @@ export default function InventoryManagement() {
           ...item,
           waste_percentage: wastePercentage.toFixed(1),
         });
+      }
+
+      // Check for nearly expiring vaccines (expiry_date within 30 days)
+      if (item.expiry_date) {
+        const expiryDate = new Date(item.expiry_date);
+        if (!Number.isNaN(expiryDate.getTime()) &&
+            expiryDate >= now &&
+            expiryDate <= thirtyDaysFromNow &&
+            item.stock_on_hand > 0) {
+          alerts.expiring.push({
+            ...item,
+            days_until_expiry: Math.ceil((expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)),
+          });
+        }
       }
     });
 
@@ -1652,12 +1670,12 @@ export default function InventoryManagement() {
                             <td className="px-3 py-1 text-center">
                               <Button
                                 size="xs"
-                                variant="danger"
+                                variant="warning"
                                 onClick={() =>
                                   openTransactionModal("receive", item)
                                 }
                               >
-                                Receive
+                                Restock
                               </Button>
                             </td>
                           </tr>
@@ -1892,7 +1910,7 @@ export default function InventoryManagement() {
             <h3 className="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-200">
               Inventory Summary
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
               <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded">
                 <p className="text-xs text-gray-600 dark:text-gray-400">
                   Vaccines
@@ -1931,6 +1949,14 @@ export default function InventoryManagement() {
                 </p>
                 <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
                   {totals.stock_on_hand}
+                </p>
+              </div>
+              <div className="text-center p-3 bg-red-50 dark:bg-red-900/30 rounded">
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  Nearly Expiring
+                </p>
+                <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                  {stockAlerts.expiring.length}
                 </p>
               </div>
             </div>

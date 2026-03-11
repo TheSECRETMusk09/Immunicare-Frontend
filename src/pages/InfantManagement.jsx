@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import infantService from "../services/infantService";
 import VaccineScheduleBooklet from "../components/VaccineScheduleBooklet";
 import ImmunizationRecordBooklet from "../components/ImmunizationRecordBooklet";
@@ -31,6 +31,18 @@ import {
   Baby,
 } from "lucide-react";
 
+const formatControlNumberDisplay = (controlNumber, dateValue) => {
+  const base = String(controlNumber || "").trim();
+  if (!base) return "Pending";
+
+  const parsedDate = dateValue ? new Date(dateValue) : null;
+  if (!parsedDate || Number.isNaN(parsedDate.getTime())) {
+    return base;
+  }
+
+  return `${base}-${parsedDate.getMonth() + 1}/${parsedDate.getDate()}/${parsedDate.getFullYear()}`;
+};
+
 export default function InfantManagement() {
   const [infants, setInfants] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,7 +54,19 @@ export default function InfantManagement() {
   const [showInjectModal, setShowInjectModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const isMountedRef = useRef(true);
+  const fetchRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const fetchInfants = useCallback(async (isRefresh = false) => {
+    const requestId = ++fetchRequestIdRef.current;
+
     try {
       if (isRefresh) {
         setRefreshing(true);
@@ -52,6 +76,11 @@ export default function InfantManagement() {
       setError(null);
       const result = await infantService.getAll();
       const infantsData = normalizeInfantsResponse(result?.data ?? result);
+
+      if (!isMountedRef.current || requestId !== fetchRequestIdRef.current) {
+        return;
+      }
+
       setInfants(infantsData);
       if (selectedInfant?.id) {
         const refreshedSelected = infantsData.find(
@@ -62,14 +91,22 @@ export default function InfantManagement() {
         }
       }
     } catch (err) {
+      if (!isMountedRef.current || requestId !== fetchRequestIdRef.current) {
+        return;
+      }
+
       console.error("[InfantManagement] Error fetching infants:", err);
       setError(err.message || "Failed to load infants. Please try again.");
       setInfants([]); // Ensure infants is always an array on error
     } finally {
+      if (!isMountedRef.current || requestId !== fetchRequestIdRef.current) {
+        return;
+      }
+
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedInfant]);
+  }, [selectedInfant?.id]);
 
   useInfantManagementSocket({
     setInfants,
@@ -173,9 +210,9 @@ export default function InfantManagement() {
     {
       key: "control_number",
       label: "Infant Control Number",
-      render: (val) => (
+      render: (val, row) => (
         <span className="font-mono text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-gray-600 dark:text-gray-300">
-          {val || "Pending"}
+          {formatControlNumberDisplay(val, row.dob)}
         </span>
       ),
     },
@@ -322,7 +359,7 @@ export default function InfantManagement() {
                 {selectedInfant.first_name} {selectedInfant.last_name}
               </h2>
               <p className="text-xs mt-1 font-mono text-gray-600 dark:text-gray-300">
-                Infant Control Number: {selectedInfant.control_number || "Pending"}
+                Infant Control Number: {formatControlNumberDisplay(selectedInfant.control_number, selectedInfant.dob)}
               </p>
             </div>
           </div>
