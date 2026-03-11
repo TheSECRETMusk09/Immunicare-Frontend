@@ -30,8 +30,10 @@ import {
   CalendarToday,
   Download,
   ErrorOutline,
+  Female,
   Inventory2,
   LocalHospital,
+  Male,
   People,
   Refresh,
   Warning,
@@ -176,6 +178,107 @@ const CHART_THEME = {
     horizontalBarRadius: [0, 10, 10, 0],
     pieCornerRadius: 10,
   },
+};
+
+const GENDER_VISUAL_COLORS = Object.freeze({
+  female: "#EC4899",
+  male: "#3B82F6",
+});
+
+const REPORT_SHORTCUT_GENERATION_MAP = Object.freeze({
+  "vaccination-summary": { type: "vaccination", format: "pdf" },
+  "appointments-followup": { type: "appointment", format: "csv" },
+  "inventory-status": { type: "inventory", format: "excel" },
+  "sms-reminder-log": { type: "consolidated", format: "csv" },
+});
+
+const SHORTCUT_FORMAT_ALIASES = Object.freeze({
+  pdf: "pdf",
+  csv: "csv",
+  excel: "excel",
+  xlsx: "excel",
+});
+
+const SHORTCUT_FORMAT_EXTENSION = Object.freeze({
+  pdf: "pdf",
+  csv: "csv",
+  excel: "xlsx",
+});
+
+const formatDateToIsoDay = (value) => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toISOString().slice(0, 10);
+};
+
+const resolveShortcutDateRange = (filters = {}) => {
+  const period = String(filters.period || "month").toLowerCase();
+
+  if (period === "custom") {
+    return {
+      startDate: filters.startDate || "",
+      endDate: filters.endDate || "",
+    };
+  }
+
+  const end = new Date();
+  end.setHours(0, 0, 0, 0);
+
+  const start = new Date(end);
+  if (period === "today") {
+    // same-day report range
+  } else if (period === "week") {
+    start.setDate(start.getDate() - 6);
+  } else {
+    // default to 30-day analytics-aligned range
+    start.setDate(start.getDate() - 29);
+  }
+
+  return {
+    startDate: formatDateToIsoDay(start),
+    endDate: formatDateToIsoDay(end),
+  };
+};
+
+const normalizeShortcutReportFormat = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  return SHORTCUT_FORMAT_ALIASES[normalized] || null;
+};
+
+const resolveShortcutGenerationConfig = (report = {}) => {
+  const normalizedKey = String(report?.key || "").trim().toLowerCase();
+  const mapped = REPORT_SHORTCUT_GENERATION_MAP[normalizedKey] || null;
+
+  if (mapped) {
+    return {
+      type: mapped.type,
+      format: normalizeShortcutReportFormat(report?.format) || mapped.format,
+    };
+  }
+
+  const reportType = String(report?.reportType || "").trim().toLowerCase() || "consolidated";
+  return {
+    type: reportType,
+    format: normalizeShortcutReportFormat(report?.format) || "pdf",
+  };
+};
+
+const extractFilenameFromContentDisposition = (contentDisposition = "") => {
+  const value = String(contentDisposition || "");
+  const utf8Match = value.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1].trim().replace(/^"|"$/g, ""));
+  }
+
+  const filenameMatch = value.match(/filename=([^;]+)/i);
+  if (filenameMatch?.[1]) {
+    return filenameMatch[1].trim().replace(/^"|"$/g, "");
+  }
+
+  return "";
 };
 
 const formatTrendLabelTick = (value) => {
@@ -457,6 +560,28 @@ const ensureDefaultGenderGroups = (genderRows = []) => {
     label: entry.label,
     count: map.has(entry.label) ? safeNum(map.get(entry.label)) : entry.count,
   }));
+};
+
+const normalizeGenderSnapshot = (genderRows = []) => {
+  const normalized = ensureDefaultGenderGroups(genderRows);
+  const maleCount = safeNum(normalized.find((item) => item.label === "Male")?.count);
+  const femaleCount = safeNum(normalized.find((item) => item.label === "Female")?.count);
+  const otherCount = safeNum(normalized.find((item) => item.label === "Other / Not specified")?.count);
+  const total = maleCount + femaleCount + otherCount;
+  const pairTotal = maleCount + femaleCount;
+  const femalePercent = pairTotal > 0 ? Math.round((femaleCount / pairTotal) * 100) : 0;
+  const malePercent = pairTotal > 0 ? 100 - femalePercent : 0;
+
+  return {
+    maleCount,
+    femaleCount,
+    otherCount,
+    total,
+    pairTotal,
+    femalePercent,
+    malePercent,
+    hasActualValues: total > 0,
+  };
 };
 
 const statusLabel = (value = "") => {
@@ -796,7 +921,9 @@ const mapDashboardPayload = (payload) => {
   const normalizedGenderGroups = ensureDefaultGenderGroups(demographicsGender);
 
   const activity = normalizeArray(payload?.recentActivity, payload?.activity, payload?.activityFeed);
-  const alerts = normalizeArray(payload?.alerts, payload?.criticalAlerts);
+  const explicitAlerts = normalizeArray(payload?.alerts);
+  const criticalAlertsFallback = normalizeArray(payload?.criticalAlerts);
+  const alerts = explicitAlerts.length > 0 ? explicitAlerts : criticalAlertsFallback;
   const reportShortcuts = normalizeArray(payload?.reportShortcuts, payload?.reports);
   const inventoryByVaccine = normalizeArray(inventory.byVaccine, inventory.vaccines, inventory.breakdown);
 
@@ -1613,7 +1740,100 @@ const InventorySection = ({ data, loading, chartAppearance, viewportWidth }) => 
   );
 };
 
-const SmsAndDemographicsSection = ({ data, loading, chartAppearance, showGenderChart = false }) => {
+const GenderStatRing = ({
+  label,
+  count,
+  percent,
+  color,
+  chartAppearance,
+  IconComponent,
+}) => {
+  const normalizedPercent = Math.max(0, Math.min(100, safeNum(percent)));
+  const arcDegrees = normalizedPercent * 3.6;
+  const trackColor = chartAppearance.isDark ? "rgba(148,163,184,0.24)" : "rgba(148,163,184,0.30)";
+  const ringInnerBackground = chartAppearance.isDark
+    ? "rgba(15,23,42,0.92)"
+    : "rgba(255,255,255,0.96)";
+
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, minWidth: 132 }}>
+      <Box
+        sx={{
+          width: { xs: 132, sm: 152 },
+          height: { xs: 132, sm: 152 },
+          borderRadius: "50%",
+          background: `conic-gradient(${color} 0deg ${arcDegrees}deg, ${trackColor} ${arcDegrees}deg 360deg)`,
+          p: "10px",
+          boxShadow: chartAppearance.isDark
+            ? "0 10px 24px rgba(2,6,23,0.35)"
+            : "0 10px 24px rgba(15,23,42,0.14)",
+        }}
+      >
+        <Box
+          sx={{
+            width: "100%",
+            height: "100%",
+            borderRadius: "50%",
+            bgcolor: ringInnerBackground,
+            border: "1px solid",
+            borderColor: chartAppearance.plotBorder,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: "50%",
+              border: "2px solid",
+              borderColor: `${color}55`,
+              bgcolor: chartAppearance.isDark ? "rgba(30,41,59,0.85)" : "rgba(248,250,252,0.95)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              mb: 0.65,
+            }}
+          >
+            <IconComponent sx={{ fontSize: 30, color }} />
+          </Box>
+
+          <Typography variant="h5" sx={{ fontWeight: 800, lineHeight: 1, color }}>
+            {`${normalizedPercent}%`}
+          </Typography>
+        </Box>
+      </Box>
+
+      <Typography
+        variant="subtitle1"
+        sx={{
+          fontWeight: 800,
+          color,
+          textTransform: "uppercase",
+          letterSpacing: "0.02em",
+        }}
+      >
+        {label}
+      </Typography>
+      <Typography variant="caption" sx={{ color: chartAppearance.axisTick, fontWeight: 700 }}>
+        {`${safeNum(count).toLocaleString()} infant${safeNum(count) === 1 ? "" : "s"}`}
+      </Typography>
+      <Typography variant="caption" sx={{ color: chartAppearance.axisTick, fontWeight: 600 }}>
+        {`${normalizedPercent}% ${label}`}
+      </Typography>
+    </Box>
+  );
+};
+
+const SmsAndDemographicsSection = ({
+  data,
+  loading,
+  chartAppearance,
+  showGenderChart = false,
+  genderError = "",
+}) => {
   const reminder = data?.reminders || {};
   const coverage = data?.demographicsCoverage || {};
   const ageData = (data?.demographicsAgeGroups || []).map((item) => ({
@@ -1621,39 +1841,18 @@ const SmsAndDemographicsSection = ({ data, loading, chartAppearance, showGenderC
     count: safeNum(item.count),
   }));
   const ageHasActualValues = ageData.some((item) => safeNum(item.count) > 0);
-  const genderData = (data?.demographicsGender || [])
-    .map((item, index) => {
-      const rawLabel = String(item.label || "Unknown").trim();
-      const normalized = rawLabel.toLowerCase().replace(/\./g, "").trim();
-      const label = normalized === "f" || normalized.startsWith("fem")
-        ? "Female"
-        : normalized === "m" || normalized.startsWith("mal")
-          ? "Male"
-          : rawLabel || "Unknown";
-
-      const color =
-        label === "Male"
-          ? CHART_THEME.palette.male
-          : label === "Female"
-            ? CHART_THEME.palette.female
-            : PIE_COLORS[index % PIE_COLORS.length];
-
-      return {
-        label,
-        count: safeNum(item.count),
-        color,
-      };
-    });
-
-  const genderHasActualValues = genderData.some((item) => safeNum(item.count) > 0);
-
-  const genderTotal = genderData.reduce((total, item) => total + safeNum(item.count), 0);
-  const maleCount = genderData.find((item) => item.label === "Male")?.count || 0;
-  const femaleCount = genderData.find((item) => item.label === "Female")?.count || 0;
-  const malePercent = genderTotal > 0 ? Math.round((maleCount / genderTotal) * 100) : 0;
-  const femalePercent = genderTotal > 0 ? Math.round((femaleCount / genderTotal) * 100) : 0;
-  const genderBreakdownLabel =
-    maleCount + femaleCount > 0 ? `${malePercent}% M • ${femalePercent}% F` : `${genderData.length} groups`;
+  const genderSnapshot = normalizeGenderSnapshot(data?.demographicsGender || []);
+  const {
+    femaleCount,
+    maleCount,
+    otherCount,
+    total: genderTotal,
+    pairTotal: femaleMaleTotal,
+    femalePercent,
+    malePercent,
+    hasActualValues: genderHasActualValues,
+  } = genderSnapshot;
+  const hasGenderError = Boolean(genderError) && !genderHasActualValues;
 
   const axisTick = { fill: chartAppearance.axisTick, fontSize: 12, fontWeight: 500 };
   const axisLine = { stroke: chartAppearance.axisLine };
@@ -1781,96 +1980,134 @@ const SmsAndDemographicsSection = ({ data, loading, chartAppearance, showGenderC
             title="Male vs Female Distribution"
             subtitle="Registered infant gender composition"
             loading={loading}
-            empty={genderData.length === 0}
-            emptyMessage="0 data: no gender-distribution records yet for the current filters."
-            ariaLabel="Rounded doughnut chart comparing male and female infant counts"
+            empty={false}
+            ariaLabel="Gender distribution infographic showing female and male infant percentages"
             chartAppearance={chartAppearance}
-            chartHeight={300}
+            chartHeight={320}
           >
-            <Box sx={{ position: "relative", width: "100%", height: 300 }}>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={genderData}
-                    dataKey="count"
-                    nameKey="label"
-                    innerRadius={72}
-                    outerRadius={108}
-                    paddingAngle={3}
-                    cornerRadius={12}
-                    stroke={chartAppearance.plotBackground}
-                    strokeWidth={2}
-                  >
-                    {genderData.map((entry, index) => (
-                      <Cell key={`gender-distribution-${entry.label}-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip content={<DashboardChartTooltip chartAppearance={chartAppearance} />} />
-                  <Legend
-                    verticalAlign="bottom"
-                    align="center"
-                    content={(legendProps) => <DashboardLegend {...legendProps} chartAppearance={chartAppearance} />}
-                  />
-                  <text
-                    x="50%"
-                    y="44%"
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fill={chartAppearance.centerLabel}
-                    fontSize="12"
-                    fontWeight="600"
-                  >
-                    Infants
-                  </text>
-                  <text
-                    x="50%"
-                    y="54%"
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fill={chartAppearance.centerValue}
-                    fontSize="24"
-                    fontWeight="700"
-                  >
-                    {genderTotal.toLocaleString()}
-                  </text>
-                  <text
-                    x="50%"
-                    y="64%"
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fill={chartAppearance.centerLabel}
-                    fontSize="11"
-                    fontWeight="600"
-                  >
-                    {genderBreakdownLabel}
-                  </text>
-                </PieChart>
-              </ResponsiveContainer>
+            <Box sx={{ width: "100%", height: 320, display: "flex", flexDirection: "column" }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 1,
+                  flexWrap: "wrap",
+                  mb: 1.5,
+                }}
+              >
+                <Chip
+                  size="small"
+                  color={hasGenderError ? "warning" : genderHasActualValues ? "success" : "default"}
+                  variant={hasGenderError ? "filled" : "outlined"}
+                  label={hasGenderError
+                    ? "Data unavailable"
+                    : genderHasActualValues
+                      ? "Live demographic split"
+                      : "No records yet"}
+                />
+                <Typography variant="caption" sx={{ color: chartAppearance.axisTick, fontWeight: 700 }}>
+                  {`Total infants: ${safeNum(genderTotal).toLocaleString()}`}
+                </Typography>
+              </Box>
 
-              {!loading && !genderHasActualValues ? (
+              <Box
+                sx={{
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexDirection: { xs: "column", sm: "row" },
+                  gap: { xs: 1.5, sm: 1 },
+                }}
+              >
+                <GenderStatRing
+                  label="Female"
+                  count={femaleCount}
+                  percent={femalePercent}
+                  color={GENDER_VISUAL_COLORS.female}
+                  chartAppearance={chartAppearance}
+                  IconComponent={Female}
+                />
+
                 <Box
                   sx={{
-                    position: "absolute",
-                    inset: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    pointerEvents: "none",
+                    px: 1,
+                    py: 0.5,
+                    textAlign: "center",
+                    minWidth: { xs: "100%", sm: 100 },
                   }}
                 >
-                  <Chip
-                    size="small"
-                    label="0 data"
+                  <Typography variant="caption" sx={{ color: chartAppearance.centerLabel, fontWeight: 700 }}>
+                    Female vs Male
+                  </Typography>
+                  <Typography
+                    variant="h5"
                     sx={{
-                      bgcolor: chartAppearance.isDark ? "rgba(15,23,42,0.85)" : "rgba(255,255,255,0.9)",
-                      border: "1px solid",
-                      borderColor: chartAppearance.plotBorder,
-                      color: chartAppearance.axisTick,
-                      fontWeight: 700,
+                      fontWeight: 800,
+                      color: chartAppearance.centerValue,
+                      lineHeight: 1.15,
+                      letterSpacing: "-0.01em",
+                      my: 0.35,
                     }}
-                  />
+                  >
+                    {`${femalePercent}% : ${malePercent}%`}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: chartAppearance.axisTick, fontWeight: 600 }}>
+                    {`${safeNum(femaleMaleTotal).toLocaleString()} profiled infants`}
+                  </Typography>
                 </Box>
-              ) : null}
+
+                <GenderStatRing
+                  label="Male"
+                  count={maleCount}
+                  percent={malePercent}
+                  color={GENDER_VISUAL_COLORS.male}
+                  chartAppearance={chartAppearance}
+                  IconComponent={Male}
+                />
+              </Box>
+
+              <Box sx={{ mt: 1.25 }}>
+                {hasGenderError ? (
+                  <Alert
+                    severity="warning"
+                    sx={{
+                      py: 0,
+                      '& .MuiAlert-message': {
+                        py: 0.45,
+                        fontSize: 12,
+                        fontWeight: 600,
+                      },
+                    }}
+                  >
+                    Unable to load gender analytics right now. Displaying safe defaults of 0% Female and 0% Male.
+                  </Alert>
+                ) : !genderHasActualValues ? (
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      display: "block",
+                      color: chartAppearance.axisTick,
+                      fontWeight: 600,
+                      textAlign: "center",
+                    }}
+                  >
+                    No demographic gender records were returned for the selected filters. Showing explicit 0% Female and 0% Male.
+                  </Typography>
+                ) : otherCount > 0 ? (
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      display: "block",
+                      color: chartAppearance.axisTick,
+                      textAlign: "center",
+                    }}
+                  >
+                    {`${safeNum(otherCount).toLocaleString()} record${safeNum(otherCount) === 1 ? " is" : "s are"} marked as Other / Not specified and excluded from the Female vs Male percentage split.`}
+                  </Typography>
+                ) : null}
+              </Box>
             </Box>
           </ChartCard>
         </Grid>
@@ -2024,7 +2261,13 @@ const TrendsSection = ({ data, loading, chartAppearance }) => {
   );
 };
 
-const AlertsActivityReportsSection = ({ data, loading, isDark }) => {
+const AlertsActivityReportsSection = ({
+  data,
+  loading,
+  isDark,
+  onReportShortcutDownload,
+  shortcutLoadingKey,
+}) => {
   const alerts = data?.alerts || [];
   const activity = data?.activity || [];
   const reports = data?.reportShortcuts || [];
@@ -2139,25 +2382,31 @@ const AlertsActivityReportsSection = ({ data, loading, isDark }) => {
             ) : (
               <Box sx={{ display: "grid", gap: 1 }}>
                 {reports.map((report) => (
+                  (() => {
+                    const reportShortcutKey = String(report?.key || report?.title || "shortcut");
+                    const isShortcutDownloading = shortcutLoadingKey === reportShortcutKey;
+
+                    return (
                   <Button
-                    key={report.key}
+                    key={reportShortcutKey}
                     variant="outlined"
                     size="small"
-                    href={report.endpoint}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    onClick={() => onReportShortcutDownload?.(report)}
+                    disabled={isShortcutDownloading}
                     sx={{ justifyContent: "space-between", textTransform: "none" }}
-                    endIcon={<Download fontSize="small" />}
+                    endIcon={isShortcutDownloading ? <Refresh fontSize="small" /> : <Download fontSize="small" />}
                   >
                     <Box sx={{ textAlign: "left" }}>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
                         {report.title}
                       </Typography>
                       <Typography variant="caption" sx={{ color: isDark ? '#64748B' : 'text.secondary' }}>
-                        {String(report.format || "").toUpperCase()}
+                        {isShortcutDownloading ? "PREPARING…" : String(report.format || "").toUpperCase()}
                       </Typography>
                     </Box>
                   </Button>
+                    );
+                  })()
                 ))}
               </Box>
             )}
@@ -2263,6 +2512,7 @@ const AnalyticsDashboard = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshWarning, setRefreshWarning] = useState("");
+  const [shortcutLoadingKey, setShortcutLoadingKey] = useState("");
 
   const pollRef = useRef(null);
 
@@ -2407,6 +2657,94 @@ const AnalyticsDashboard = () => {
       setSnackbar({ open: true, message: "Export failed", severity: "error" });
     }
   };
+
+  const handleReportShortcutDownload = useCallback(async (report) => {
+    const shortcutKey = String(report?.key || report?.title || "report-shortcut");
+    setShortcutLoadingKey(shortcutKey);
+
+    try {
+      const shortcutConfig = resolveShortcutGenerationConfig(report);
+      const dateRange = resolveShortcutDateRange(filters);
+      const reportFilters = {
+        ...(dateRange.startDate ? { startDate: dateRange.startDate } : {}),
+        ...(dateRange.endDate ? { endDate: dateRange.endDate } : {}),
+      };
+
+      if (filters.vaccineType && filters.vaccineType !== "ALL") {
+        reportFilters.vaccineType = filters.vaccineType;
+      }
+
+      if (filters.vaccinationStatus && filters.vaccinationStatus !== "all") {
+        reportFilters.status = filters.vaccinationStatus;
+        reportFilters.vaccinationStatus = filters.vaccinationStatus;
+      }
+
+      const generationResponse = await apiClient.post("/reports/generate", {
+        type: shortcutConfig.type,
+        format: shortcutConfig.format,
+        ...(dateRange.startDate ? { startDate: dateRange.startDate } : {}),
+        ...(dateRange.endDate ? { endDate: dateRange.endDate } : {}),
+        filters: reportFilters,
+      });
+
+      const generatedReportId = generationResponse?.data?.id || generationResponse?.id;
+      if (!generatedReportId) {
+        throw new Error("Report generation did not return a downloadable report identifier.");
+      }
+
+      const downloadResponse = await apiClient.customRequest(
+        `/reports/${generatedReportId}/download`,
+        {
+          method: "GET",
+          responseType: "blob",
+        },
+      );
+
+      const contentDisposition =
+        downloadResponse?.headers?.["content-disposition"] ||
+        downloadResponse?.headers?.["Content-Disposition"] ||
+        "";
+      const resolvedFilename = extractFilenameFromContentDisposition(contentDisposition);
+      const fallbackExtension = SHORTCUT_FORMAT_EXTENSION[shortcutConfig.format] || "dat";
+      const fallbackFilename = `${shortcutConfig.type}-report.${fallbackExtension}`;
+      const filename = resolvedFilename || fallbackFilename;
+
+      const mimeType =
+        downloadResponse?.headers?.["content-type"] ||
+        downloadResponse?.headers?.["Content-Type"] ||
+        "application/octet-stream";
+
+      const responseData = downloadResponse?.data;
+      const fileBlob = responseData instanceof Blob
+        ? responseData
+        : new Blob([responseData], { type: mimeType });
+
+      const objectUrl = window.URL.createObjectURL(fileBlob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.setAttribute("download", filename);
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      window.URL.revokeObjectURL(objectUrl);
+
+      setSnackbar({
+        open: true,
+        message: `${report?.title || "Report"} downloaded`,
+        severity: "success",
+      });
+    } catch (shortcutError) {
+      console.error("Report shortcut download error:", shortcutError);
+      const message = shortcutError?.message || "Unable to download report from shortcut.";
+      setSnackbar({
+        open: true,
+        message,
+        severity: /no data found/i.test(message) ? "info" : "error",
+      });
+    } finally {
+      setShortcutLoadingKey("");
+    }
+  }, [filters]);
 
   const liveSyncEnabled = useMemo(() => connectionState === "connected", [connectionState]);
   const chartAppearance = useMemo(() => resolveChartAppearance(isDark), [isDark]);
@@ -2579,7 +2917,12 @@ const AnalyticsDashboard = () => {
               chartAppearance={chartAppearance}
               viewportWidth={viewportWidth}
             />
-            <SmsAndDemographicsSection data={dashboardData} loading={loading} chartAppearance={chartAppearance} />
+            <SmsAndDemographicsSection
+              data={dashboardData}
+              loading={loading}
+              chartAppearance={chartAppearance}
+              genderError={error}
+            />
           </>
         )}
 
@@ -2592,8 +2935,15 @@ const AnalyticsDashboard = () => {
               loading={loading}
               chartAppearance={chartAppearance}
               showGenderChart
+              genderError={error}
             />
-            <AlertsActivityReportsSection data={dashboardData} loading={loading} isDark={isDark} />
+            <AlertsActivityReportsSection
+              data={dashboardData}
+              loading={loading}
+              isDark={isDark}
+              onReportShortcutDownload={handleReportShortcutDownload}
+              shortcutLoadingKey={shortcutLoadingKey}
+            />
           </>
         )}
 

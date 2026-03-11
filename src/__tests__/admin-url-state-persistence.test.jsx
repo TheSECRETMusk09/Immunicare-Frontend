@@ -281,7 +281,7 @@ describe("Admin module URL state persistence", () => {
       expect(apiClient.getAnalyticsDashboard).toHaveBeenCalledTimes(5);
     });
     expect(screen.getByTestId("location-pathname")).toHaveTextContent("/analytics");
-    expect(screen.getByTestId("location-search")).toContain("tab=overview");
+    expect(screen.getByTestId("location-search")).toHaveTextContent("tab=overview");
 
     const vaccineSelect = screen.getByRole("combobox", { name: /vaccine/i });
     fireEvent.mouseDown(vaccineSelect);
@@ -291,7 +291,50 @@ describe("Admin module URL state persistence", () => {
       expect(apiClient.getAnalyticsDashboard).toHaveBeenCalledTimes(6);
     });
     expect(screen.getByTestId("location-pathname")).toHaveTextContent("/analytics");
-    expect(screen.getByTestId("location-search")).toContain("tab=overview");
+    expect(screen.getByTestId("location-search")).toHaveTextContent("tab=overview");
+
+    const statusSelect = screen.getByRole("combobox", { name: /vaccination status/i });
+    fireEvent.mouseDown(statusSelect);
+    fireEvent.click(screen.getByRole("option", { name: /completed/i, hidden: true }));
+
+    await waitFor(() => {
+      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalledTimes(7);
+    });
+    expect(screen.getByTestId("location-pathname")).toHaveTextContent("/analytics");
+    expect(screen.getByTestId("location-search")).toHaveTextContent("tab=overview");
+
+    fireEvent.click(screen.getByRole("switch", { name: /auto-refresh/i }));
+    expect(screen.getByTestId("location-pathname")).toHaveTextContent("/analytics");
+    expect(screen.getByTestId("location-search")).toHaveTextContent("tab=overview");
+  });
+
+  test("Analytics canonicalizes tab search to tab-only after invalid deep link tab while staying on /analytics", async () => {
+    renderAnalyticsRoute(
+      "/analytics?tab=invalid-tab&foo=bar",
+      <>
+        <AnalyticsDashboard />
+        <LocationProbe />
+      </>,
+    );
+
+    await waitFor(() => {
+      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location-pathname")).toHaveTextContent("/analytics");
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location-search")).toHaveTextContent(
+        "tab=overview",
+      );
+    });
+
+    expect(screen.getByTestId("location-search").textContent || "").not.toContain("foo=");
+    expect(
+      screen.getByRole("tab", { name: /^overview$/i }),
+    ).toHaveAttribute("aria-selected", "true");
   });
 
   test("Inventory module preserves active tab via URL and storage fallback", async () => {

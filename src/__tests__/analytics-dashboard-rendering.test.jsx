@@ -17,6 +17,8 @@ jest.mock("../utils/api", () => ({
   __esModule: true,
   default: {
     getAnalyticsDashboard: jest.fn(),
+    post: jest.fn(),
+    customRequest: jest.fn(),
   },
 }));
 
@@ -193,6 +195,8 @@ const buildDashboardPayload = (overrides = {}) => ({
 });
 
 describe("Analytics dashboard rendering and filter stability", () => {
+  let anchorClickSpy;
+
   beforeEach(() => {
     Object.defineProperty(window, "matchMedia", {
       writable: true,
@@ -211,10 +215,37 @@ describe("Analytics dashboard rendering and filter stability", () => {
     jest.clearAllMocks();
     cleanup();
 
+    window.URL.createObjectURL = jest.fn(() => "blob:mock-report-url");
+    window.URL.revokeObjectURL = jest.fn();
+
     apiClient.getAnalyticsDashboard.mockResolvedValue({
       success: true,
       data: buildDashboardPayload(),
     });
+
+    apiClient.post.mockResolvedValue({
+      success: true,
+      data: { id: 91 },
+    });
+
+    apiClient.customRequest.mockResolvedValue({
+      data: new Blob(["report-file"], { type: "application/pdf" }),
+      headers: {
+        "content-disposition": 'attachment; filename="analytics-report.pdf"',
+        "content-type": "application/pdf",
+      },
+    });
+
+    anchorClickSpy = jest
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    if (anchorClickSpy) {
+      anchorClickSpy.mockRestore();
+      anchorClickSpy = null;
+    }
   });
 
   test("renders trend modules with zero-filled points and labels", async () => {
@@ -256,12 +287,89 @@ describe("Analytics dashboard rendering and filter stability", () => {
     expect(screen.getByText(/male vs female distribution/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/line chart of infant age-group distribution/i)).toBeInTheDocument();
     expect(
-      screen.getByLabelText(/rounded doughnut chart comparing male and female infant counts/i),
+      screen.getByLabelText(/gender distribution infographic showing female and male infant percentages/i),
     ).toBeInTheDocument();
 
-    const zeroDataBadges = screen.getAllByText(/^0 data$/i);
-    expect(zeroDataBadges.length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/^0 data$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^0% Female$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^0% Male$/i)).toBeInTheDocument();
+    expect(screen.getByText(/showing explicit 0% female and 0% male/i)).toBeInTheDocument();
     expect(screen.queryByText(/no records available for current filters/i)).not.toBeInTheDocument();
+  });
+
+  test("keeps a full gender card with explicit 0% fallback when demographics request fails", async () => {
+    apiClient.getAnalyticsDashboard.mockRejectedValueOnce(new Error("Initial dashboard fetch failed"));
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByText(/initial dashboard fetch failed/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: /demographics & activity/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/male vs female distribution/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/^0% Female$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^0% Male$/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/displaying safe defaults of 0% female and 0% male/i),
+    ).toBeInTheDocument();
+  });
+
+  test("report shortcuts generate and download reports via reports API without direct broken endpoint navigation", async () => {
+    apiClient.post.mockResolvedValueOnce({
+      success: true,
+      data: { id: 321 },
+    });
+
+    apiClient.customRequest.mockResolvedValueOnce({
+      data: new Blob(["vaccination-shortcut"], { type: "application/pdf" }),
+      headers: {
+        "content-disposition": 'attachment; filename="vaccination-summary.pdf"',
+        "content-type": "application/pdf",
+      },
+    });
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalled();
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: /demographics & activity/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/report shortcuts/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /vaccination summary/i }));
+
+    await waitFor(() => {
+      expect(apiClient.post).toHaveBeenCalledWith(
+        "/reports/generate",
+        expect.objectContaining({
+          type: "vaccination",
+          format: "pdf",
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(apiClient.customRequest).toHaveBeenCalledWith(
+        "/reports/321/download",
+        expect.objectContaining({
+          method: "GET",
+          responseType: "blob",
+        }),
+      );
+    });
+
+    expect(window.URL.createObjectURL).toHaveBeenCalled();
+    expect(window.URL.revokeObjectURL).toHaveBeenCalled();
+    expect(anchorClickSpy).toHaveBeenCalled();
   });
 
   test("inventory labels and dropdown filters remain interactive without screen blackout", async () => {
@@ -343,6 +451,51 @@ describe("Analytics dashboard rendering and filter stability", () => {
     expect(screen.queryByText(/no critical alerts for current filters/i)).not.toBeInTheDocument();
   });
 
+  test("prefers alerts payload over criticalAlerts fallback when both are present", async () => {
+    apiClient.getAnalyticsDashboard.mockResolvedValueOnce({
+      success: true,
+      data: buildDashboardPayload({
+        alerts: [
+          {
+            id: "alert-warning-primary",
+            severity: "warning",
+            type: "inventory",
+            message: "Primary alerts source should be rendered",
+            timestamp: "2026-03-10T10:00:00.000Z",
+          },
+        ],
+        criticalAlerts: [
+          {
+            id: "critical-fallback",
+            severity: "critical",
+            type: "vaccination",
+            message: "Fallback criticalAlerts should be ignored when alerts exists",
+            timestamp: "2026-03-10T09:00:00.000Z",
+          },
+        ],
+      }),
+    });
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalled();
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: /demographics & activity/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/critical alerts/i)).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText(/primary alerts source should be rendered/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/fallback criticalalerts should be ignored when alerts exists/i),
+    ).not.toBeInTheDocument();
+  });
+
   test("renders KPI cards from canonical summary fields for infants, guardians, completed today, and due", async () => {
     apiClient.getAnalyticsDashboard.mockResolvedValueOnce({
       success: true,
@@ -371,10 +524,13 @@ describe("Analytics dashboard rendering and filter stability", () => {
     expect(screen.getByText(/vaccinations completed today/i)).toBeInTheDocument();
     expect(screen.getByText(/infants due for vaccination/i)).toBeInTheDocument();
 
-    expect(screen.getByText("143")).toBeInTheDocument();
-    expect(screen.getByText("118")).toBeInTheDocument();
-    expect(screen.getByText("27")).toBeInTheDocument();
-    expect(screen.getByText("39")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryAllByText("143").length).toBeGreaterThan(0);
+    });
+
+    expect(screen.queryAllByText("118").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("27").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("39").length).toBeGreaterThan(0);
     expect(screen.getByText(/12 overdue/i)).toBeInTheDocument();
   });
 
