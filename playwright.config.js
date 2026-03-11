@@ -5,6 +5,9 @@
  * @see https://playwright.dev/docs/test-configuration
  */
 const { defineConfig, devices } = require('@playwright/test');
+const path = require('path');
+
+require('dotenv').config({ path: path.resolve(__dirname, './e2e/.env.test') });
 
 module.exports = defineConfig({
   testDir: './e2e/tests',
@@ -24,7 +27,7 @@ module.exports = defineConfig({
   ],
 
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:3000',
+    baseURL: process.env.BASE_URL || process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -127,5 +130,9 @@ module.exports = defineConfig({
     url: 'http://localhost:3000',
     reuseExistingServer: true,
     timeout: 120000,
+    env: {
+      NODE_ENV: 'test',
+      ...process.env,
+    },
   },
 });
