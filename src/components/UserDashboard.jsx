@@ -496,7 +496,7 @@ function DocumentsTab({ infants }) {
 
   const handleViewGrowthChart = (infantId) => {
     // Navigate to growth chart page for the infant
-    navigate(`/growth-chart/${infantId}`);
+    navigate(`/guardian/health-charts/${infantId}`);
   };
 
   const handleDownloadRecords = async (infantId) => {
