@@ -52,7 +52,7 @@ import {
   YAxis,
 } from "recharts";
 import { format } from "date-fns";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import apiClient from "../../utils/api";
 import { useSocket } from "../../contexts/SocketContext";
 import { useTheme as useAppTheme } from "../../contexts/ThemeContext";
@@ -95,6 +95,7 @@ const ANALYTICS_TAB_CONFIG = [
 
 const ANALYTICS_DEFAULT_TAB_KEY = ANALYTICS_TAB_CONFIG[0].key;
 const ANALYTICS_TAB_STORAGE_KEY = "admin.analytics.activeTab";
+const ANALYTICS_CANONICAL_PATH = "/analytics";
 const ANALYTICS_TAB_KEY_SET = new Set(ANALYTICS_TAB_CONFIG.map((tab) => tab.key));
 
 const normalizeAnalyticsTabKey = (value) => {
@@ -113,6 +114,37 @@ const getStoredAnalyticsTabKey = () => {
   }
 
   return normalizeAnalyticsTabKey(safeLocalStorage.getItem(ANALYTICS_TAB_STORAGE_KEY));
+};
+
+const normalizeAnalyticsTabIndex = (index) => {
+  const parsed = Number.parseInt(index, 10);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed >= ANALYTICS_TAB_CONFIG.length) {
+    return 0;
+  }
+
+  return parsed;
+};
+
+const buildNextTabSearchParams = (nextTabKey) => {
+  const normalizedTabKey = normalizeAnalyticsTabKey(nextTabKey) || ANALYTICS_DEFAULT_TAB_KEY;
+  const next = new URLSearchParams();
+  next.set("tab", normalizedTabKey);
+  return next;
+};
+
+const isCanonicalAnalyticsSearch = (search, tabKey) => {
+  const normalizedTabKey = normalizeAnalyticsTabKey(tabKey);
+  if (!normalizedTabKey) {
+    return false;
+  }
+
+  const params = new URLSearchParams(search);
+  if (normalizeAnalyticsTabKey(params.get("tab")) !== normalizedTabKey) {
+    return false;
+  }
+
+  params.delete("tab");
+  return Array.from(params.keys()).length === 0;
 };
 
 const persistAnalyticsTabKey = (tabKey) => {
@@ -2215,7 +2247,8 @@ const AnalyticsDashboard = () => {
   const isTabletDown = useMediaQuery(theme.breakpoints.down("md"));
   const viewportWidth = isMobile ? 560 : isTabletDown ? 840 : 1200;
   const { on, off, connectionState } = useSocket();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const [, setSearchParams] = useSearchParams();
 
   const [filters, setFilters] = useState({
     period: "month",
@@ -2377,7 +2410,10 @@ const AnalyticsDashboard = () => {
 
   const liveSyncEnabled = useMemo(() => connectionState === "connected", [connectionState]);
   const chartAppearance = useMemo(() => resolveChartAppearance(isDark), [isDark]);
-  const tabFromUrl = normalizeAnalyticsTabKey(searchParams.get("tab"));
+  const tabFromUrl = useMemo(() => {
+    const currentSearchParams = new URLSearchParams(location.search);
+    return normalizeAnalyticsTabKey(currentSearchParams.get("tab"));
+  }, [location.search]);
 
   const activeTabKey = useMemo(
     () => tabFromUrl || getStoredAnalyticsTabKey() || ANALYTICS_DEFAULT_TAB_KEY,
@@ -2386,31 +2422,48 @@ const AnalyticsDashboard = () => {
 
   const tab = useMemo(() => {
     const tabIndex = ANALYTICS_TAB_CONFIG.findIndex((entry) => entry.key === activeTabKey);
-    return tabIndex >= 0 ? tabIndex : 0;
+    return normalizeAnalyticsTabIndex(tabIndex);
   }, [activeTabKey]);
 
   useEffect(() => {
-    if (tabFromUrl) {
-      persistAnalyticsTabKey(tabFromUrl);
+    const resolvedTabKey = tabFromUrl || getStoredAnalyticsTabKey() || ANALYTICS_DEFAULT_TAB_KEY;
+    persistAnalyticsTabKey(resolvedTabKey);
+
+    if (isCanonicalAnalyticsSearch(location.search, resolvedTabKey)) {
       return;
     }
 
-    const fallbackTabKey = getStoredAnalyticsTabKey() || ANALYTICS_DEFAULT_TAB_KEY;
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("tab", fallbackTabKey);
+    const nextParams = buildNextTabSearchParams(resolvedTabKey);
     setSearchParams(nextParams, { replace: true });
-  }, [tabFromUrl, searchParams, setSearchParams]);
+  }, [location.search, tabFromUrl, setSearchParams]);
+
+  useEffect(() => {
+    if (location.pathname === ANALYTICS_CANONICAL_PATH) {
+      return;
+    }
+
+    console.error(
+      "[AnalyticsDashboard] Unexpected pathname change detected during analytics render:",
+      location.pathname,
+    );
+  }, [location.pathname]);
 
   const handleTabChange = useCallback(
     (_event, nextTabIndex) => {
       blurActiveElementIfNeeded();
-      const nextTabKey = ANALYTICS_TAB_CONFIG[nextTabIndex]?.key || ANALYTICS_DEFAULT_TAB_KEY;
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.set("tab", nextTabKey);
+      const safeTabIndex = normalizeAnalyticsTabIndex(nextTabIndex);
+      const nextTabKey = ANALYTICS_TAB_CONFIG[safeTabIndex]?.key || ANALYTICS_DEFAULT_TAB_KEY;
+
+      if (nextTabKey === activeTabKey) {
+        persistAnalyticsTabKey(nextTabKey);
+        return;
+      }
+
+      const nextParams = buildNextTabSearchParams(nextTabKey);
       setSearchParams(nextParams);
       persistAnalyticsTabKey(nextTabKey);
     },
-    [searchParams, setSearchParams],
+    [activeTabKey, setSearchParams],
   );
 
   const tabs = ANALYTICS_TAB_CONFIG;

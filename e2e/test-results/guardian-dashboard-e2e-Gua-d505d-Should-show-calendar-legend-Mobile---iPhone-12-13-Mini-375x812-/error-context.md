@@ -1,0 +1,56 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e6]:
+        - img "Nurse holding a baby" [ref=e7]
+        - generic [ref=e8]:
+          - generic [ref=e9]:
+            - heading "YOUR INFANT'S FIRST APPOINTMENTS." [level=1] [ref=e10]:
+              - text: YOUR INFANT'S FIRST
+              - text: APPOINTMENTS.
+            - paragraph [ref=e11]: Schedule and track vital health check-ups and vaccinations.
+          - generic [ref=e12]:
+            - generic [ref=e13]:
+              - img [ref=e15]
+              - generic [ref=e17]: Appointments
+            - generic [ref=e18]:
+              - img [ref=e20]
+              - generic [ref=e22]: Immunizations
+            - generic [ref=e23]:
+              - img [ref=e25]
+              - generic [ref=e27]:
+                - text: Privacy &
+                - text: Security
+      - generic [ref=e29]:
+        - link "Go to home page" [ref=e30]:
+          - /url: /
+          - img [ref=e31]
+          - text: Home
+        - generic [ref=e34]:
+          - generic [ref=e35]:
+            - heading "GUARDIAN ACCESS PORTAL" [level=2] [ref=e36]
+            - paragraph [ref=e37]: Manage your infant's vaccination schedule and appointments.
+          - generic [ref=e38]:
+            - textbox "Email or Patient ID" [ref=e40]
+            - generic [ref=e42]:
+              - textbox "Password" [ref=e43]
+              - button "Show guardian password" [ref=e44] [cursor=pointer]:
+                - img
+            - link "Forgot Password?" [ref=e47]:
+              - /url: /forgot-password
+            - generic [ref=e49]:
+              - checkbox "Remember me" [ref=e51] [cursor=pointer]
+              - generic [ref=e52]:
+                - text: Remember me
+                - paragraph [ref=e53]: Keep me signed in on this device
+            - button "Sign In" [ref=e54] [cursor=pointer]
+          - paragraph [ref=e56]:
+            - text: Don't have an account?
+            - link "Register here" [ref=e57]:
+              - /url: /register
+    - paragraph [ref=e59]: © 2026 Immunicare. All rights reserved.
+  - generic "Notifications"
+```

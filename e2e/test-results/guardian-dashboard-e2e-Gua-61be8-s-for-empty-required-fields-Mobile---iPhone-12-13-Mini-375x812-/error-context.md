@@ -1,0 +1,125 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - link "Skip to main content" [ref=e4]:
+      - /url: "#main-content"
+    - link "Go to home page" [ref=e5]:
+      - /url: /
+      - img [ref=e6]
+      - text: Home
+    - main [ref=e9]:
+      - generic [ref=e10]:
+        - img [ref=e12]
+        - heading "IMMUNICARE" [level=1] [ref=e13]
+        - paragraph [ref=e14]: Parent/Guardian Registration
+      - generic [ref=e15]:
+        - heading "Create Your Account" [level=2] [ref=e16]
+        - paragraph [ref=e17]: Fill in the form below to register for Immunicare
+        - form "Create Your Account" [ref=e18]:
+          - generic [ref=e19]:
+            - generic [ref=e20]:
+              - img [ref=e21]
+              - heading "Personal Information" [level=3] [ref=e24]
+            - generic [ref=e25]:
+              - generic [ref=e26]:
+                - generic [ref=e27]:
+                  - text: First Name
+                  - generic [ref=e28]: (required)
+                - textbox "First Name (required)" [active] [ref=e30]:
+                  - /placeholder: Enter first name
+              - generic [ref=e31]:
+                - generic [ref=e32]:
+                  - text: Last Name
+                  - generic [ref=e33]: (required)
+                - textbox "Last Name (required)" [ref=e35]:
+                  - /placeholder: Enter last name
+          - generic [ref=e36]:
+            - generic [ref=e37]:
+              - img [ref=e38]
+              - heading "Contact Information" [level=3] [ref=e41]
+            - generic [ref=e42]:
+              - generic [ref=e43]:
+                - generic [ref=e44]:
+                  - text: Email Address
+                  - generic [ref=e45]: (required)
+                - textbox "Email Address (required)" [ref=e47]:
+                  - /placeholder: Enter email address
+              - generic [ref=e48]:
+                - generic [ref=e49]:
+                  - text: Phone Number
+                  - generic [ref=e50]: (required)
+                - textbox "Phone Number (required)" [ref=e52]:
+                  - /placeholder: Enter phone number
+            - generic [ref=e53]:
+              - generic [ref=e54]: Home Address (optional)
+              - textbox "Home Address (optional)" [ref=e55]:
+                - /placeholder: Enter your full address
+          - generic [ref=e56]:
+            - generic [ref=e57]:
+              - img [ref=e58]
+              - heading "Security" [level=3] [ref=e60]
+            - generic [ref=e61]:
+              - generic [ref=e62]:
+                - generic [ref=e63]:
+                  - text: Password
+                  - generic [ref=e64]: (required)
+                - generic [ref=e65]:
+                  - textbox "Password (required)" [ref=e66]:
+                    - /placeholder: Create a password
+                  - button "Show password" [ref=e67] [cursor=pointer]:
+                    - img
+              - generic [ref=e69]:
+                - generic [ref=e70]:
+                  - text: Confirm Password
+                  - generic [ref=e71]: (required)
+                - generic [ref=e72]:
+                  - textbox "Confirm Password (required)" [ref=e73]:
+                    - /placeholder: Confirm your password
+                  - button "Show password" [ref=e74] [cursor=pointer]:
+                    - img
+            - generic [ref=e76]:
+              - paragraph [ref=e77]: Password Requirements
+              - generic [ref=e78]:
+                - generic [ref=e79]: At least 8 characters
+                - generic [ref=e81]: One uppercase letter
+                - generic [ref=e83]: One lowercase letter
+                - generic [ref=e85]: One number
+                - generic [ref=e87]: One special character
+          - generic [ref=e89]:
+            - generic [ref=e90]:
+              - img [ref=e91]
+              - heading "Child Information (optional)" [level=3] [ref=e94]:
+                - text: Child Information
+                - generic [ref=e95]: (optional)
+            - paragraph [ref=e96]: Add your child's information to link their immunization records to your account.
+            - generic [ref=e97]:
+              - generic [ref=e98]:
+                - generic [ref=e99]: Child's Name
+                - textbox "Child's Name" [ref=e101]:
+                  - /placeholder: Enter child's full name
+              - generic [ref=e102]:
+                - generic [ref=e103]: Date of Birth
+                - textbox "Date of Birth" [ref=e105]
+              - generic [ref=e107]:
+                - generic [ref=e108]: Relationship to Child*
+                - combobox "Relationship to Child*" [ref=e109]:
+                  - option "Select relationship"
+                  - option "Parent" [selected]
+                  - option "Mother"
+                  - option "Father"
+                  - option "Guardian"
+                  - option "Other"
+          - button "Create Account" [ref=e111] [cursor=pointer]
+          - generic [ref=e113]:
+            - button "Back" [ref=e114] [cursor=pointer]:
+              - img [ref=e115]
+              - text: Back
+            - paragraph [ref=e117]:
+              - text: Already have an account?
+              - link "Sign in here" [ref=e118]:
+                - /url: /login
+      - paragraph [ref=e120]: © 2026 Immunicare System
+  - generic "Notifications"
+```

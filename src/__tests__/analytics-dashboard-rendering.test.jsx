@@ -309,6 +309,75 @@ describe("Analytics dashboard rendering and filter stability", () => {
     expect(screen.queryByText(/failed to load analytics dashboard data/i)).not.toBeInTheDocument();
   });
 
+  test("supports dashboard payloads that return criticalAlerts only and still renders Critical Alerts module", async () => {
+    apiClient.getAnalyticsDashboard.mockResolvedValueOnce({
+      success: true,
+      data: buildDashboardPayload({
+        alerts: undefined,
+        criticalAlerts: [
+          {
+            id: "critical-1",
+            severity: "critical",
+            type: "vaccination",
+            message: "12 infant vaccinations overdue",
+            timestamp: "2026-03-10T09:00:00.000Z",
+          },
+        ],
+      }),
+    });
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalled();
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: /demographics & activity/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/critical alerts/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/12 infant vaccinations overdue/i)).toBeInTheDocument();
+
+    expect(screen.queryByText(/no critical alerts for current filters/i)).not.toBeInTheDocument();
+  });
+
+  test("renders KPI cards from canonical summary fields for infants, guardians, completed today, and due", async () => {
+    apiClient.getAnalyticsDashboard.mockResolvedValueOnce({
+      success: true,
+      data: buildDashboardPayload({
+        summary: {
+          totalRegisteredInfants: 143,
+          totalGuardians: 118,
+          vaccinationsCompletedToday: 27,
+          infantsDueForVaccination: 39,
+          overdueVaccinations: 12,
+          pendingAppointments: 15,
+          lowStockVaccines: 4,
+          totalAvailableVaccineDoses: 920,
+        },
+      }),
+    });
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalled();
+    });
+
+    expect(screen.getByText(/total registered infants/i)).toBeInTheDocument();
+    expect(screen.getByText(/total guardians/i)).toBeInTheDocument();
+    expect(screen.getByText(/vaccinations completed today/i)).toBeInTheDocument();
+    expect(screen.getByText(/infants due for vaccination/i)).toBeInTheDocument();
+
+    expect(screen.getByText("143")).toBeInTheDocument();
+    expect(screen.getByText("118")).toBeInTheDocument();
+    expect(screen.getByText("27")).toBeInTheDocument();
+    expect(screen.getByText("39")).toBeInTheDocument();
+    expect(screen.getByText(/12 overdue/i)).toBeInTheDocument();
+  });
+
   test("shows auto-refresh warning without clearing existing rendered cards when silent refresh fails", async () => {
     jest.useFakeTimers();
     try {

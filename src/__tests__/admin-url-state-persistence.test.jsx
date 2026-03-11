@@ -60,7 +60,12 @@ jest.mock("recharts", () => {
 
 const LocationProbe = () => {
   const location = useLocation();
-  return <div data-testid="location-search">{location.search}</div>;
+  return (
+    <>
+      <div data-testid="location-pathname">{location.pathname}</div>
+      <div data-testid="location-search">{location.search}</div>
+    </>
+  );
 };
 
 const AnalyticsHarness = () => {
@@ -220,6 +225,73 @@ describe("Admin module URL state persistence", () => {
     expect(
       screen.getByRole("tab", { name: /appointments & follow-up/i }),
     ).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("Analytics filter interactions keep pathname pinned to /analytics while only refreshing data", async () => {
+    apiClient.getAnalyticsDashboard.mockResolvedValue({
+      success: true,
+      data: {
+        summary: {
+          totalRegisteredInfants: 8,
+          totalGuardians: 6,
+          vaccinationsCompletedToday: 2,
+          infantsDueForVaccination: 3,
+        },
+      },
+    });
+
+    renderAnalyticsRoute(
+      "/analytics?tab=overview",
+      <>
+        <AnalyticsDashboard />
+        <LocationProbe />
+      </>,
+    );
+
+    await waitFor(() => {
+      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByTestId("location-pathname")).toHaveTextContent("/analytics");
+
+    const periodSelect = screen.getByRole("combobox", { name: /period/i });
+    fireEvent.mouseDown(periodSelect);
+    fireEvent.click(screen.getByRole("option", { name: /today/i, hidden: true }));
+
+    await waitFor(() => {
+      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.getByTestId("location-pathname")).toHaveTextContent("/analytics");
+
+    fireEvent.mouseDown(periodSelect);
+    fireEvent.click(
+      screen.getByRole("option", { name: /custom date range/i, hidden: true }),
+    );
+
+    await waitFor(() => {
+      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalledTimes(3);
+    });
+    expect(screen.getByTestId("location-pathname")).toHaveTextContent("/analytics");
+
+    const startDateInput = screen.getByLabelText(/start date/i);
+    const endDateInput = screen.getByLabelText(/end date/i);
+    fireEvent.change(startDateInput, { target: { value: "2026-03-01" } });
+    fireEvent.change(endDateInput, { target: { value: "2026-03-10" } });
+
+    await waitFor(() => {
+      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalledTimes(5);
+    });
+    expect(screen.getByTestId("location-pathname")).toHaveTextContent("/analytics");
+    expect(screen.getByTestId("location-search")).toContain("tab=overview");
+
+    const vaccineSelect = screen.getByRole("combobox", { name: /vaccine/i });
+    fireEvent.mouseDown(vaccineSelect);
+    fireEvent.click(screen.getByRole("option", { name: /^BCG$/i, hidden: true }));
+
+    await waitFor(() => {
+      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalledTimes(6);
+    });
+    expect(screen.getByTestId("location-pathname")).toHaveTextContent("/analytics");
+    expect(screen.getByTestId("location-search")).toContain("tab=overview");
   });
 
   test("Inventory module preserves active tab via URL and storage fallback", async () => {
