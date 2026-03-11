@@ -146,8 +146,9 @@ export default function Appointments() {
   } = useAppointments();
   const { infants } = useInfants();
 
-  const [appointments, setAppointments] = useState(initialAppointments || []);
+  const [appointments, setAppointments] = useState([]);
   const [error, setError] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [view, setView] = useState("list");
   // Custom calendar state (matching GuardianAppointmentsPage)
@@ -169,6 +170,18 @@ export default function Appointments() {
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [filteredAppointments, setFilteredAppointments] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  // Update filtered appointments when main appointments change
+  useEffect(() => {
+    if (statusFilter === 'all') {
+      setFilteredAppointments(appointments);
+    } else {
+      setFilteredAppointments(
+        appointments.filter(apt => apt.status === statusFilter)
+      );
+    }
+  }, [appointments, statusFilter]);
   const [dateDetailsLoading, setDateDetailsLoading] = useState(false);
   const [createFormError, setCreateFormError] = useState("");
   const [editFormErrors, setEditFormErrors] = useState({});
@@ -287,6 +300,27 @@ export default function Appointments() {
       return aptDateKey === dateKey;
     });
   };
+
+  // Sync initial appointments when they load
+  useEffect(() => {
+    if (!isRefreshing && initialAppointments && initialAppointments.length > 0) {
+      setAppointments(initialAppointments);
+    }
+  }, [initialAppointments, isRefreshing]);
+
+  // Refresh appointments from API
+  const refreshAppointments = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const response = await apiClient.getAppointments();
+      const data = Array.isArray(response) ? response : response?.data || [];
+      setAppointments(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to refresh appointments:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
 
   const columns = [
     {
@@ -414,18 +448,8 @@ export default function Appointments() {
         normalizedCancelReason,
       );
 
-      // Update UI immediately without page reload
-      setAppointments(
-        appointments.map((apt) =>
-          apt.id === selectedAppointment.id
-            ? {
-                ...apt,
-                status: "cancelled",
-                cancellation_reason: normalizedCancelReason,
-              }
-            : apt,
-        ),
-      );
+      // Refresh from API to ensure data consistency
+      await refreshAppointments();
 
       setShowCancelModal(false);
       setCancelReason("");
@@ -572,7 +596,8 @@ export default function Appointments() {
       };
 
       const newAppointment = await apiClient.createAppointment(appointmentData);
-      setAppointments([newAppointment, ...appointments]);
+      // Refresh from API to ensure data consistency
+      await refreshAppointments();
       setShowBookingModal(false);
       setCreateFormData({
         infant_id: "",
@@ -662,11 +687,8 @@ export default function Appointments() {
         editFormData.id,
         appointmentData,
       );
-      setAppointments(
-        appointments.map((apt) =>
-          apt.id === editFormData.id ? { ...apt, ...updatedAppointment } : apt,
-        ),
-      );
+      // Refresh from API to ensure data consistency
+      await refreshAppointments();
       setShowEditModal(false);
       setSelectedAppointment(null);
     } catch (err) {
@@ -684,7 +706,10 @@ export default function Appointments() {
     }
   };
 
-  if (loading && appointments.length === 0 && !hookError) {
+  // Combined loading state: show skeleton when initially loading OR when no appointments have been loaded yet
+  const isLoading = loading || (appointments.length === 0 && !hookError && !isRefreshing);
+
+  if (isLoading) {
     return (
       <div className="space-y-6 p-6">
         <div className="h-20 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse mb-8" />
@@ -697,7 +722,10 @@ export default function Appointments() {
     );
   }
 
-  if (hookError && appointments.length === 0) {
+  // Show error state only when there's a hook error AND no appointments have been loaded
+  const hasError = hookError && appointments.length === 0 && !isRefreshing;
+
+  if (hasError) {
     return (
       <PageContainer>
         <Alert variant="error" title="Error loading appointments">
@@ -747,6 +775,14 @@ export default function Appointments() {
                 📅 Calendar
               </button>
             </div>
+            <Button
+              variant="secondary"
+              onClick={() => refreshAppointments()}
+              disabled={isRefreshing}
+              className="gap-2"
+            >
+              {isRefreshing ? '⟳' : '↻'} Refresh
+            </Button>
             <Button
               variant="primary"
               onClick={() => setShowBookingModal(true)}

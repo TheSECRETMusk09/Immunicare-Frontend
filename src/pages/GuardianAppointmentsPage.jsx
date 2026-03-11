@@ -56,6 +56,17 @@ const formatDateTime = (value) => {
   });
 };
 
+const formatTimeSlotLabel = (value) => {
+  if (!value) return "";
+  const parsed = new Date(`2000-01-01T${value}`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
 const getStatusPillClass = (status) => {
   switch (status) {
     case "scheduled":
@@ -91,6 +102,7 @@ const CALENDAR_WEEK_START = 0; // Sunday-first column order (Sun ... Sat)
 
 export default function GuardianAppointmentsPage() {
   const { guardianId } = useAuth();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [searchParams] = useSearchParams();
@@ -122,6 +134,9 @@ export default function GuardianAppointmentsPage() {
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [postTransactionSyncing, setPostTransactionSyncing] = useState(false);
   const [availabilityChecking, setAvailabilityChecking] = useState(false);
+  const [timeSlotsLoading, setTimeSlotsLoading] = useState(false);
+  const [timeSlots, setTimeSlots] = useState([]);
+  const [timeSlotsFeedback, setTimeSlotsFeedback] = useState(null);
 
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -414,6 +429,7 @@ export default function GuardianAppointmentsPage() {
   };
 
   const refreshAppointments = useCallback(async () => {
+    setIsRefreshing(true);
     setAppointmentsLoading(true);
     try {
       const response = guardianId
@@ -426,6 +442,7 @@ export default function GuardianAppointmentsPage() {
       setAppointments([]);
     } finally {
       setAppointmentsLoading(false);
+      setIsRefreshing(false);
     }
   }, [guardianId]);
 
@@ -549,10 +566,54 @@ export default function GuardianAppointmentsPage() {
     runAvailabilityCheck();
   }, [guardianId, formData.scheduled_date, formData.vaccine_id]);
 
+  const fetchTimeSlots = useCallback(async () => {
+    if (!guardianId || !showBookingModal || !formData.scheduled_date) {
+      setTimeSlots([]);
+      setTimeSlotsFeedback(null);
+      return;
+    }
+
+    setTimeSlotsLoading(true);
+    setTimeSlotsFeedback(null);
+
+    try {
+      const result = await apiClient.getAppointmentTimeSlots({
+        scheduled_date: formData.scheduled_date,
+        vaccine_id: formData.vaccine_id || undefined,
+        exclude_appointment_id: editingAppointment?.id || undefined,
+      });
+
+      const slots = Array.isArray(result?.slots) ? result.slots : [];
+      setTimeSlots(slots);
+      setTimeSlotsFeedback(result || null);
+
+      setFormData((previous) => {
+        if (!previous.scheduled_time) return previous;
+        if (slots.includes(previous.scheduled_time)) return previous;
+        return { ...previous, scheduled_time: "" };
+      });
+    } catch (slotError) {
+      setTimeSlots([]);
+      setTimeSlotsFeedback({
+        available: false,
+        message: slotError?.message || "Failed to load time slots.",
+      });
+      setFormData((previous) => ({ ...previous, scheduled_time: "" }));
+    } finally {
+      setTimeSlotsLoading(false);
+    }
+  }, [guardianId, showBookingModal, formData.scheduled_date, formData.vaccine_id, editingAppointment?.id]);
+
+  useEffect(() => {
+    fetchTimeSlots();
+  }, [fetchTimeSlots]);
+
   const openCreateModal = () => {
     setEditingAppointment(null);
     setError("");
     setSuccessMessage("");
+    setTimeSlots([]);
+    setTimeSlotsFeedback(null);
     setFormData((previous) => ({
       ...previous,
       infant_id: previous.infant_id || childIdFromQuery || "",
@@ -569,6 +630,8 @@ export default function GuardianAppointmentsPage() {
   const openEditModal = (appointment) => {
     const schedule = new Date(appointment.scheduled_date);
     setEditingAppointment(appointment);
+    setTimeSlots([]);
+    setTimeSlotsFeedback(null);
     setFormData({
       infant_id: String(appointment.infant_id || ""),
       vaccine_id: "",
@@ -602,6 +665,16 @@ export default function GuardianAppointmentsPage() {
 
     if (availabilityFeedback && !availabilityFeedback.available) {
       setError(availabilityFeedback.message || "Selected schedule is not available.");
+      return;
+    }
+
+    if (timeSlotsFeedback && !timeSlotsFeedback.available) {
+      setError(timeSlotsFeedback.message || "No available time slots for the selected date.");
+      return;
+    }
+
+    if (timeSlots.length > 0 && !timeSlots.includes(formData.scheduled_time)) {
+      setError("Selected time is no longer available. Please choose another slot.");
       return;
     }
 
@@ -1106,16 +1179,37 @@ export default function GuardianAppointmentsPage() {
                 }
                 required
               />
-              <Input
-                type="time"
+              <Select
                 label="Time"
                 value={formData.scheduled_time}
                 onChange={(event) =>
                   setFormData((previous) => ({ ...previous, scheduled_time: event.target.value }))
                 }
                 required
-              />
+                disabled={timeSlotsLoading || (timeSlotsFeedback && !timeSlotsFeedback.available)}
+              >
+                <option value="">
+                  {timeSlotsLoading ? "Loading time slots..." : "Select time"}
+                </option>
+                {timeSlots.map((slot) => (
+                  <option key={slot} value={slot}>
+                    {formatTimeSlotLabel(slot)}
+                  </option>
+                ))}
+              </Select>
             </div>
+
+            {timeSlotsLoading ? (
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span className="loading loading-infinity loading-xs text-primary-600" />
+                Loading available time slots...
+              </div>
+            ) : (
+              timeSlotsFeedback &&
+              !timeSlotsFeedback.available && (
+                <Alert variant="warning">{timeSlotsFeedback.message}</Alert>
+              )
+            )}
 
             <Select
               label="Appointment Type"
@@ -1160,7 +1254,11 @@ export default function GuardianAppointmentsPage() {
                 type="submit"
                 actionRole="primary"
                 loading={formSubmitting}
-                disabled={availabilityFeedback ? !availabilityFeedback.available : false}
+                disabled={
+                  (availabilityFeedback ? !availabilityFeedback.available : false) ||
+                  timeSlotsLoading ||
+                  (timeSlotsFeedback ? !timeSlotsFeedback.available : false)
+                }
                 className="guardian-form-actions__primary ui-form-action-btn ui-form-action-btn--primary"
                 data-testid="guardian-booking-submit-btn"
               >

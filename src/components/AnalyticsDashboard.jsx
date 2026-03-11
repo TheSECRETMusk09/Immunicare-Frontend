@@ -98,14 +98,14 @@ export default function AnalyticsDashboard() {
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(true);
 
-  // Mock data fallbacks
+  // Deterministic mock data fallbacks (no random values)
   const mockVaccinationData = useCallback(() => {
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-    return months.map((month) => ({
+    return months.map((month, index) => ({
       month,
-      administered: Math.floor(Math.random() * 50) + 20,
-      scheduled: Math.floor(Math.random() * 30) + 10,
-      pending: Math.floor(Math.random() * 20) + 5,
+      administered: 35 + index * 5,
+      scheduled: 25 + index * 3,
+      pending: 10 + index * 2,
     }));
   }, []);
 
@@ -130,12 +130,12 @@ export default function AnalyticsDashboard() {
   }, []);
 
   const mockGrowthData = useCallback(() => {
-    const weeks = Array.from({ length: 12 }, (_, i) => i * 4);
+    const weeks = [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44];
     return weeks.map((week) => ({
       week,
-      weight: 2.5 + week * 0.2 + Math.random() * 0.5,
-      height: 50 + week * 1.5 + Math.random() * 2,
-      headCircumference: 34 + week * 0.5 + Math.random() * 0.3,
+      weight: 2.5 + week * 0.2,
+      height: 50 + week * 1.5,
+      headCircumference: 34 + week * 0.5,
     }));
   }, []);
 
@@ -188,14 +188,15 @@ export default function AnalyticsDashboard() {
       });
     } catch (error) {
       console.error("Error fetching analytics:", error);
-      // Fall back to mock data if API fails
+      // Use empty arrays instead of mock data - let the UI show empty states
       setData({
-        vaccinations: mockVaccinationData(),
-        appointments: mockAppointmentData(),
-        inventory: mockInventoryData(),
-        growth: mockGrowthData(),
-        gender: mockGenderData(),
+        vaccinations: [],
+        appointments: [],
+        inventory: [],
+        growth: [],
+        gender: [],
         stats: {},
+        isUsingFallback: true,
       });
     } finally {
       setLoading(false);
@@ -214,6 +215,9 @@ export default function AnalyticsDashboard() {
 
   const COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444"];
 
+  // Check if we're using fallback data
+  const isUsingFallback = data.isUsingFallback === true;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -221,6 +225,8 @@ export default function AnalyticsDashboard() {
       </div>
     );
   }
+
+  const hasData = data.vaccinations?.length > 0 || data.appointments?.length > 0 || data.inventory?.length > 0;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -235,6 +241,11 @@ export default function AnalyticsDashboard() {
               <p className="text-gray-600 dark:text-gray-400 mt-1">
                 Comprehensive insights and metrics for your healthcare center
               </p>
+              {isUsingFallback && (
+                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                  ⚠️ Showing demo data - API connection unavailable
+                </p>
+              )}
             </div>
             <div className="flex space-x-4">
               <Select

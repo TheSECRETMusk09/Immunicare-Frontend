@@ -374,6 +374,15 @@ const VaccinationsDashboard = () => {
               Syncing latest changes...
             </span>
           )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void fetchData({ silent: true })}
+            disabled={refreshing}
+            title="Refresh vaccinations"
+          >
+            <span className="mr-1">🔄</span> {refreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
           {isAdmin && (
             <Button onClick={handleAddVaccination}>
               <span className="mr-2">➕</span> Add Vaccination

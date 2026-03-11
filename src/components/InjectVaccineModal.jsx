@@ -484,14 +484,17 @@ export default function InjectVaccineModal({
             name="lot_number"
             value={formData.lot_number}
             onChange={handleChange}
-            placeholder="Enter lot number"
+            placeholder={formData.vaccine_inventory_id ? "Auto-filled from inventory" : "Enter lot number"}
+            disabled={!!formData.vaccine_inventory_id}
+            required={!formData.vaccine_inventory_id}
           />
           <Input
             label="Batch Number"
             name="batch_number"
             value={formData.batch_number}
             onChange={handleChange}
-            placeholder="Enter batch number"
+            placeholder={formData.vaccine_inventory_id ? "Auto-filled from inventory" : "Enter batch number"}
+            disabled={!!formData.vaccine_inventory_id}
           />
         </div>
 

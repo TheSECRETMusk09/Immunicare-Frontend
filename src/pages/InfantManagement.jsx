@@ -34,6 +34,7 @@ import {
 export default function InfantManagement() {
   const [infants, setInfants] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [selectedInfant, setSelectedInfant] = useState(null);
   const [activeView, setActiveView] = useState("list"); // 'list', 'schedule', 'records', 'personal', 'chart'
@@ -41,9 +42,13 @@ export default function InfantManagement() {
   const [showInjectModal, setShowInjectModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const fetchInfants = useCallback(async () => {
+  const fetchInfants = useCallback(async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       setError(null);
       const result = await infantService.getAll();
       const infantsData = normalizeInfantsResponse(result?.data ?? result);
@@ -62,6 +67,7 @@ export default function InfantManagement() {
       setInfants([]); // Ensure infants is always an array on error
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [selectedInfant]);
 
@@ -78,10 +84,12 @@ export default function InfantManagement() {
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      void fetchInfants();
+      void fetchInfants(true);
     }, 60000);
 
-    return () => window.clearInterval(intervalId);
+    return () => {
+      window.clearInterval(intervalId);
+    };
   }, [fetchInfants]);
 
   const handleViewBooklet = (infant, viewType) => {
@@ -287,7 +295,7 @@ export default function InfantManagement() {
         <Alert variant="error" title="Error loading infants">
           {error}
           <div className="mt-4">
-            <Button onClick={fetchInfants} size="sm">
+            <Button onClick={() => fetchInfants(false)} size="sm">
               Retry
             </Button>
           </div>
@@ -452,8 +460,22 @@ export default function InfantManagement() {
             className="pl-10"
           />
         </div>
-        <div className="text-sm text-gray-600 dark:text-gray-400 self-center">
-          Showing {filteredInfants.length} of {infants.length} infants
+        <div className="flex items-center gap-2">
+          {refreshing && (
+            <span className="text-xs text-gray-500 dark:text-gray-400">Refreshing...</span>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => fetchInfants(true)}
+            disabled={refreshing}
+            title="Refresh infant list"
+          >
+            <span className="mr-1">🔄</span> {refreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
+          <div className="text-sm text-gray-600 dark:text-gray-400 self-center">
+            Showing {filteredInfants.length} of {infants.length} infants
+          </div>
         </div>
       </div>
 

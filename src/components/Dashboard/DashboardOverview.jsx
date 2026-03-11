@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Bell, CalendarClock, ShieldAlert, Syringe } from "lucide-react";
 import { Card, Button, PageHeader, Alert } from "../UI";
@@ -104,10 +104,10 @@ export default function DashboardOverview() {
 
   const [localRefreshTick, setLocalRefreshTick] = useState(0);
 
-  const { data: stats, isLoading: statsLoading } = useDashboardStats();
-  const { data: appointments, isLoading: appointmentsLoading } = useDashboardAppointments(10);
-  const { data: infants, isLoading: infantsLoading } = useDashboardInfants();
-  const { data: inventory, isLoading: inventoryLoading } = useVaccineInventory();
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useDashboardStats();
+  const { data: appointments, isLoading: appointmentsLoading, refetch: refetchAppointments } = useDashboardAppointments(10);
+  const { data: infants, isLoading: infantsLoading, refetch: refetchInfants } = useDashboardInfants();
+  const { data: inventory, isLoading: inventoryLoading, refetch: refetchInventory } = useVaccineInventory();
   const { data: monitoring, isLoading: monitoringLoading, refetch: refetchMonitoring } =
     useAdminVaccinationMonitoring(
       { limit: 25 },
@@ -116,13 +116,33 @@ export default function DashboardOverview() {
       },
     );
 
+  // Combined refetch function for all dashboard data
+  const refreshAllDashboardData = useCallback(async () => {
+    setLocalRefreshTick((prev) => prev + 1);
+    await Promise.all([
+      refetchStats(),
+      refetchAppointments(),
+      refetchInfants(),
+      refetchInventory(),
+      refetchMonitoring(),
+    ]);
+  }, [refetchStats, refetchAppointments, refetchInfants, refetchInventory, refetchMonitoring]);
+
+  // Refresh on socket events - comprehensive handling for all data types
   useEffect(() => {
     if (!isConnected) return;
-    if (socketAlerts.length === 0 && socketNotifications.length === 0) return;
 
-    setLocalRefreshTick((prev) => prev + 1);
-    refetchMonitoring();
-  }, [isConnected, socketAlerts.length, socketNotifications.length, refetchMonitoring]);
+    // Determine if we should refresh based on socket activity
+    const shouldRefresh = socketAlerts.length > 0 || socketNotifications.length > 0;
+    if (!shouldRefresh) return;
+
+    // Debounce refresh to avoid excessive calls
+    const timeoutId = setTimeout(() => {
+      void refreshAllDashboardData();
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [isConnected, socketAlerts.length, socketNotifications.length, refreshAllDashboardData]);
 
   const loading =
     statsLoading ||
@@ -298,17 +318,26 @@ export default function DashboardOverview() {
 
       <Card title={<span className="font-bold">Upcoming Appointments</span>}>
         <div className="space-y-2">
-          {(appointments || []).slice(0, 6).map((apt, index) => (
-            <div
-              key={`${apt.id || index}`}
-              className="rounded-lg border border-gray-200 dark:border-gray-700 p-2 text-sm flex items-center justify-between gap-2"
-            >
-              <span className="truncate">{apt.patient_name || apt.infantName || apt.infant_name || "Infant"}</span>
-              <span className="text-gray-500">{formatDate(apt.scheduled_date || apt.scheduledDate)}</span>
+          {appointmentsLoading ? (
+            <div className="py-4 text-center text-gray-500">
+              <span className="inline-block animate-pulse">Loading appointments...</span>
             </div>
-          ))}
-          {(appointments || []).length === 0 && (
+          ) : (appointments || []).length === 0 ? (
             <p className="text-sm text-gray-500">No upcoming appointments.</p>
+          ) : (
+            (appointments || []).slice(0, 6).map((apt) => (
+              <div
+                key={`apt-${apt.id || apt.infant_id || apt.patient_name || Math.random()}`}
+                className="rounded-lg border border-gray-200 dark:border-gray-700 p-2 text-sm flex items-center justify-between gap-2"
+              >
+                <span className="truncate font-medium">
+                  {apt.patient_name || apt.infantName || apt.infant_name || "Infant"}
+                </span>
+                <span className="text-gray-500 whitespace-nowrap">
+                  {formatDate(apt.scheduled_date || apt.scheduledDate)}
+                </span>
+              </div>
+            ))
           )}
         </div>
       </Card>

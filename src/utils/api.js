@@ -879,6 +879,18 @@ class ApiClient {
     return this.request(`/appointments/availability/check?${params}`);
   }
 
+  async getAppointmentTimeSlots({ scheduled_date, vaccine_id, clinic_id, exclude_appointment_id } = {}) {
+    const params = new URLSearchParams();
+    if (scheduled_date) params.append("scheduled_date", scheduled_date);
+    if (vaccine_id) params.append("vaccine_id", vaccine_id);
+    if (clinic_id) params.append("clinic_id", clinic_id);
+    if (exclude_appointment_id) {
+      params.append("exclude_appointment_id", exclude_appointment_id);
+    }
+
+    return this.request(`/appointments/availability/slots?${params}`);
+  }
+
   async getAppointmentCalendarAvailability({ month, start_date, end_date, clinic_id } = {}) {
     const params = new URLSearchParams();
     if (month) params.append("month", month);
