@@ -4,6 +4,42 @@ import { Button, Input, Alert, LoadingSpinner } from "./UI";
 import { useAuth } from "../contexts/AuthContext";
 import { normalizeInfantResponse } from "../utils/adminDataAdapters";
 
+const EDITABLE_INFANT_FIELDS = [
+  "first_name",
+  "last_name",
+  "middle_name",
+  "dob",
+  "sex",
+  "national_id",
+  "address",
+  "contact",
+  "guardian_id",
+  "mother_name",
+  "father_name",
+  "birth_weight",
+  "birth_height",
+  "place_of_birth",
+  "barangay",
+  "health_center",
+  "family_no",
+  "time_of_delivery",
+  "type_of_delivery",
+  "doctor_midwife_nurse",
+  "nbs_done",
+  "nbs_date",
+  "cellphone_number",
+  "facility_id",
+];
+
+const sanitizeInfantUpdatePayload = (raw = {}) => {
+  return EDITABLE_INFANT_FIELDS.reduce((acc, field) => {
+    if (Object.prototype.hasOwnProperty.call(raw, field)) {
+      acc[field] = raw[field];
+    }
+    return acc;
+  }, {});
+};
+
 const formatControlNumberDisplay = (controlNumber, dobValue) => {
   const base = String(controlNumber || "").trim();
   if (!base) return "Not assigned";
@@ -93,7 +129,8 @@ export default function InfantPersonalRecord({
     setSaving(true);
     setSaveError(null);
     try {
-      const updateResponse = await apiClient.updateInfant(infantId, formData);
+      const updatePayload = sanitizeInfantUpdatePayload(formData);
+      const updateResponse = await apiClient.updateInfant(infantId, updatePayload);
       const updatedInfant = normalizeInfantResponse(updateResponse);
 
       if (!isMountedRef.current) {

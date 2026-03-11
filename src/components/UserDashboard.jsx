@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../utils/api";
 import { Card, Button, Badge } from "./UI";
-import ImmunizationChart from "./ImmunizationChart";
 import HealthAlerts from "./HealthAlerts";
 import { Calendar, Users, FileText, Bell, Plus } from "lucide-react";
 
@@ -11,7 +10,7 @@ export default function UserDashboard() {
   const [infants, setInfants] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [vaccinations, setVaccinations] = useState([]);
-  const [notifications, setNotifications] = useState([]);
+  const [notifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
@@ -67,12 +66,6 @@ export default function UserDashboard() {
     return appointments
       .filter((a) => new Date(a.scheduled_date) >= new Date())
       .sort((a, b) => new Date(a.scheduled_date) - new Date(b.scheduled_date))
-      .slice(0, 5);
-  };
-
-  const getRecentVaccinations = () => {
-    return vaccinations
-      .sort((a, b) => new Date(b.admin_date) - new Date(a.admin_date))
       .slice(0, 5);
   };
 

@@ -26,6 +26,7 @@ import GuardianTopHeader from '../components/GuardianTopHeader';
 import GuardianModuleHeader from '../components/GuardianModuleHeader';
 import { useAuth } from '../contexts/AuthContext';
 import apiClient from '../utils/api';
+import { triggerGuardianAddChildModal } from '../components/QuickActionFAB';
 
 const unwrapApiPayload = (value) => {
   if (value && typeof value === 'object' && 'data' in value) {
@@ -121,7 +122,7 @@ const NotificationSkeleton = () => (
 
 const StatCard = ({ label, value, subLabel, icon: Icon, variant = 'emerald', onClick }) => (
   <div
-    className={`guardian-stat-card guardian-stat-card--${variant} rounded-2xl p-4 sm:p-5 relative overflow-hidden min-h-[100px] sm:min-h-[120px] transition-all duration-200 hover:shadow-md ${onClick ? 'cursor-pointer hover:-translate-y-1' : ''}`}
+    className={`guardian-stat-card guardian-stat-card--${variant} rounded-2xl p-5 sm:p-6 relative overflow-hidden min-h-[108px] sm:min-h-[126px] transition-all duration-200 hover:shadow-md ${onClick ? 'cursor-pointer hover:-translate-y-1' : ''}`}
     onClick={onClick}
   >
     {/* Background decoration */}
@@ -129,8 +130,8 @@ const StatCard = ({ label, value, subLabel, icon: Icon, variant = 'emerald', onC
       <Icon className="w-5 h-5 sm:w-6 sm:h-6 guardian-stat-card__icon" />
     </div>
     <div className="relative z-10">
-      <p className="text-[10px] sm:text-xs font-bold guardian-stat-card__label uppercase tracking-wider mb-1 sm:mb-2 opacity-90">{label}</p>
-      <p className="text-2xl sm:text-3xl font-bold guardian-stat-card__value mb-0.5 sm:mb-1">{value}</p>
+      <p className="text-[10px] sm:text-xs font-bold guardian-stat-card__label uppercase tracking-wider mb-1.5 sm:mb-2.5 opacity-90">{label}</p>
+      <p className="text-2xl sm:text-3xl font-bold guardian-stat-card__value leading-tight mb-1 sm:mb-1.5">{value}</p>
       {subLabel && (
         <div className="flex items-center gap-1">
           <TrendingUp className="w-3 h-3 guardian-stat-card__trend-icon opacity-70" />
@@ -694,7 +695,12 @@ const GuardianDashboard = () => {
                   value={stats.childrenCount}
                   icon={Users}
                   variant="emerald"
-                  onClick={() => navigate('/guardian/children')}
+                  onClick={() => {
+                    navigate('/guardian/children');
+                    setTimeout(() => {
+                      triggerGuardianAddChildModal();
+                    }, 0);
+                  }}
                 />
                 <StatCard
                   label="NEXT APPT"
@@ -865,7 +871,12 @@ const GuardianDashboard = () => {
                     title="No Children Registered"
                     description="Add your first child to get started tracking their vaccinations"
                     actionLabel="Add Child"
-                    onAction={() => navigate('/guardian/children/new')}
+                    onAction={() => {
+                      navigate('/guardian/children');
+                      setTimeout(() => {
+                        triggerGuardianAddChildModal();
+                      }, 0);
+                    }}
                     variant="primary"
                   />
                 </div>

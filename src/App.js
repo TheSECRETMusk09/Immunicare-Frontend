@@ -37,7 +37,6 @@ import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ProtectedRoute from "./components/ProtectedRoute";
 import UserVaccinationRecords from "./pages/UserVaccinationRecords";
-import ChangePassword from "./pages/ChangePassword";
 
 // Dashboard components - lazy loaded
 const Dashboard = lazy(() =>

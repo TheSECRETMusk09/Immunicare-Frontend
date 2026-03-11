@@ -281,16 +281,15 @@ describe("Analytics dashboard rendering and filter stability", () => {
     fireEvent.click(screen.getByRole("tab", { name: /demographics & activity/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/demographic coverage \(age groups\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/male vs female distribution/i)).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/male vs female distribution/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/line chart of infant age-group distribution/i)).toBeInTheDocument();
+    expect(screen.queryByText(/demographic coverage \(age groups\)/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/line chart of infant age-group distribution/i)).not.toBeInTheDocument();
     expect(
       screen.getByLabelText(/gender distribution infographic showing female and male infant percentages/i),
     ).toBeInTheDocument();
 
-    expect(screen.getByText(/^0 data$/i)).toBeInTheDocument();
     expect(screen.getByText(/^0% Female$/i)).toBeInTheDocument();
     expect(screen.getByText(/^0% Male$/i)).toBeInTheDocument();
     expect(screen.getByText(/showing explicit 0% female and 0% male/i)).toBeInTheDocument();
@@ -399,6 +398,8 @@ describe("Analytics dashboard rendering and filter stability", () => {
     await waitFor(() => {
       expect(apiClient.getAnalyticsDashboard).toHaveBeenCalledTimes(2);
     });
+
+    expect(screen.queryByText(/demographic coverage \(age groups\)/i)).not.toBeInTheDocument();
   });
 
   test("normalizes wrapped and direct analytics payload responses so trend sections still render", async () => {

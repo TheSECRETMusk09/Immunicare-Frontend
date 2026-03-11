@@ -611,9 +611,17 @@ textarea:focus {
 
 /* Dialog/Modal */
 [role="dialog"] {
+  /*
+   * Scope this accessibility helper to true modal dialogs only.
+   * MUI Select/Popover menus also use role="dialog" in some contexts,
+   * and forcing full-screen fixed positioning there can create a dark
+   * viewport overlay that appears like page navigation.
+   */
+  &:where([aria-modal="true"]) {
   position: fixed;
   inset: 0;
   z-index: var(--z-modal);
+  }
 }
 
 [role="dialog"][aria-modal="true"] {
@@ -700,42 +708,21 @@ textarea:focus {
    Hidden Content Accessibility
    ========================================================================== */
 
-[hidden="true"],
-[aria-hidden="true"] {
+[hidden],
+[hidden="true"] {
   display: none !important;
 }
+
+/*
+ * Important: do NOT globally hide [aria-hidden="true"].
+ * UI frameworks (e.g., MUI Popover/Menu/Dialog) temporarily set aria-hidden
+ * on sibling containers for accessibility, and forcing display:none here can
+ * make the whole page appear blank when a dropdown opens.
+ */
 
 /* ==========================================================================
    Landmark Regions (WCAG 1.3.1)
    ========================================================================== */
-
-[role="banner"] {
-  /* Header region */
-}
-
-[role="navigation"] {
-  /* Navigation region */
-}
-
-[role="main"] {
-  /* Main content region */
-}
-
-[role="complementary"] {
-  /* Complementary content */
-}
-
-[role="contentinfo"] {
-  /* Footer region */
-}
-
-[role="search"] {
-  /* Search region */
-}
-
-[role="region"] {
-  /* Generic region with label */
-}
 
 /* ==========================================================================
    Form Accessibility
@@ -781,14 +768,6 @@ legend {
 [role="table"] {
   border-collapse: collapse;
   width: 100%;
-}
-
-[role="rowgroup"] {
-  /* Row group */
-}
-
-[role="row"] {
-  /* Row */
 }
 
 [role="columnheader"],

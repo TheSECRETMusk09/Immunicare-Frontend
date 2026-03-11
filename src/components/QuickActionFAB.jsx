@@ -18,8 +18,45 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Calendar, Users, Phone, X, ChevronUp } from 'lucide-react';
-import { Button } from './UI';
+import { Plus, Calendar, Users, Phone, X } from 'lucide-react';
+
+export const GUARDIAN_OPEN_ADD_CHILD_MODAL_EVENT = 'guardian:open-add-child-modal';
+export const GUARDIAN_INFANT_REGISTERED_EVENT = 'guardian:infant-registered';
+
+export const triggerGuardianAddChildModal = () => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const addChildModalEvent = new CustomEvent(
+    GUARDIAN_OPEN_ADD_CHILD_MODAL_EVENT,
+    {
+      cancelable: true,
+      detail: {
+        source: 'quick-action-fab',
+        timestamp: Date.now(),
+      },
+    },
+  );
+
+  const eventNotCancelled = window.dispatchEvent(addChildModalEvent);
+  return !eventNotCancelled;
+};
+
+export const triggerGuardianInfantRegistered = (infant = null) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent(GUARDIAN_INFANT_REGISTERED_EVENT, {
+      detail: {
+        infant,
+        timestamp: Date.now(),
+      },
+    }),
+  );
+};
 
 const QuickActionFAB = ({
   isGuardian = true,
@@ -131,7 +168,12 @@ const QuickActionFAB = ({
 
     switch (action) {
       case 'addChild':
-        navigate('/guardian/children');
+        if (!triggerGuardianAddChildModal()) {
+          navigate('/guardian/children');
+          setTimeout(() => {
+            triggerGuardianAddChildModal();
+          }, 0);
+        }
         break;
       case 'bookAppointment':
         navigate('/guardian/appointments/new');

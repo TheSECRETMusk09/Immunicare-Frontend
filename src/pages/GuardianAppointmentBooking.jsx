@@ -27,6 +27,10 @@ import {
   Home,
   Syringe,
 } from "lucide-react";
+import {
+  GUARDIAN_INFANT_REGISTERED_EVENT,
+  triggerGuardianAddChildModal,
+} from "../components/QuickActionFAB";
 
 // Get minimum booking date (today)
 const getMinDate = () => {
@@ -156,6 +160,24 @@ export default function GuardianAppointmentBooking() {
 
   useEffect(() => {
     fetchChildren();
+  }, [fetchChildren]);
+
+  useEffect(() => {
+    const handleInfantRegistered = async () => {
+      await fetchChildren();
+    };
+
+    window.addEventListener(
+      GUARDIAN_INFANT_REGISTERED_EVENT,
+      handleInfantRegistered,
+    );
+
+    return () => {
+      window.removeEventListener(
+        GUARDIAN_INFANT_REGISTERED_EVENT,
+        handleInfantRegistered,
+      );
+    };
   }, [fetchChildren]);
 
   const fetchTimeSlots = useCallback(async () => {
@@ -503,7 +525,12 @@ export default function GuardianAppointmentBooking() {
                     </p>
                     <Button
                       type="button"
-                      onClick={() => navigate("/guardian/children/new")}
+                      onClick={() => {
+                        navigate('/guardian/children');
+                        setTimeout(() => {
+                          triggerGuardianAddChildModal();
+                        }, 0);
+                      }}
                       size="sm"
                     >
                       Add Child

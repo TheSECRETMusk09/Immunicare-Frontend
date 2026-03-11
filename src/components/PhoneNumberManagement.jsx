@@ -43,10 +43,6 @@ const PhoneNumberManagement = () => {
 
   const guardianIdAsNumber = Number.parseInt(guardianId, 10);
 
-  useEffect(() => {
-    fetchPhoneNumbers();
-  }, [fetchPhoneNumbers]);
-
   const fetchPhoneNumbers = useCallback(async () => {
     if (Number.isNaN(guardianIdAsNumber) || guardianIdAsNumber <= 0) return;
 
@@ -62,6 +58,10 @@ const PhoneNumberManagement = () => {
       setLoading(false);
     }
   }, [guardianIdAsNumber]);
+
+  useEffect(() => {
+    fetchPhoneNumbers();
+  }, [fetchPhoneNumbers]);
 
   const handleAddPhone = async () => {
     if (Number.isNaN(guardianIdAsNumber) || guardianIdAsNumber <= 0) {

@@ -8,8 +8,8 @@
  */
 
 import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { render, waitFor } from '@testing-library/react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import '@testing-library/jest-dom';
 
 import apiClient from '../utils/api';

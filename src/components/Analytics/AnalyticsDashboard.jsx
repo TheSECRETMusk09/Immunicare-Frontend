@@ -397,8 +397,8 @@ const PIE_COLORS = [
 ];
 
 const SELECT_MENU_PROPS = {
-  // Keep default portal behavior so Menu anchors remain in document layout
-  // across tab switches and route unmounts.
+  // Keep MUI Select menu in portal to preserve valid anchor positioning.
+  // Backdrop is kept non-blocking so legacy global styles cannot mimic navigation overlays.
   disablePortal: false,
   keepMounted: false,
   hideBackdrop: true,
@@ -603,6 +603,72 @@ const toShortDateTime = (value) => {
     hour: "numeric",
     minute: "2-digit",
   });
+};
+
+const resolveAlertTone = (severity, isDark) => {
+  const normalized = String(severity || "warning").toLowerCase();
+
+  if (normalized === "critical" || normalized === "error") {
+    return {
+      label: "Critical",
+      accent: isDark ? "#FCA5A5" : "#DC2626",
+      chipBg: isDark ? "rgba(239,68,68,0.22)" : "rgba(254,226,226,0.92)",
+      chipText: isDark ? "#FECACA" : "#991B1B",
+      cardBg: isDark
+        ? "linear-gradient(135deg, rgba(127,29,29,0.34) 0%, rgba(153,27,27,0.24) 100%)"
+        : "linear-gradient(135deg, rgba(254,242,242,0.94) 0%, rgba(254,226,226,0.94) 100%)",
+      border: isDark ? "rgba(252,165,165,0.46)" : "rgba(248,113,113,0.44)",
+    };
+  }
+
+  return {
+    label: "Warning",
+    accent: isDark ? "#FCD34D" : "#B45309",
+    chipBg: isDark ? "rgba(245,158,11,0.22)" : "rgba(254,243,199,0.92)",
+    chipText: isDark ? "#FDE68A" : "#92400E",
+    cardBg: isDark
+      ? "linear-gradient(135deg, rgba(146,64,14,0.34) 0%, rgba(180,83,9,0.24) 100%)"
+      : "linear-gradient(135deg, rgba(255,251,235,0.95) 0%, rgba(254,243,199,0.95) 100%)",
+    border: isDark ? "rgba(252,211,77,0.46)" : "rgba(245,158,11,0.4)",
+  };
+};
+
+const resolveActivityTone = (type, isDark) => {
+  const normalized = String(type || "activity").toLowerCase();
+
+  if (normalized.includes("appointment")) {
+    return {
+      badgeBg: isDark ? "rgba(59,130,246,0.28)" : "rgba(219,234,254,0.92)",
+      badgeText: isDark ? "#BFDBFE" : "#1D4ED8",
+      cardBg: isDark ? "rgba(30,58,138,0.22)" : "rgba(239,246,255,0.82)",
+      border: isDark ? "rgba(96,165,250,0.34)" : "rgba(147,197,253,0.5)",
+    };
+  }
+
+  if (normalized.includes("vaccination") || normalized.includes("immun")) {
+    return {
+      badgeBg: isDark ? "rgba(16,185,129,0.28)" : "rgba(209,250,229,0.92)",
+      badgeText: isDark ? "#A7F3D0" : "#047857",
+      cardBg: isDark ? "rgba(6,95,70,0.2)" : "rgba(236,253,245,0.84)",
+      border: isDark ? "rgba(52,211,153,0.34)" : "rgba(134,239,172,0.52)",
+    };
+  }
+
+  if (normalized.includes("inventory") || normalized.includes("stock")) {
+    return {
+      badgeBg: isDark ? "rgba(245,158,11,0.28)" : "rgba(254,243,199,0.92)",
+      badgeText: isDark ? "#FDE68A" : "#B45309",
+      cardBg: isDark ? "rgba(146,64,14,0.2)" : "rgba(255,251,235,0.84)",
+      border: isDark ? "rgba(252,211,77,0.34)" : "rgba(245,158,11,0.44)",
+    };
+  }
+
+  return {
+    badgeBg: isDark ? "rgba(148,163,184,0.26)" : "rgba(241,245,249,0.92)",
+    badgeText: isDark ? "#CBD5E1" : "#334155",
+    cardBg: isDark ? "rgba(30,41,59,0.34)" : "rgba(248,250,252,0.84)",
+    border: isDark ? "rgba(148,163,184,0.3)" : "rgba(203,213,225,0.72)",
+  };
 };
 
 const resolveChartAppearance = (isDark) => {
@@ -1016,11 +1082,61 @@ const FilterBar = ({
   onAutoRefreshToggle,
   isDark,
 }) => {
-  const surfaceBg = isDark ? "rgba(15,23,42,0.72)" : "background.paper";
-  const surfaceBorder = isDark ? "rgba(148,163,184,0.22)" : "divider";
+  const surfaceBg = isDark
+    ? "linear-gradient(180deg, rgba(15,23,42,0.9) 0%, rgba(15,23,42,0.74) 100%)"
+    : "background.paper";
+  const surfaceBorder = isDark ? "rgba(148,163,184,0.3)" : "divider";
+  const labelColor = isDark ? "#CBD5E1" : "#475569";
+  const helperColor = isDark ? "#94A3B8" : "#64748B";
+  const fieldOutlineDefault = isDark ? "rgba(148,163,184,0.38)" : "rgba(148,163,184,0.35)";
 
   return (
-    <Card sx={{ mb: 3, bgcolor: surfaceBg, border: "1px solid", borderColor: surfaceBorder }}>
+    <Card
+      sx={{
+        mb: 3,
+        bgcolor: surfaceBg,
+        border: "1px solid",
+        borderColor: surfaceBorder,
+        boxShadow: isDark ? "0 12px 28px rgba(2,6,23,0.35)" : "0 8px 22px rgba(15,23,42,0.06)",
+        "& .MuiInputLabel-root": {
+          color: helperColor,
+          fontWeight: 500,
+        },
+        "& .MuiInputLabel-root.Mui-focused": {
+          color: isDark ? "#93C5FD" : "primary.main",
+        },
+        "& .MuiOutlinedInput-root": {
+          color: isDark ? "#F8FAFC" : "text.primary",
+          backgroundColor: isDark ? "rgba(15,23,42,0.28)" : "transparent",
+          "& .MuiOutlinedInput-notchedOutline": {
+            borderColor: fieldOutlineDefault,
+          },
+          "&:hover .MuiOutlinedInput-notchedOutline": {
+            borderColor: isDark ? "rgba(148,163,184,0.62)" : "rgba(100,116,139,0.56)",
+          },
+          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+            borderColor: isDark ? "#60A5FA" : "primary.main",
+          },
+        },
+        "& .MuiSelect-icon": {
+          color: labelColor,
+        },
+        "& .MuiChip-outlined": {
+          borderColor: isDark ? "rgba(148,163,184,0.34)" : "divider",
+          color: labelColor,
+          bgcolor: isDark ? "rgba(30,41,59,0.66)" : "transparent",
+        },
+        "& .MuiChip-colorSuccess": {
+          color: isDark ? "#BBF7D0" : undefined,
+          borderColor: isDark ? "rgba(74,222,128,0.44)" : undefined,
+          bgcolor: isDark ? "rgba(22,101,52,0.3)" : undefined,
+        },
+        "& .MuiFormControlLabel-label": {
+          color: labelColor,
+          fontWeight: 500,
+        },
+      }}
+    >
       <CardContent>
         <Grid container spacing={2} alignItems="center">
           <Grid size={{ xs: 12, lg: 9 }}>
@@ -1172,14 +1288,24 @@ const FilterBar = ({
 const KpiCard = ({ title, value, subtitle, icon, color = "primary", loading, isDark }) => {
   const Icon = icon;
   const displayValue = typeof value === "number" ? safeNum(value).toLocaleString() : String(value ?? "0");
-  const surfaceBg = isDark ? "rgba(15,23,42,0.72)" : "background.paper";
-  const surfaceBorder = isDark ? "rgba(148,163,184,0.22)" : "divider";
-  const titleColor = isDark ? '#94A3B8' : 'text.secondary';
-  const subtitleColor = isDark ? '#64748B' : 'text.secondary';
-  const valueColor = isDark ? '#F8FAFC' : 'text.primary';
+  const surfaceBg = isDark
+    ? "linear-gradient(180deg, rgba(15,23,42,0.88) 0%, rgba(15,23,42,0.72) 100%)"
+    : "background.paper";
+  const surfaceBorder = isDark ? "rgba(148,163,184,0.28)" : "divider";
+  const titleColor = isDark ? "#CBD5E1" : "text.secondary";
+  const subtitleColor = isDark ? "#94A3B8" : "text.secondary";
+  const valueColor = isDark ? "#F8FAFC" : "text.primary";
 
   return (
-    <Card sx={{ height: "100%", bgcolor: surfaceBg, border: "1px solid", borderColor: surfaceBorder }}>
+    <Card
+      sx={{
+        height: "100%",
+        bgcolor: surfaceBg,
+        border: "1px solid",
+        borderColor: surfaceBorder,
+        boxShadow: isDark ? "0 10px 22px rgba(2,6,23,0.34)" : "0 6px 16px rgba(15,23,42,0.06)",
+      }}
+    >
       <CardContent>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
           <Typography variant="body2" sx={{ color: titleColor }}>
@@ -1508,13 +1634,25 @@ const AppointmentAndFollowupSection = ({ data, loading, chartAppearance }) => {
   const appointment = data?.appointmentFollowup || {};
   const statusData = data?.appointmentStatusBreakdown || [];
   const appointmentTotal = statusData.reduce((total, entry) => total + safeNum(entry.count), 0);
-  const surfaceBg = chartAppearance.isDark ? "rgba(15,23,42,0.72)" : "background.paper";
-  const surfaceBorder = chartAppearance.isDark ? "rgba(148,163,184,0.22)" : "divider";
+  const surfaceBg = chartAppearance.isDark
+    ? "linear-gradient(180deg, rgba(15,23,42,0.88) 0%, rgba(15,23,42,0.74) 100%)"
+    : "background.paper";
+  const surfaceBorder = chartAppearance.isDark ? "rgba(148,163,184,0.3)" : "divider";
 
   return (
     <Grid container spacing={2} sx={{ mb: 3 }}>
       <Grid size={{ xs: 12, md: 6 }}>
-        <Card sx={{ height: "100%", bgcolor: surfaceBg, border: "1px solid", borderColor: surfaceBorder }}>
+        <Card
+          sx={{
+            height: "100%",
+            bgcolor: surfaceBg,
+            border: "1px solid",
+            borderColor: surfaceBorder,
+            boxShadow: chartAppearance.isDark
+              ? "0 12px 26px rgba(2,6,23,0.36)"
+              : "0 8px 18px rgba(15,23,42,0.06)",
+          }}
+        >
           <CardContent>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: chartAppearance.isDark ? '#FFFFFF' : 'text.primary' }}>
               Appointment and Follow-up Summary
@@ -1624,13 +1762,25 @@ const InventorySection = ({ data, loading, chartAppearance, viewportWidth }) => 
   const axisLine = { stroke: chartAppearance.axisLine };
   const mobileLayout = viewportWidth < 640;
   const tabletLayout = viewportWidth >= 640 && viewportWidth < 960;
-  const surfaceBg = chartAppearance.isDark ? "rgba(15,23,42,0.72)" : "background.paper";
-  const surfaceBorder = chartAppearance.isDark ? "rgba(148,163,184,0.22)" : "divider";
+  const surfaceBg = chartAppearance.isDark
+    ? "linear-gradient(180deg, rgba(15,23,42,0.88) 0%, rgba(15,23,42,0.74) 100%)"
+    : "background.paper";
+  const surfaceBorder = chartAppearance.isDark ? "rgba(148,163,184,0.3)" : "divider";
 
   return (
     <Grid container spacing={2} sx={{ mb: 3 }}>
       <Grid size={{ xs: 12, md: 5 }}>
-        <Card sx={{ height: "100%", bgcolor: surfaceBg, border: "1px solid", borderColor: surfaceBorder }}>
+        <Card
+          sx={{
+            height: "100%",
+            bgcolor: surfaceBg,
+            border: "1px solid",
+            borderColor: surfaceBorder,
+            boxShadow: chartAppearance.isDark
+              ? "0 12px 26px rgba(2,6,23,0.36)"
+              : "0 8px 18px rgba(15,23,42,0.06)",
+          }}
+        >
           <CardContent>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: chartAppearance.isDark ? '#FFFFFF' : 'text.primary' }}>
               Vaccine Inventory Summary            </Typography>
@@ -1835,12 +1985,6 @@ const SmsAndDemographicsSection = ({
   genderError = "",
 }) => {
   const reminder = data?.reminders || {};
-  const coverage = data?.demographicsCoverage || {};
-  const ageData = (data?.demographicsAgeGroups || []).map((item) => ({
-    group: item.group,
-    count: safeNum(item.count),
-  }));
-  const ageHasActualValues = ageData.some((item) => safeNum(item.count) > 0);
   const genderSnapshot = normalizeGenderSnapshot(data?.demographicsGender || []);
   const {
     femaleCount,
@@ -1854,18 +1998,26 @@ const SmsAndDemographicsSection = ({
   } = genderSnapshot;
   const hasGenderError = Boolean(genderError) && !genderHasActualValues;
 
-  const axisTick = { fill: chartAppearance.axisTick, fontSize: 12, fontWeight: 500 };
-  const axisLine = { stroke: chartAppearance.axisLine };
-
-  const summaryGridSize = showGenderChart ? { xs: 12, lg: 4 } : { xs: 12, md: 5 };
-  const ageChartGridSize = showGenderChart ? { xs: 12, md: 6, lg: 4 } : { xs: 12, md: 7 };
-  const surfaceBg = chartAppearance.isDark ? "rgba(15,23,42,0.72)" : "background.paper";
-  const surfaceBorder = chartAppearance.isDark ? "rgba(148,163,184,0.22)" : "divider";
+  const summaryGridSize = showGenderChart ? { xs: 12, lg: 6 } : { xs: 12 };
+  const surfaceBg = chartAppearance.isDark
+    ? "linear-gradient(180deg, rgba(15,23,42,0.88) 0%, rgba(15,23,42,0.74) 100%)"
+    : "background.paper";
+  const surfaceBorder = chartAppearance.isDark ? "rgba(148,163,184,0.3)" : "divider";
 
   return (
     <Grid container spacing={2} sx={{ mb: 3 }}>
       <Grid size={summaryGridSize}>
-        <Card sx={{ height: "100%", bgcolor: surfaceBg, border: "1px solid", borderColor: surfaceBorder }}>
+        <Card
+          sx={{
+            height: "100%",
+            bgcolor: surfaceBg,
+            border: "1px solid",
+            borderColor: surfaceBorder,
+            boxShadow: chartAppearance.isDark
+              ? "0 12px 26px rgba(2,6,23,0.36)"
+              : "0 8px 18px rgba(15,23,42,0.06)",
+          }}
+        >
           <CardContent>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: chartAppearance.isDark ? '#FFFFFF' : 'text.primary' }}>
               SMS Reminder Analytics            </Typography>
@@ -1902,80 +2054,8 @@ const SmsAndDemographicsSection = ({
         </Card>
       </Grid>
 
-      <Grid size={ageChartGridSize}>
-        <ChartCard
-          title="Demographic Coverage (Age Groups)"
-          subtitle={`Registered infants: ${safeNum(coverage.infants)} • Guardians: ${safeNum(coverage.guardians)}`}
-          loading={loading}
-          empty={ageData.length === 0}
-          emptyMessage="0 data: no demographic age-group records yet for the current filters."
-          ariaLabel="Line chart of infant age-group distribution"
-          chartAppearance={chartAppearance}
-          chartHeight={300}
-        >
-          <Box sx={{ position: "relative", width: "100%", height: 300 }}>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={ageData} margin={CHART_THEME.layout.margin}>
-                <CartesianGrid
-                  stroke={chartAppearance.gridStroke}
-                  strokeDasharray={CHART_THEME.layout.gridDash}
-                  vertical={false}
-                />
-                <XAxis dataKey="group" tick={axisTick} axisLine={axisLine} tickLine={axisLine} />
-                <YAxis allowDecimals={false} tick={axisTick} axisLine={axisLine} tickLine={axisLine} />
-                <RechartsTooltip
-                  cursor={{ stroke: CHART_THEME.palette.primary, strokeOpacity: 0.3 }}
-                  content={<DashboardChartTooltip chartAppearance={chartAppearance} />}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="count"
-                  name="Infants"
-                  stroke={CHART_THEME.palette.primary}
-                  strokeWidth={3}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  dot={{
-                    r: 3,
-                    stroke: chartAppearance.plotBackground,
-                    strokeWidth: 2,
-                    fill: CHART_THEME.palette.primary,
-                  }}
-                  activeDot={{ r: 6, fill: CHART_THEME.palette.primary, strokeWidth: 0 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-
-            {!loading && !ageHasActualValues ? (
-              <Box
-                sx={{
-                  position: "absolute",
-                  inset: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  pointerEvents: "none",
-                }}
-              >
-                <Chip
-                  size="small"
-                  label="0 data"
-                  sx={{
-                    bgcolor: chartAppearance.isDark ? "rgba(15,23,42,0.85)" : "rgba(255,255,255,0.9)",
-                    border: "1px solid",
-                    borderColor: chartAppearance.plotBorder,
-                    color: chartAppearance.axisTick,
-                    fontWeight: 700,
-                  }}
-                />
-              </Box>
-            ) : null}
-          </Box>
-        </ChartCard>
-      </Grid>
-
       {showGenderChart ? (
-        <Grid size={{ xs: 12, md: 6, lg: 4 }}>
+        <Grid size={{ xs: 12, lg: 6 }}>
           <ChartCard
             title="Male vs Female Distribution"
             subtitle="Registered infant gender composition"
@@ -2271,15 +2351,27 @@ const AlertsActivityReportsSection = ({
   const alerts = data?.alerts || [];
   const activity = data?.activity || [];
   const reports = data?.reportShortcuts || [];
-  const surfaceBg = isDark ? "rgba(15,23,42,0.72)" : "background.paper";
-  const surfaceBorder = isDark ? "rgba(148,163,184,0.22)" : "divider";
+  const surfaceBg = isDark
+    ? "linear-gradient(180deg, rgba(15,23,42,0.88) 0%, rgba(15,23,42,0.74) 100%)"
+    : "background.paper";
+  const surfaceBorder = isDark ? "rgba(148,163,184,0.3)" : "divider";
+  const headingColor = isDark ? "#F8FAFC" : "text.primary";
+  const subTextColor = isDark ? "#94A3B8" : "text.secondary";
 
   return (
     <Grid container spacing={2}>
       <Grid size={{ xs: 12, lg: 4 }}>
-        <Card sx={{ height: "100%", bgcolor: surfaceBg, border: "1px solid", borderColor: surfaceBorder }}>
+        <Card
+          sx={{
+            height: "100%",
+            bgcolor: surfaceBg,
+            border: "1px solid",
+            borderColor: surfaceBorder,
+            boxShadow: isDark ? "0 12px 26px rgba(2,6,23,0.36)" : "0 8px 18px rgba(15,23,42,0.06)",
+          }}
+        >
           <CardContent>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: headingColor }}>
               Critical Alerts
             </Typography>
             {loading ? (
@@ -2291,20 +2383,50 @@ const AlertsActivityReportsSection = ({
             ) : alerts.length === 0 ? (
               <Alert severity="success">No critical alerts for current filters.</Alert>
             ) : (
-              <Box sx={{ display: "grid", gap: 1.5 }}>
+              <Box sx={{ display: "grid", gap: 1.25 }}>
                 {alerts.slice(0, 6).map((item) => (
-                  <Alert
+                  (() => {
+                    const tone = resolveAlertTone(item.severity, isDark);
+
+                    return (
+                  <Box
                     key={item.id}
-                    severity={item.severity === "critical" ? "error" : "warning"}
-                    icon={<ErrorOutline fontSize="inherit" />}
+                    sx={{
+                      border: "1px solid",
+                      borderColor: tone.border,
+                      borderRadius: 2,
+                      px: 1.25,
+                      py: 1,
+                      background: tone.cardBg,
+                    }}
                   >
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, mb: 0.75 }}>
+                      <Chip
+                        size="small"
+                        icon={<ErrorOutline sx={{ color: tone.accent }} fontSize="small" />}
+                        label={tone.label}
+                        sx={{
+                          height: 24,
+                          fontWeight: 700,
+                          bgcolor: tone.chipBg,
+                          color: tone.chipText,
+                          border: "1px solid",
+                          borderColor: tone.border,
+                          '& .MuiChip-icon': {
+                            ml: 0.5,
+                          },
+                        }}
+                      />
+                      <Typography variant="caption" sx={{ color: subTextColor, fontWeight: 600 }}>
+                        {toShortDateTime(item.timestamp)}
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: headingColor, lineHeight: 1.4 }}>
                       {item.message}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: isDark ? '#64748B' : 'text.secondary' }}>
-                      {toShortDateTime(item.timestamp)}
-                    </Typography>
-                  </Alert>
+                  </Box>
+                    );
+                  })()
                 ))}
               </Box>
             )}
@@ -2313,9 +2435,17 @@ const AlertsActivityReportsSection = ({
       </Grid>
 
       <Grid size={{ xs: 12, lg: 5 }}>
-        <Card sx={{ height: "100%", bgcolor: surfaceBg, border: "1px solid", borderColor: surfaceBorder }}>
+        <Card
+          sx={{
+            height: "100%",
+            bgcolor: surfaceBg,
+            border: "1px solid",
+            borderColor: surfaceBorder,
+            boxShadow: isDark ? "0 12px 26px rgba(2,6,23,0.36)" : "0 8px 18px rgba(15,23,42,0.06)",
+          }}
+        >
           <CardContent>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: headingColor }}>
               Recent Activity Feed
             </Typography>
             {loading ? (
@@ -2328,35 +2458,73 @@ const AlertsActivityReportsSection = ({
             ) : activity.length === 0 ? (
               <Alert severity="info">No recent activity for current filter range.</Alert>
             ) : (
-              <Box sx={{ display: "grid", gap: 1.25, maxHeight: 320, overflowY: "auto", pr: 0.5 }}>
+              <Box
+                sx={{
+                  display: "grid",
+                  gap: 1,
+                  maxHeight: 332,
+                  overflowY: "auto",
+                  pr: 0.5,
+                  "&::-webkit-scrollbar": {
+                    width: 8,
+                  },
+                  "&::-webkit-scrollbar-thumb": {
+                    backgroundColor: isDark ? "rgba(148,163,184,0.36)" : "rgba(148,163,184,0.5)",
+                    borderRadius: 999,
+                  },
+                }}
+              >
                 {activity.slice(0, 10).map((item) => (
+                  (() => {
+                    const tone = resolveActivityTone(item.type, isDark);
+
+                    return (
                   <Box
                     key={item.id}
                     sx={{
                       border: "1px solid",
-                      borderColor: "divider",
+                      borderColor: tone.border,
                       borderRadius: 2,
-                      p: 1.25,
+                      p: 1.1,
+                      background: tone.cardBg,
                     }}
                   >
-                    <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1, mb: 0.5 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1, mb: 0.6 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: headingColor, lineHeight: 1.35 }}>
                         {item.title}
                       </Typography>
                       <Chip
                         size="small"
-                        variant="outlined"
                         label={statusLabel(item.type)}
-                        sx={{ height: 22 }}
+                        sx={{
+                          height: 22,
+                          borderRadius: 1,
+                          bgcolor: tone.badgeBg,
+                          color: tone.badgeText,
+                          fontWeight: 700,
+                          border: "1px solid",
+                          borderColor: tone.border,
+                          '& .MuiChip-label': {
+                            px: 0.75,
+                          },
+                        }}
                       />
                     </Box>
-                    <Typography variant="caption" display="block" sx={{ color: isDark ? '#94A3B8' : 'text.secondary' }}>
-                      {item.description}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    {item.description ? (
+                      <Typography
+                        variant="caption"
+                        display="block"
+                        sx={{ color: subTextColor, lineHeight: 1.45, mb: 0.55 }}
+                      >
+                        {item.description}
+                      </Typography>
+                    ) : null}
+                    <Typography variant="caption" sx={{ color: subTextColor, fontWeight: 600 }}>
                       {toShortDateTime(item.timestamp)}
                     </Typography>
                   </Box>
+                    );
+                  })()
                 ))}
               </Box>
             )}
@@ -2365,9 +2533,17 @@ const AlertsActivityReportsSection = ({
       </Grid>
 
       <Grid size={{ xs: 12, lg: 3 }}>
-        <Card sx={{ height: "100%", bgcolor: surfaceBg, border: "1px solid", borderColor: surfaceBorder }}>
+        <Card
+          sx={{
+            height: "100%",
+            bgcolor: surfaceBg,
+            border: "1px solid",
+            borderColor: surfaceBorder,
+            boxShadow: isDark ? "0 12px 26px rgba(2,6,23,0.36)" : "0 8px 18px rgba(15,23,42,0.06)",
+          }}
+        >
           <CardContent>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: headingColor }}>
               Report Shortcuts
             </Typography>
 
@@ -2393,14 +2569,24 @@ const AlertsActivityReportsSection = ({
                     size="small"
                     onClick={() => onReportShortcutDownload?.(report)}
                     disabled={isShortcutDownloading}
-                    sx={{ justifyContent: "space-between", textTransform: "none" }}
+                    sx={{
+                      justifyContent: "space-between",
+                      textTransform: "none",
+                      borderColor: isDark ? "rgba(96,165,250,0.58)" : "rgba(59,130,246,0.52)",
+                      backgroundColor: isDark ? "rgba(30,41,59,0.48)" : "rgba(239,246,255,0.7)",
+                      color: isDark ? "#BFDBFE" : "#1D4ED8",
+                      '&:hover': {
+                        borderColor: isDark ? "rgba(96,165,250,0.8)" : "rgba(37,99,235,0.72)",
+                        backgroundColor: isDark ? "rgba(30,58,138,0.35)" : "rgba(219,234,254,0.85)",
+                      },
+                    }}
                     endIcon={isShortcutDownloading ? <Refresh fontSize="small" /> : <Download fontSize="small" />}
                   >
                     <Box sx={{ textAlign: "left" }}>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
                         {report.title}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: isDark ? '#64748B' : 'text.secondary' }}>
+                      <Typography variant="caption" sx={{ color: subTextColor }}>
                         {isShortcutDownloading ? "PREPARING…" : String(report.format || "").toUpperCase()}
                       </Typography>
                     </Box>
@@ -2418,18 +2604,18 @@ const AlertsActivityReportsSection = ({
 };
 
 const SummaryMiniCard = ({ label, value, error = false, isDark = false }) => {
-  const labelColor = isDark ? '#94A3B8' : 'text.secondary';
-  const valueColor = error ? 'error.main' : (isDark ? '#F8FAFC' : 'text.primary');
+  const labelColor = isDark ? '#CBD5E1' : 'text.secondary';
+  const valueColor = error ? (isDark ? '#FCA5A5' : 'error.main') : (isDark ? '#F8FAFC' : 'text.primary');
 
   return (
     <Box
       sx={{
         border: "1px solid",
-        borderColor: isDark ? 'rgba(148,163,184,0.22)' : 'divider',
+        borderColor: isDark ? 'rgba(148,163,184,0.34)' : 'divider',
         borderRadius: 2,
         p: 1.5,
         minHeight: 72,
-        bgcolor: isDark ? 'rgba(30,41,59,0.5)' : 'transparent',
+        bgcolor: isDark ? 'rgba(30,41,59,0.68)' : 'transparent',
       }}
     >
       <Typography variant="caption" sx={{ color: labelColor, display: "block" }}>

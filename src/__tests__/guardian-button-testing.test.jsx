@@ -9,6 +9,10 @@ import GuardianSidebar from "../components/GuardianSidebar";
 import MyChildren from "../pages/MyChildren";
 import Appointments from "../pages/Appointments";
 import apiClient from "../utils/api";
+import {
+  GUARDIAN_INFANT_REGISTERED_EVENT,
+  GUARDIAN_OPEN_ADD_CHILD_MODAL_EVENT,
+} from "../components/QuickActionFAB";
 
 const mockAuthContext = {
   user: { id: 1, first_name: "Test", username: "guardian_test" },
@@ -289,6 +293,69 @@ describe("Guardian module pages", () => {
     expect(
       await screen.findByText("VACCINATION_RECORDS_PAGE"),
     ).toBeInTheDocument();
+  });
+
+  test("MyChildren opens Add Child modal when global add-child event is dispatched", async () => {
+    renderWithRoutes("/guardian/children", {
+      "/guardian/children": <MyChildren />,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/my children/i)).toBeInTheDocument();
+    });
+
+    window.dispatchEvent(new CustomEvent(GUARDIAN_OPEN_ADD_CHILD_MODAL_EVENT));
+
+    expect(
+      await screen.findByRole("heading", { name: /register new child/i }),
+    ).toBeInTheDocument();
+  });
+
+  test("Appointment booking refreshes children list when infant registered event is dispatched", async () => {
+    const baselineChildren = [
+      {
+        id: 1,
+        first_name: "John",
+        last_name: "Doe",
+        sex: "M",
+        dob: "2020-01-01",
+        control_number: "CN-001",
+      },
+    ];
+
+    const updatedChildren = [
+      ...baselineChildren,
+      {
+        id: 3,
+        first_name: "Baby",
+        last_name: "New",
+        sex: "F",
+        dob: "2026-01-10",
+        control_number: "CN-003",
+      },
+    ];
+
+    apiClient.getInfantsByGuardian
+      .mockResolvedValueOnce(baselineChildren)
+      .mockResolvedValueOnce(updatedChildren);
+
+    const { default: GuardianAppointmentBooking } = await import(
+      "../pages/GuardianAppointmentBooking"
+    );
+
+    renderWithRoutes("/guardian/appointments/new", {
+      "/guardian/appointments/new": <GuardianAppointmentBooking />,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/select child/i)).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/Baby New/i)).not.toBeInTheDocument();
+
+    window.dispatchEvent(new CustomEvent(GUARDIAN_INFANT_REGISTERED_EVENT));
+
+    expect(await screen.findByText(/Baby New/i)).toBeInTheDocument();
   });
 
   test("Appointments page opens scheduling modal", async () => {

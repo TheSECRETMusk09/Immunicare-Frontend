@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Users, Baby, ChevronRight, Plus, Calendar } from "lucide-react";
+import { Users, Baby, ChevronRight, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../utils/api";
+import { triggerGuardianAddChildModal } from "../QuickActionFAB";
 
 /**
  * ChildrenSummaryCard Component
@@ -136,7 +137,12 @@ const ChildrenSummaryCard = ({ guardianId, loading: parentLoading = false }) => 
               Add your first child to get started
             </p>
             <button
-              onClick={() => navigate("/guardian/children/new")}
+              onClick={() => {
+                navigate('/guardian/children');
+                setTimeout(() => {
+                  triggerGuardianAddChildModal();
+                }, 0);
+              }}
               className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors min-h-[44px]"
             >
               <Plus className="w-4 h-4" />

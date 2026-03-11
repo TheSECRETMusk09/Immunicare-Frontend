@@ -23,6 +23,10 @@ import {
   Bell,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
+import {
+  GUARDIAN_OPEN_ADD_CHILD_MODAL_EVENT,
+  triggerGuardianInfantRegistered,
+} from "../components/QuickActionFAB";
 
 const getErrorFieldMap = (error) => {
   if (!error || !error.response || !error.response.data) {
@@ -120,6 +124,31 @@ export default function MyChildren() {
       setShowRegisterModal(true);
     }
   }, [isNewRoute]);
+
+  useEffect(() => {
+    const handleOpenAddChildModal = (event) => {
+      if (event && typeof event.preventDefault === "function") {
+        event.preventDefault();
+      }
+
+      setRegisterError(null);
+      setRegisterSuccess(null);
+      setRegisterFieldErrors({});
+      setShowRegisterModal(true);
+    };
+
+    window.addEventListener(
+      GUARDIAN_OPEN_ADD_CHILD_MODAL_EVENT,
+      handleOpenAddChildModal,
+    );
+
+    return () => {
+      window.removeEventListener(
+        GUARDIAN_OPEN_ADD_CHILD_MODAL_EVENT,
+        handleOpenAddChildModal,
+      );
+    };
+  }, []);
 
   const fetchChildren = useCallback(async () => {
     if (!guardianId) {
@@ -345,8 +374,10 @@ export default function MyChildren() {
       await apiClient.createGuardianInfant(infantData);
       setRegisterSuccess("Child registered successfully!");
 
-      // Refresh children list
-      fetchChildren();
+      triggerGuardianInfantRegistered(infantData);
+
+      // Refresh children list immediately for instant UI sync
+      await fetchChildren();
 
       // Close modal and reset form after delay
       setTimeout(() => {
