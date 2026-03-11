@@ -82,6 +82,12 @@ const GuardianImmunizationChartPage = lazy(() =>
   })),
 );
 
+const GuardianGrowthChartPage = lazy(() =>
+  import("./pages/GuardianGrowthChartPage").then((module) => ({
+    default: module.default,
+  })),
+);
+
 const GuardianNotificationsPage = lazy(() =>
   import("./pages/GuardianNotificationsPage").then((module) => ({
     default: module.default,
@@ -624,11 +630,11 @@ function AppContent() {
             />
             <Route
               path="health-charts"
-              element={<GuardianImmunizationChartPage />}
+              element={<GuardianGrowthChartPage />}
             />
             <Route
               path="health-charts/:childId"
-              element={<GuardianImmunizationChartPage />}
+              element={<GuardianGrowthChartPage />}
             />
             <Route
               path="immunization-chart"

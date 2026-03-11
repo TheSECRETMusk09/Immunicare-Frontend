@@ -171,18 +171,49 @@ export default function ImmunizationChart({ infantId }) {
     try {
       setLoading(true);
       setError(null);
-      const [infantData, appointmentsData, growthData, vaccinationData] =
-        await Promise.all([
-          apiClient.getInfant(infantId),
-          apiClient.getAppointmentsByInfant(infantId),
-          apiClient.getGrowthRecordsByInfant(infantId),
-          apiClient.getVaccinationRecordsByInfant(infantId),
-        ]);
+      const [
+        infantResult,
+        appointmentsResult,
+        growthResult,
+        vaccinationResult,
+      ] = await Promise.allSettled([
+        apiClient.getInfant(infantId),
+        apiClient.getAppointmentsByInfant(infantId),
+        apiClient.getGrowthRecordsByInfant(infantId),
+        apiClient.getVaccinationRecordsByInfant(infantId),
+      ]);
 
-      const normalizedInfant = normalizeInfantResponse(infantData);
-      const normalizedAppointments = normalizeAppointmentsResponse(appointmentsData);
-      const normalizedGrowthRecords = normalizeGrowthRecordsResponse(growthData);
-      const normalizedVaccinations = normalizeVaccinationRecordsResponse(vaccinationData);
+      if (infantResult.status !== "fulfilled") {
+        throw infantResult.reason || new Error("Failed to load infant details.");
+      }
+
+      const normalizedInfant = normalizeInfantResponse(infantResult.value);
+
+      const normalizedAppointments =
+        appointmentsResult.status === "fulfilled"
+          ? normalizeAppointmentsResponse(appointmentsResult.value)
+          : [];
+
+      const normalizedGrowthRecords =
+        growthResult.status === "fulfilled"
+          ? normalizeGrowthRecordsResponse(growthResult.value)
+          : [];
+
+      const normalizedVaccinations =
+        vaccinationResult.status === "fulfilled"
+          ? normalizeVaccinationRecordsResponse(vaccinationResult.value)
+          : [];
+
+      const partialFailures = [];
+      if (appointmentsResult.status === "rejected") {
+        partialFailures.push("appointments");
+      }
+      if (growthResult.status === "rejected") {
+        partialFailures.push("growth records");
+      }
+      if (vaccinationResult.status === "rejected") {
+        partialFailures.push("vaccination records");
+      }
 
       if (!isMountedRef.current || requestId !== requestIdRef.current) {
         return;
@@ -192,6 +223,12 @@ export default function ImmunizationChart({ infantId }) {
       setAppointments(normalizedAppointments);
       setGrowthRecords(normalizedGrowthRecords);
       setVaccinations(normalizedVaccinations);
+
+      if (partialFailures.length > 0) {
+        setError(
+          `Some chart data could not be loaded (${partialFailures.join(", ")}). Showing available information.`,
+        );
+      }
     } catch (err) {
       if (!isMountedRef.current || requestId !== requestIdRef.current) {
         return;
