@@ -1180,7 +1180,7 @@ export default function GuardianAppointmentsPage() {
                 required
               />
               <Select
-                label="Time"
+                label="Appointment Time (8AM - 4PM)"
                 value={formData.scheduled_time}
                 onChange={(event) =>
                   setFormData((previous) => ({ ...previous, scheduled_time: event.target.value }))
@@ -1197,6 +1197,9 @@ export default function GuardianAppointmentsPage() {
                   </option>
                 ))}
               </Select>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Available from 8:00 AM to 4:00 PM (12:00 PM - 1:00 PM lunch break).
+              </p>
             </div>
 
             {timeSlotsLoading ? (

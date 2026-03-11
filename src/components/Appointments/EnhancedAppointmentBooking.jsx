@@ -66,6 +66,7 @@ const steps = [
   "Confirm Details",
 ];
 
+// 8:00 AM - 4:00 PM schedule with lunch break from 12:00 PM - 1:00 PM
 const timeSlots = [
   "08:00",
   "08:30",
@@ -82,7 +83,6 @@ const timeSlots = [
   "15:00",
   "15:30",
   "16:00",
-  "16:30",
 ];
 
 const EnhancedAppointmentBooking = ({
@@ -354,7 +354,10 @@ const EnhancedAppointmentBooking = ({
             </Grid>
             <Grid item xs={12} md={4}>
               <Typography variant="h6" gutterBottom>
-                Available Slots for {format(selectedDate, "MMMM d, yyyy")}
+                Available Slots (8:00 AM - 4:00 PM) for {format(selectedDate, "MMMM d, yyyy")}
+              </Typography>
+              <Typography variant="caption" color="textSecondary" display="block">
+                Lunch break: 12:00 PM - 1:00 PM
               </Typography>
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mt: 2 }}>
                 {timeSlots.map((time) => {

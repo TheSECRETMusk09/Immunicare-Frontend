@@ -1908,3 +1908,56 @@ body {
     width: 100%;
   }
 }
+
+/* ==========================================================================
+   Guardian Immunization Chart - Desktop Drag Scroll & Responsive Stability
+   ========================================================================== */
+
+.guardian-chart-scroll-container {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.guardian-chart-scroll-container .immunization-chart-container {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.guardian-chart-scroll-container .immunization-scroll-container {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 1023px) {
+  .guardian-chart-scroll-container {
+    overflow: hidden;
+  }
+
+  .guardian-chart-scroll-container .immunization-chart-container,
+  .guardian-chart-scroll-container .immunization-scroll-container {
+    min-width: 0 !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .guardian-immunization-scroll-desktop {
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: pan-y;
+    scroll-behavior: smooth;
+  }
+
+  .guardian-immunization-scroll-desktop .immunization-card {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .guardian-immunization-scroll-desktop.guardian-immunization-scroll-dragging {
+    cursor: grabbing;
+    scroll-behavior: auto;
+  }
+}

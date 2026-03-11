@@ -34,24 +34,15 @@ const getMinDate = () => {
   return today.toISOString().split("T")[0];
 };
 
-// Generate time options from 8am to 5pm
-const generateTimeOptions = () => {
-  const options = [{ value: "", label: "Select Time" }];
-  for (let hour = 8; hour <= 17; hour++) {
-    for (let min = 0; min < 60; min += 30) {
-      const time = `${hour.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
-      const displayTime = new Date(`2000-01-01T${time}`).toLocaleTimeString(
-        "en-US",
-        {
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: true,
-        },
-      );
-      options.push({ value: time, label: displayTime });
-    }
-  }
-  return options;
+const formatTimeSlotLabel = (value) => {
+  if (!value) return "";
+  const parsed = new Date(`2000-01-01T${value}`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
 };
 
 // Philippine holiday check
@@ -122,6 +113,9 @@ export default function GuardianAppointmentBooking() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [createdAppointment, setCreatedAppointment] = useState(null);
+  const [timeSlotsLoading, setTimeSlotsLoading] = useState(false);
+  const [timeSlots, setTimeSlots] = useState([]);
+  const [timeSlotsFeedback, setTimeSlotsFeedback] = useState(null);
 
   const [formData, setFormData] = useState({
     infant_id: childId || "",
@@ -133,8 +127,6 @@ export default function GuardianAppointmentBooking() {
 
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
-
-  const timeOptions = generateTimeOptions();
 
   // Fetch children for this guardian
   const fetchChildren = useCallback(async () => {
@@ -165,6 +157,46 @@ export default function GuardianAppointmentBooking() {
   useEffect(() => {
     fetchChildren();
   }, [fetchChildren]);
+
+  const fetchTimeSlots = useCallback(async () => {
+    if (!guardianId || !formData.scheduled_date) {
+      setTimeSlots([]);
+      setTimeSlotsFeedback(null);
+      return;
+    }
+
+    setTimeSlotsLoading(true);
+    setTimeSlotsFeedback(null);
+
+    try {
+      const result = await apiClient.getAppointmentTimeSlots({
+        scheduled_date: formData.scheduled_date,
+      });
+
+      const slots = Array.isArray(result?.slots) ? result.slots : [];
+      setTimeSlots(slots);
+      setTimeSlotsFeedback(result || null);
+
+      setFormData((previous) => {
+        if (!previous.scheduled_time) return previous;
+        if (slots.includes(previous.scheduled_time)) return previous;
+        return { ...previous, scheduled_time: "" };
+      });
+    } catch (slotError) {
+      setTimeSlots([]);
+      setTimeSlotsFeedback({
+        available: false,
+        message: slotError?.message || "Failed to load time slots.",
+      });
+      setFormData((previous) => ({ ...previous, scheduled_time: "" }));
+    } finally {
+      setTimeSlotsLoading(false);
+    }
+  }, [guardianId, formData.scheduled_date]);
+
+  useEffect(() => {
+    fetchTimeSlots();
+  }, [fetchTimeSlots]);
 
   // Handle child selection
   const handleChildSelect = (infantId) => {
@@ -225,6 +257,16 @@ export default function GuardianAppointmentBooking() {
 
     if (hasErrors) {
       setErrors(newErrors);
+      return;
+    }
+
+    if (timeSlotsFeedback && !timeSlotsFeedback.available) {
+      setError(timeSlotsFeedback.message || "No available time slots for the selected date.");
+      return;
+    }
+
+    if (timeSlots.length > 0 && !timeSlots.includes(formData.scheduled_time)) {
+      setError("Selected time is no longer available. Please choose another slot.");
       return;
     }
 
@@ -528,6 +570,7 @@ export default function GuardianAppointmentBooking() {
                           setFormData((prev) => ({
                             ...prev,
                             scheduled_date: e.target.value,
+                            scheduled_time: "",
                           }))
                         }
                         onBlur={() => handleBlur("scheduled_date")}
@@ -541,7 +584,7 @@ export default function GuardianAppointmentBooking() {
 
                     <div className="w-full">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Appointment Time <span className="text-red-500">*</span>
+                        Appointment Time (8AM - 4PM) <span className="text-red-500">*</span>
                       </label>
                       <Select
                         value={formData.scheduled_time}
@@ -553,14 +596,34 @@ export default function GuardianAppointmentBooking() {
                         }
                         onBlur={() => handleBlur("scheduled_time")}
                         error={touched.scheduled_time ? errors.scheduled_time : undefined}
+                        disabled={
+                          !formData.scheduled_date ||
+                          timeSlotsLoading ||
+                          (timeSlotsFeedback && !timeSlotsFeedback.available)
+                        }
                         className="w-full guardian-input"
                       >
-                        {timeOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
+                        <option value="">
+                          {!formData.scheduled_date
+                            ? "Select date first"
+                            : timeSlotsLoading
+                              ? "Loading time slots..."
+                              : "Select time"}
+                        </option>
+                        {timeSlots.map((slot) => (
+                          <option key={slot} value={slot}>
+                            {formatTimeSlotLabel(slot)}
                           </option>
                         ))}
                       </Select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Available from 8:00 AM to 4:00 PM (12:00 PM - 1:00 PM lunch break).
+                      </p>
+                      {!timeSlotsLoading && timeSlotsFeedback && !timeSlotsFeedback.available && (
+                        <Alert variant="warning" className="mt-2">
+                          {timeSlotsFeedback.message}
+                        </Alert>
+                      )}
                     </div>
                   </div>
 

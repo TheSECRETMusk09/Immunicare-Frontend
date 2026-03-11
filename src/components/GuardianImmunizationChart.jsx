@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Check, X, Clock, AlertCircle } from 'lucide-react';
 
 /**
@@ -81,7 +82,19 @@ const ImmunizationCard = ({ vaccine, status, dueDate, index }) => {
   );
 };
 
-const GuardianImmunizationChart = ({ immunizations = [] }) => {
+const GuardianImmunizationChart = ({ immunizations = [], childId = null, onViewFullChart = null }) => {
+  const navigate = useNavigate();
+  const scrollContainerRef = useRef(null);
+  const [isDesktopViewport, setIsDesktopViewport] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false;
+    }
+
+    return window.matchMedia('(min-width: 1024px)').matches;
+  });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStateRef = useRef({ isPointerDown: false, pointerId: null, startX: 0, startScrollLeft: 0 });
+
   const defaultImmunizations = [
         {
       name: 'BCG',
@@ -135,6 +148,121 @@ const GuardianImmunizationChart = ({ immunizations = [] }) => {
 
   const data = immunizations.length > 0 ? immunizations : defaultImmunizations;
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia('(min-width: 1024px)');
+    const handleViewportChange = (event) => {
+      setIsDesktopViewport(event.matches);
+      if (!event.matches) {
+        setIsDragging(false);
+      }
+    };
+
+    setIsDesktopViewport(mediaQuery.matches);
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', handleViewportChange);
+      return () => mediaQuery.removeEventListener('change', handleViewportChange);
+    }
+
+    mediaQuery.addListener(handleViewportChange);
+    return () => mediaQuery.removeListener(handleViewportChange);
+  }, []);
+
+  const handlePointerDown = useCallback((event) => {
+    if (!isDesktopViewport || event.pointerType === 'touch') {
+      return;
+    }
+
+    const container = scrollContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    dragStateRef.current = {
+      isPointerDown: true,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startScrollLeft: container.scrollLeft,
+    };
+
+    setIsDragging(true);
+    container.setPointerCapture?.(event.pointerId);
+  }, [isDesktopViewport]);
+
+  const handlePointerMove = useCallback((event) => {
+    const container = scrollContainerRef.current;
+    const dragState = dragStateRef.current;
+
+    if (!container || !dragState.isPointerDown || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const deltaX = event.clientX - dragState.startX;
+    container.scrollLeft = dragState.startScrollLeft - deltaX;
+  }, []);
+
+  const stopDragging = useCallback((pointerId) => {
+    const container = scrollContainerRef.current;
+    if (container && pointerId !== null && pointerId !== undefined) {
+      container.releasePointerCapture?.(pointerId);
+    }
+
+    dragStateRef.current = {
+      isPointerDown: false,
+      pointerId: null,
+      startX: 0,
+      startScrollLeft: 0,
+    };
+
+    setIsDragging(false);
+  }, []);
+
+  const handlePointerUp = useCallback((event) => {
+    if (!dragStateRef.current.isPointerDown || dragStateRef.current.pointerId !== event.pointerId) {
+      return;
+    }
+
+    stopDragging(event.pointerId);
+  }, [stopDragging]);
+
+  const handlePointerLeave = useCallback((event) => {
+    if (!dragStateRef.current.isPointerDown || dragStateRef.current.pointerId !== event.pointerId) {
+      return;
+    }
+
+    stopDragging(event.pointerId);
+  }, [stopDragging]);
+
+  const handlePointerCancel = useCallback((event) => {
+    if (!dragStateRef.current.isPointerDown || dragStateRef.current.pointerId !== event.pointerId) {
+      return;
+    }
+
+    stopDragging(event.pointerId);
+  }, [stopDragging]);
+
+  const handleViewFullChart = () => {
+    if (typeof onViewFullChart === 'function') {
+      onViewFullChart();
+      return;
+    }
+
+    const sanitizedChildId =
+      childId !== null && childId !== undefined && String(childId).trim() !== ''
+        ? String(childId).trim()
+        : null;
+
+    const targetPath = sanitizedChildId
+      ? `/guardian/immunization-chart/${sanitizedChildId}`
+      : '/guardian/immunization-chart';
+
+    navigate(targetPath, { replace: false });
+  };
+
   return (
     <div
       className="immunization-chart-container"
@@ -147,8 +275,9 @@ const GuardianImmunizationChart = ({ immunizations = [] }) => {
         </h2>
         <button
           className="text-sm font-medium text-theme-accent-primary hover:underline"
-          onClick={() => window.open('/guardian/immunization-chart', '_self')}
+          onClick={handleViewFullChart}
           aria-label="View full immunization chart"
+          type="button"
         >
           View Full Chart
         </button>
@@ -156,7 +285,15 @@ const GuardianImmunizationChart = ({ immunizations = [] }) => {
 
       {/* Horizontal scrollable container */}
       <div
-        className="immunization-scroll-container flex gap-4 overflow-x-auto pb-4"
+        ref={scrollContainerRef}
+        className={`immunization-scroll-container flex gap-4 overflow-x-auto pb-4 ${
+          isDesktopViewport ? 'guardian-immunization-scroll-desktop' : ''
+        } ${isDragging ? 'guardian-immunization-scroll-dragging' : ''}`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerLeave}
+        onPointerCancel={handlePointerCancel}
       >
         {data.map((immunization, index) => (
           <ImmunizationCard

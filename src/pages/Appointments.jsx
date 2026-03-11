@@ -117,23 +117,24 @@ const validateDateSelection = (dateStr) => {
   return { valid: true, message: "Date is available" };
 };
 
-// Generate time options from 8am to 5pm
+// Generate time options from 8:00 AM to 4:00 PM (30-minute intervals)
 const generateTimeOptions = () => {
   const options = [{ value: "", label: "Select Time" }];
-  for (let hour = 8; hour <= 17; hour++) {
-    for (let min = 0; min < 60; min += 30) {
-      const time = `${hour.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
-      const displayTime = new Date(`2000-01-01T${time}`).toLocaleTimeString(
-        "en-US",
-        {
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: true,
-        },
-      );
-      options.push({ value: time, label: displayTime });
-    }
+  const startMinutes = 8 * 60;
+  const endMinutes = 16 * 60;
+
+  for (let currentMinutes = startMinutes; currentMinutes <= endMinutes; currentMinutes += 30) {
+    const hour = Math.floor(currentMinutes / 60);
+    const minute = currentMinutes % 60;
+    const time = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+    const displayTime = new Date(`2000-01-01T${time}`).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+    options.push({ value: time, label: displayTime });
   }
+
   return options;
 };
 
@@ -1367,7 +1368,7 @@ export default function Appointments() {
             </div>
             <div className="admin-field-group">
               <label className="admin-field-label required">
-                Appointment Time (8AM - 5PM)
+                Appointment Time (8AM - 4PM)
               </label>
               <Select
                 value={createFormData.scheduled_time}
@@ -1637,7 +1638,7 @@ export default function Appointments() {
             </div>
             <div className="admin-field-group">
               <label className="admin-field-label required">
-                Appointment Time (8AM - 5PM)
+                Appointment Time (8AM - 4PM)
               </label>
               <Select
                 value={editFormData.scheduled_time}
