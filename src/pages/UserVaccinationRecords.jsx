@@ -16,6 +16,13 @@ import {
 } from "lucide-react";
 import ImmunizationRecordBooklet from "../components/ImmunizationRecordBooklet";
 
+const PROVIDER_FALLBACK_LABEL = "Provider unavailable";
+
+const resolveProviderName = (record) =>
+  record?.provider_name ||
+  record?.administered_by_name ||
+  PROVIDER_FALLBACK_LABEL;
+
 export default function UserVaccinationRecords() {
   const { guardianId } = useAuth();
   const { childId } = useParams();
@@ -75,7 +82,15 @@ export default function UserVaccinationRecords() {
       const recordsData = Array.isArray(recordsResponse)
         ? recordsResponse
         : recordsResponse?.data || recordsResponse || [];
-      setVaccinationRecords(recordsData);
+
+      const normalizedRecords = (Array.isArray(recordsData) ? recordsData : []).map(
+        (record) => ({
+          ...record,
+          provider_name: resolveProviderName(record),
+        }),
+      );
+
+      setVaccinationRecords(normalizedRecords);
       setVaccinationSchedules(schedulesResponse || []);
     } catch (err) {
       console.error("Error fetching vaccination data:", err);
@@ -514,6 +529,9 @@ export default function UserVaccinationRecords() {
                             Dose
                           </th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Provider
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                             Due Date
                           </th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -540,6 +558,11 @@ export default function UserVaccinationRecords() {
                               <td className="px-4 py-4">
                                 <div className="text-sm text-gray-500 dark:text-gray-300">
                                   Dose {vaccine.dose_no || 1}
+                                </div>
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="text-sm text-gray-500 dark:text-gray-300">
+                                  {resolveProviderName(vaccine)}
                                 </div>
                               </td>
                               <td className="px-4 py-4">
