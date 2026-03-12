@@ -1,9 +1,40 @@
 const { createProxyMiddleware } = require("http-proxy-middleware");
+const fs = require("fs");
+const path = require("path");
+
+const DEFAULT_BACKEND_PORT = Number.parseInt(process.env.BACKEND_PORT || "5000", 10) || 5000;
+
+const resolveBackendTarget = () => {
+  const configuredTarget = process.env.BACKEND_TARGET_URL;
+  if (configuredTarget && configuredTarget.trim()) {
+    return configuredTarget.trim();
+  }
+
+  const runtimePortStateFile = path.resolve(__dirname, "../../backend/.runtime/active-port.json");
+
+  try {
+    if (fs.existsSync(runtimePortStateFile)) {
+      const runtime = JSON.parse(fs.readFileSync(runtimePortStateFile, "utf8"));
+      const port = Number.parseInt(runtime?.port, 10);
+      const status = String(runtime?.status || "").toLowerCase();
+      if (Number.isFinite(port) && port > 0 && status === "running") {
+        return `http://localhost:${port}`;
+      }
+    }
+  } catch (_error) {
+    // Fall back to the default target when runtime state can't be read.
+  }
+
+  return `http://localhost:${DEFAULT_BACKEND_PORT}`;
+};
 
 module.exports = function (app) {
+  const backendTarget = resolveBackendTarget();
+
   // Common proxy options for backend
   const backendProxyOptions = {
-    target: "http://localhost:5000",
+    target: backendTarget,
+    router: () => resolveBackendTarget(),
     changeOrigin: true,
     logLevel: "warn",
     timeout: 30000,
