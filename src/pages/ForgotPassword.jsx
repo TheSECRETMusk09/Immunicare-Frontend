@@ -343,20 +343,25 @@ const ForgotPassword = () => {
                     if (method === "email") {
                       setEmail(e.target.value);
                     } else {
-                      setPhoneNumber(e.target.value);
+                      // For SMS method, only allow digits
+                      const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 11);
+                      setPhoneNumber(digitsOnly);
                     }
                     if (error) setError(null);
                   }}
                   placeholder={
                     method === "email"
                       ? "Enter your email address"
-                      : "Enter your mobile number"
+                      : "Enter your mobile number (e.g., 09123456789)"
                   }
                   icon={method === "email" ? Mail : Phone}
                   disabled={loading}
                   required
                   autoComplete={method === "email" ? "email" : "tel"}
                   className="bg-white/10 backdrop-blur-sm border-white/30 text-white placeholder-white/50"
+                  inputMode={method === "sms" ? "numeric" : undefined}
+                  pattern={method === "sms" ? "[0-9]*" : undefined}
+                  maxLength={method === "sms" ? 11 : undefined}
                 />
 
                 {method === "sms" && (

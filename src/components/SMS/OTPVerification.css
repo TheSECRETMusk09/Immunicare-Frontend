@@ -105,6 +105,39 @@
   -moz-appearance: textfield;
   touch-action: manipulation;
   caret-color: #10b981;
+  /* Improve visibility of OTP digits */
+  text-shadow: 0 0 1px rgba(0, 0, 0, 0.1);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Show placeholder when empty */
+  position: relative;
+}
+
+/* Placeholder dot for empty OTP inputs */
+.otp-verification__input:not(:focus)::placeholder {
+  color: transparent;
+}
+
+.otp-verification__input::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #d1d5db;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.otp-verification__input:not(:focus):empty::before {
+  opacity: 1;
+}
+
+.otp-verification__input:not(:focus):empty {
+  color: transparent;
 }
 
 .otp-verification__input::-webkit-outer-spin-button,
@@ -304,7 +337,12 @@
 .dark .otp-verification__input {
   background: #374151;
   border-color: #4b5563;
-  color: #f9fafb;
+  color: #ffffff;
+  text-shadow: 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+.dark .otp-verification__input::before {
+  background-color: #6b7280;
 }
 
 .dark .otp-verification__input:focus {

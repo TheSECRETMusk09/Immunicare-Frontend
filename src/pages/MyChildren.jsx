@@ -196,6 +196,19 @@ export default function MyChildren() {
     birthplace: "",
   });
 
+  // Normalize sex value for display (handles both "M"/"F" and "male"/"female" from backend)
+  const normalizeSexForDisplay = (sex) => {
+    if (!sex) return 'M'; // Default to Male
+    const normalized = String(sex).toUpperCase().charAt(0);
+    return normalized === 'M' || normalized === 'F' ? normalized : 'M';
+  };
+
+  // Normalize sex for form submission (converts "M"/"F" to "male"/"female" for backend)
+  const normalizeSexForSubmission = (sex) => {
+    const normalized = normalizeSexForDisplay(sex);
+    return normalized === 'M' ? 'male' : 'female';
+  };
+
   // Handle edit form changes
   const handleEditChange = (e) => {
     const { name, value } = e.target;
@@ -229,7 +242,7 @@ export default function MyChildren() {
       first_name: child.first_name || "",
       last_name: child.last_name || "",
       dob: child.dob ? child.dob.split("T")[0] : "",
-      sex: child.sex || "M",
+      sex: normalizeSexForDisplay(child.sex),
       birth_weight: child.birth_weight || "",
       birth_length: child.birth_height || "",
       birthplace: child.place_of_birth || "",
@@ -264,7 +277,7 @@ export default function MyChildren() {
         first_name: editFormData.first_name,
         last_name: editFormData.last_name,
         dob: editFormData.dob,
-        sex: editFormData.sex === "M" ? "male" : "female",
+        sex: normalizeSexForSubmission(editFormData.sex),
         birth_weight: editFormData.birth_weight || null,
         birth_height: editFormData.birth_length || null,
         place_of_birth: editFormData.birthplace || null,
@@ -364,7 +377,7 @@ export default function MyChildren() {
         first_name: formData.first_name,
         last_name: formData.last_name,
         dob: formData.dob,
-        sex: formData.sex === "M" ? "male" : "female",
+        sex: normalizeSexForSubmission(formData.sex),
         guardian_id: guardianId,
         birth_weight: formData.birth_weight || null,
         birth_height: formData.birth_length || null,
@@ -510,7 +523,7 @@ export default function MyChildren() {
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div className="w-14 h-14 bg-gradient-to-br from-blue-400/30 to-purple-500/30 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                      {child.sex === "M" ? (
+                      {normalizeSexForDisplay(child.sex) === "M" ? (
                         <User className="w-8 h-8 guardian-card-icon-accent guardian-card-icon-accent--blue" />
                       ) : (
                         <User className="w-8 h-8 guardian-card-icon-accent guardian-card-icon-accent--pink" />
@@ -555,7 +568,7 @@ export default function MyChildren() {
                     <div className="flex justify-between items-center py-2 border-b border-theme-border-primary">
                       <span className="guardian-card-text-secondary">Sex</span>
                       <span className="font-semibold guardian-card-text-primary">
-                        {child.sex === "M" ? "Male" : "Female"}
+                        {normalizeSexForDisplay(child.sex) === "M" ? "Male" : "Female"}
                       </span>
                     </div>
                     <div className="flex justify-between items-center py-2">
@@ -1065,7 +1078,7 @@ export default function MyChildren() {
           {selectedChild && (
             <div className="bg-theme-bg-tertiary rounded-lg p-4">
               <div className="text-center flex items-center justify-center">
-                {selectedChild.sex === "M" ? (
+                {normalizeSexForDisplay(selectedChild.sex) === "M" ? (
                   <User className="w-6 h-6 text-blue-300 mr-2" />
                 ) : (
                   <User className="w-6 h-6 text-pink-300 mr-2" />

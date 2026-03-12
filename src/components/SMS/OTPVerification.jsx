@@ -256,7 +256,7 @@ const OTPVerification = ({
             className={`otp-verification__input ${
               error ? "otp-verification__input--error" : ""
             }`}
-            aria-label={`Digit ${index + 1}`}
+            aria-label={`Digit ${index + 1} of ${length}`}
             autoComplete={index === 0 ? "one-time-code" : "off"}
           />
         ))}
