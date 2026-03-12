@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
+import { API_BASE_URL } from "../utils/apiConfig";
 
-const API_BASE_URL = "http://localhost:5000/api/patients";
+const PATIENTS_API_BASE_URL = `${API_BASE_URL}/patients`;
 
 export const usePatientManagement = () => {
   const [patients, setPatients] = useState([]);
@@ -9,7 +10,7 @@ export const usePatientManagement = () => {
 
   const fetchPatients = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/all`);
+      const response = await fetch(`${PATIENTS_API_BASE_URL}/all`);
       if (!response.ok) {
         throw new Error("Failed to fetch patients");
       }
@@ -24,7 +25,7 @@ export const usePatientManagement = () => {
 
   const addPatient = async (patientData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/add`, {
+      const response = await fetch(`${PATIENTS_API_BASE_URL}/add`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -42,7 +43,7 @@ export const usePatientManagement = () => {
 
   const updatePatient = async (id, patientData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/update/${id}`, {
+      const response = await fetch(`${PATIENTS_API_BASE_URL}/update/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -60,7 +61,7 @@ export const usePatientManagement = () => {
 
   const deletePatient = async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/delete/${id}`, {
+      const response = await fetch(`${PATIENTS_API_BASE_URL}/delete/${id}`, {
         method: "DELETE",
       });
       if (!response.ok) {
@@ -74,7 +75,7 @@ export const usePatientManagement = () => {
 
   const searchPatients = async (query) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/search?q=${query}`);
+      const response = await fetch(`${PATIENTS_API_BASE_URL}/search?q=${query}`);
       if (!response.ok) {
         throw new Error("Failed to search patients");
       }
@@ -88,7 +89,7 @@ export const usePatientManagement = () => {
 
   const getPatientById = async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/${id}`);
+      const response = await fetch(`${PATIENTS_API_BASE_URL}/${id}`);
       if (!response.ok) {
         throw new Error("Failed to fetch patient details");
       }
@@ -102,7 +103,7 @@ export const usePatientManagement = () => {
 
   const getPatientVaccinationHistory = async (patientId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/${patientId}/vaccinations`);
+      const response = await fetch(`${PATIENTS_API_BASE_URL}/${patientId}/vaccinations`);
       if (!response.ok) {
         throw new Error("Failed to fetch vaccination history");
       }
@@ -117,7 +118,7 @@ export const usePatientManagement = () => {
   const addVaccinationRecord = async (patientId, vaccinationData) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/${patientId}/vaccinations`,
+        `${PATIENTS_API_BASE_URL}/${patientId}/vaccinations`,
         {
           method: "POST",
           headers: {

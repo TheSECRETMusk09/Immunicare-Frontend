@@ -27,6 +27,7 @@ import {
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [method, setMethod] = useState("email"); // 'email' or 'sms'
   const [otp, setOtp] = useState("");
   const [error, setError] = useState(null);
@@ -57,12 +58,54 @@ const ForgotPassword = () => {
     return null;
   };
 
-  const handleSendOtp = async (e) => {
-    e.preventDefault();
+  const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+
+  const normalizePhoneNumber = (value) => {
+    const trimmed = String(value || "").trim();
+    if (!trimmed) return "";
+    const hasPlus = trimmed.startsWith("+");
+    const digits = trimmed.replace(/\D/g, "");
+    return hasPlus ? `+${digits}` : digits;
+  };
+
+  const validatePhoneNumber = (value) => {
+    const normalized = normalizePhoneNumber(value);
+    if (!normalized) {
+      return "Phone number is required";
+    }
+
+    const digitsOnly = normalized.replace(/^\+/, "");
+    if (!/^\d{10,15}$/.test(digitsOnly)) {
+      return "Please enter a valid phone number";
+    }
+
+    return null;
+  };
+
+  const validateRequestByMethod = () => {
+    if (method === "email") {
+      return validateEmail(email);
+    }
+
+    const phoneError = validatePhoneNumber(phoneNumber);
+    if (phoneError) {
+      return phoneError;
+    }
 
     const emailError = validateEmail(email);
     if (emailError) {
-      setError(emailError);
+      return "Account email is required for SMS verification lookup";
+    }
+
+    return null;
+  };
+
+  const handleSendOtp = async (e) => {
+    e.preventDefault();
+
+    const requestValidationError = validateRequestByMethod();
+    if (requestValidationError) {
+      setError(requestValidationError);
       return;
     }
 
@@ -86,8 +129,9 @@ const ForgotPassword = () => {
         return;
       }
 
-      // Call the new OTP endpoint
-      await apiClient.forgotPasswordOtp(email.trim().toLowerCase(), method);
+      // Call the OTP endpoint with normalized identifier
+      const normalizedEmail = normalizeEmail(email);
+      await apiClient.forgotPasswordOtp(normalizedEmail, method);
       setOtpSent(true);
     } catch (err) {
       console.error("Send OTP error:", err);
@@ -111,8 +155,9 @@ const ForgotPassword = () => {
     setError(null);
 
     try {
+      const normalizedEmail = normalizeEmail(email);
       const response = await apiClient.verifyResetOtp(
-        email.trim().toLowerCase(),
+        normalizedEmail,
         otp,
       );
       if (response.resetToken) {
@@ -156,10 +201,14 @@ const ForgotPassword = () => {
 
   const resendOtp = async () => {
     setError(null);
+    setLoading(true);
     try {
-      await apiClient.forgotPasswordOtp(email.trim().toLowerCase(), method);
+      const normalizedEmail = normalizeEmail(email);
+      await apiClient.forgotPasswordOtp(normalizedEmail, method);
     } catch (err) {
       setError(err.message || "Failed to resend OTP. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -269,8 +318,9 @@ const ForgotPassword = () => {
                 Reset Your Password
               </h2>
               <p className="text-white/70 text-sm mb-6 sm:mb-8">
-                Enter your email and choose how you want to receive the
-                verification code.
+                {method === "email"
+                  ? "Enter your email and choose how you want to receive the verification code."
+                  : "Enter your mobile number, then provide your account email for secure lookup before sending the SMS code."}
               </p>
 
               {error && (
@@ -284,22 +334,56 @@ const ForgotPassword = () => {
 
               <form onSubmit={handleSendOtp} className="space-y-5 sm:space-y-6">
                 <TextInput
-                  label="Email Address"
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={email}
+                  label={method === "email" ? "Email Address" : "Phone Number"}
+                  id={method === "email" ? "email" : "phoneNumber"}
+                  name={method === "email" ? "email" : "phoneNumber"}
+                  type={method === "email" ? "email" : "tel"}
+                  value={method === "email" ? email : phoneNumber}
                   onChange={(e) => {
-                    setEmail(e.target.value);
+                    if (method === "email") {
+                      setEmail(e.target.value);
+                    } else {
+                      setPhoneNumber(e.target.value);
+                    }
                     if (error) setError(null);
                   }}
-                  placeholder="Enter your email address"
-                  icon={Mail}
+                  placeholder={
+                    method === "email"
+                      ? "Enter your email address"
+                      : "Enter your mobile number"
+                  }
+                  icon={method === "email" ? Mail : Phone}
                   disabled={loading}
                   required
-                  autoComplete="email"
+                  autoComplete={method === "email" ? "email" : "tel"}
                   className="bg-white/10 backdrop-blur-sm border-white/30 text-white placeholder-white/50"
                 />
+
+                {method === "sms" && (
+                  <div className="space-y-2">
+                    <TextInput
+                      label="Account Email (for lookup)"
+                      id="lookupEmail"
+                      name="lookupEmail"
+                      type="email"
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (error) setError(null);
+                      }}
+                      placeholder="Enter your account email"
+                      icon={Mail}
+                      disabled={loading}
+                      required
+                      autoComplete="email"
+                      className="bg-white/10 backdrop-blur-sm border-white/30 text-white placeholder-white/50"
+                    />
+                    <p className="text-xs text-white/60 leading-relaxed">
+                      SMS recovery uses your account email to securely locate the
+                      registered phone number in the backend.
+                    </p>
+                  </div>
+                )}
 
                 {/* Method Selection */}
                 <div className="space-y-3">
@@ -445,7 +529,7 @@ const ForgotPassword = () => {
                   className="inline-flex items-center text-sm font-semibold text-white/70 hover:text-white transition-colors"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
-                  Change email or method
+                  Change identifier or method
                 </button>
               </div>
             </>

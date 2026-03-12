@@ -1,64 +1,130 @@
-const DEFAULT_API_BASE_URL = "/api";
+const DEFAULT_DEV_API_BASE_URL = "/api";
+const DEFAULT_DEV_SOCKET_URL = "/";
+const DEFAULT_SOCKET_PATH = "/socket.io";
 
 const removeTrailingSlash = (value) => value.replace(/\/+$/, "");
 
 const parseConfiguredOrigins = (...values) => {
   return values
     .filter(Boolean)
-    .flatMap((value) => value.split(","))
+    .flatMap((value) => String(value).split(","))
     .map((value) => value.trim())
     .filter(Boolean);
 };
 
-export const normalizeApiBaseUrl = (
-  rawUrl = process.env.REACT_APP_API_URL || DEFAULT_API_BASE_URL,
-) => {
-  const trimmedUrl = (rawUrl || "").trim();
+const isProductionBuild = process.env.NODE_ENV === "production";
 
-  if (!trimmedUrl) {
-    return DEFAULT_API_BASE_URL;
-  }
-
-  // Relative paths are typically handled by CRA proxy in development.
-  if (trimmedUrl.startsWith("/")) {
-    return removeTrailingSlash(trimmedUrl) || DEFAULT_API_BASE_URL;
-  }
-
-  // Absolute URLs can be configured with or without the /api suffix.
+const normalizeAbsoluteUrl = (rawValue) => {
   try {
-    const parsed = new URL(trimmedUrl);
-    if (!parsed.pathname || parsed.pathname === "/") {
-      parsed.pathname = "/api";
-    }
+    const parsed = new URL(String(rawValue || "").trim());
     return removeTrailingSlash(parsed.toString());
   } catch {
-    // Fallback for malformed values: keep behavior predictable.
-    return DEFAULT_API_BASE_URL;
+    return null;
   }
 };
 
-// Production API base URL configuration
-const getProductionApiUrl = () => {
-  // Default to production API subdomain for production environment
-  if (process.env.NODE_ENV === 'production') {
-    return 'https://api.immunicareph.site/api';
+export const normalizeApiBaseUrl = (rawUrl = process.env.REACT_APP_API_URL) => {
+  const trimmedUrl = String(rawUrl || "").trim();
+
+  if (!trimmedUrl) {
+    return null;
   }
-  return normalizeApiBaseUrl();
+
+  if (trimmedUrl.startsWith("/")) {
+    return removeTrailingSlash(trimmedUrl) || "/";
+  }
+
+  const normalizedAbsoluteUrl = normalizeAbsoluteUrl(trimmedUrl);
+  if (!normalizedAbsoluteUrl) {
+    return null;
+  }
+
+  const parsed = new URL(normalizedAbsoluteUrl);
+  if (!parsed.pathname || parsed.pathname === "/") {
+    parsed.pathname = "/api";
+  }
+
+  return removeTrailingSlash(parsed.toString());
 };
 
-export const API_BASE_URL = getProductionApiUrl();
+export const normalizeSocketUrl = (rawUrl = process.env.REACT_APP_SOCKET_URL) => {
+  const trimmedUrl = String(rawUrl || "").trim();
 
-export const getAllowedFrontendOrigins = () => {
-  const productionOrigins = ['https://immunicareph.site', 'https://www.immunicareph.site'];
+  if (!trimmedUrl) {
+    return null;
+  }
 
-  // For development, use configured origins or defaults
-  if (process.env.NODE_ENV === 'development') {
-    return parseConfiguredOrigins(
-      process.env.REACT_APP_FRONTEND_URL,
-      process.env.REACT_APP_APP_URL,
+  if (trimmedUrl.startsWith("/")) {
+    return removeTrailingSlash(trimmedUrl) || "/";
+  }
+
+  return normalizeAbsoluteUrl(trimmedUrl);
+};
+
+export const normalizeSocketPath = (rawPath = process.env.REACT_APP_SOCKET_PATH) => {
+  const value = String(rawPath || DEFAULT_SOCKET_PATH).trim();
+  if (!value.startsWith("/")) {
+    return null;
+  }
+
+  return removeTrailingSlash(value) || "/";
+};
+
+const resolveApiBaseUrl = () => {
+  const configured = normalizeApiBaseUrl(process.env.REACT_APP_API_URL);
+
+  if (configured) {
+    return configured;
+  }
+
+  if (isProductionBuild) {
+    throw new Error(
+      "Missing or invalid REACT_APP_API_URL. Production builds require an explicit API base URL.",
     );
   }
 
-  return productionOrigins;
+  return DEFAULT_DEV_API_BASE_URL;
 };
 
+const resolveSocketUrl = () => {
+  const configured = normalizeSocketUrl(process.env.REACT_APP_SOCKET_URL);
+
+  if (configured) {
+    return configured;
+  }
+
+  if (isProductionBuild) {
+    throw new Error(
+      "Missing or invalid REACT_APP_SOCKET_URL. Production builds require an explicit socket base URL.",
+    );
+  }
+
+  return DEFAULT_DEV_SOCKET_URL;
+};
+
+const resolveSocketPath = () => {
+  const configured = normalizeSocketPath(process.env.REACT_APP_SOCKET_PATH);
+
+  if (configured) {
+    return configured;
+  }
+
+  if (isProductionBuild) {
+    throw new Error(
+      "Invalid REACT_APP_SOCKET_PATH. Production builds require a socket path that starts with '/'.",
+    );
+  }
+
+  return DEFAULT_SOCKET_PATH;
+};
+
+export const API_BASE_URL = resolveApiBaseUrl();
+export const SOCKET_URL = resolveSocketUrl();
+export const SOCKET_PATH = resolveSocketPath();
+
+export const getAllowedFrontendOrigins = () => {
+  return parseConfiguredOrigins(
+    process.env.REACT_APP_FRONTEND_URL,
+    process.env.REACT_APP_APP_URL,
+  );
+};

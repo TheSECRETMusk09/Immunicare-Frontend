@@ -17,6 +17,7 @@ import {
   CheckCircle,
   AlertCircle,
 } from "lucide-react";
+import "./OTPVerification.css";
 
 const OTPVerification = ({
   phoneNumber,

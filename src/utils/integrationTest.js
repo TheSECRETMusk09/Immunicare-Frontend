@@ -4,6 +4,7 @@
  */
 
 import apiClient from "./api";
+import { API_BASE_URL } from "./apiConfig";
 
 export const runIntegrationTests = async () => {
   const results = {
@@ -22,9 +23,7 @@ export const runIntegrationTests = async () => {
 
   // Test 1: API Connectivity
   try {
-    const response = await fetch(
-      `${process.env.REACT_APP_API_URL || "http://localhost:5000"}/api/health`,
-    );
+    const response = await fetch(`${API_BASE_URL}/health`);
     addResult("API Health Check", response.ok);
   } catch (error) {
     addResult("API Health Check", false, error.message);
@@ -44,12 +43,9 @@ export const runIntegrationTests = async () => {
 
   // Test 3: Cookie Support
   try {
-    const response = await fetch(
-      `${process.env.REACT_APP_API_URL || "http://localhost:5000"}/api/health`,
-      {
-        credentials: "include",
-      },
-    );
+    const response = await fetch(`${API_BASE_URL}/health`, {
+      credentials: "include",
+    });
     addResult("Cookie Support (withCredentials)", response.ok);
   } catch (error) {
     addResult("Cookie Support (withCredentials)", false, error.message);
@@ -169,9 +165,7 @@ export const quickIntegrationCheck = async () => {
 
   try {
     // Check API availability
-    const healthResponse = await fetch(
-      `${process.env.REACT_APP_API_URL || "http://localhost:5000"}/api/health`,
-    );
+    const healthResponse = await fetch(`${API_BASE_URL}/health`);
     checks.apiAvailable = healthResponse.ok;
 
     // Check authentication

@@ -1,4 +1,4 @@
-  import {
+import {
   createContext,
   useContext,
   useEffect,
@@ -9,18 +9,17 @@
 import { io } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 import { safeLocalStorage, safeSessionStorage } from "../utils/safeStorage";
+import { SOCKET_URL, SOCKET_PATH } from "../utils/apiConfig";
 
 // Use relative path for socket connection to work with webpack proxy
 // The proxy in setupProxy.js handles forwarding /socket.io to localhost:5000
 const getSocketUrl = () => {
-  // Always use relative path to leverage the proxy in dev and same-origin in prod
-  // unless an explicit external URL is provided
-  return process.env.REACT_APP_SOCKET_URL || "/";
+  return SOCKET_URL;
 };
 
 // Default socket configuration
 const SOCKET_CONFIG = {
-  path: "/socket.io",
+  path: SOCKET_PATH,
   transports: ["websocket", "polling"], // Allow polling fallback
   reconnection: true,
   reconnectionAttempts: Infinity,
@@ -153,7 +152,7 @@ export const SocketProvider = ({ children }) => {
         console.log("Socket disconnected:", reason);
         setIsConnected(false);
         setConnectionState("disconnected");
-        
+
         if (reason === "io server disconnect") {
           // Server disconnected us, try to reconnect manually
           socket.connect();
@@ -178,7 +177,7 @@ export const SocketProvider = ({ children }) => {
         setConnectionState("error");
         setConnectionError(error.message);
         isConnectingRef.current = false;
-        
+
         if (error.message === "xhr poll error" || error.message === "websocket error") {
            // These are common network errors, just log them
            console.debug("Socket network error, will retry...");

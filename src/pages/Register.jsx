@@ -460,9 +460,9 @@ const Register = () => {
   // OTP verification state
   if (pendingVerification && !success) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900">
+      <div className="min-h-screen min-h-[100dvh] flex items-center justify-center px-3 sm:px-4 py-3 sm:py-6 bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 overflow-y-auto">
         <div className="w-full max-w-md">
-          <div className="bg-white/10 backdrop-blur-lg rounded-[2rem] shadow-2xl p-6 sm:p-8 border border-white/20">
+          <div className="bg-white/95 text-slate-900 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] shadow-2xl p-4 sm:p-6 border border-white/30 max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-y-auto mobile-scrollbar">
             <OTPVerification
               phoneNumber={pendingVerification.phone}
               purpose="verification"

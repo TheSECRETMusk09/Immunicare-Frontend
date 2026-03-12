@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
+import { API_BASE_URL } from "../utils/apiConfig";
 
-const API_BASE_URL = "http://localhost:5000/api/inventory";
+const INVENTORY_API_BASE_URL = `${API_BASE_URL}/inventory`;
 
 export const useInventory = () => {
   const [inventory, setInventory] = useState([]);
@@ -9,7 +10,7 @@ export const useInventory = () => {
 
   const fetchInventory = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/all`);
+      const response = await fetch(`${INVENTORY_API_BASE_URL}/all`);
       if (!response.ok) {
         throw new Error("Failed to fetch inventory");
       }
@@ -24,7 +25,7 @@ export const useInventory = () => {
 
   const addInventoryItem = async (itemData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/add`, {
+      const response = await fetch(`${INVENTORY_API_BASE_URL}/add`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -42,7 +43,7 @@ export const useInventory = () => {
 
   const updateInventoryItem = async (id, itemData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/update/${id}`, {
+      const response = await fetch(`${INVENTORY_API_BASE_URL}/update/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -60,7 +61,7 @@ export const useInventory = () => {
 
   const deleteInventoryItem = async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/delete/${id}`, {
+      const response = await fetch(`${INVENTORY_API_BASE_URL}/delete/${id}`, {
         method: "DELETE",
       });
       if (!response.ok) {
@@ -74,7 +75,7 @@ export const useInventory = () => {
 
   const searchInventory = async (query) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/search?q=${query}`);
+      const response = await fetch(`${INVENTORY_API_BASE_URL}/search?q=${query}`);
       if (!response.ok) {
         throw new Error("Failed to search inventory");
       }
@@ -88,7 +89,7 @@ export const useInventory = () => {
 
   const getInventoryItemById = async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/${id}`);
+      const response = await fetch(`${INVENTORY_API_BASE_URL}/${id}`);
       if (!response.ok) {
         throw new Error("Failed to fetch inventory item details");
       }
@@ -103,7 +104,7 @@ export const useInventory = () => {
   const getLowStockItems = async (threshold = 10) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/low-stock?threshold=${threshold}`
+        `${INVENTORY_API_BASE_URL}/low-stock?threshold=${threshold}`
       );
       if (!response.ok) {
         throw new Error("Failed to fetch low stock items");
@@ -118,7 +119,7 @@ export const useInventory = () => {
 
   const updateStockLevel = async (id, quantityChange) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/stock/${id}`, {
+      const response = await fetch(`${INVENTORY_API_BASE_URL}/stock/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -136,7 +137,7 @@ export const useInventory = () => {
 
   const getInventoryByCategory = async (category) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/category/${category}`);
+      const response = await fetch(`${INVENTORY_API_BASE_URL}/category/${category}`);
       if (!response.ok) {
         throw new Error("Failed to fetch inventory by category");
       }

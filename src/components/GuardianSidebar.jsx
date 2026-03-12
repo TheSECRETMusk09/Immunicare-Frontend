@@ -42,11 +42,20 @@ const GuardianSidebar = memo(
 
     // Desktop collapsed state (session-persisted)
     const SIDEBAR_COLLAPSE_KEY = "immunicare.guardian.sidebarCollapsed";
+    const LAST_GROWTH_CHILD_KEY = "immunicare.guardian.lastGrowthChildId";
     const [isCollapsedDesktop, setIsCollapsedDesktop] = useState(() => {
       try {
         return sessionStorage.getItem(SIDEBAR_COLLAPSE_KEY) === "1";
       } catch {
         return false;
+      }
+    });
+    const [lastGrowthChildId, setLastGrowthChildId] = useState(() => {
+      try {
+        const storedValue = sessionStorage.getItem(LAST_GROWTH_CHILD_KEY);
+        return /^\d+$/.test(String(storedValue || "")) ? String(storedValue) : null;
+      } catch {
+        return null;
       }
     });
 
@@ -167,6 +176,39 @@ const GuardianSidebar = memo(
     const sectionKeyFromItem = (item) =>
       item?.sectionKey || item?.name?.toLowerCase().replace(/\s+/g, "_");
 
+    const extractChildIdFromPath = useCallback((pathname) => {
+      const routeMatch = pathname.match(
+        /^\/guardian\/(?:health-charts|vaccination-records|immunization-chart|children)\/(\d+)(?:\/|$)/,
+      );
+
+      return routeMatch?.[1] || null;
+    }, []);
+
+    useEffect(() => {
+      const routeChildId = extractChildIdFromPath(location.pathname);
+
+      if (!routeChildId) return;
+
+      setLastGrowthChildId((prev) => (prev === routeChildId ? prev : routeChildId));
+
+      try {
+        sessionStorage.setItem(LAST_GROWTH_CHILD_KEY, routeChildId);
+      } catch {
+        // ignore session storage errors
+      }
+    }, [extractChildIdFromPath, location.pathname]);
+
+    const resolveGrowthChartsPath = useCallback(() => {
+      const routeChildId = extractChildIdFromPath(location.pathname);
+      const resolvedChildId = routeChildId || lastGrowthChildId;
+
+      if (resolvedChildId) {
+        return `/guardian/health-charts/${resolvedChildId}`;
+      }
+
+      return "/guardian/health-charts";
+    }, [extractChildIdFromPath, lastGrowthChildId, location.pathname]);
+
     // Toggle collapsible section (independent toggles)
     const toggleSection = useCallback((sectionKey) => {
       if (!sectionKey) return;
@@ -216,8 +258,18 @@ const GuardianSidebar = memo(
         path: "/guardian/health-charts",
         hasSubItems: true,
         subItems: [
-          { name: "All Health Records", icon: FileText, path: "/guardian/health-charts" },
-          { name: "Growth Charts", icon: Activity, path: "/guardian/health-charts" },
+          {
+            name: "All Health Records",
+            key: "health-records-all",
+            icon: FileText,
+            path: "/guardian/health-charts",
+          },
+          {
+            name: "Growth Charts",
+            key: "health-records-growth-charts",
+            icon: Activity,
+            path: resolveGrowthChartsPath(),
+          },
         ],
       },
 
@@ -432,7 +484,7 @@ const GuardianSidebar = memo(
                           {item.subItems.map((subItem) => (
                             <button
                               type="button"
-                              key={subItem.path}
+                              key={subItem.key || `${item.sectionKey || item.name}-${subItem.name}-${subItem.path}`}
                               onClick={() => {
                                 navigate(subItem.path);
                                 closeIfMobile();
