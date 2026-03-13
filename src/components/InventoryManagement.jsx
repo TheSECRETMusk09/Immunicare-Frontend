@@ -460,6 +460,7 @@ export default function InventoryManagement() {
                   (apiRecord.expired_wasted || 0) -
                   (apiRecord.issuance || 0),
                 _apiId: apiRecord.id,
+                _vaccineId: apiRecord.vaccine_id,
               };
             }
 
@@ -736,9 +737,16 @@ export default function InventoryManagement() {
         return;
       }
 
+      // Check if inventory record exists in database (required for transactions)
+      const dbInventoryId = matchedInventory._apiId;
+      if (!dbInventoryId) {
+        setError("Please save the inventory record first before creating transactions. Click on the Save Inventory button to save your current inventory data to the database.");
+        return;
+      }
+
       const payload = {
-        vaccine_inventory_id: matchedInventory.id,
-        vaccine_id: matchedInventory.vaccine_id || matchedInventory.id,
+        vaccine_inventory_id: dbInventoryId,
+        vaccine_id: matchedInventory._vaccineId || matchedInventory.vaccine_id || (matchedInventory._apiId ? matchedInventory.id : null),
         transaction_type: mapModalTypeToApiType(modalType),
         quantity: qty,
         lot_number: lotNumber || undefined,

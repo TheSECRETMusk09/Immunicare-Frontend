@@ -139,12 +139,21 @@ export default function AnalyticsDashboard() {
     }));
   }, []);
 
-  const mockGenderData = useCallback(() => {
-    return [
-      { name: "Male", value: 52, fill: "#3B82F6" },
-      { name: "Female", value: 48, fill: "#8B5CF6" },
-    ];
-  }, []);
+  // Transform gender data from API to chart format
+  const transformGenderData = (demographicsData) => {
+    if (!demographicsData?.genderBreakdown || !Array.isArray(demographicsData.genderBreakdown)) {
+      return [
+        { name: 'Male', value: 52, fill: '#3B82F6' },
+        { name: 'Female', value: 48, fill: '#8B5CF6' },
+      ];
+    }
+
+    return demographicsData.genderBreakdown.map((item, index) => ({
+      name: item.label || 'Unknown',
+      value: parseInt(item.count, 10) || 0,
+      fill: index === 0 ? '#3B82F6' : '#8B5CF6',
+    }));
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -156,35 +165,83 @@ export default function AnalyticsDashboard() {
         inventoryData,
         growthData,
         dashboardStats,
-      ] = await Promise.all([
+        demographicsData,
+      ] = await Promise.allSettled([
         apiClient.getVaccinationAnalytics(),
         apiClient.getAppointmentAnalytics(),
         apiClient.getInventoryStats(),
         apiClient.getGrowthStats(),
         apiClient.getDashboardStats(),
+        apiClient.getDemographicsAnalytics(),
       ]);
 
       // Transform data for charts
-      const vaccinations = Array.isArray(vaccinationData)
-        ? vaccinationData
-        : vaccinationData.data || mockVaccinationData();
-      const appointments = Array.isArray(appointmentData)
-        ? appointmentData
-        : appointmentData.data || mockAppointmentData();
-      const inventory = Array.isArray(inventoryData)
-        ? inventoryData
-        : inventoryData.data || mockInventoryData();
-      const growth = Array.isArray(growthData)
-        ? growthData
-        : growthData.data || mockGrowthData();
+      const vaccinations = vaccinationData.status === 'fulfilled'
+        ? (vaccinationData.value?.trends || [])
+        : mockVaccinationData();
+
+      const appointments = appointmentData.status === 'fulfilled'
+        ? (appointmentData.value?.statusBreakdown || []).map(item => ({
+            status: item.status,
+            value: item.count,
+          }))
+        : mockAppointmentData();
+
+      const inventory = inventoryData.status === 'fulfilled'
+        ? (inventoryData.value?.byVaccine || []).map(item => ({
+            name: item.vaccineName || item.vaccine_key,
+            value: item.availableDoses || 0,
+            status: item.criticalStock ? 'danger' : item.lowStock ? 'warning' : 'good',
+          }))
+        : mockInventoryData();
+
+      const growth = growthData.status === 'fulfilled'
+        ? (growthData.value?.data || [])
+        : mockGrowthData();
+
+      // Get stats from dashboard or use individual responses
+      const stats = dashboardStats.status === 'fulfilled'
+        ? dashboardStats.value
+        : {};
+
+      // Transform demographics for gender chart
+      const gender = demographicsData.status === 'fulfilled'
+        ? transformGenderData(demographicsData.value)
+        : [
+            { name: 'Male', value: 52, fill: '#3B82F6' },
+            { name: 'Female', value: 48, fill: '#8B5CF6' },
+          ];
+
+      // Extract summary metrics
+      const summary = vaccinationData.status === 'fulfilled'
+        ? vaccinationData.value?.summary || {}
+        : {};
+
+      // Get critical stock alerts from inventory
+      const criticalAlerts = inventoryData.status === 'fulfilled'
+        ? inventoryData.value?.criticalAlerts || []
+        : [];
 
       setData({
         vaccinations,
         appointments,
         inventory,
         growth,
-        gender: mockGenderData(),
-        stats: dashboardStats || {},
+        gender,
+        stats: {
+          vaccinations: summary.administeredInPeriod || summary.completedToday || stats.vaccinations || 0,
+          appointments: stats.appointments || 0,
+          infants: stats.infants || summary.uniqueInfantsServed || 0,
+          guardians: stats.guardians || 0,
+          lowStock: summary.lowStock || inventoryData.value?.lowStockCount || 0,
+          pendingVaccinations: summary.dueInPeriod || 0,
+          overdueVaccinations: summary.overdue || 0,
+          completedVaccinations: summary.completedToday || 0,
+          childrenTracked: summary.uniqueInfantsServed || stats.infants || 0,
+          vaccinationCoverage: summary.coverageRate || 0,
+        },
+        criticalAlerts,
+        isUsingFallback: false,
       });
     } catch (error) {
       console.error("Error fetching analytics:", error);
@@ -196,6 +253,7 @@ export default function AnalyticsDashboard() {
         growth: [],
         gender: [],
         stats: {},
+        criticalAlerts: [],
         isUsingFallback: true,
       });
     } finally {
@@ -206,7 +264,7 @@ export default function AnalyticsDashboard() {
     mockAppointmentData,
     mockInventoryData,
     mockGrowthData,
-    mockGenderData,
+    transformGenderData,
   ]);
 
   useEffect(() => {
@@ -276,13 +334,13 @@ export default function AnalyticsDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Total Vaccinations
+                  Completed Vaccinations
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {data.stats?.vaccinations || "1,234"}
+                  {data.stats?.completedVaccinations || "0"}
                 </p>
                 <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                  +12.5% from last month
+                  Total completed
                 </p>
               </div>
               <Syringe className="h-12 w-12 text-blue-500" />
@@ -293,16 +351,16 @@ export default function AnalyticsDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Appointments
+                  Pending Vaccinations
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {data.stats?.appointments || "456"}
+                  {data.stats?.pendingVaccinations || "0"}
                 </p>
-                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                  +8.3% from last month
+                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                  Awaiting schedule
                 </p>
               </div>
-              <Calendar className="h-12 w-12 text-green-500" />
+              <Calendar className="h-12 w-12 text-yellow-500" />
             </div>
           </Card>
 
@@ -310,13 +368,13 @@ export default function AnalyticsDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Active Infants
+                  Children Tracked
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {data.stats?.infants || "892"}
+                  {data.stats?.childrenTracked || data.stats?.infants || "0"}
                 </p>
                 <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                  Stable
+                  Registered infants
                 </p>
               </div>
               <Users className="h-12 w-12 text-purple-500" />
@@ -327,16 +385,87 @@ export default function AnalyticsDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Inventory Items
+                  Critical Stock Alerts
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {data.stats?.lowStock || "156"}
+                  {data.stats?.lowStock || "0"}
                 </p>
-                <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                  3 items low stock
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  Needs attention
                 </p>
               </div>
-              <Package className="h-12 w-12 text-orange-500" />
+              <AlertTriangle className="h-12 w-12 text-red-500" />
+            </div>
+          </Card>
+        </div>
+
+        {/* Infant Management Module Widgets */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card className="hover:shadow-md transition-shadow bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Total Registered Infants
+                </p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {data.stats?.infants || "0"}
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  Active patients
+                </p>
+              </div>
+              <Users className="h-12 w-12 text-blue-500" />
+            </div>
+          </Card>
+
+          <Card className="hover:shadow-md transition-shadow bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Total Guardians
+                </p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {data.stats?.guardians || "0"}
+                </p>
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                  Registered parents
+                </p>
+              </div>
+              <Users className="h-12 w-12 text-green-500" />
+            </div>
+          </Card>
+
+          <Card className="hover:shadow-md transition-shadow bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Overdue Vaccinations
+                </p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {data.stats?.overdueVaccinations || "0"}
+                </p>
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  Requires action
+                </p>
+              </div>
+              <AlertTriangle className="h-12 w-12 text-red-500" />
+            </div>
+          </Card>
+
+          <Card className="hover:shadow-md transition-shadow bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Vaccination Coverage
+                </p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {data.stats?.vaccinationCoverage || "0"}%
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  Completion rate
+                </p>
+              </div>
+              <TrendingUp className="h-12 w-12 text-green-500" />
             </div>
           </Card>
         </div>

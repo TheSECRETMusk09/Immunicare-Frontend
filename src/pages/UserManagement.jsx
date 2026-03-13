@@ -392,9 +392,11 @@ export default function UserManagement() {
     });
   }, [localSystemUsers]);
 
-  // Filter admins from system users (role_id 1 = super_admin, 2 = admin)
+  // Filter admins from system users - use role names for proper filtering
+  // Includes: super_admin, system_admin, admin, doctor, nurse, midwife
+  const ADMIN_ROLE_NAMES = ['super_admin', 'system_admin', 'admin', 'doctor', 'nurse', 'midwife'];
   const admins = normalizedSystemUsers.filter(
-    (user) => user.role_id === 1 || user.role_id === 2,
+    (user) => ADMIN_ROLE_NAMES.includes((user.role_name || '').toLowerCase())
   );
   const normalizedGuardians = useMemo(() => {
     if (!Array.isArray(localGuardians)) {
@@ -451,9 +453,24 @@ export default function UserManagement() {
       );
     }
 
-    // Apply role filter
+    // Apply role filter - use role names for filtering
     if (roleFilter) {
-      result = result.filter((user) => user.role_id === parseInt(roleFilter));
+      const roleFilterNum = parseInt(roleFilter);
+      // Map role IDs to role names for filtering
+      const roleIdToName = {
+        1: 'super_admin',
+        2: 'admin',
+        3: 'system_admin',
+        4: 'doctor',
+        5: 'nurse',
+        6: 'midwife'
+      };
+      const roleName = roleIdToName[roleFilterNum];
+      if (roleName) {
+        result = result.filter((user) =>
+          (user.role_name || '').toLowerCase() === roleName.toLowerCase()
+        );
+      }
     }
 
     // Apply status filter
@@ -1522,6 +1539,10 @@ export default function UserManagement() {
                       { value: "", label: "All Roles" },
                       { value: "1", label: "Super Admin" },
                       { value: "2", label: "Admin" },
+                      { value: "3", label: "System Admin" },
+                      { value: "4", label: "Doctor" },
+                      { value: "5", label: "Nurse" },
+                      { value: "6", label: "Midwife" },
                     ]}
                     className="w-40"
                   />

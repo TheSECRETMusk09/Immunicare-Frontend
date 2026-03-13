@@ -776,6 +776,47 @@ class ApiClient {
     });
   }
 
+  // Infant Vaccine Readiness endpoints
+  async getInfantVaccineReadiness(infantId) {
+    return this.request(`/vaccination-readiness/infant/${infantId}`);
+  }
+
+  async setInfantVaccineReadiness(infantId, vaccineId, isReady, notes = null) {
+    return this.request(`/vaccination-readiness/infant/${infantId}/vaccine/${vaccineId}`, {
+      method: "POST",
+      data: { isReady, notes },
+    });
+  }
+
+  async batchSetInfantVaccineReadiness(infantId, vaccineIds, isReady, notes = null) {
+    return this.request(`/vaccination-readiness/infant/${infantId}/batch`, {
+      method: "POST",
+      data: { vaccineIds, isReady, notes },
+    });
+  }
+
+  async getInfantVaccinationSchedule(infantId) {
+    return this.request(`/vaccination-readiness/schedule/${infantId}`);
+  }
+
+  // Vaccination with automatic inventory deduction
+  async recordVaccinationWithInventory(recordData) {
+    return this.request("/vaccinations/record-with-inventory", {
+      method: "POST",
+      data: recordData,
+    });
+  }
+
+  async getVaccineInventoryStatus(vaccineId) {
+    return this.request(`/vaccinations/inventory-status/${vaccineId}`);
+  }
+
+  async getVaccinationTransactions(filters = {}) {
+    const params = new URLSearchParams(filters);
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return this.request(`/vaccinations/transactions${suffix}`);
+  }
+
   // Inventory Management endpoints
   async getInventoryItems() {
     return this.request("/inventory/items");

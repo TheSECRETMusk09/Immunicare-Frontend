@@ -271,6 +271,7 @@ export default function InjectVaccineModal({
       await apiClient.createVaccineInventoryTransaction({
         vaccine_inventory_id: Number(formData.vaccine_inventory_id),
         vaccine_id: Number(formData.vaccine_id),
+        clinic_id: selectedInventoryRecord?.clinic_id ? Number(selectedInventoryRecord.clinic_id) : (scopedClinicId ? Number(scopedClinicId) : null),
         transaction_type: "ISSUE",
         quantity: 1,
         lot_number: formData.lot_number || null,

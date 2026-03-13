@@ -50,6 +50,7 @@ export default function ImmunizationChart({ infantId }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [guardian, setGuardian] = useState(null);
 
   const isMountedRef = useRef(true);
   const requestIdRef = useRef(0);
@@ -267,6 +268,26 @@ export default function ImmunizationChart({ infantId }) {
     void fetchData();
   }, [infantId, fetchData]);
 
+  // Fetch guardian info after infant is loaded
+  useEffect(() => {
+    if (!infant?.guardian_id) {
+      setGuardian(null);
+      return;
+    }
+
+    const fetchGuardian = async () => {
+      try {
+        const guardianData = await apiClient.getGuardianProfile(infant.guardian_id);
+        setGuardian(guardianData);
+      } catch (error) {
+        console.error('Error fetching guardian:', error);
+        setGuardian(null);
+      }
+    };
+
+    fetchGuardian();
+  }, [infant?.guardian_id]);
+
   const getVisitData = (visitAge) => {
     const appointment = appointments.find((app) =>
       app.type?.includes(visitAge.toLowerCase()),
@@ -328,6 +349,7 @@ export default function ImmunizationChart({ infantId }) {
     setSaving(true);
     setSaveError(null);
     setSaveSuccess(false);
+
     try {
       // Save growth record
       if (visitData.growth) {
@@ -349,12 +371,12 @@ export default function ImmunizationChart({ infantId }) {
             ? "breastfeeding"
             : "not_breastfeeding",
           health_status: "well",
-          measured_by: 1, // Current user ID would be dynamic in real app
+          measured_by: 1,
           notes: visitData.remarks || "",
         });
       }
 
-      // Save vaccination records
+      // Save vaccination records with automatic inventory deduction
       if (visitData.vaccines && visitData.vaccines.length > 0) {
         const vaccines = toArrayPayload(await apiClient.getVaccines(), ["vaccines"]);
         const batches = toArrayPayload(await apiClient.getVaccineBatches(), ["batches"]);
@@ -368,19 +390,34 @@ export default function ImmunizationChart({ infantId }) {
             );
 
             if (vaccine) {
+              // Find available batch with stock
               const batch = batches.find(
                 (b) => b.vaccine_id === vaccine.id && b.qty_current > 0,
               );
 
               if (batch) {
-                await apiClient.createVaccinationRecord({
-                  infant_id: infantId,
+                // Use the new endpoint that automatically deducts inventory
+                await apiClient.recordVaccinationWithInventory({
+                  patient_id: infantId,
                   vaccine_id: vaccine.id,
-                  batch_id: batch.id,
-                  dose_no: 1, // This would be calculated based on previous doses
+                  dose_no: 1,
                   admin_date: visitData.visit_date,
-                  vaccinator_id: 1, // Current user ID would be dynamic
+                  administered_by: 1,
+                  site_of_injection: vaccineName.site || "Left arm",
+                  batch_id: batch.id,
                   notes: `Administered during ${visitData.visit_age} visit`,
+                });
+              } else {
+                // Fallback: Create record without inventory deduction if no batch available
+                console.warn(`No available batch for vaccine ${vaccine.name}, creating record without inventory deduction`);
+                await apiClient.createVaccinationRecord({
+                  patient_id: infantId,
+                  vaccine_id: vaccine.id,
+                  dose_no: 1,
+                  admin_date: visitData.visit_date,
+                  administered_by: 1,
+                  site_of_injection: vaccineName.site || "Left arm",
+                  notes: `Administered during ${visitData.visit_age} visit (no inventory deducted - no batch available)`,
                 });
               }
             }
@@ -581,6 +618,57 @@ export default function ImmunizationChart({ infantId }) {
                 <span className="ml-2 text-gray-900 dark:text-gray-100">
                   {infant.health_care_provider}
                 </span>
+              </div>
+            )}
+
+            {/* Guardian Contact Information Section */}
+            {(guardian || infant.guardian_name || infant.guardian_phone) && (
+              <div className="md:col-span-2 lg:col-span-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+                <h4 className="font-semibold text-gray-800 dark:text-gray-100 mb-3">
+                  Guardian Contact Information
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                  {guardian?.name && (
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                        Guardian Name:
+                      </span>
+                      <span className="ml-2 text-gray-900 dark:text-gray-100">
+                        {guardian.name}
+                      </span>
+                    </div>
+                  )}
+                  {(guardian?.phone || infant.guardian_phone) && (
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                        Phone:
+                      </span>
+                      <span className="ml-2 text-gray-900 dark:text-gray-100">
+                        {guardian?.phone || infant.guardian_phone}
+                      </span>
+                    </div>
+                  )}
+                  {guardian?.email && (
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                        Email:
+                      </span>
+                      <span className="ml-2 text-gray-900 dark:text-gray-100">
+                        {guardian.email}
+                      </span>
+                    </div>
+                  )}
+                  {guardian?.address && (
+                    <div className="md:col-span-2">
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                        Address:
+                      </span>
+                      <span className="ml-2 text-gray-900 dark:text-gray-100">
+                        {guardian.address}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
