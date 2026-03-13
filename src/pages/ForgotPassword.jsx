@@ -102,6 +102,7 @@ const ForgotPassword = () => {
 
   const handleSendOtp = async (e) => {
     e.preventDefault();
+    setError(null);
 
     const requestValidationError = validateRequestByMethod();
     if (requestValidationError) {
@@ -205,6 +206,7 @@ const ForgotPassword = () => {
     try {
       const normalizedEmail = normalizeEmail(email);
       await apiClient.forgotPasswordOtp(normalizedEmail, method);
+      setOtpSent(true);
     } catch (err) {
       setError(err.message || "Failed to resend OTP. Please try again.");
     } finally {

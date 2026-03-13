@@ -137,9 +137,27 @@ const Register = () => {
   };
 
   const normalizePhoneForVerification = useCallback((phoneValue) => {
-    return String(phoneValue || "")
-      .replace(/[\s\-()]/g, "")
-      .trim();
+    const digits = String(phoneValue || "").replace(/\D+/g, "");
+    if (!digits) {
+      return "";
+    }
+
+    // PH local: 09XXXXXXXXX
+    if (digits.length === 11 && digits.startsWith("09")) {
+      return `+63${digits.slice(1)}`;
+    }
+
+    // PH intl without plus: 639XXXXXXXXX
+    if (digits.length === 12 && digits.startsWith("639")) {
+      return `+${digits}`;
+    }
+
+    // Generic E.164-ish fallback if starts with country code and within length bounds
+    if (digits.length >= 10 && digits.length <= 15) {
+      return `+${digits}`;
+    }
+
+    return digits;
   }, []);
 
   const validateField = (name, value) => {
@@ -318,8 +336,6 @@ const Register = () => {
         expiresIn:
           Number.parseInt(response?.data?.expiresInSeconds, 10) || 10 * 60,
       });
-
-      setSuccess(false);
     } catch (error) {
       console.error("Registration error:", error);
 
