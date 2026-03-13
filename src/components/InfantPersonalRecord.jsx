@@ -29,6 +29,9 @@ const EDITABLE_INFANT_FIELDS = [
   "nbs_date",
   "cellphone_number",
   "facility_id",
+  // NEW: allergy and health care provider fields
+  "allergy_information",
+  "health_care_provider",
 ];
 
 const sanitizeInfantUpdatePayload = (raw = {}) => {
@@ -721,6 +724,54 @@ export default function InfantPersonalRecord({
                   ) : (
                     <p className="text-gray-900 dark:text-gray-100">
                       {infant.family_no || "Not specified"}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* NEW: Allergy & Health Care Provider Information */}
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+              <h4 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4">
+                ALLERGY & HEALTH CARE INFORMATION
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    ALLERGY INFORMATION
+                  </label>
+                  {isEditing ? (
+                    <textarea
+                      value={formData.allergy_information || ""}
+                      onChange={(e) =>
+                        handleInputChange("allergy_information", e.target.value)
+                      }
+                      placeholder="Enter any known allergies (e.g., drug allergies, food allergies)"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      rows={3}
+                    />
+                  ) : (
+                    <p className="text-gray-900 dark:text-gray-100">
+                      {infant.allergy_information || "No known allergies"}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    HEALTH CARE PROVIDER
+                  </label>
+                  {isEditing ? (
+                    <Input
+                      value={formData.health_care_provider || ""}
+                      onChange={(e) =>
+                        handleInputChange("health_care_provider", e.target.value)
+                      }
+                      placeholder="Enter health care provider name"
+                    />
+                  ) : (
+                    <p className="text-gray-900 dark:text-gray-100">
+                      {infant.health_care_provider || "Not specified"}
                     </p>
                   )}
                 </div>

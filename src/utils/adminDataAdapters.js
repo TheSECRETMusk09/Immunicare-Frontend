@@ -142,6 +142,8 @@ export const normalizeInfant = (row = {}) => {
     birth_height: row.birth_height ?? row.birth_length ?? null,
     cellphone_number:
       row.cellphone_number ?? row.contact ?? row.contact_number ?? null,
+    allergy_information: row.allergy_information ?? null,
+    health_care_provider: row.health_care_provider ?? null,
     is_active:
       row.is_active === undefined ? true : toBoolean(row.is_active, true),
   };
@@ -185,6 +187,7 @@ export const normalizeVaccinationRecord = (row = {}) => {
       row.administered_by_name ??
       row.healthcare_worker ??
       null,
+    health_care_provider: row.health_care_provider ?? null,
     infant_name:
       row.infant_name ??
       joinName(

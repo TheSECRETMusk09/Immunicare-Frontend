@@ -99,18 +99,19 @@
   font-weight: 700;
   text-align: center;
   background: #ffffff;
-  color: #111827;
+  color: #000000;
   transition: all 0.2s ease;
   -webkit-appearance: none;
   -moz-appearance: textfield;
   touch-action: manipulation;
   caret-color: #10b981;
   /* Improve visibility of OTP digits */
-  text-shadow: 0 0 1px rgba(0, 0, 0, 0.1);
+  text-shadow: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /* Show placeholder when empty */
   position: relative;
+  letter-spacing: 0.05em;
 }
 
 /* Placeholder dot for empty OTP inputs */
@@ -338,7 +339,7 @@
   background: #374151;
   border-color: #4b5563;
   color: #ffffff;
-  text-shadow: 0 0 1px rgba(255, 255, 255, 0.3);
+  text-shadow: none;
 }
 
 .dark .otp-verification__input::before {

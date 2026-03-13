@@ -92,11 +92,6 @@ const ForgotPassword = () => {
       return phoneError;
     }
 
-    const emailError = validateEmail(email);
-    if (emailError) {
-      return "Account email is required for SMS verification lookup";
-    }
-
     return null;
   };
 
@@ -131,8 +126,13 @@ const ForgotPassword = () => {
       }
 
       // Call the OTP endpoint with normalized identifier
-      const normalizedEmail = normalizeEmail(email);
-      await apiClient.forgotPasswordOtp(normalizedEmail, method);
+      if (method === "email") {
+        const normalizedEmail = normalizeEmail(email);
+        await apiClient.forgotPasswordOtp(normalizedEmail, method);
+      } else {
+        const normalizedPhone = normalizePhoneNumber(phoneNumber);
+        await apiClient.forgotPasswordOtp(normalizedPhone, method);
+      }
       setOtpSent(true);
     } catch (err) {
       console.error("Send OTP error:", err);
@@ -156,10 +156,13 @@ const ForgotPassword = () => {
     setError(null);
 
     try {
-      const normalizedEmail = normalizeEmail(email);
+      const identifier = method === "email"
+        ? normalizeEmail(email)
+        : normalizePhoneNumber(phoneNumber);
       const response = await apiClient.verifyResetOtp(
-        normalizedEmail,
+        identifier,
         otp,
+        method
       );
       if (response.resetToken) {
         setResetToken(response.resetToken);
@@ -204,8 +207,13 @@ const ForgotPassword = () => {
     setError(null);
     setLoading(true);
     try {
-      const normalizedEmail = normalizeEmail(email);
-      await apiClient.forgotPasswordOtp(normalizedEmail, method);
+      if (method === "email") {
+        const normalizedEmail = normalizeEmail(email);
+        await apiClient.forgotPasswordOtp(normalizedEmail, method);
+      } else {
+        const normalizedPhone = normalizePhoneNumber(phoneNumber);
+        await apiClient.forgotPasswordOtp(normalizedPhone, method);
+      }
       setOtpSent(true);
     } catch (err) {
       setError(err.message || "Failed to resend OTP. Please try again.");
@@ -365,32 +373,6 @@ const ForgotPassword = () => {
                   pattern={method === "sms" ? "[0-9]*" : undefined}
                   maxLength={method === "sms" ? 11 : undefined}
                 />
-
-                {method === "sms" && (
-                  <div className="space-y-2">
-                    <TextInput
-                      label="Account Email (for lookup)"
-                      id="lookupEmail"
-                      name="lookupEmail"
-                      type="email"
-                      value={email}
-                      onChange={(e) => {
-                        setEmail(e.target.value);
-                        if (error) setError(null);
-                      }}
-                      placeholder="Enter your account email"
-                      icon={Mail}
-                      disabled={loading}
-                      required
-                      autoComplete="email"
-                      className="bg-white/10 backdrop-blur-sm border-white/30 text-white placeholder-white/50"
-                    />
-                    <p className="text-xs text-white/60 leading-relaxed">
-                      SMS recovery uses your account email to securely locate the
-                      registered phone number in the backend.
-                    </p>
-                  </div>
-                )}
 
                 {/* Method Selection */}
                 <div className="space-y-3">

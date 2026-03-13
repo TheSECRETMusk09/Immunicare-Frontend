@@ -563,6 +563,26 @@ export default function ImmunizationChart({ infantId }) {
                   : "○"}
               </span>
             </div>
+            {infant.allergy_information && (
+              <div className="md:col-span-2 lg:col-span-4">
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  Allergies:
+                </span>
+                <span className="ml-2 text-gray-900 dark:text-gray-100">
+                  {infant.allergy_information}
+                </span>
+              </div>
+            )}
+            {infant.health_care_provider && (
+              <div className="md:col-span-2 lg:col-span-4">
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  Health Care Provider:
+                </span>
+                <span className="ml-2 text-gray-900 dark:text-gray-100">
+                  {infant.health_care_provider}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

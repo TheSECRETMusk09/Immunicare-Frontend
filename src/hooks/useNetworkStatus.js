@@ -1,6 +1,22 @@
 import { useState, useEffect, useRef } from "react";
 import { API_BASE_URL } from "../utils/apiConfig";
 
+const HEALTH_CHECK_TIMEOUT_MS = 5000;
+
+const resolveHealthCheckUrl = () => {
+  const trimmedBaseUrl = String(API_BASE_URL || "").replace(/\/+$/, "");
+
+  if (!trimmedBaseUrl) {
+    return "/api/health";
+  }
+
+  if (trimmedBaseUrl.startsWith("/")) {
+    return `${trimmedBaseUrl}/health`;
+  }
+
+  return new URL("health", `${trimmedBaseUrl}/`).toString();
+};
+
 export const useNetworkStatus = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isBackendReachable, setIsBackendReachable] = useState(null);
@@ -60,39 +76,35 @@ export const useNetworkStatus = () => {
     // Skip check if component is unmounted
     if (!mountedRef.current) return;
 
+    if (!navigator.onLine) {
+      setIsBackendReachable(false);
+      return;
+    }
+
+    const requestUrl = resolveHealthCheckUrl();
+    const isAbsoluteRequest = /^https?:\/\//i.test(requestUrl);
+    const isCrossOriginRequest =
+      isAbsoluteRequest &&
+      typeof window !== "undefined" &&
+      !requestUrl.startsWith(window.location.origin);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    let didTimeout = false;
+    const timeoutId = setTimeout(() => {
+      if (abortControllerRef.current === controller) {
+        didTimeout = true;
+        controller.abort();
+      }
+    }, HEALTH_CHECK_TIMEOUT_MS);
+
     try {
-      // When using proxy, requests go through localhost:3000/api
-      // When using direct mode, requests go to localhost:5000/api
-      const isProxyMode = API_BASE_URL.startsWith("/api");
-      const requestUrl = isProxyMode
-        ? `${window.location.origin}/api/health`
-        : `${API_BASE_URL}/health`;
-
-      // Create new AbortController for this request
-      abortControllerRef.current = new AbortController();
-      const timeoutId = setTimeout(
-        () => {
-          if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-          }
-        },
-        5000, // 5 second timeout
-      );
-
-      // Use a lightweight endpoint to check connectivity
       const response = await fetch(requestUrl, {
         method: "GET",
-        mode: isProxyMode ? "same-origin" : "cors",
+        mode: isCrossOriginRequest ? "cors" : "same-origin",
         cache: "no-store",
-        credentials: "omit", // Don't send cookies for health check
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache",
-          Pragma: "no-cache",
-        },
-        redirect: "follow",
-        referrerPolicy: "no-referrer",
-        signal: abortControllerRef.current.signal,
+        credentials: "omit",
+        signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
@@ -102,19 +114,27 @@ export const useNetworkStatus = () => {
 
       setIsBackendReachable(response.ok);
     } catch (error) {
+      clearTimeout(timeoutId);
+
       // Skip if component is unmounted
       if (!mountedRef.current) return;
 
-      // Handle abort error gracefully - don't treat as failure
       if (error.name === "AbortError") {
-        // Request was aborted, which is normal during cleanup or timeout
-        // Don't update state, just return silently
+        if (didTimeout) {
+          console.warn("Backend reachability check timed out:", requestUrl);
+          setIsBackendReachable(false);
+        }
         return;
       }
 
-      // Handle network errors gracefully
       console.warn("Backend reachability check failed:", error.message);
       setIsBackendReachable(false);
+    } finally {
+      clearTimeout(timeoutId);
+
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
     }
   };
 
