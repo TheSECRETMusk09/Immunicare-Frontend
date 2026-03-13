@@ -99,6 +99,12 @@ const GuardianAppointmentsPage = lazy(() =>
   })),
 );
 
+const GuardianMessagesPage = lazy(() =>
+  import("./pages/GuardianMessagesPage").then((module) => ({
+    default: module.default,
+  })),
+);
+
 const GuardianAppointmentBooking = lazy(() =>
   import("./pages/GuardianAppointmentBooking").then((module) => ({
     default: module.default,
@@ -107,10 +113,12 @@ const GuardianAppointmentBooking = lazy(() =>
 
 // Missing page components - lazy loaded
 const VaccineTracking = lazy(() => import("./pages/VaccineTracking"));
+const VaccineTrackingDashboardPage = lazy(() => import("./pages/VaccineTrackingDashboard"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Announcements = lazy(() => import("./pages/Announcements"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Settings = lazy(() => import("./pages/Settings"));
+const ChangePasswordPage = lazy(() => import("./pages/ChangePassword"));
 
 // Digital Papers Pages - lazy loaded
 const DigitalPapersDashboard = lazy(
@@ -336,6 +344,7 @@ function AppContent() {
           />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ForgotPassword />} />
+          <Route path="/change-password" element={<ChangePasswordPage />} />
           <Route
             path="/dashboard"
             element={
@@ -384,6 +393,16 @@ function AppContent() {
           />
           <Route
             path="/inventory"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminLayout>
+                  <InventoryManagement />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inventory-management"
             element={
               <ProtectedRoute adminOnly>
                 <AdminLayout>
@@ -528,6 +547,16 @@ function AppContent() {
             }
           />
           <Route
+            path="/vaccine-tracking-dashboard"
+            element={
+              <ProtectedRoute requireSystemAdmin>
+                <AdminLayout>
+                  <VaccineTrackingDashboardPage />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/reports"
             element={
               <ProtectedRoute requireSystemAdmin>
@@ -643,7 +672,7 @@ function AppContent() {
               path="immunization-chart/:childId"
               element={<GuardianImmunizationChartPage />}
             />
-            <Route path="messages" element={<Notifications />} />
+            <Route path="messages" element={<GuardianMessagesPage />} />
             <Route
               path="notifications"
               element={<GuardianNotificationsPage />}
@@ -653,6 +682,7 @@ function AppContent() {
               element={<GuardianNotificationsPage />}
             />
             <Route path="profile" element={<Profile />} />
+            <Route path="health-information" element={<HealthInformation />} />
             <Route
               path="settings"
               element={<Navigate to="/guardian/profile" replace />}

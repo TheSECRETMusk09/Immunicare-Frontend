@@ -1,27 +1,23 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { API_BASE_URL } from "../utils/apiConfig";
+import { getStoredAccessToken } from "../utils/api";
 
 export const useSettings = () => {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Get auth token from localStorage
-  const getAuthToken = useCallback(() => {
-    return localStorage.getItem("token");
-  }, []);
-
   // Create axios instance with auth headers
   const createAuthHeaders = useCallback(() => {
-    const token = getAuthToken();
+    const token = getStoredAccessToken();
     return {
       headers: {
         "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
       },
     };
-  }, [getAuthToken]);
+  }, []);
 
   // Fetch all settings
   const fetchSettings = useCallback(async () => {

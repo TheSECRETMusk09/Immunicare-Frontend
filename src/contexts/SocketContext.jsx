@@ -8,7 +8,7 @@ import {
 } from "react";
 import { io } from "socket.io-client";
 import { useAuth } from "./AuthContext";
-import { safeLocalStorage, safeSessionStorage } from "../utils/safeStorage";
+import { getStoredAccessToken } from "../utils/api";
 import { SOCKET_URL, SOCKET_PATH } from "../utils/apiConfig";
 
 // Use relative path for socket connection to work with webpack proxy
@@ -29,9 +29,6 @@ const SOCKET_CONFIG = {
   autoConnect: false // We connect manually in the provider
 };
 
-export const socket = io(getSocketUrl(), SOCKET_CONFIG);
-
-
 const SocketContext = createContext(null);
 
 export const SocketProvider = ({ children }) => {
@@ -46,7 +43,6 @@ export const SocketProvider = ({ children }) => {
   const isConnectingRef = useRef(false);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
-  const pingIntervalRef = useRef(null);
   const maxReconnectAttempts = 5;
 
   // Play notification sound
@@ -80,8 +76,7 @@ export const SocketProvider = ({ children }) => {
   // Initialize socket connection
   useEffect(() => {
     // Get token from storage using safe storage (same as api.js does)
-    const token =
-      safeLocalStorage.getItem("token") || safeSessionStorage.getItem("token");
+    const token = getStoredAccessToken();
 
     // Only connect if authenticated and token exists
     if (!token || !isAuthenticated) {
@@ -130,22 +125,11 @@ export const SocketProvider = ({ children }) => {
       // Connection handlers
       socket.on("connect", () => {
         console.log("Socket connected:", socket.id);
-        socket.emit("authenticate", { token }); // Explicit auth event if needed
         setIsConnected(true);
         setConnectionState("connected");
         setConnectionError(null);
         isConnectingRef.current = false;
         reconnectAttemptsRef.current = 0;
-
-        // Setup ping interval for connection health check
-        if (pingIntervalRef.current) {
-          clearInterval(pingIntervalRef.current);
-        }
-        pingIntervalRef.current = setInterval(() => {
-          if (socket.connected) {
-            socket.emit("ping", { timestamp: Date.now() });
-          }
-        }, 30000); // Ping every 30 seconds
       });
 
       socket.on("disconnect", (reason) => {
@@ -158,12 +142,6 @@ export const SocketProvider = ({ children }) => {
           socket.connect();
         }
         isConnectingRef.current = false;
-
-        // Clear ping interval
-        if (pingIntervalRef.current) {
-          clearInterval(pingIntervalRef.current);
-          pingIntervalRef.current = null;
-        }
 
         // Don't reset reconnect attempts on manual disconnect
         if (reason === "io client disconnect") {
@@ -184,12 +162,6 @@ export const SocketProvider = ({ children }) => {
         }
         reconnectAttemptsRef.current += 1;
 
-        // Clear ping interval on error
-        if (pingIntervalRef.current) {
-          clearInterval(pingIntervalRef.current);
-          pingIntervalRef.current = null;
-        }
-
         // Silently fail after max attempts - socket is not critical
         if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
           console.warn("Max reconnection attempts reached. Giving up.");
@@ -200,12 +172,6 @@ export const SocketProvider = ({ children }) => {
       // Handle reconnection events
       socket.on("reconnect_attempt", (attempt) => {
         setConnectionState("reconnecting");
-      });
-
-      // Handle pong response for health check
-      socket.on("pong", (data) => {
-        const latency = Date.now() - data.timestamp;
-        console.log("Socket latency:", latency, "ms");
       });
 
       socket.on("connected", (data) => {
@@ -258,7 +224,7 @@ export const SocketProvider = ({ children }) => {
           ),
         );
 
-        if (data.isRead) {
+        if (data.isRead || data.status === "read") {
           setUnreadCount((prev) => Math.max(0, prev - 1));
         }
       });
@@ -284,46 +250,65 @@ export const SocketProvider = ({ children }) => {
       });
 
       // ========== Guardian-Admin Dashboard Sync Events ==========
+      const dispatchBrowserEvent = (name, detail) => {
+        if (typeof window === "undefined") {
+          return;
+        }
 
-      // Appointment update events (for Guardian-Admin sync)
-      socket.on("appointment-created", (data) => {
-        console.log("Appointment created (sync):", data);
-        // Emit custom event for components to listen
-        window.dispatchEvent(new CustomEvent("appointment-update", { detail: { action: "created", ...data } }));
-      });
+        window.dispatchEvent(new CustomEvent(name, { detail }));
+      };
 
-      socket.on("appointment-updated", (data) => {
-        console.log("Appointment updated (sync):", data);
-        window.dispatchEvent(new CustomEvent("appointment-update", { detail: { action: "updated", ...data } }));
-      });
+      const toNormalizedStatus = (value) =>
+        String(value || "")
+          .trim()
+          .toLowerCase()
+          .replace(/-/g, "_");
 
-      socket.on("appointment-cancelled", (data) => {
-        console.log("Appointment cancelled (sync):", data);
-        window.dispatchEvent(new CustomEvent("appointment-update", { detail: { action: "cancelled", ...data } }));
-      });
+      const handleAppointmentSync = (data, defaultAction = "updated") => {
+        const normalizedStatus = toNormalizedStatus(data?.status || data?.raw_status);
+        const action =
+          normalizedStatus === "cancelled"
+            ? "cancelled"
+            : defaultAction;
 
-      // Vaccination record events (for Guardian-Admin sync)
-      socket.on("vaccination-recorded", (data) => {
-        console.log("Vaccination recorded (sync):", data);
-        window.dispatchEvent(new CustomEvent("vaccination-update", { detail: { action: "recorded", ...data } }));
-      });
+        dispatchBrowserEvent("appointment-update", { action, ...data });
+      };
 
-      socket.on("vaccination-updated", (data) => {
-        console.log("Vaccination updated (sync):", data);
-        window.dispatchEvent(new CustomEvent("vaccination-update", { detail: { action: "updated", ...data } }));
-      });
+      const handleVaccinationSync = (data, defaultAction = "updated") => {
+        dispatchBrowserEvent("vaccination-update", { action: defaultAction, ...data });
+      };
 
-      // Guardian data sync events
-      socket.on("guardian-data-changed", (data) => {
-        console.log("Guardian data changed (sync):", data);
-        window.dispatchEvent(new CustomEvent("guardian-data-update", { detail: data }));
-      });
+      const handleGuardianSync = (data, defaultAction = "updated") => {
+        dispatchBrowserEvent("guardian-data-update", { action: defaultAction, ...data });
+      };
 
-      // Child data sync events
-      socket.on("child-data-changed", (data) => {
-        console.log("Child data changed (sync):", data);
-        window.dispatchEvent(new CustomEvent("child-data-update", { detail: data }));
-      });
+      const handleChildSync = (data, defaultAction = "updated") => {
+        dispatchBrowserEvent("child-data-update", { action: defaultAction, ...data });
+      };
+
+      socket.on("appointment_created", (data) => handleAppointmentSync(data, "created"));
+      socket.on("appointment-created", (data) => handleAppointmentSync(data, "created"));
+      socket.on("appointment_updated", (data) => handleAppointmentSync(data, "updated"));
+      socket.on("appointment-updated", (data) => handleAppointmentSync(data, "updated"));
+      socket.on("appointment_cancelled", (data) => handleAppointmentSync(data, "cancelled"));
+      socket.on("appointment-cancelled", (data) => handleAppointmentSync(data, "cancelled"));
+      socket.on("appointment_deleted", (data) => handleAppointmentSync(data, "deleted"));
+
+      socket.on("vaccination_created", (data) => handleVaccinationSync(data, "recorded"));
+      socket.on("vaccination-recorded", (data) => handleVaccinationSync(data, "recorded"));
+      socket.on("vaccination_updated", (data) => handleVaccinationSync(data, "updated"));
+      socket.on("vaccination-updated", (data) => handleVaccinationSync(data, "updated"));
+      socket.on("vaccination_deleted", (data) => handleVaccinationSync(data, "deleted"));
+
+      socket.on("guardian_updated", (data) => handleGuardianSync(data, "updated"));
+      socket.on("guardian_created", (data) => handleGuardianSync(data, "created"));
+      socket.on("guardian_deleted", (data) => handleGuardianSync(data, "deleted"));
+      socket.on("guardian-data-changed", (data) => handleGuardianSync(data, "updated"));
+
+      socket.on("infant_updated", (data) => handleChildSync(data, "updated"));
+      socket.on("infant_created", (data) => handleChildSync(data, "created"));
+      socket.on("infant_deleted", (data) => handleChildSync(data, "deleted"));
+      socket.on("child-data-changed", (data) => handleChildSync(data, "updated"));
     }, 800); // Increased delay to 800ms for better page load stability
 
     // Cleanup on unmount
@@ -331,10 +316,6 @@ export const SocketProvider = ({ children }) => {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
-      }
-      if (pingIntervalRef.current) {
-        clearInterval(pingIntervalRef.current);
-        pingIntervalRef.current = null;
       }
       if (socketRef.current) {
         console.log("Socket: Cleaning up connection");
@@ -364,12 +345,12 @@ export const SocketProvider = ({ children }) => {
 
   // Manual reconnect function
   const reconnect = useCallback(() => {
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-    }
     reconnectAttemptsRef.current = 0;
     setConnectionState("connecting");
-    // Trigger reconnection by updating a dependency
+
+    if (socketRef.current) {
+      socketRef.current.connect();
+    }
   }, []);
 
   // Join a room

@@ -1,6 +1,17 @@
 import React, { useState } from "react";
 import { Modal, Button, PasswordInput } from "./UI";
-import apiClient from "../utils/api";
+import apiClient, { clearAuthStorage } from "../utils/api";
+
+const getPostPasswordChangeRedirect = () => {
+  if (typeof window === "undefined") {
+    return "/login";
+  }
+
+  const currentPath = window.location.pathname || "";
+  return currentPath.startsWith("/guardian")
+    ? "/guardian/login"
+    : "/admin/login";
+};
 
 export default function PasswordChangeModal({ isOpen, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
@@ -42,16 +53,14 @@ export default function PasswordChangeModal({ isOpen, onClose, onSuccess }) {
         formData.newPassword,
       );
 
-      if (response.success) {
+      if (response) {
         setSuccess(true);
         setTimeout(() => {
           setSuccess(false);
           onSuccess();
           onClose();
-          // Force logout and redirect to login after successful password change
-          localStorage.clear();
-          sessionStorage.clear();
-          window.location.href = "/";
+          clearAuthStorage();
+          window.location.href = getPostPasswordChangeRedirect();
         }, 2000);
       }
     } catch (err) {

@@ -3,15 +3,40 @@ import axiosRetry from "axios-retry";
 import { safeLocalStorage, safeSessionStorage } from "./safeStorage";
 import { API_BASE_URL } from "./apiConfig";
 
-const LOGIN_ROUTES = new Set([
+const PUBLIC_AUTH_ROUTES = [
   "/",
   "/login",
   "/guardian/login",
   "/admin/login",
   "/client/login",
-]);
+  "/guardian/introduction",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+];
 
 let refreshRequest = null;
+
+const getRememberMePreference = () =>
+  safeLocalStorage.getItem("rememberMe") === "true";
+
+const getStoredAccessToken = () =>
+  safeLocalStorage.getItem("token") || safeSessionStorage.getItem("token");
+
+const getStoredUserJson = () =>
+  safeLocalStorage.getItem("user") || safeSessionStorage.getItem("user");
+
+const getPreferredAuthStorage = () => {
+  if (safeLocalStorage.getItem("token")) {
+    return safeLocalStorage;
+  }
+
+  if (safeSessionStorage.getItem("token")) {
+    return safeSessionStorage;
+  }
+
+  return getRememberMePreference() ? safeLocalStorage : safeSessionStorage;
+};
 
 const extractErrorMessage = (errorData) => {
   if (!errorData) return null;
@@ -58,6 +83,9 @@ const getCurrentPath = () => {
   return window.location?.pathname || "";
 };
 
+const isPublicAuthRoute = (pathname) =>
+  PUBLIC_AUTH_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+
 const clearAuthStorage = () => {
   safeLocalStorage.removeItem("token");
   safeSessionStorage.removeItem("token");
@@ -65,13 +93,47 @@ const clearAuthStorage = () => {
   safeSessionStorage.removeItem("refreshToken");
   safeLocalStorage.removeItem("user");
   safeSessionStorage.removeItem("user");
+  safeLocalStorage.removeItem("rememberMe");
+};
+
+const persistAuthSession = ({ accessToken, user, rememberMe = false } = {}) => {
+  const targetStorage = rememberMe ? safeLocalStorage : safeSessionStorage;
+  const secondaryStorage = rememberMe ? safeSessionStorage : safeLocalStorage;
+
+  secondaryStorage.removeItem("token");
+  secondaryStorage.removeItem("user");
+
+  if (rememberMe) {
+    safeLocalStorage.setItem("rememberMe", "true");
+  } else {
+    safeLocalStorage.removeItem("rememberMe");
+  }
+
+  if (accessToken) {
+    targetStorage.setItem("token", accessToken);
+  }
+
+  if (user) {
+    targetStorage.setItem("user", JSON.stringify(user));
+  }
+};
+
+const persistStoredUser = (user) => {
+  if (!user) {
+    return;
+  }
+
+  const storage = getPreferredAuthStorage();
+  storage.setItem("user", JSON.stringify(user));
 };
 
 const redirectToLoginIfNeeded = () => {
   if (typeof window === "undefined") return;
   const pathname = getCurrentPath();
-  if (!LOGIN_ROUTES.has(pathname)) {
-    window.location.href = "/";
+  if (!isPublicAuthRoute(pathname)) {
+    window.location.href = pathname.startsWith("/guardian")
+      ? "/guardian/login"
+      : "/admin/login";
   }
 };
 
@@ -125,8 +187,7 @@ axiosRetry(axiosClient, {
 axiosClient.interceptors.request.use(
   (config) => {
     // Check both localStorage and sessionStorage for token using safe storage
-    const token =
-      safeLocalStorage.getItem("token") || safeSessionStorage.getItem("token");
+    const token = getStoredAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -183,20 +244,13 @@ axiosClient.interceptors.response.use(
         // If refresh successful, update token and retry original request
         const newToken =
           refreshResponse.data.token || refreshResponse.data.accessToken;
-        const newRefreshToken = refreshResponse.data.refreshToken;
 
         if (newToken) {
-          // Store tokens for future requests (both cookie and localStorage for redundancy)
-          const rememberMe = safeLocalStorage.getItem("rememberMe") === "true";
-          const tokenStorage = rememberMe
-            ? safeLocalStorage
-            : safeSessionStorage;
-
-          // Update localStorage/sessionStorage for subsequent API calls
+          const tokenStorage = getPreferredAuthStorage();
           tokenStorage.setItem("token", newToken);
 
-          if (newRefreshToken) {
-            tokenStorage.setItem("refreshToken", newRefreshToken);
+          if (refreshResponse.data.user) {
+            persistStoredUser(refreshResponse.data.user);
           }
 
           // Update the original request with new token
@@ -315,13 +369,6 @@ class ApiClient {
       });
       console.log("[ApiClient] Login response status:", response.status);
       console.log("[ApiClient] Login response data:", response.data);
-      // Store refresh token for token refresh fallback
-      if (response.data.refreshToken) {
-        const storage = credentials.rememberMe
-          ? safeLocalStorage
-          : safeSessionStorage;
-        storage.setItem("refreshToken", response.data.refreshToken);
-      }
       return response.data;
     } catch (error) {
       console.error(
@@ -360,17 +407,31 @@ class ApiClient {
   }
 
   // New dual-option forgot password methods
-  async forgotPasswordOtp(email, method = "email") {
+  async forgotPasswordOtp(identifierOrPayload, method = "email") {
+    const data =
+      identifierOrPayload && typeof identifierOrPayload === "object"
+        ? { ...identifierOrPayload }
+        : method === "sms"
+          ? { phone: identifierOrPayload, method }
+          : { email: identifierOrPayload, method };
+
     return this.request("/auth/forgot-password/otp", {
       method: "POST",
-      data: { email, method },
+      data,
     });
   }
 
-  async verifyResetOtp(email, otp) {
+  async verifyResetOtp(identifierOrPayload, otp, method = "email") {
+    const data =
+      identifierOrPayload && typeof identifierOrPayload === "object"
+        ? { ...identifierOrPayload }
+        : method === "sms"
+          ? { phone: identifierOrPayload, otp, method }
+          : { email: identifierOrPayload, otp, method };
+
     return this.request("/auth/forgot-password/verify-otp", {
       method: "POST",
-      data: { email, otp },
+      data,
     });
   }
 
@@ -1463,4 +1524,13 @@ class ApiClient {
 }
 
 export const apiClient = new ApiClient();
+export {
+  clearAuthStorage,
+  getRememberMePreference,
+  getStoredAccessToken,
+  getStoredUserJson,
+  getPreferredAuthStorage,
+  persistAuthSession,
+  persistStoredUser,
+};
 export default apiClient;

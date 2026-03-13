@@ -6,8 +6,13 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import apiClient from "../utils/api";
-import { safeLocalStorage, safeSessionStorage } from "../utils/safeStorage";
+import apiClient, {
+  clearAuthStorage,
+  getStoredAccessToken,
+  getStoredUserJson,
+  persistAuthSession,
+  persistStoredUser,
+} from "../utils/api";
 import { normalizeAuthUser } from "../utils/authRedirect";
 
 // Create the AuthContext
@@ -30,74 +35,47 @@ export function AuthProvider({ children }) {
 
     const checkAuth = async () => {
       try {
-        // Use safe storage access to prevent SecurityError
-        const token =
-          safeLocalStorage.getItem("token") ||
-          safeSessionStorage.getItem("token");
-        const storedUser =
-          safeLocalStorage.getItem("user") ||
-          safeSessionStorage.getItem("user");
+        const token = getStoredAccessToken();
+        const storedUser = getStoredUserJson();
 
-        if (token && storedUser) {
-          const parsedUser = normalizeAuthUser(JSON.parse(storedUser));
+        if (!token) {
+          return;
+        }
 
-          // Verify session with backend to get fresh user data with correct role_type
+        if (storedUser) {
           try {
-            const verifyResponse = await apiClient.verifySession();
-            if (verifyResponse.authenticated && verifyResponse.user) {
-              // Use the verified user data from backend (has correct role_type)
-              const verifiedUser = normalizeAuthUser(verifyResponse.user);
-              if (!mounted) return;
-              setUser(verifiedUser);
-
-              // Update stored user data with verified data
-              const storage = safeLocalStorage.getItem("token")
-                ? safeLocalStorage
-                : safeSessionStorage;
-              storage.setItem("user", JSON.stringify(verifiedUser));
-
-              // Check if user needs to change password
-              if (
-                verifiedUser.role_type === CANONICAL_ROLES.GUARDIAN &&
-                verifiedUser.forcePasswordChange
-              ) {
-                if (!mounted) return;
-                setForcePasswordChange(true);
-              }
-            } else {
-              // Session invalid, clear storage
-              safeLocalStorage.removeItem("token");
-              safeLocalStorage.removeItem("user");
-              safeSessionStorage.removeItem("token");
-              safeSessionStorage.removeItem("user");
-            }
-          } catch (verifyError) {
-            // If verification fails (e.g., token expired), use stored data as fallback
-            // but ensure role_type is used
-            console.warn(
-              "Session verification failed, using stored data:",
-              verifyError.message,
-            );
-            if (!mounted) return;
-            setUser(parsedUser);
-
-            // Check if user needs to change password
-            if (
-              parsedUser.role_type === CANONICAL_ROLES.GUARDIAN &&
-              parsedUser.forcePasswordChange
-            ) {
-              if (!mounted) return;
-              setForcePasswordChange(true);
-            }
+            JSON.parse(storedUser);
+          } catch {
+            clearAuthStorage();
+            return;
           }
+        }
+
+        const verifyResponse = await apiClient.verifySession();
+
+        if (verifyResponse.authenticated && verifyResponse.user) {
+          const verifiedUser = normalizeAuthUser(verifyResponse.user);
+          if (!mounted) return;
+          setUser(verifiedUser);
+          persistStoredUser(verifiedUser);
+
+          if (
+            verifiedUser.role_type === CANONICAL_ROLES.GUARDIAN &&
+            verifiedUser.forcePasswordChange
+          ) {
+            if (!mounted) return;
+            setForcePasswordChange(true);
+          }
+        } else {
+          clearAuthStorage();
         }
       } catch (error) {
         console.error("Error checking authentication:", error);
-        // Clear invalid data
-        safeLocalStorage.removeItem("token");
-        safeLocalStorage.removeItem("user");
-        safeSessionStorage.removeItem("token");
-        safeSessionStorage.removeItem("user");
+        clearAuthStorage();
+        if (mounted) {
+          setUser(null);
+          setForcePasswordChange(false);
+        }
       } finally {
         if (mounted) {
           setLoading(false);
@@ -122,22 +100,21 @@ export function AuthProvider({ children }) {
       const response = await apiClient.login(credentials);
       console.log("[AuthContext] Login response:", response);
 
-      const { token, user: rawUserData } = response;
+      const accessToken = response.accessToken || response.token || null;
+      const { user: rawUserData } = response;
       const userData = normalizeAuthUser(rawUserData);
-      console.log("[AuthContext] Token received:", token ? "yes" : "no");
+      console.log("[AuthContext] Token received:", accessToken ? "yes" : "no");
       console.log("[AuthContext] User data:", userData);
 
-      // Store token and user data using safe storage
-      const storage = credentials.rememberMe
-        ? safeLocalStorage
-        : safeSessionStorage;
-      storage.setItem("token", token);
-      storage.setItem("user", JSON.stringify(userData));
-
-      // Store rememberMe preference for token refresh logic
-      if (credentials.rememberMe) {
-        safeLocalStorage.setItem("rememberMe", "true");
+      if (!accessToken) {
+        throw new Error("Login succeeded without an access token");
       }
+
+      persistAuthSession({
+        accessToken,
+        user: userData,
+        rememberMe: credentials.rememberMe,
+      });
 
       setUser(userData);
       console.log("[AuthContext] User set, isAuthenticated should be true");
@@ -161,24 +138,23 @@ export function AuthProvider({ children }) {
   }, []);
 
   // Logout function
-  const logout = useCallback(() => {
-    // Clear all auth data using safe storage
-    safeLocalStorage.removeItem("token");
-    safeLocalStorage.removeItem("user");
-    safeSessionStorage.removeItem("token");
-    safeSessionStorage.removeItem("user");
-    setUser(null);
-    setForcePasswordChange(false);
+  const logout = useCallback(async () => {
+    try {
+      await apiClient.logout();
+    } catch (error) {
+      console.warn("Logout request failed, clearing local auth state anyway:", error.message);
+    } finally {
+      clearAuthStorage();
+      setUser(null);
+      setForcePasswordChange(false);
+    }
   }, []);
 
   // Update user data
   const updateUser = useCallback((updatedUserData) => {
     setUser((prevUser) => {
       const newUser = normalizeAuthUser({ ...prevUser, ...updatedUserData });
-      const storage = safeLocalStorage.getItem("user")
-        ? safeLocalStorage
-        : safeSessionStorage;
-      storage.setItem("user", JSON.stringify(newUser));
+      persistStoredUser(newUser);
       return newUser;
     });
   }, []);

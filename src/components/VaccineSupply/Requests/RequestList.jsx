@@ -2,6 +2,12 @@ import React, { useState, useEffect } from "react";
 import { Card, Table, Badge, Button, Modal, Form } from "../UI";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
+import { getStoredAccessToken } from "../../../utils/api";
+
+const getAuthHeaders = () => {
+  const token = getStoredAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 const RequestList = () => {
   const navigate = useNavigate();
@@ -42,9 +48,7 @@ const RequestList = () => {
       const response = await fetch(
         `/api/vaccine-supply/requests?${params.toString()}`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          headers: getAuthHeaders(),
         },
       );
       const data = await response.json();
@@ -65,9 +69,7 @@ const RequestList = () => {
       const response = await fetch(
         `/api/vaccine-supply/requests/${requestId}`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          headers: getAuthHeaders(),
         },
       );
       const data = await response.json();
@@ -87,7 +89,7 @@ const RequestList = () => {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            ...getAuthHeaders(),
           },
           body: JSON.stringify(reviewData),
         },

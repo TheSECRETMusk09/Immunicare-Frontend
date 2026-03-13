@@ -128,10 +128,10 @@ const ForgotPassword = () => {
       // Call the OTP endpoint with normalized identifier
       if (method === "email") {
         const normalizedEmail = normalizeEmail(email);
-        await apiClient.forgotPasswordOtp(normalizedEmail, method);
+        await apiClient.forgotPasswordOtp({ email: normalizedEmail, method });
       } else {
         const normalizedPhone = normalizePhoneNumber(phoneNumber);
-        await apiClient.forgotPasswordOtp(normalizedPhone, method);
+        await apiClient.forgotPasswordOtp({ phone: normalizedPhone, method });
       }
       setOtpSent(true);
     } catch (err) {
@@ -156,13 +156,10 @@ const ForgotPassword = () => {
     setError(null);
 
     try {
-      const identifier = method === "email"
-        ? normalizeEmail(email)
-        : normalizePhoneNumber(phoneNumber);
       const response = await apiClient.verifyResetOtp(
-        identifier,
-        otp,
-        method
+        method === "email"
+          ? { email: normalizeEmail(email), otp, method }
+          : { phone: normalizePhoneNumber(phoneNumber), otp, method }
       );
       if (response.resetToken) {
         setResetToken(response.resetToken);
@@ -209,10 +206,10 @@ const ForgotPassword = () => {
     try {
       if (method === "email") {
         const normalizedEmail = normalizeEmail(email);
-        await apiClient.forgotPasswordOtp(normalizedEmail, method);
+        await apiClient.forgotPasswordOtp({ email: normalizedEmail, method });
       } else {
         const normalizedPhone = normalizePhoneNumber(phoneNumber);
-        await apiClient.forgotPasswordOtp(normalizedPhone, method);
+        await apiClient.forgotPasswordOtp({ phone: normalizedPhone, method });
       }
       setOtpSent(true);
     } catch (err) {
@@ -330,7 +327,7 @@ const ForgotPassword = () => {
               <p className="text-white/70 text-sm mb-6 sm:mb-8">
                 {method === "email"
                   ? "Enter your email and choose how you want to receive the verification code."
-                  : "Enter your mobile number, then provide your account email for secure lookup before sending the SMS code."}
+                  : "Enter the mobile number linked to your account so we can send your SMS verification code."}
               </p>
 
               {error && (

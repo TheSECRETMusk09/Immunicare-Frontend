@@ -2,6 +2,12 @@ import React, { useState, useEffect } from "react";
 import { Card, Button, Badge, Alert } from "../UI";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
+import { getStoredAccessToken } from "../../../utils/api";
+
+const getAuthHeaders = () => {
+  const token = getStoredAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 const BarangayDashboard = () => {
   const navigate = useNavigate();
@@ -25,9 +31,7 @@ const BarangayDashboard = () => {
       const response = await fetch(
         `/api/vaccine-supply/dashboard/barangay/${facilityId}`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          headers: getAuthHeaders(),
         },
       );
       const data = await response.json();
@@ -46,9 +50,7 @@ const BarangayDashboard = () => {
   const fetchAlerts = async () => {
     try {
       const response = await fetch(`/api/vaccine-supply/dashboard/alerts`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+        headers: getAuthHeaders(),
       });
       const data = await response.json();
       if (data.success) {

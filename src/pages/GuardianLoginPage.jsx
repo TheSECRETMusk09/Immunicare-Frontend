@@ -268,11 +268,8 @@ const GuardianLoginPage = () => {
 
   // Redirect if logged in
   useEffect(() => {
-    if (isAuthenticated) {
-      const storedUser = JSON.parse(
-        localStorage.getItem("user") || sessionStorage.getItem("user") || "{}"
-      );
-      const userData = normalizeAuthUser(user || storedUser);
+    if (isAuthenticated && user) {
+      const userData = normalizeAuthUser(user);
       navigate(getDefaultAuthenticatedRouteFromUser(userData), { replace: true });
     }
   }, [isAuthenticated, navigate, user]);
