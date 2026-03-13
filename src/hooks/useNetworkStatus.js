@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { API_BASE_URL } from "../utils/apiConfig";
 
-const HEALTH_CHECK_TIMEOUT_MS = 5000;
+const HEALTH_CHECK_TIMEOUT_MS = 10000; // Increased from 5s to 10s for production network latency
 
 const resolveHealthCheckUrl = () => {
   const trimmedBaseUrl = String(API_BASE_URL || "").replace(/\/+$/, "");
@@ -125,6 +125,10 @@ export const useNetworkStatus = () => {
           setIsBackendReachable(false);
         }
         return;
+      } else if (error.message.includes('Failed to fetch') || error.message.includes('Network request failed')) {
+        // Network errors are common in production, just log and set to false
+        console.warn("Backend reachability check failed (network error):", error.message);
+        setIsBackendReachable(false);
       }
 
       console.warn("Backend reachability check failed:", error.message);
