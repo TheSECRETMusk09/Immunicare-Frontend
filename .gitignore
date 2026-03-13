@@ -20,8 +20,10 @@
 .env.*
 !.env.example
 !.env.development.example
+!.env.development
 !.env.test.example
 !.env.production.example
+!.env.production
 
 # misc
 .DS_Store
