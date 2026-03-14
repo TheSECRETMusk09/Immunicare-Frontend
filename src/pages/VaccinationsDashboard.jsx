@@ -189,18 +189,16 @@ const VaccinationsDashboard = () => {
       setSaving(true);
       setError(null);
 
-       const payload = {
-         patient_id: Number(vaccinationForm.infant_id),
-         vaccine_id: Number(vaccinationForm.vaccine_id),
-         dose_no: Number(vaccinationForm.dose_no || 1),
-         admin_date: vaccinationForm.admin_date || null,
-         next_due_date: vaccinationForm.next_due_date || null,
-         administered_by: vaccinationForm.administered_by || null,
-         notes: vaccinationForm.notes || null,
-         batch_id: vaccinationForm.batch_number || null,
-         lot_number: vaccinationForm.lot_number || null,
-         status: vaccinationForm.status || "pending",
-       };
+        const payload = {
+          patient_id: Number(vaccinationForm.infant_id),
+          vaccine_id: Number(vaccinationForm.vaccine_id),
+          dose_no: Number(vaccinationForm.dose_no || 1),
+          admin_date: vaccinationForm.admin_date || null,
+          next_due_date: vaccinationForm.next_due_date || null,
+          administered_by: vaccinationForm.administered_by || null,
+          notes: vaccinationForm.notes || null,
+          status: vaccinationForm.status || "pending",
+        };
 
       if (vaccinationForm.id) {
         setMutationInFlight(true);
