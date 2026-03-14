@@ -506,14 +506,14 @@ const GuardianDashboard = () => {
           })
         : 'None';
 
-      setStats({
-        childrenCount: apiStats.childrenCount || childrenData.length,
-        nextAppointment: apiStats.nextAppointment || nextAppointmentDate,
-        vaccinatedCount: apiStats.completedVaccinations || vaccinatedCount,
-        pendingCount: apiStats.pendingVaccinations || pendingCount,
-        overdueCount: dueVaccinesList.filter(v => v.status === 'overdue').length,
-        upcomingVaccines: dueVaccinesList.filter(v => v.status === 'due_soon').length,
-      });
+       setStats({
+         childrenCount: apiStats.childrenCount || childrenData.length,
+         nextAppointment: nextAppointmentDate,
+         vaccinatedCount: apiStats.completedVaccinations || vaccinatedCount,
+         pendingCount: apiStats.pendingVaccinations || pendingCount,
+         overdueCount: dueVaccinesList.filter(v => v.status === 'overdue').length,
+         upcomingVaccines: dueVaccinesList.filter(v => v.status === 'due_soon').length,
+       });
 
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
