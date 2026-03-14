@@ -165,20 +165,40 @@ const axiosClient = axios.create({
   timeout: 30000, // 30 second timeout for all requests (increased from 10s)
 });
 
+const SAFE_RETRY_METHODS = new Set(["get", "head", "options"]);
+
+const canRetryRequest = (config = {}) => {
+  if (!config || config.disableRetry === true) {
+    return false;
+  }
+
+  if (config.enableUnsafeRetry === true) {
+    return true;
+  }
+
+  const method = String(config.method || "get").toLowerCase();
+  return SAFE_RETRY_METHODS.has(method);
+};
+
 // Configure retry logic - don't retry on 401 Unauthorized
 axiosRetry(axiosClient, {
-  retries: 3,
+  retries: 2,
   retryDelay: (retryCount) => {
     return retryCount * 1000; // exponential backoff
   },
   retryCondition: (error) => {
-    // Retry on network errors or 5xx status codes, but NOT on 401 (auth errors)
-    if (error.response?.status === 401) {
-      return false; // Don't retry on auth errors
+    if (!canRetryRequest(error.config)) {
+      return false;
     }
+
+    const responseStatus = error.response?.status;
+    if ([400, 401, 403, 404, 409, 422, 429].includes(responseStatus)) {
+      return false;
+    }
+
     return (
-      axiosRetry.isNetworkOrIdempotentRequestError(error) ||
-      (error.response && error.response.status >= 500)
+      axiosRetry.isNetworkError(error) ||
+      (typeof responseStatus === "number" && responseStatus >= 500)
     );
   },
 });
@@ -389,6 +409,15 @@ class ApiClient {
     return this.request("/auth/register/guardian", {
       method: "POST",
       data: userData,
+      disableRetry: true,
+    });
+  }
+
+  async resendGuardianRegistrationOtp(payload) {
+    return this.request("/auth/register/guardian/resend-otp", {
+      method: "POST",
+      data: payload,
+      disableRetry: true,
     });
   }
 
@@ -396,6 +425,7 @@ class ApiClient {
     return this.request("/auth/register/guardian/verify", {
       method: "POST",
       data: { phone, otp },
+      disableRetry: true,
     });
   }
 

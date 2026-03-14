@@ -27,20 +27,32 @@ const OTPVerification = ({
   onCancel,
   length = 6,
   expiresIn = 300,
+  resendAvailableIn = 60,
   loading = false,
   error = null,
 }) => {
   const [otp, setOtp] = useState(Array(length).fill(""));
   const [timeRemaining, setTimeRemaining] = useState(expiresIn);
-  const [canResend, setCanResend] = useState(false);
-  const [resendCooldown, setResendCooldown] = useState(0);
+  const [canResend, setCanResend] = useState(resendAvailableIn <= 0);
+  const [resendCooldown, setResendCooldown] = useState(
+    Math.max(0, resendAvailableIn),
+  );
   const [verifySuccess, setVerifySuccess] = useState(false);
   const inputRefs = useRef([]);
+
+  useEffect(() => {
+    setTimeRemaining(expiresIn);
+  }, [expiresIn]);
+
+  useEffect(() => {
+    const nextCooldown = Math.max(0, resendAvailableIn);
+    setResendCooldown(nextCooldown);
+    setCanResend(nextCooldown <= 0);
+  }, [resendAvailableIn]);
 
   // Timer countdown
   useEffect(() => {
     if (timeRemaining <= 0) {
-      setCanResend(true);
       return;
     }
 
@@ -63,7 +75,10 @@ const OTPVerification = ({
 
     const timer = setInterval(() => {
       setResendCooldown((prev) => {
-        if (prev <= 1) return 0;
+        if (prev <= 1) {
+          setCanResend(true);
+          return 0;
+        }
         return prev - 1;
       });
     }, 1000);
@@ -176,15 +191,19 @@ const OTPVerification = ({
         if (result?.expiresIn) {
           setTimeRemaining(result.expiresIn);
         }
-        setCanResend(false);
-        setResendCooldown(60); // 60 second cooldown
+        const nextResendCooldown = Math.max(
+          0,
+          Number(result?.resendAvailableIn ?? resendAvailableIn ?? 60) || 0,
+        );
+        setCanResend(nextResendCooldown <= 0);
+        setResendCooldown(nextResendCooldown);
         setOtp(Array(length).fill(""));
         inputRefs.current[0]?.focus();
       }
     } catch (err) {
       console.error("Resend failed:", err);
     }
-  }, [canResend, resendCooldown, onResend, length]);
+  }, [canResend, resendCooldown, onResend, length, resendAvailableIn]);
 
   // Format time remaining
   const formatTime = (seconds) => {

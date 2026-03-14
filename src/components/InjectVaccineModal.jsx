@@ -268,21 +268,36 @@ export default function InjectVaccineModal({
       );
       createdVaccinationRecordId = normalizedCreatedVaccination?.id || null;
 
-      await apiClient.createVaccineInventoryTransaction({
-        vaccine_inventory_id: Number(formData.vaccine_inventory_id),
-        vaccine_id: Number(formData.vaccine_id),
-        clinic_id: selectedInventoryRecord?.clinic_id ? Number(selectedInventoryRecord.clinic_id) : (scopedClinicId ? Number(scopedClinicId) : null),
-        transaction_type: "ISSUE",
-        quantity: 1,
-        lot_number: formData.lot_number || null,
-        batch_number: formData.batch_number || null,
-        reference_number: createdVaccinationRecordId
-          ? `VAC-${createdVaccinationRecordId}`
-          : null,
-        notes: createdVaccinationRecordId
-          ? `Vaccination record ${createdVaccinationRecordId} administered to infant ID ${selectedInfantId}`
-          : `Vaccination administered to infant ID ${selectedInfantId}`,
-      });
+       console.log('Creating inventory transaction with payload:', {
+         vaccine_inventory_id: Number(formData.vaccine_inventory_id),
+         vaccine_id: Number(formData.vaccine_id),
+         clinic_id: selectedInventoryRecord?.clinic_id ? Number(selectedInventoryRecord.clinic_id) : undefined,
+         transaction_type: 'ISSUE',
+         quantity: 1,
+         lot_number: formData.lot_number || null,
+         batch_number: formData.batch_number || null,
+         reference_number: createdVaccinationRecordId
+           ? `VAC-${createdVaccinationRecordId}`
+           : null,
+         notes: createdVaccinationRecordId
+           ? `Vaccination record ${createdVaccinationRecordId} administered to infant ID ${selectedInfantId}`
+           : `Vaccination administered to infant ID ${selectedInfantId}`,
+       });
+       await apiClient.createVaccineInventoryTransaction({
+         vaccine_inventory_id: Number(formData.vaccine_inventory_id),
+         vaccine_id: Number(formData.vaccine_id),
+         clinic_id: selectedInventoryRecord?.clinic_id ? Number(selectedInventoryRecord.clinic_id) : undefined,
+         transaction_type: "ISSUE",
+         quantity: 1,
+         lot_number: formData.lot_number || null,
+         batch_number: formData.batch_number || null,
+         reference_number: createdVaccinationRecordId
+           ? `VAC-${createdVaccinationRecordId}`
+           : null,
+         notes: createdVaccinationRecordId
+           ? `Vaccination record ${createdVaccinationRecordId} administered to infant ID ${selectedInfantId}`
+           : `Vaccination administered to infant ID ${selectedInfantId}`,
+       });
 
       setSuccess("Vaccination recorded and inventory updated successfully.");
 
@@ -291,22 +306,23 @@ export default function InjectVaccineModal({
         onSuccess();
         onClose();
       }, 1000);
-    } catch (err) {
-      if (createdVaccinationRecordId) {
-        try {
-          await apiClient.deleteVaccinationRecord(createdVaccinationRecordId);
-        } catch (rollbackError) {
-          console.error(
-            "Failed to rollback vaccination record after inventory transaction failure:",
-            rollbackError,
-          );
-        }
-      }
+     } catch (err) {
+       console.error("Error recording vaccination:", err);
+       if (createdVaccinationRecordId) {
+         try {
+           await apiClient.deleteVaccinationRecord(createdVaccinationRecordId);
+         } catch (rollbackError) {
+           console.error(
+             "Failed to rollback vaccination record after inventory transaction failure:",
+             rollbackError,
+           );
+         }
+       }
 
-      setError(err.message || "Failed to record vaccination. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+       setError(err.message || "Failed to record vaccination. Please try again.");
+     } finally {
+       setLoading(false);
+     }
   };
 
   const handleChange = (e) => {

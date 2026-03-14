@@ -160,6 +160,32 @@ const Register = () => {
     return digits;
   }, []);
 
+  const createPendingVerificationState = useCallback(
+    (responsePayload, fallbackPhone) => {
+      const responseData = responsePayload?.data || responsePayload || {};
+      const verificationPhone = normalizePhoneForVerification(
+        responseData?.phone || fallbackPhone,
+      );
+
+      return {
+        phone: verificationPhone,
+        expiresIn:
+          Number.parseInt(responseData?.expiresInSeconds, 10) || 10 * 60,
+        resendAvailableIn:
+          Number.parseInt(responseData?.resendAvailableInSeconds, 10) || 60,
+      };
+    },
+    [normalizePhoneForVerification],
+  );
+
+  const extractRetryAfterSeconds = useCallback((error) => {
+    return (
+      Number.parseInt(error?.response?.headers?.["retry-after"], 10) ||
+      error?.response?.data?.retryAfter ||
+      null
+    );
+  }, []);
+
   const validateField = (name, value) => {
     switch (name) {
       case "firstName":
@@ -259,6 +285,10 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (loading) {
+      return;
+    }
+
     // Validate all fields
     const newErrors = {};
     const fieldsToValidate = [
@@ -326,16 +356,10 @@ const Register = () => {
       // Make API call using centralized apiClient
       const response = await apiClient.register(registrationData);
 
-      const verificationPhone = normalizePhoneForVerification(
-        response?.data?.phone || registrationData.phone,
-      );
-
       setRegistrationPayload(registrationData);
-      setPendingVerification({
-        phone: verificationPhone,
-        expiresIn:
-          Number.parseInt(response?.data?.expiresInSeconds, 10) || 10 * 60,
-      });
+      setPendingVerification(
+        createPendingVerificationState(response, registrationData.phone),
+      );
     } catch (error) {
       console.error("Registration error:", error);
 
@@ -346,9 +370,7 @@ const Register = () => {
 
       const responseStatus = error?.response?.status;
       const responseCode = error?.response?.data?.code;
-      const retryAfterSeconds =
-        Number.parseInt(error?.response?.headers?.["retry-after"], 10) ||
-        error?.response?.data?.retryAfter;
+      const retryAfterSeconds = extractRetryAfterSeconds(error);
 
       if (responseStatus === 409 && responseCode === "EMAIL_EXISTS") {
         setErrors((prev) => ({
@@ -424,26 +446,42 @@ const Register = () => {
     setOtpError(null);
 
     try {
-      const response = await apiClient.register(registrationPayload);
-      const verificationPhone = normalizePhoneForVerification(
-        response?.data?.phone || registrationPayload.phone,
+      const response = await apiClient.resendGuardianRegistrationOtp({
+        phone: pendingVerification?.phone || registrationPayload.phone,
+        email: registrationPayload.email,
+      });
+      const nextPendingVerification = createPendingVerificationState(
+        response,
+        registrationPayload.phone,
       );
-      const expiresIn =
-        Number.parseInt(response?.data?.expiresInSeconds, 10) || 10 * 60;
 
-      setPendingVerification({ phone: verificationPhone, expiresIn });
-      return { expiresIn };
+      setPendingVerification(nextPendingVerification);
+      return {
+        expiresIn: nextPendingVerification.expiresIn,
+        resendAvailableIn: nextPendingVerification.resendAvailableIn,
+      };
     } catch (error) {
+      const retryAfterSeconds = extractRetryAfterSeconds(error);
       const message =
-        error?.response?.data?.error ||
-        error?.message ||
-        "Failed to resend OTP. Please try again.";
+        error?.response?.status === 429
+          ? `A verification code was recently sent. Please wait ${Math.max(
+              1,
+              Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : 60,
+            )} second(s) before requesting another code.`
+          : error?.response?.data?.error ||
+            error?.message ||
+            "Failed to resend OTP. Please try again.";
       setOtpError(message);
       throw error;
     } finally {
       setOtpLoading(false);
     }
-  }, [normalizePhoneForVerification, registrationPayload]);
+  }, [
+    createPendingVerificationState,
+    extractRetryAfterSeconds,
+    pendingVerification?.phone,
+    registrationPayload,
+  ]);
 
   // Offline state UI
   if (isOffline) {
@@ -489,6 +527,7 @@ const Register = () => {
                 setOtpError(null);
               }}
               expiresIn={pendingVerification.expiresIn}
+              resendAvailableIn={pendingVerification.resendAvailableIn}
               loading={otpLoading}
               error={otpError}
             />
