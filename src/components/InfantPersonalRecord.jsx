@@ -177,7 +177,10 @@ export default function InfantPersonalRecord({
     setSaveError(null);
     try {
       const updatePayload = sanitizeInfantUpdatePayload(formData);
-      const updateResponse = await apiClient.updateInfant(infantId, updatePayload);
+      const updateResponse = await apiClient.request(`/infants/${infantId}`, {
+        method: "PUT",
+        data: updatePayload
+      });
       const updatedInfant = normalizeInfantResponse(updateResponse);
 
       if (!isMountedRef.current) {
@@ -587,7 +590,7 @@ export default function InfantPersonalRecord({
               <h4 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4">
                 DELIVERY INFORMATION
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     TIME OF DELIVERY
@@ -757,7 +760,7 @@ export default function InfantPersonalRecord({
               <h4 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4">
                 HEALTH CENTER, ALLERGY & HEALTH CARE INFORMATION
               </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     BARANGAY

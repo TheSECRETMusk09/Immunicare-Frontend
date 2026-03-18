@@ -70,6 +70,7 @@ const VaccinationsDashboard = () => {
   const [vaccinationForm, setVaccinationForm] = useState(DEFAULT_FORM);
   const [trackingStartDate, setTrackingStartDate] = useState("");
   const [trackingEndDate, setTrackingEndDate] = useState("");
+  const [trackingSearchQuery, setTrackingSearchQuery] = useState("");
 
   const findRecordWithRelations = useCallback(
     (record) => {
@@ -307,6 +308,14 @@ const VaccinationsDashboard = () => {
           if (trackingStartDate && infantDate < trackingStartDate) return false;
           if (trackingEndDate && infantDate > trackingEndDate) return false;
         }
+
+        if (trackingSearchQuery) {
+          const query = trackingSearchQuery.toLowerCase();
+          const firstName = (infant.first_name || "").toLowerCase();
+          const lastName = (infant.last_name || "").toLowerCase();
+          if (!firstName.includes(query) && !lastName.includes(query)) return false;
+        }
+
         return true;
       })
       .map((infant) => {
@@ -325,7 +334,7 @@ const VaccinationsDashboard = () => {
           ...summary,
         };
       });
-  }, [infants, vaccinationRecords, vaccinationSchedules, trackingStartDate, trackingEndDate]);
+  }, [infants, vaccinationRecords, vaccinationSchedules, trackingStartDate, trackingEndDate, trackingSearchQuery]);
 
   const availableVaccinesForClinic = useMemo(() => {
     const scopedInventory = inventoryRecords.filter((record) => {
@@ -722,8 +731,19 @@ const VaccinationsDashboard = () => {
               className="border-none shadow-none py-12"
             />
           ) : (
-            <div className="flex-1 overflow-y-auto auto-hide-scrollbar pr-2">
+            <div className="flex-1 min-h-0 flex flex-col">
               <div className="mb-4 flex flex-col sm:flex-row gap-4 items-start sm:items-end flex-shrink-0">
+                <div className="w-full sm:max-w-xs">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Search Infant
+                  </label>
+                  <Input
+                    placeholder="Search by name..."
+                    value={trackingSearchQuery}
+                    onChange={(e) => setTrackingSearchQuery(e.target.value)}
+                    icon={Search}
+                  />
+                </div>
                 <div className="w-full sm:max-w-md">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Focus by infant
@@ -768,6 +788,7 @@ const VaccinationsDashboard = () => {
                 </div>
               </div>
 
+              <div className="flex-1 overflow-y-auto auto-hide-scrollbar pr-2 pb-2">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {(selectedInfantId
                   ? complianceRows.filter((entry) => entry.infant.id === selectedInfantId)
@@ -867,6 +888,7 @@ const VaccinationsDashboard = () => {
                   />
                 </div>
               )}
+              </div>
             </div>
           )}
         </div>

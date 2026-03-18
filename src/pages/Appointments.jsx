@@ -1446,10 +1446,11 @@ export default function Appointments() {
               <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                 {(blockedDates[selectedDate]?.is_blocked)
                   ? "Blocked by Admin"
-                  : (selectedDateDetails?.isWeekend ??
-                    (selectedDate && isWeekend(selectedDate)))
-                    ? "Weekend (Sat/Sun)"
-                    : "Available"}
+                    : (selectedDateDetails?.holiday || (selectedDate && isPhilippineHoliday(selectedDate)))
+                      ? "Holiday"
+                      : (selectedDateDetails?.isWeekend ?? (selectedDate && isWeekend(selectedDate)))
+                        ? "Weekend (Sat/Sun)"
+                        : "Available"}
               </p>
             </div>
           </div>
@@ -1569,16 +1570,16 @@ export default function Appointments() {
             </div>
           )}
 
-          {createFormData.scheduled_date && bookingDateDetails?.holiday && (
+          {createFormData.scheduled_date && (bookingDateDetails?.holiday || isPhilippineHoliday(createFormData.scheduled_date)) && (
             <Alert variant="warning" className="mb-3">
-              {bookingDateDetails.holiday.name} is a holiday. Appointments are
+              {(bookingDateDetails?.holiday || isPhilippineHoliday(createFormData.scheduled_date)).name} is a holiday. Appointments are
               not available on this date.
             </Alert>
           )}
 
           {createFormData.scheduled_date &&
-            !bookingDateDetails?.holiday &&
-            bookingDateDetails?.isWeekend && (
+            !(bookingDateDetails?.holiday || isPhilippineHoliday(createFormData.scheduled_date)) &&
+            (bookingDateDetails?.isWeekend || isWeekend(createFormData.scheduled_date)) && (
               <Alert variant="warning" className="mb-3">
                 This selected date is a weekend. Appointments are available on
                 weekdays only.
@@ -1868,6 +1869,20 @@ export default function Appointments() {
         }
       >
         <form id="appointmentEditForm" className="admin-form" onSubmit={handleUpdateAppointment}>
+          {editFormData.scheduled_date && isPhilippineHoliday(editFormData.scheduled_date) && (
+            <Alert variant="warning" className="mb-3">
+              {isPhilippineHoliday(editFormData.scheduled_date).name} is a holiday. Appointments are
+              not available on this date.
+            </Alert>
+          )}
+
+          {editFormData.scheduled_date && !isPhilippineHoliday(editFormData.scheduled_date) && isWeekend(editFormData.scheduled_date) && (
+            <Alert variant="warning" className="mb-3">
+              This selected date is a weekend. Appointments are available on
+              weekdays only.
+            </Alert>
+          )}
+
           {/* Patient Info Card */}
           <div className="admin-form-card admin-form-card-info">
             <div className="admin-form-card-header">

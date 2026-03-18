@@ -107,7 +107,10 @@ export default function AddInfantModal({
 
     try {
       if (editingInfant) {
-        await apiClient.updateInfant(editingInfant.id, formData);
+        await apiClient.request(`/infants/${editingInfant.id}`, {
+          method: "PUT",
+          data: formData
+        });
         setSuccess("Infant record updated successfully!");
       } else {
         await apiClient.createInfant(formData);

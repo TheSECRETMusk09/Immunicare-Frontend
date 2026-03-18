@@ -368,6 +368,12 @@ export default function GuardianAppointmentsPage() {
 
     setSelectedDate(clickedDate);
 
+    const holiday = isPhilippineHoliday(info.date);
+    if (holiday) {
+      setCalendarGuardFeedback(`${holiday.name} is a holiday. Appointments cannot be scheduled.`);
+      return;
+    }
+
     const availability = isDateAvailableForBooking(info.date);
     if (!availability.isAvailable) {
       setCalendarGuardFeedback(availability.reason);
@@ -674,6 +680,12 @@ export default function GuardianAppointmentsPage() {
       return;
     }
 
+    const holiday = isPhilippineHoliday(formData.scheduled_date);
+    if (holiday) {
+      setError(`${holiday.name} is a holiday. Appointments cannot be scheduled.`);
+      return;
+    }
+
     if (availabilityFeedback && !availabilityFeedback.available) {
       setError(availabilityFeedback.message || "Selected schedule is not available.");
       return;
@@ -938,6 +950,19 @@ export default function GuardianAppointmentsPage() {
                 dayCellClassNames={getDayCellClassNames}
                 dayHeaderClassNames={getDayHeaderClassNames}
                 dayHeaderContent={renderDayHeaderContent}
+                dayCellContent={(arg) => {
+                  const holiday = isPhilippineHoliday(arg.date);
+                  return (
+                    <div className="flex flex-col w-full h-full min-h-[4rem]">
+                      <div className="text-right p-1 text-sm">{arg.dayNumberText}</div>
+                      {holiday && (
+                        <div className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 truncate px-1 text-right bg-amber-50 dark:bg-amber-900/20 rounded mx-1 mb-1">
+                          {holiday.name}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }}
                 selectAllow={(selectInfo) => !isWeekendDate(selectInfo.start)}
                 headerToolbar={false}
                 height="auto"
@@ -981,6 +1006,10 @@ export default function GuardianAppointmentsPage() {
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded bg-gray-200 border border-gray-300 dark:bg-gray-700 dark:border-gray-600"></div>
                 <span className="text-gray-600 dark:text-gray-400">Weekend (Unavailable)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded bg-amber-50 border border-amber-300 dark:bg-amber-800 dark:border-amber-700"></div>
+                <span className="text-gray-600 dark:text-gray-400">Holiday</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded bg-blue-500"></div>
@@ -1219,6 +1248,12 @@ export default function GuardianAppointmentsPage() {
               ))}
             </Select>
 
+            {isPhilippineHoliday(formData.scheduled_date) && (
+              <Alert variant="warning">
+                {isPhilippineHoliday(formData.scheduled_date).name} is a holiday. Appointments cannot be scheduled on this date.
+              </Alert>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
                 type="date"
@@ -1311,7 +1346,8 @@ export default function GuardianAppointmentsPage() {
                 disabled={
                   (availabilityFeedback ? !availabilityFeedback.available : false) ||
                   timeSlotsLoading ||
-                  (timeSlotsFeedback ? !timeSlotsFeedback.available : false)
+                  (timeSlotsFeedback ? !timeSlotsFeedback.available : false) ||
+                  Boolean(isPhilippineHoliday(formData.scheduled_date))
                 }
                 className="guardian-form-actions__primary ui-form-action-btn ui-form-action-btn--primary"
                 data-testid="guardian-booking-submit-btn"
