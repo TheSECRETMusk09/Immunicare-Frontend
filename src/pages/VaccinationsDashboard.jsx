@@ -5,7 +5,6 @@ import {
   Input,
   Modal,
   PageHeader,
-  PageContainer,
   EmptyState,
   SkeletonTable,
   SkeletonCard,
@@ -362,15 +361,19 @@ const VaccinationsDashboard = () => {
   }
 
   return (
-    <div className="space-y-8 p-6">
-      <PageHeader
-        title="Comprehensive Vaccination Management"
-        subtitle="Track, record, and manage all vaccination activities for pediatric patients"
-        icon={Syringe}
-      />
+    <div className="flex flex-col h-screen overflow-hidden">
+      {/* Sticky Header Section - Stays fixed at top while scrolling */}
+      <div className="flex-shrink-0 sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6">
+        <PageHeader
+          title="Comprehensive Vaccination Management"
+          subtitle="Track, record, and manage all vaccination activities for pediatric patients"
+          icon={Syringe}
+        />
+      </div>
 
+      <div className="flex-1 flex flex-col p-4 sm:px-6 sm:pb-6 pt-3 overflow-hidden space-y-4">
       {error && (
-        <Alert variant="error" title="Vaccination module error">
+        <Alert variant="error" title="Vaccination module error" className="flex-shrink-0">
           {error}
           <div className="mt-4">
             <Button size="sm" onClick={() => void fetchData({ silent: true })}>
@@ -380,30 +383,34 @@ const VaccinationsDashboard = () => {
         </Alert>
       )}
 
-      <div className="border-b border-gray-200 dark:border-gray-700">
-        <nav className="-mb-px flex space-x-8 overflow-x-auto">
-          {[
-            { key: "schedule", label: "📅 Vaccination Schedule" },
-            { key: "records", label: "💉 Vaccination Records" },
-            { key: "tracking", label: "📊 Vaccination Tracking" },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === tab.key
-                  ? "border-primary-500 text-primary-600 dark:text-primary-400"
-                  : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
+      {/* Tab Navigation */}
+      <div className="flex-shrink-0 bg-white dark:bg-gray-900">
+        <div className="border-b border-gray-200 dark:border-gray-700">
+          <nav className="-mb-px flex space-x-8 overflow-x-auto">
+            {[
+              { key: "records", label: "💉 Vaccination Records" },
+              { key: "tracking", label: "📊 Vaccination Tracking" },
+              { key: "schedule", label: "📅 Vaccination Schedule" },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                  activeTab === tab.key
+                    ? "border-primary-500 text-primary-600 dark:text-primary-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        </div>
       </div>
 
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="w-full md:w-1/3">
+      {/* Filter Controls */}
+      <div className="flex-shrink-0 z-10 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4 flex flex-col sm:flex-row justify-between gap-4 items-start sm:items-center">
+        <div className="w-full sm:max-w-md relative">
           <Input
             placeholder="Search vaccinations..."
             value={searchQuery}
@@ -411,7 +418,7 @@ const VaccinationsDashboard = () => {
             icon={Search}
           />
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           {refreshing && (
             <span className="text-xs text-gray-500 dark:text-gray-400">Refreshing...</span>
           )}
@@ -430,12 +437,13 @@ const VaccinationsDashboard = () => {
             <span className="mr-1">🔄</span> {refreshing ? 'Refreshing...' : 'Refresh'}
           </Button>
           {isAdmin && (
-            <Button onClick={handleAddVaccination}>
-              <span className="mr-2">➕</span> Add Vaccination
+            <Button onClick={handleAddVaccination} size="sm">
+              <span className="mr-1">➕</span> Add
             </Button>
           )}
           <Button
             variant="secondary"
+            size="sm"
             onClick={() => {
               const headers = [
                 "Child Name",
@@ -480,34 +488,34 @@ const VaccinationsDashboard = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="p-6 text-center">
-          <div className="text-2xl font-bold text-success-600">{dashboardStats.completed}</div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+      <div className="flex-shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-4 text-center">
+          <div className="text-xl sm:text-2xl font-bold text-success-600">{dashboardStats.completed}</div>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Completed Vaccinations
           </p>
         </Card>
-        <Card className="p-6 text-center">
-          <div className="text-2xl font-bold text-warning-600">{dashboardStats.pending}</div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+        <Card className="p-4 text-center">
+          <div className="text-xl sm:text-2xl font-bold text-warning-600">{dashboardStats.pending}</div>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Pending Vaccinations
           </p>
         </Card>
-        <Card className="p-6 text-center">
-          <div className="text-2xl font-bold text-danger-600">{dashboardStats.overdue}</div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+        <Card className="p-4 text-center">
+          <div className="text-xl sm:text-2xl font-bold text-danger-600">{dashboardStats.overdue}</div>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Overdue Vaccinations
           </p>
         </Card>
-        <Card className="p-6 text-center">
-          <div className="text-2xl font-bold text-info-600">{dashboardStats.trackedInfants}</div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Children Tracked</p>
+        <Card className="p-4 text-center">
+          <div className="text-xl sm:text-2xl font-bold text-info-600">{dashboardStats.trackedInfants}</div>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">Children Tracked</p>
         </Card>
       </div>
 
       {activeTab === "schedule" && (
-        <PageContainer>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+        <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 overflow-hidden">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex-shrink-0">
             Vaccination Schedule Overview
           </h3>
 
@@ -519,9 +527,9 @@ const VaccinationsDashboard = () => {
               className="border-none shadow-none py-12"
             />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700">
+            <div className="flex-1 overflow-auto auto-hide-scrollbar">
+              <table className="w-full relative">
+                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Vaccine
@@ -560,12 +568,12 @@ const VaccinationsDashboard = () => {
               </table>
             </div>
           )}
-        </PageContainer>
+        </div>
       )}
 
       {activeTab === "records" && (
-        <PageContainer>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+        <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 overflow-hidden">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex-shrink-0">
             Vaccination Records
           </h3>
 
@@ -585,9 +593,9 @@ const VaccinationsDashboard = () => {
               className="border-none shadow-none py-12"
             />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700">
+            <div className="flex-1 overflow-auto auto-hide-scrollbar">
+              <table className="w-full relative">
+                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Child Name
@@ -685,12 +693,12 @@ const VaccinationsDashboard = () => {
               </table>
             </div>
           )}
-        </PageContainer>
+        </div>
       )}
 
       {activeTab === "tracking" && (
-        <PageContainer>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+        <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 overflow-hidden">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex-shrink-0">
             Vaccination Compliance Tracking
           </h3>
 
@@ -702,8 +710,8 @@ const VaccinationsDashboard = () => {
               className="border-none shadow-none py-12"
             />
           ) : (
-            <>
-              <div className="mb-4 max-w-md">
+            <div className="flex-1 overflow-y-auto auto-hide-scrollbar pr-2">
+              <div className="mb-4 max-w-md flex-shrink-0">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Focus by infant
                 </label>
@@ -824,10 +832,11 @@ const VaccinationsDashboard = () => {
                   />
                 </div>
               )}
-            </>
+            </div>
           )}
-        </PageContainer>
+        </div>
       )}
+      </div>
 
       <Modal
         isOpen={showAddModal}

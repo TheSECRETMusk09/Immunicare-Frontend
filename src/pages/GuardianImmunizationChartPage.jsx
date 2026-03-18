@@ -5,7 +5,7 @@ import apiClient from "../utils/api";
 import GuardianImmunizationChart from "../components/GuardianImmunizationChart";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
 import { LoadingSpinner, Alert, Button } from "../components/UI";
-import { FileCheck, ChevronDown } from "lucide-react";
+import { FileCheck, ChevronDown, Activity } from "lucide-react";
 
 /**
  * GuardianImmunizationChartPage
@@ -23,6 +23,9 @@ export default function GuardianImmunizationChartPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [activeTab, setActiveTab] = useState("immunization"); // 'immunization' or 'growth'
+  const [growthRecords, setGrowthRecords] = useState([]);
+  const [loadingGrowth, setLoadingGrowth] = useState(false);
 
   const fetchChildren = useCallback(async () => {
     if (!guardianId) {
@@ -54,6 +57,30 @@ export default function GuardianImmunizationChartPage() {
     }
   }, [guardianId, childId]);
 
+  // Fetch growth records when switching to growth tab
+  const fetchGrowthRecords = useCallback(async (targetChildId) => {
+    if (!targetChildId) {
+      setGrowthRecords([]);
+      return;
+    }
+
+    try {
+      setLoadingGrowth(true);
+      const response = await apiClient.getGrowthRecordsByInfant(targetChildId);
+      const normalized = Array.isArray(response) ? response : response?.data || [];
+      setGrowthRecords(normalized.sort((a, b) => {
+        const dateA = new Date(a.measurement_date || a.date || 0);
+        const dateB = new Date(b.measurement_date || b.date || 0);
+        return dateB - dateA;
+      }));
+    } catch (err) {
+      console.error("Error fetching growth records:", err);
+      setGrowthRecords([]);
+    } finally {
+      setLoadingGrowth(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (guardianId) {
       fetchChildren();
@@ -70,6 +97,13 @@ export default function GuardianImmunizationChartPage() {
       setSelectedChild(children[0]);
     }
   }, [childId, children, selectedChild]);
+
+  // Fetch growth records when switching to growth tab
+  useEffect(() => {
+    if (activeTab === "growth" && selectedChild?.id) {
+      fetchGrowthRecords(selectedChild.id);
+    }
+  }, [activeTab, selectedChild?.id, fetchGrowthRecords]);
 
   if (loading) {
     return (
@@ -124,6 +158,34 @@ export default function GuardianImmunizationChartPage() {
       />
 
       <main className="guardian-page-content space-y-4 sm:space-y-6">
+      {/* Tab Navigation */}
+      <div className="flex gap-2 bg-theme-bg-card rounded-xl p-1 border border-theme-border-primary">
+        <button
+          type="button"
+          onClick={() => setActiveTab("immunization")}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-colors ${
+            activeTab === "immunization"
+              ? "bg-emerald-600 text-white shadow-sm"
+              : "text-theme-secondary hover:bg-theme-bg-hover"
+          }`}
+        >
+          <FileCheck className="w-4 h-4" />
+          Immunization Chart
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("growth")}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-colors ${
+            activeTab === "growth"
+              ? "bg-emerald-600 text-white shadow-sm"
+              : "text-theme-secondary hover:bg-theme-bg-hover"
+          }`}
+        >
+          <Activity className="w-4 h-4" />
+          Growth Charts
+        </button>
+      </div>
+
       {/* Child Selector */}
       {children.length > 1 && (
         <div className="relative">
@@ -182,12 +244,81 @@ export default function GuardianImmunizationChartPage() {
       )}
 
       {/* Immunization Chart */}
-      {selectedChild && (
+      {selectedChild && activeTab === "immunization" && (
         <div className="guardian-chart-scroll-container bg-theme-bg-card rounded-xl shadow-sm border border-theme-border-primary p-4">
           <GuardianImmunizationChart
             childId={selectedChild.id}
             onViewFullChart={() => navigate(`/guardian/immunization-chart/${selectedChild.id}`)}
           />
+        </div>
+      )}
+
+      {/* Growth Charts Section */}
+      {selectedChild && activeTab === "growth" && (
+        <div className="space-y-4">
+          {/* Latest Measurements Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-theme-bg-card rounded-xl shadow-sm border border-theme-border-primary p-4">
+              <p className="text-xs uppercase tracking-wide text-theme-secondary">Latest Weight</p>
+              <p className="text-2xl font-bold text-theme-primary mt-2">
+                {growthRecords.length > 0 ? `${growthRecords[0]?.weight_kg || growthRecords[0]?.weight || '-'} kg` : '-'}
+              </p>
+            </div>
+            <div className="bg-theme-bg-card rounded-xl shadow-sm border border-theme-border-primary p-4">
+              <p className="text-xs uppercase tracking-wide text-theme-secondary">Latest Height</p>
+              <p className="text-2xl font-bold text-theme-primary mt-2">
+                {growthRecords.length > 0 ? `${growthRecords[0]?.length_cm || growthRecords[0]?.height || growthRecords[0]?.length || '-'} cm` : '-'}
+              </p>
+            </div>
+            <div className="bg-theme-bg-card rounded-xl shadow-sm border border-theme-border-primary p-4">
+              <p className="text-xs uppercase tracking-wide text-theme-secondary">Head Circumference</p>
+              <p className="text-2xl font-bold text-theme-primary mt-2">
+                {growthRecords.length > 0 ? `${growthRecords[0]?.head_circumference_cm || growthRecords[0]?.head_circumference || '-'} cm` : '-'}
+              </p>
+            </div>
+          </div>
+
+          {/* Growth History Table */}
+          <div className="bg-theme-bg-card rounded-xl shadow-sm border border-theme-border-primary p-4 sm:p-6">
+            <h3 className="text-lg font-semibold text-theme-primary mb-4">Growth History</h3>
+
+            {loadingGrowth ? (
+              <div className="py-10 flex justify-center">
+                <LoadingSpinner size="md" />
+              </div>
+            ) : growthRecords.length === 0 ? (
+              <div className="py-10 text-center text-theme-secondary">
+                No growth records yet for this child.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[700px]">
+                  <thead>
+                    <tr className="border-b border-theme-border-primary">
+                      <th className="text-left text-xs uppercase tracking-wide text-theme-secondary py-2">Date</th>
+                      <th className="text-left text-xs uppercase tracking-wide text-theme-secondary py-2">Weight (kg)</th>
+                      <th className="text-left text-xs uppercase tracking-wide text-theme-secondary py-2">Height (cm)</th>
+                      <th className="text-left text-xs uppercase tracking-wide text-theme-secondary py-2">Head Circ. (cm)</th>
+                      <th className="text-left text-xs uppercase tracking-wide text-theme-secondary py-2">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {growthRecords.map((record) => (
+                      <tr key={record.id || `${record.measurement_date}-${record.weight_kg}`} className="border-b border-theme-border-primary/60">
+                        <td className="py-3 text-theme-primary">
+                          {record.measurement_date ? new Date(record.measurement_date).toLocaleDateString() : '-'}
+                        </td>
+                        <td className="py-3 text-theme-primary">{record.weight_kg || record.weight || '-'}</td>
+                        <td className="py-3 text-theme-primary">{record.length_cm || record.height || record.length || '-'}</td>
+                        <td className="py-3 text-theme-primary">{record.head_circumference_cm || record.head_circumference || '-'}</td>
+                        <td className="py-3 text-theme-secondary max-w-[220px] truncate">{record.notes || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
       </main>

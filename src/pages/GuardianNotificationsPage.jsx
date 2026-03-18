@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import useGuardianNotifications from "../hooks/useGuardianNotifications";
+import { useSocket } from "../contexts/SocketContext";
 import { format, isToday, isYesterday, isThisWeek } from "date-fns";
 import GuardianTopHeader from "../components/GuardianTopHeader";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
@@ -178,6 +179,77 @@ const GuardianNotificationsPage = () => {
     deleteNotification
   } = useGuardianNotifications({ limit: 50, pollingInterval: 0 });
 
+  // Get socket connection for real-time updates
+  const { isConnected, notifications: socketNotifications, on, off } = useSocket();
+  const [socketRealTimeNotifications, setSocketRealTimeNotifications] = useState([]);
+
+  // Handle real-time socket notifications
+  useEffect(() => {
+    if (!isConnected) return;
+
+    // Listen for new notifications
+    const handleNewNotification = (data) => {
+      console.log("Real-time notification received:", data);
+      if (data?.notification) {
+        setSocketRealTimeNotifications(prev => [data.notification, ...prev]);
+      }
+    };
+
+    // Listen for notification updates
+    const handleNotificationUpdated = (data) => {
+      console.log("Real-time notification updated:", data);
+      // Trigger a refresh to get the latest state
+      refresh();
+    };
+
+    // Listen for notification deletion
+    const handleNotificationDeleted = (data) => {
+      console.log("Real-time notification deleted:", data);
+      setSocketRealTimeNotifications(prev =>
+        prev.filter(n => n.id !== data.notificationId)
+      );
+    };
+
+    // Listen for all notifications read
+    const handleAllRead = (data) => {
+      console.log("Real-time all notifications read:", data);
+      setSocketRealTimeNotifications(prev =>
+        prev.map(n => ({ ...n, isRead: true }))
+      );
+    };
+
+    // Register event listeners
+    on('notification', handleNewNotification);
+    on('critical-notification', handleNewNotification);
+    on('actionable-notification', handleNewNotification);
+    on('notification-updated', handleNotificationUpdated);
+    on('notification-deleted', handleNotificationDeleted);
+    on('notifications-read-all', handleAllRead);
+
+    // Cleanup
+    return () => {
+      off('notification', handleNewNotification);
+      off('critical-notification', handleNewNotification);
+      off('actionable-notification', handleNewNotification);
+      off('notification-updated', handleNotificationUpdated);
+      off('notification-deleted', handleNotificationDeleted);
+      off('notifications-read-all', handleAllRead);
+    };
+  }, [isConnected, on, off, refresh]);
+
+  // Combine API notifications with real-time socket notifications
+  const combinedNotifications = React.useMemo(() => {
+    const allNotifications = [...socketRealTimeNotifications, ...notifications];
+    // Remove duplicates by ID
+    const uniqueMap = new Map();
+    allNotifications.forEach(n => {
+      if (!uniqueMap.has(n.id)) {
+        uniqueMap.set(n.id, n);
+      }
+    });
+    return Array.from(uniqueMap.values());
+  }, [socketRealTimeNotifications, notifications]);
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
 
@@ -204,7 +276,7 @@ const GuardianNotificationsPage = () => {
   };
 
   // Group notifications by date
-  const groupedNotifications = notifications.reduce((acc, notification) => {
+  const groupedNotifications = combinedNotifications.reduce((acc, notification) => {
     const date = new Date(notification.created_at);
     let key = 'Earlier';
 
@@ -285,6 +357,14 @@ const GuardianNotificationsPage = () => {
 
           {/* Filter Chips */}
           <div className="flex gap-2 mt-4 overflow-x-auto pb-2 scrollbar-hide">
+            {/* Real-time Connection Status */}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700">
+              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+              <span className="text-gray-600 dark:text-gray-300">
+                {isConnected ? 'Live' : 'Polling'}
+              </span>
+            </div>
+
             {[
               { id: 'all', label: 'All' },
               { id: 'unread', label: 'Unread' },
@@ -315,7 +395,7 @@ const GuardianNotificationsPage = () => {
               <div key={i} className="animate-pulse bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 h-24" />
             ))}
           </div>
-        ) : notifications.length === 0 ? (
+        ) : combinedNotifications.length === 0 ? (
           <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 border-dashed">
             <div className="w-16 h-16 bg-gray-50 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
               <Bell className="w-8 h-8 text-gray-400 dark:text-gray-500" />

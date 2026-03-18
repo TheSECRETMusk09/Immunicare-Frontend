@@ -1,10 +1,11 @@
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import apiClient from "../utils/api";
 import { Alert, Button, Input, Modal, Select } from "../components/UI";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
-import { PackageX, Calendar, Plus } from "lucide-react";
+import GuardianTopHeader from "../components/GuardianTopHeader";
+import { PackageX, Calendar, Plus, RefreshCw, Bell, User } from "lucide-react";
 import moment from "moment";
 import { useTheme, useMediaQuery } from "@mui/material";
 
@@ -14,11 +15,16 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
+// Philippine Holidays utility
+import {
+  isPhilippineHoliday,
+  isWeekend,
+  isDateAvailableForBooking,
+  getHolidayTypeClass,
+} from "../utils/holidays";
+
 const isWeekendDate = (value) => {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
-  const day = date.getDay();
-  return day === 0 || day === 6;
+  return isWeekend(value);
 };
 
 const toDateKey = (value) => {
@@ -101,6 +107,7 @@ const canMutateAppointment = (status) => !["completed", "attended", "cancelled"]
 const CALENDAR_WEEK_START = 0; // Sunday-first column order (Sun ... Sat)
 
 export default function GuardianAppointmentsPage() {
+  const navigate = useNavigate();
   const { guardianId } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const theme = useTheme();
@@ -361,10 +368,9 @@ export default function GuardianAppointmentsPage() {
 
     setSelectedDate(clickedDate);
 
-    if (isWeekendDate(info.date)) {
-      setCalendarGuardFeedback(
-        "Appointments can only be booked on weekdays (Monday-Friday).",
-      );
+    const availability = isDateAvailableForBooking(info.date);
+    if (!availability.isAvailable) {
+      setCalendarGuardFeedback(availability.reason);
       return;
     }
 
@@ -382,6 +388,11 @@ export default function GuardianAppointmentsPage() {
 
     if (isWeekendDate(args.date)) {
       classNames.push("guardian-appointments-calendar-day--weekend");
+    }
+
+    const holiday = isPhilippineHoliday(args.date);
+    if (holiday) {
+      classNames.push(getHolidayTypeClass(holiday.type));
     }
 
     if (toDateKey(args.date) === toDateKey(new Date())) {
@@ -752,24 +763,64 @@ export default function GuardianAppointmentsPage() {
 
   return (
     <div className="guardian-page-wrapper min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 guardian-module-mobile-header-spacing">
-      <GuardianModuleHeader
-        title="Appointments"
-        subtitle="Book, edit, cancel, and monitor your baby's vaccination appointments"
-        icon={<Calendar className="w-8 h-8 text-white" />}
-        className="guardian-appointments-mobile-ui"
-        actionsClassName="guardian-appointments-header-actions"
-        actions={
-          <div className="guardian-appointments-header-actions-inner flex items-center gap-2 sm:gap-3">
-            <Button variant="secondary" size="sm" onClick={handleToday}>
-              Today
-            </Button>
-            <Button variant="primary" size="sm" onClick={openCreateModal}>
-              <Plus className="w-4 h-4 mr-1" />
-              New Appointment
-            </Button>
-          </div>
-        }
-      />
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 w-full bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-200">
+        <GuardianTopHeader
+          title=""
+          onRefresh={refreshAppointments}
+          isRefreshing={isRefreshing}
+        />
+      </div>
+
+      <div className="pt-14 sm:pt-16 lg:pt-0">
+        <GuardianModuleHeader
+          title="Appointments"
+          subtitle="Book, edit, cancel, and monitor your baby's vaccination appointments"
+          icon={<Calendar className="w-8 h-8 text-white" />}
+          className="guardian-appointments-mobile-ui"
+          actionsClassName="guardian-appointments-header-actions"
+          actions={
+            <div className="flex items-center gap-2">
+              <div className="hidden lg:flex guardian-desktop-pageheader-actions mr-2">
+                <button
+                  type="button"
+                  onClick={refreshAppointments}
+                  className="guardian-desktop-pageheader-icon-btn"
+                  aria-label="Refresh Appointments"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/guardian/notifications')}
+                  className="guardian-desktop-pageheader-icon-btn guardian-desktop-pageheader-icon-btn--notif"
+                  aria-label="Open notifications"
+                >
+                  <Bell className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/guardian/profile')}
+                  className="guardian-desktop-pageheader-icon-btn"
+                  aria-label="Open profile"
+                >
+                  <User className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="guardian-appointments-header-actions-inner flex items-center gap-2 sm:gap-3">
+                <Button variant="secondary" size="sm" onClick={handleToday}>
+                  Today
+                </Button>
+                <Button variant="primary" size="sm" onClick={openCreateModal}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  New Appointment
+                </Button>
+              </div>
+            </div>
+          }
+        />
+      </div>
 
       <main className="guardian-page-content space-y-4 md:space-y-5 lg:space-y-6">
         {error && <Alert variant="error">{error}</Alert>}

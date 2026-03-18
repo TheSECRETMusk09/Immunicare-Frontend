@@ -16,7 +16,6 @@ import {
 } from "../utils/adminDataAdapters";
 
 import VaccinationsDashboard from "../pages/VaccinationsDashboard";
-import VaccineTracking from "../pages/VaccineTracking";
 
 import apiClient from "../utils/api";
 
@@ -62,13 +61,6 @@ const renderVaccinationsDashboard = () =>
   render(
     <MemoryRouter initialEntries={["/vaccination-management"]}>
       <VaccinationsDashboard />
-    </MemoryRouter>,
-  );
-
-const renderVaccineTracking = () =>
-  render(
-    <MemoryRouter initialEntries={["/vaccine-tracking"]}>
-      <VaccineTracking />
     </MemoryRouter>,
   );
 
@@ -342,7 +334,7 @@ describe("Admin integration sync and mapping checks", () => {
       ]);
       apiClient.getVaccineStockAlerts.mockResolvedValue([]);
 
-      renderVaccineTracking();
+      renderVaccinationsDashboard();
 
       expect(await screen.findByText(/vaccine tracking/i)).toBeInTheDocument();
 
@@ -398,7 +390,7 @@ describe("Admin integration sync and mapping checks", () => {
     apiClient.getVaccineInventoryTransactions.mockResolvedValue([]);
     apiClient.getVaccineStockAlerts.mockResolvedValue([]);
 
-    renderVaccineTracking();
+    renderVaccinationsDashboard();
 
     await waitFor(() => {
       expect(apiClient.getVaccineInventory).toHaveBeenCalled();
@@ -441,7 +433,7 @@ describe("Admin integration sync and mapping checks", () => {
       status: "ACKNOWLEDGED",
     });
 
-    renderVaccineTracking();
+    renderVaccinationsDashboard();
 
     expect(
       await screen.findByRole("button", { name: /inventory tracking/i }),

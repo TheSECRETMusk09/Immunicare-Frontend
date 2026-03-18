@@ -480,7 +480,7 @@ export const VaccinationDashboard = () => {
             variant="primary"
             size="lg"
             className="w-full"
-            onClick={() => navigate("/vaccine-tracking")}
+            onClick={() => navigate("/vaccination-management")}
           >
             <span className="flex items-center gap-2">
               <svg

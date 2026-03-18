@@ -205,6 +205,81 @@ const infantService = {
       "Fetch infants by age range",
     );
   },
+
+  // ========================================
+  // AGE MANAGEMENT
+  // ========================================
+
+  /**
+   * Get all infants with their calculated ages
+   * @param {number} limit
+   * @param {number} offset
+   * @returns {Promise<Object>}
+   */
+  async getInfantAges(limit = 100, offset = 0) {
+    return handleApiResponse(
+      apiClient.getInfantAges(limit, offset),
+      "Fetch infant ages",
+    );
+  },
+
+  /**
+   * Get age statistics for all infants
+   * @returns {Promise<Object>}
+   */
+  async getAgeStats() {
+    return handleApiResponse(
+      apiClient.getInfantAgeStats(),
+      "Fetch infant age statistics",
+    );
+  },
+
+  /**
+   * Get detailed age information for an infant
+   * @param {string|number} infantId
+   * @returns {Promise<Object>}
+   */
+  async getAgeInfo(infantId) {
+    return handleApiResponse(
+      apiClient.getInfantAgeInfo(infantId),
+      "Fetch infant age info",
+    );
+  },
+
+  /**
+   * Update age for a specific infant
+   * @param {string|number} infantId
+   * @returns {Promise<Object>}
+   */
+  async updateAge(infantId) {
+    return handleApiResponse(
+      apiClient.updateInfantAge(infantId),
+      "Update infant age",
+    );
+  },
+
+  /**
+   * Update ages for all infants (bulk operation)
+   * @returns {Promise<Object>}
+   */
+  async updateAllAges() {
+    return handleApiResponse(
+      apiClient.updateAllInfantAges(),
+      "Update all infant ages",
+    );
+  },
+
+  /**
+   * Calculate age from a given date of birth
+   * @param {string} dob - Date of birth
+   * @returns {Promise<Object>}
+   */
+  async calculateAge(dob) {
+    return handleApiResponse(
+      apiClient.calculateAge(dob),
+      "Calculate infant age",
+    );
+  },
 };
 
 export default infantService;

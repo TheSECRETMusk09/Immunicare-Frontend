@@ -487,11 +487,6 @@ function DocumentsTab({ infants }) {
     navigate(`/vaccinations/schedule/${infantId}`);
   };
 
-  const handleViewGrowthChart = (infantId) => {
-    // Navigate to growth chart page for the infant
-    navigate(`/guardian/health-charts/${infantId}`);
-  };
-
   const handleDownloadRecords = async (infantId) => {
     try {
       // Fetch completion status and download documents
@@ -527,7 +522,7 @@ function DocumentsTab({ infants }) {
                   {infant.first_name} {infant.last_name}
                 </h4>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Vaccination Records & Growth Charts
+                  Vaccination Records
                 </p>
               </div>
               <FileText className="h-8 w-8 text-blue-500" />
@@ -541,14 +536,6 @@ function DocumentsTab({ infants }) {
                 onClick={() => handleGenerateSchedule(infant.id)}
               >
                 Generate Vaccine Schedule
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="w-full"
-                onClick={() => handleViewGrowthChart(infant.id)}
-              >
-                View Growth Chart
               </Button>
               <Button
                 size="sm"

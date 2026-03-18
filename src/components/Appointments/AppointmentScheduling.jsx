@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Calendar } from "react-calendar";
 import "react-calendar/dist/Calendar.css";
+import apiClient from "../../utils/api";
 
 export const AppointmentScheduling = () => {
   const [appointments, setAppointments] = useState([]);
@@ -31,6 +32,9 @@ export const AppointmentScheduling = () => {
     notes: "",
     reminderSent: false,
   });
+  const [suggestedAppointments, setSuggestedAppointments] = useState([]);
+  const [suggestionLoading, setSuggestionLoading] = useState(false);
+  const [suggestionError, setSuggestionError] = useState(null);
 
   const [activeTab, setActiveTab] = useState("calendar");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -39,6 +43,32 @@ export const AppointmentScheduling = () => {
   useEffect(() => {
     // Load appointments from API
     loadAppointments();
+  }, [selectedDate]);
+
+  // Fetch suggested appointments when date changes
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      // For demo purposes, we'll use a mock infant ID
+      // In a real implementation, this would come from context or props
+      const mockInfantId = 1;
+
+      if (!mockInfantId) return;
+
+      setSuggestionLoading(true);
+      setSuggestionError(null);
+
+      try {
+        const response = await apiClient.getAppointmentSuggestions(mockInfantId);
+        setSuggestedAppointments(response.data || []);
+      } catch (err) {
+        setSuggestionError(err.message || 'Failed to load suggested appointments');
+        setSuggestedAppointments([]);
+      } finally {
+        setSuggestionLoading(false);
+      }
+    };
+
+    fetchSuggestions();
   }, [selectedDate]);
 
   const loadAppointments = async () => {
@@ -174,103 +204,179 @@ export const AppointmentScheduling = () => {
     return "💉";
   };
 
-  const CalendarView = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Calendar */}
-      <Card className="lg:col-span-1">
-        <div className="p-4">
-          <Calendar
-            onChange={setSelectedDate}
-            value={selectedDate}
-            tileContent={({ date, view }) => {
-              const dayAppointments = getAppointmentsForDate(date);
-              if (dayAppointments.length > 0 && view === "month") {
-                return (
-                  <div className="absolute bottom-1 left-1 right-1">
-                    <div className="h-1 bg-blue-500 rounded"></div>
-                  </div>
-                );
-              }
-              return null;
-            }}
-            className="w-full"
-          />
-        </div>
-      </Card>
+   const CalendarView = () => (
+     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+       {/* Calendar */}
+       <Card className="lg:col-span-1">
+         <div className="p-4">
+           <Calendar
+             onChange={setSelectedDate}
+             value={selectedDate}
+             tileContent={({ date, view }) => {
+               const dayAppointments = getAppointmentsForDate(date);
+               const daySuggestions = suggestedAppointments.filter(
+                 sugg => sugg.date === date.toISOString().split('T')[0]
+               );
 
-      {/* Appointments List */}
-      <Card className="lg:col-span-2">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">
-            Appointments for {selectedDate.toLocaleDateString()}
-          </h3>
-          <Button variant="primary" onClick={handleAddAppointment}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Appointment
-          </Button>
-        </div>
+               if ((dayAppointments.length > 0 || daySuggestions.length > 0) && view === "month") {
+                 return (
+                   <div className="absolute bottom-1 left-1 right-1">
+                     <div className="h-1 bg-blue-500 rounded"></div>
+                     {daySuggestions.length > 0 && (
+                       <div className="h-1 bg-green-500 rounded" style={{ marginTop: '2px' }}></div>
+                     )}
+                   </div>
+                 );
+               }
+               return null;
+             }}
+             className="w-full"
+           />
+         </div>
+       </Card>
 
-        <div className="space-y-3">
-          {getAppointmentsForDate(selectedDate).map((appointment) => (
-            <div
-              key={appointment.id}
-              className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
-            >
-              <div className="flex items-center space-x-4">
-                <div className="text-2xl">
-                  {getVaccineIcon(appointment.vaccine)}
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900">
-                    {appointment.patientName}
-                  </h4>
-                  <p className="text-sm text-gray-600">{appointment.vaccine}</p>
-                  <div className="flex items-center space-x-4 text-xs text-gray-500">
-                    <span>{appointment.time}</span>
-                    <span>•</span>
-                    <span>{appointment.location}</span>
-                    <span>•</span>
-                    <span>Nurse: {appointment.nurse}</span>
-                  </div>
-                </div>
+       {/* Appointments List */}
+       <Card className="lg:col-span-2">
+         <div className="flex justify-between items-center mb-4">
+           <h3 className="text-lg font-semibold">
+             Appointments for {selectedDate.toLocaleDateString()}
+           </h3>
+           <Button variant="primary" onClick={handleAddAppointment}>
+             <Plus className="w-4 h-4 mr-2" />
+             Add Appointment
+           </Button>
+         </div>
+
+         <div className="space-y-3">
+           {/* Regular Appointments */}
+           {getAppointmentsForDate(selectedDate).map((appointment) => (
+             <div
+               key={appointment.id}
+               className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+             >
+               <div className="flex items-center space-x-4">
+                 <div className="text-2xl">
+                   {getVaccineIcon(appointment.vaccine)}
+                 </div>
+                 <div>
+                   <h4 className="font-semibold text-gray-900">
+                     {appointment.patientName}
+                   </h4>
+                   <p className="text-sm text-gray-600">{appointment.vaccine}</p>
+                   <div className="flex items-center space-x-4 text-xs text-gray-500">
+                     <span>{appointment.time}</span>
+                     <span>•</span>
+                     <span>{appointment.location}</span>
+                     <span>•</span>
+                     <span>Nurse: {appointment.nurse}</span>
+                   </div>
+                 </div>
+               </div>
+               <div className="flex items-center space-x-2">
+                 <Badge variant={getStatusColor(appointment.status)}>
+                   {appointment.status}
+                 </Badge>
+                 <Button
+                   variant="outline"
+                   size="sm"
+                   onClick={() => handleEditAppointment(appointment)}
+                 >
+                   <Edit className="w-4 h-4" />
+                 </Button>
+                 <Button
+                   variant="danger"
+                   size="sm"
+                   onClick={() => handleDeleteAppointment(appointment.id)}
+                 >
+                   <Trash2 className="w-4 h-4" />
+                 </Button>
+               </div>
+             </div>
+           ))}
+
+            {/* Suggested Appointments - Loading/Error State */}
+            {suggestionLoading && (
+              <div className="flex items-center justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
+                <span className="ml-2 text-sm text-gray-500">Loading suggestions...</span>
               </div>
-              <div className="flex items-center space-x-2">
-                <Badge variant={getStatusColor(appointment.status)}>
-                  {appointment.status}
-                </Badge>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleEditAppointment(appointment)}
+            )}
+            {suggestionError && !suggestionLoading && (
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                <p className="text-sm text-red-600 dark:text-red-400">{suggestionError}</p>
+              </div>
+            )}
+            {!suggestionLoading && !suggestionError && suggestedAppointments
+              .filter(sugg => sugg.date === selectedDate.toISOString().split('T')[0])
+              .map((suggestion, index) => (
+                <div
+                  key={`suggestion-${index}`}
+                  className="flex items-center justify-between p-4 border border-green-200 rounded-lg hover:bg-green-50"
                 >
-                  <Edit className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => handleDeleteAppointment(appointment.id)}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
+                  <div className="flex items-center space-x-4">
+                    <div className="text-2xl">
+                      {getVaccineIcon(suggestion.vaccine)}
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900">
+                        Suggested for {suggestion.infant_name || 'Child'}
+                      </h4>
+                      <p className="text-sm text-gray-600">
+                        {suggestion.vaccine} Dose {suggestion.doseNumber}
+                      </p>
+                      <div className="flex items-center space-x-4 text-xs text-gray-500">
+                        <span>{suggestion.time}</span>
+                        <span>•</span>
+                        <span>Room 2</span>
+                        <span>•</span>
+                        <span>
+                          {suggestion.isOverdue ? 'OVERDUE' : suggestion.daysUntil > 0 ? `In ${Math.ceil(suggestion.daysUntil)} days` : 'Today'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="green">
+                      Suggested
+                    </Badge>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => {
+                        // Fill form with suggested appointment data
+                        setFormData({
+                          ...formData,
+                          date: suggestion.date,
+                          time: suggestion.time,
+                          vaccine: suggestion.vaccine,
+                          patientName: suggestion.infant_name || '',
+                          patientId: suggestion.infant_id || '',
+                        });
+                        setShowModal(true);
+                      }}
+                    >
+                      Book This Slot
+                    </Button>
+                  </div>
+                </div>
+              ))}
 
-          {getAppointmentsForDate(selectedDate).length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              No appointments scheduled for this date
-              <div className="mt-2">
-                <Button variant="primary" onClick={handleAddAppointment}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add First Appointment
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      </Card>
-    </div>
-  );
+           {(getAppointmentsForDate(selectedDate).length === 0 &&
+             suggestedAppointments.filter(sugg => sugg.date === selectedDate.toISOString().split('T')[0]).length === 0) && (
+             <div className="text-center py-8 text-gray-500">
+               No appointments scheduled for this date
+               <div className="mt-2">
+                 <Button variant="primary" onClick={handleAddAppointment}>
+                   <Plus className="w-4 h-4 mr-2" />
+                   Add First Appointment
+                 </Button>
+               </div>
+             </div>
+           )}
+         </div>
+       </Card>
+     </div>
+   );
 
   const ListView = () => (
     <Card>

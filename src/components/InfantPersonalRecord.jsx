@@ -3,6 +3,7 @@ import apiClient from "../utils/api";
 import { Button, Input, Alert, LoadingSpinner } from "./UI";
 import { useAuth } from "../contexts/AuthContext";
 import { normalizeInfantResponse } from "../utils/adminDataAdapters";
+import InfantDocuments from "./InfantDocuments";
 
 const EDITABLE_INFANT_FIELDS = [
   "first_name",
@@ -802,6 +803,16 @@ export default function InfantPersonalRecord({
             )}
           </div>
         </form>
+      </div>
+
+      {/* Documents Section */}
+      <div className="mt-6">
+        <InfantDocuments
+          infantId={infantId}
+          onDocumentChange={(doc) => {
+            console.log("Document changed:", doc);
+          }}
+        />
       </div>
     </div>
   );

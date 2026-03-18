@@ -18,6 +18,7 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import PropTypes from "prop-types";
+import notificationService from "../services/notificationService";
 
 // Create context
 const NotificationContext = createContext(null);
@@ -273,15 +274,130 @@ export const NotificationProvider = ({ children, maxNotifications = 5 }) => {
     [addNotification],
   );
 
+   // Transfer-in specific notifications
+   const transferInSubmitted = useCallback(
+     async (data = {}) => {
+       try {
+         await notificationService.sendTransferInSubmittedNotification(data);
+       } catch (serviceError) {
+         console.error('Failed to send transfer-in submitted notification:', serviceError);
+       }
+       // Show toast for immediate feedback
+       return addNotification({
+         type: NOTIFICATION_TYPES.SUCCESS,
+         message: `Transfer-in submitted: ${data.childName || 'Child'} vaccines recorded`,
+         title: 'Transfer-In Submitted',
+       });
+     },
+     [addNotification],
+   );
+
+   const nextVaccineComputed = useCallback(
+     async (data = {}) => {
+       try {
+         await notificationService.sendNextVaccineComputedNotification(data);
+       } catch (serviceError) {
+         console.error('Failed to send next vaccine computed notification:', serviceError);
+       }
+       // Show toast for immediate feedback
+       const vaccineName = data.vaccineName || 'vaccine';
+       const doseNumber = data.doseNumber || 'next';
+       return addNotification({
+         type: NOTIFICATION_TYPES.INFO,
+         message: `Next vaccine due: ${vaccineName} dose ${doseNumber}`,
+         title: 'Next Vaccine Computed',
+       });
+     },
+     [addNotification],
+   );
+
+   const appointmentSuggested = useCallback(
+     async (data = {}) => {
+       try {
+         await notificationService.sendAppointmentSuggestedNotification(data);
+       } catch (serviceError) {
+         console.error('Failed to send appointment suggested notification:', serviceError);
+       }
+       // Show toast for immediate feedback
+       const date = data.date || 'upcoming date';
+       const time = data.time || 'time TBD';
+       return addNotification({
+         type: NOTIFICATION_TYPES.INFO,
+         message: `Appointment suggested: ${date} at ${time}`,
+         title: 'Appointment Suggested',
+       });
+     },
+     [addNotification],
+   );
+
+   const vaccineOverdue = useCallback(
+     async (data = {}) => {
+       try {
+         await notificationService.sendVaccineOverdueNotification(data);
+       } catch (serviceError) {
+         console.error('Failed to send vaccine overdue notification:', serviceError);
+       }
+       // Show toast for immediate feedback
+       const vaccineName = data.vaccineName || 'vaccine';
+       const daysOverdue = data.daysOverdue || 0;
+       return addNotification({
+         type: NOTIFICATION_TYPES.WARNING,
+         message: `${vaccineName} vaccine is overdue by ${daysOverdue} days`,
+         title: 'Vaccine Overdue Warning',
+       });
+     },
+     [addNotification],
+   );
+
+   const missedAppointment = useCallback(
+     async (data = {}) => {
+       try {
+         await notificationService.sendMissedAppointmentNotification(data);
+       } catch (serviceError) {
+         console.error('Failed to send missed appointment notification:', serviceError);
+       }
+       // Show toast for immediate feedback
+       const date = data.date || 'scheduled date';
+       return addNotification({
+         type: NOTIFICATION_TYPES.WARNING,
+         message: `Missed appointment on ${date}`,
+         title: 'Missed Appointment',
+       });
+     },
+     [addNotification],
+   );
+
+   const stockUnavailable = useCallback(
+     async (data = {}) => {
+       try {
+         await notificationService.sendStockUnavailableNotification(data);
+       } catch (serviceError) {
+         console.error('Failed to send stock unavailable notification:', serviceError);
+       }
+       // Show toast for immediate feedback
+       const vaccineName = data.vaccineName || 'vaccine';
+       return addNotification({
+         type: NOTIFICATION_TYPES.ERROR,
+         message: `${vaccineName} vaccine is currently unavailable`,
+         title: 'Stock Unavailable',
+       });
+     },
+     [addNotification],
+   );
+
   // Handle API errors consistently
   const handleApiError = useCallback(
     (error, fallbackMessage = "An error occurred. Please try again.") => {
       const message =
         error?.response?.data?.message || error?.message || fallbackMessage;
 
-      return error(message, { title: "API Error" });
+      return addNotification({
+        type: NOTIFICATION_TYPES.ERROR,
+        message,
+        title: "API Error",
+      });
     },
-    [error],
+    [addNotification],
   );
 
   // Auto-remove notifications after duration
@@ -312,6 +428,13 @@ export const NotificationProvider = ({ children, maxNotifications = 5 }) => {
     warning,
     info,
     handleApiError,
+    // Transfer-in and notification event handlers
+    transferInSubmitted,
+    nextVaccineComputed,
+    appointmentSuggested,
+    vaccineOverdue,
+    missedAppointment,
+    stockUnavailable,
   };
 
   return (

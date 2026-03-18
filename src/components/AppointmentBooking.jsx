@@ -7,6 +7,8 @@ import {
   Plus,
 } from "lucide-react";
 import { Button, Input, Select } from "./UI";
+import apiClient from "../utils/api";
+import VaccineEligibilityIndicator, { VaccineEligibilityList } from "./VaccineEligibilityIndicator";
 
 export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -14,8 +16,13 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
   const [appointmentType, setAppointmentType] = useState("routine_checkup");
   const [reason, setReason] = useState("");
   const [availableSlots, setAvailableSlots] = useState([]);
+  const [suggestedSlots, setSuggestedSlots] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [suggestionLoading, setSuggestionLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [suggestionError, setSuggestionError] = useState(null);
+  const [eligibleVaccines, setEligibleVaccines] = useState(null);
+  const [eligibleLoading, setEligibleLoading] = useState(false);
 
   // Generate available time slots
   const generateTimeSlots = (date) => {
@@ -40,6 +47,51 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
     setAvailableSlots(generateTimeSlots(selectedDate));
   }, [selectedDate]);
 
+  // Fetch eligible vaccines when infantId changes
+  useEffect(() => {
+    const fetchEligibleVaccines = async () => {
+      if (!infantId) {
+        setEligibleVaccines(null);
+        return;
+      }
+
+      setEligibleLoading(true);
+      try {
+        const response = await apiClient.getEligibleVaccines(infantId);
+        setEligibleVaccines(response);
+      } catch (err) {
+        console.error("Error fetching eligible vaccines:", err);
+        setEligibleVaccines(null);
+      } finally {
+        setEligibleLoading(false);
+      }
+    };
+
+    fetchEligibleVaccines();
+  }, [infantId]);
+
+  // Fetch suggested appointments when date changes
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (!infantId) return;
+
+      setSuggestionLoading(true);
+      setSuggestionError(null);
+
+      try {
+        const response = await apiClient.getAppointmentSuggestions(infantId);
+        setSuggestedSlots(response.data || []);
+      } catch (err) {
+        setSuggestionError(err.message || 'Failed to load suggested appointments');
+        setSuggestedSlots([]);
+      } finally {
+        setSuggestionLoading(false);
+      }
+    };
+
+    fetchSuggestions();
+  }, [infantId, selectedDate]);
+
   const handleDateChange = (date) => {
     setSelectedDate(date);
     setSelectedTime("");
@@ -48,7 +100,10 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
   const handleBooking = async (e) => {
     e.preventDefault();
 
-    if (!selectedTime) {
+    // If a suggested time is selected, use it; otherwise use the manually selected time
+    const timeToUse = selectedTime || (suggestedSlots.length > 0 ? suggestedSlots[0].time : "");
+
+    if (!timeToUse) {
       setError("Please select a time slot");
       return;
     }
@@ -58,7 +113,7 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
 
     try {
       // Format the appointment date and time
-      const [hours, minutes] = selectedTime.split(":");
+      const [hours, minutes] = timeToUse.split(":");
       const appointmentDateTime = new Date(selectedDate);
       appointmentDateTime.setHours(parseInt(hours), parseInt(minutes));
 
@@ -132,6 +187,81 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
             </span>
           </div>
         </div>
+
+        {/* Appointment Suggestions Section */}
+        <div className="mt-4">
+          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Suggested Appointments
+          </h4>
+          {suggestionLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <span className="ml-2 text-sm text-gray-500">Loading suggestions...</span>
+            </div>
+          ) : suggestionError ? (
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+              <p className="text-sm text-red-600 dark:text-red-400">{suggestionError}</p>
+            </div>
+          ) : suggestedSlots.length > 0 ? (
+            <div className="space-y-2">
+              {suggestedSlots.map((slot, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => {
+                    setSelectedTime(slot.time);
+                    if (slot.date) {
+                      setSelectedDate(new Date(slot.date));
+                    }
+                  }}
+                  className={`w-full p-3 text-left border rounded-md transition-colors ${
+                    selectedTime === slot.time
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
+                      : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
+                      {slot.date ? new Date(slot.date).toLocaleDateString() : selectedDate.toLocaleDateString()}
+                    </span>
+                    <span className="text-gray-600 dark:text-gray-400">{slot.time}</span>
+                  </div>
+                  {slot.vaccine && (
+                    <span className="text-xs text-blue-600 dark:text-blue-400 mt-1 block">
+                      {slot.vaccine}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 dark:text-gray-400 py-2">
+              No appointment suggestions available. Please select a time manually.
+            </p>
+          )}
+        </div>
+
+        {/* Eligible Vaccines Section - Using VaccineEligibilityIndicator and VaccineEligibilityList components */}
+        {eligibleLoading ? (
+          <div className="mt-4 flex items-center justify-center py-4">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            <span className="ml-2 text-sm text-gray-500">Loading vaccine eligibility...</span>
+          </div>
+        ) : eligibleVaccines ? (
+          <>
+            <VaccineEligibilityIndicator
+              vaccines={eligibleVaccines}
+              loading={eligibleLoading}
+            />
+            <VaccineEligibilityList
+              vaccines={eligibleVaccines}
+              onSelectVaccine={(vaccine) => {
+                // Could pre-select vaccine in form
+                console.log('Selected vaccine:', vaccine);
+              }}
+            />
+          </>
+        ) : null}
 
         {/* Time Selection */}
         <div>

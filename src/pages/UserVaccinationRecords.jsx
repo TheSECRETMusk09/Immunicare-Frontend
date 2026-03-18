@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import apiClient from "../utils/api";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
+import GuardianTopHeader from "../components/GuardianTopHeader";
 import { Button, Card, Input } from "../components/UI";
 import {
   Search,
@@ -13,6 +14,10 @@ import {
   Calendar,
   FileText,
   ChevronDown,
+  AlertCircle,
+  RefreshCw,
+  Bell,
+  User,
 } from "lucide-react";
 import ImmunizationRecordBooklet from "../components/ImmunizationRecordBooklet";
 
@@ -37,6 +42,10 @@ export default function UserVaccinationRecords() {
   const [viewMode, setViewMode] = useState("records"); // "records", "schedule", "upcoming"
   const [searchQuery, setSearchQuery] = useState("");
   const [showChildDropdown, setShowChildDropdown] = useState(false);
+
+  // Readiness state for next-dose prediction
+  const [childReadiness, setChildReadiness] = useState(null);
+  const [readinessLoading, setReadinessLoading] = useState(false);
 
   const fetchChildren = useCallback(async () => {
     if (!guardianId) {
@@ -97,6 +106,24 @@ export default function UserVaccinationRecords() {
     }
   }, []);
 
+  // Fetch readiness for next-dose prediction
+  const fetchReadiness = useCallback(async (childId) => {
+    setReadinessLoading(true);
+    try {
+      const result = await apiClient.getVaccinationReadiness(childId);
+      if (result?.success && result?.data) {
+        setChildReadiness(result.data);
+      } else {
+        setChildReadiness(null);
+      }
+    } catch (err) {
+      console.error("Error fetching readiness:", err);
+      setChildReadiness(null);
+    } finally {
+      setReadinessLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (guardianId) {
       fetchChildren();
@@ -106,12 +133,13 @@ export default function UserVaccinationRecords() {
   useEffect(() => {
     if (selectedChild) {
       fetchVaccinationData(selectedChild.id);
+      fetchReadiness(selectedChild.id);
       // Update URL with child ID
       navigate(`/guardian/vaccination-records/${selectedChild.id}`, {
         replace: true,
       });
     }
-  }, [selectedChild, fetchVaccinationData, navigate]);
+  }, [selectedChild, fetchVaccinationData, fetchReadiness, navigate]);
 
   useEffect(() => {
     // Handle direct child ID access
@@ -278,12 +306,61 @@ export default function UserVaccinationRecords() {
 
   return (
     <div className="guardian-page-wrapper min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-      <GuardianModuleHeader
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 w-full bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-200">
+        <GuardianTopHeader
+          title=""
+          onRefresh={() => {
+            fetchChildren();
+            if (selectedChild) {
+              fetchVaccinationData(selectedChild.id);
+              fetchReadiness(selectedChild.id);
+            }
+          }}
+          isRefreshing={loading}
+        />
+      </div>
+
+      <div className="pt-14 sm:pt-16 lg:pt-0">
+        <GuardianModuleHeader
         title="Vaccination Records"
         subtitle="Track and manage your child's vaccination history"
         icon={<FileText className="w-8 h-8 text-white" />}
         actions={
           <div className="flex items-center gap-2">
+            <div className="hidden lg:flex guardian-desktop-pageheader-actions mr-2">
+              <button
+                type="button"
+                onClick={() => {
+                  fetchChildren();
+                  if (selectedChild) {
+                    fetchVaccinationData(selectedChild.id);
+                    fetchReadiness(selectedChild.id);
+                  }
+                }}
+                className="guardian-desktop-pageheader-icon-btn"
+                aria-label="Refresh Vaccination Records"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate('/guardian/notifications')}
+                className="guardian-desktop-pageheader-icon-btn guardian-desktop-pageheader-icon-btn--notif"
+                aria-label="Open notifications"
+              >
+                <Bell className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate('/guardian/profile')}
+                className="guardian-desktop-pageheader-icon-btn"
+                aria-label="Open profile"
+              >
+                <User className="w-4 h-4" />
+              </button>
+            </div>
             <Button
               variant={
                 viewMode === "records" ||
@@ -307,6 +384,7 @@ export default function UserVaccinationRecords() {
           </div>
         }
       />
+      </div>
 
       <main className="guardian-page-content space-y-4 sm:space-y-6">
 
@@ -418,7 +496,7 @@ export default function UserVaccinationRecords() {
           </div>
 
           {/* Summary Cards - Child Specific Only */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-2">
             <Card className="p-4 flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
                 <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -462,9 +540,104 @@ export default function UserVaccinationRecords() {
             </Card>
           </div>
 
+          {/* Next-Dose Prediction Banner */}
+          {selectedChild && !readinessLoading && childReadiness && (
+            <div className={`rounded-xl p-4 ${
+              childReadiness.readinessStatus === 'READY'
+                ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                : childReadiness.readinessStatus === 'OVERDUE'
+                  ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+                  : childReadiness.readinessStatus === 'PENDING_CONFIRMATION'
+                    ? 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800'
+                    : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
+            }`}>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  {childReadiness.readinessStatus === 'READY' ? (
+                    <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400 mt-0.5" />
+                  ) : childReadiness.readinessStatus === 'OVERDUE' ? (
+                    <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400 mt-0.5" />
+                  ) : (
+                    <Clock className="w-6 h-6 text-blue-600 dark:text-blue-400 mt-0.5" />
+                  )}
+                  <div>
+                    <h4 className={`font-semibold ${
+                      childReadiness.readinessStatus === 'READY'
+                        ? 'text-green-800 dark:text-green-300'
+                        : childReadiness.readinessStatus === 'OVERDUE'
+                          ? 'text-red-800 dark:text-red-300'
+                          : childReadiness.readinessStatus === 'PENDING_CONFIRMATION'
+                            ? 'text-yellow-800 dark:text-yellow-300'
+                            : 'text-blue-800 dark:text-blue-300'
+                    }`}>
+                      {childReadiness.readinessStatus === 'READY'
+                        ? 'Ready for Next Vaccination!'
+                        : childReadiness.readinessStatus === 'OVERDUE'
+                          ? 'Overdue - Schedule Appointment Now!'
+                          : childReadiness.readinessStatus === 'PENDING_CONFIRMATION'
+                            ? 'Pending Confirmation'
+                            : 'Upcoming Vaccination'}
+                    </h4>
+
+                    {/* Due Vaccines */}
+                    {childReadiness.dueVaccines && childReadiness.dueVaccines.length > 0 && (
+                      <p className="text-sm text-green-700 dark:text-green-400 mt-1">
+                        Due: {childReadiness.dueVaccines.map(v => v.label).join(', ')}
+                      </p>
+                    )}
+
+                    {/* Overdue Vaccines */}
+                    {childReadiness.overdueVaccines && childReadiness.overdueVaccines.length > 0 && (
+                      <p className="text-sm text-red-700 dark:text-red-400 mt-1">
+                        Overdue: {childReadiness.overdueVaccines.map(v => v.label).join(', ')}
+                      </p>
+                    )}
+
+                    {/* Next Appointment Prediction */}
+                    {childReadiness.nextAppointmentPrediction && (
+                      <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">
+                        <span className="font-medium">Recommended Date:</span>{' '}
+                        {childReadiness.nextAppointmentPrediction.date
+                          ? new Date(childReadiness.nextAppointmentPrediction.date).toLocaleDateString('en-US', {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })
+                          : 'Not available'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Book Appointment Button */}
+                {(childReadiness.readinessStatus === 'READY' ||
+                  childReadiness.readinessStatus === 'OVERDUE' ||
+                  (childReadiness.nextAppointmentPrediction && childReadiness.nextAppointmentPrediction.date)) && (
+                  <Button
+                    onClick={() => navigate(`/guardian/book-appointment?childId=${selectedChild.id}`)}
+                    size="sm"
+                    className="shrink-0"
+                  >
+                    <Calendar className="w-4 h-4 mr-2" />
+                    Book Appointment
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Loading State for Readiness */}
+          {selectedChild && readinessLoading && (
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500 mr-2"></div>
+              <span className="text-gray-500 dark:text-gray-400">Loading vaccination status...</span>
+            </div>
+          )}
+
           {/* Tab Navigation - Simplified for Guardian */}
           {viewMode !== "booklet" && (
-            <div className="flex flex-wrap gap-2 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex gap-1 sm:gap-2 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
               <button
                 onClick={() => setViewMode("records")}
                 className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-all ${

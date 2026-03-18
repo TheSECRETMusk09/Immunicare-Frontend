@@ -17,7 +17,6 @@ import {
   User,
   Bell,
   Baby,
-  Activity,
   Sun,
   Moon,
 } from "lucide-react";
@@ -31,7 +30,6 @@ const GuardianSidebar = memo(
     // ✅ Independent toggles (stable keys)
     const [expandedSections, setExpandedSections] = useState({
       vaccinations: false,
-      health_records: false,
     });
 
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -42,20 +40,11 @@ const GuardianSidebar = memo(
 
     // Desktop collapsed state (session-persisted)
     const SIDEBAR_COLLAPSE_KEY = "immunicare.guardian.sidebarCollapsed";
-    const LAST_GROWTH_CHILD_KEY = "immunicare.guardian.lastGrowthChildId";
     const [isCollapsedDesktop, setIsCollapsedDesktop] = useState(() => {
       try {
         return sessionStorage.getItem(SIDEBAR_COLLAPSE_KEY) === "1";
       } catch {
         return false;
-      }
-    });
-    const [lastGrowthChildId, setLastGrowthChildId] = useState(() => {
-      try {
-        const storedValue = sessionStorage.getItem(LAST_GROWTH_CHILD_KEY);
-        return /^\d+$/.test(String(storedValue || "")) ? String(storedValue) : null;
-      } catch {
-        return null;
       }
     });
 
@@ -164,7 +153,6 @@ const GuardianSidebar = memo(
       if (!isCollapsed) return;
       setExpandedSections({
         vaccinations: false,
-        health_records: false,
       });
     }, [isCollapsed]);
 
@@ -178,36 +166,11 @@ const GuardianSidebar = memo(
 
     const extractChildIdFromPath = useCallback((pathname) => {
       const routeMatch = pathname.match(
-        /^\/guardian\/(?:health-charts|vaccination-records|immunization-chart|children)\/(\d+)(?:\/|$)/,
+        /^\/guardian\/(?:vaccination-records|immunization-chart|children)\/(\d+)(?:\/|$)/,
       );
 
       return routeMatch?.[1] || null;
     }, []);
-
-    useEffect(() => {
-      const routeChildId = extractChildIdFromPath(location.pathname);
-
-      if (!routeChildId) return;
-
-      setLastGrowthChildId((prev) => (prev === routeChildId ? prev : routeChildId));
-
-      try {
-        sessionStorage.setItem(LAST_GROWTH_CHILD_KEY, routeChildId);
-      } catch {
-        // ignore session storage errors
-      }
-    }, [extractChildIdFromPath, location.pathname]);
-
-    const resolveGrowthChartsPath = useCallback(() => {
-      const routeChildId = extractChildIdFromPath(location.pathname);
-      const resolvedChildId = routeChildId || lastGrowthChildId;
-
-      if (resolvedChildId) {
-        return `/guardian/health-charts/${resolvedChildId}`;
-      }
-
-      return "/guardian/health-charts";
-    }, [extractChildIdFromPath, lastGrowthChildId, location.pathname]);
 
     // Toggle collapsible section (independent toggles)
     const toggleSection = useCallback((sectionKey) => {
@@ -234,7 +197,7 @@ const GuardianSidebar = memo(
       }
     };
 
-    // Navigation items
+    // Navigation items - Using FileText for documents menu entry
     const navItems = [
       { name: "Dashboard", icon: LayoutDashboard, path: "/guardian/dashboard" },
       { name: "My Children", icon: Users, path: "/guardian/children" },
@@ -251,27 +214,9 @@ const GuardianSidebar = memo(
           { name: "Immunization Chart", icon: FileSpreadsheet, path: "/guardian/immunization-chart" },
         ],
       },
-      {
-        name: "Health Records",
-        sectionKey: "health_records",
-        icon: FileText,
-        path: "/guardian/health-charts",
-        hasSubItems: true,
-        subItems: [
-          {
-            name: "All Health Records",
-            key: "health-records-all",
-            icon: FileText,
-            path: "/guardian/health-charts",
-          },
-          {
-            name: "Growth Charts",
-            key: "health-records-growth-charts",
-            icon: Activity,
-            path: resolveGrowthChartsPath(),
-          },
-        ],
-      },
+
+      // Documents menu entry using FileText icon
+      { name: "Documents", icon: FileText, path: "/guardian/documents" },
 
       { name: "Appointments", icon: Calendar, path: "/guardian/appointments" },
       { name: "Notifications", icon: Bell, path: "/guardian/notifications", badge: notificationCount },
@@ -282,6 +227,9 @@ const GuardianSidebar = memo(
       (path) => location.pathname === path || location.pathname.startsWith(path + "/"),
       [location.pathname],
     );
+
+    // Use extractChildIdFromPath for child-specific navigation
+    const currentChildId = extractChildIdFromPath(location.pathname);
 
     const isParentActive = useCallback(
       (item) =>
@@ -520,6 +468,16 @@ const GuardianSidebar = memo(
               </span>
             </div>
           </div>
+
+          {/* Child-specific navigation indicator - using extractChildIdFromPath */}
+          {currentChildId && (
+            <div className="px-4 py-2 border-t border-gray-100 dark:border-gray-700">
+              <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-3 py-2">
+                <Baby className="w-3 h-3" />
+                <span>Viewing child-specific records</span>
+              </div>
+            </div>
+          )}
 
           {/* Footer */}
           <div className="guardian-sidebar-footer border-t border-gray-100 dark:border-gray-700 p-4 space-y-2 lg:mt-auto">

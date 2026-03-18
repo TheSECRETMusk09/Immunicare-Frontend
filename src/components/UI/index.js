@@ -41,11 +41,13 @@ export { default as TextInput } from "./TextInput";
 export { default as PasswordInput } from "./PasswordInput";
 export { default as PasswordToggleButton } from "./PasswordToggleButton";
 export { default as PasswordVisibilityToggle } from "./PasswordVisibilityToggle";
+export { default as Checkbox } from "./Checkbox";
 export { default as RememberMeCheckbox } from "./RememberMeCheckbox";
+export { default as TextArea } from "./TextArea";
 export {
-  default as FormError,
-  FormErrorSummary,
-  FieldError,
+   default as FormError,
+   FormErrorSummary,
+   FieldError,
 } from "./FormError";
 
 // Navigation components

@@ -90,6 +90,9 @@ const Reports = () => {
     endDate: "",
     filters: {},
   });
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingReportId, setDeletingReportId] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Default templates fallback
   const getDefaultTemplates = () => [
@@ -415,20 +418,34 @@ const Reports = () => {
     [],
   );
 
-  const handleDeleteReport = useCallback(async (reportId) => {
-    if (!window.confirm("Are you sure you want to delete this report?")) {
-      return;
-    }
+  const handleDeleteReport = useCallback((reportId) => {
+    // Show confirmation modal instead of window.confirm
+    setDeletingReportId(reportId);
+    setShowDeleteModal(true);
+  }, []);
 
+  const confirmDeleteReport = useCallback(async () => {
+    if (!deletingReportId) return;
+
+    setIsDeleting(true);
     try {
-      await apiClient.request(`/reports/${reportId}`, {
+      await apiClient.request(`/reports/${deletingReportId}`, {
         method: "DELETE",
       });
-      setReports((prevReports) => prevReports.filter((r) => r.id !== reportId));
+      setReports((prevReports) => prevReports.filter((r) => r.id !== deletingReportId));
+      setShowDeleteModal(false);
+      setDeletingReportId(null);
     } catch (err) {
       setError(err.message || "Failed to delete report");
       console.error("Error deleting report:", err);
+    } finally {
+      setIsDeleting(false);
     }
+  }, [deletingReportId]);
+
+  const closeDeleteModal = useCallback(() => {
+    setShowDeleteModal(false);
+    setDeletingReportId(null);
   }, []);
 
   const handleTemplateSelect = (templateType) => {
@@ -558,27 +575,31 @@ const Reports = () => {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <PageHeader
-        title="Reports Management"
-        subtitle="Generate and manage comprehensive reports for your facility"
-        icon={<BarChart3 className="w-8 h-8 text-white" />}
-        actions={
-          <Button variant="primary" onClick={() => setShowGenerateModal(true)}>
-            + Generate New Report
-          </Button>
-        }
-      />
+    <div className="flex flex-col h-screen overflow-hidden">
+      {/* Page Header - Fixed/Sticky at top */}
+      <div className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6">
+        <PageHeader
+          title="Reports Management"
+          subtitle="Generate and manage comprehensive reports for your facility"
+          icon={<BarChart3 className="w-8 h-8 text-white" />}
+          actions={
+            <Button variant="primary" onClick={() => setShowGenerateModal(true)}>
+              + Generate New Report
+            </Button>
+          }
+        />
+      </div>
 
+      <div className="flex-1 flex flex-col p-4 sm:px-6 sm:pb-6 pt-3 overflow-hidden space-y-4">
       {error && (
-        <Alert variant="error" className="mb-4" onClose={() => setError(null)}>
+        <Alert variant="error" className="flex-shrink-0" onClose={() => setError(null)}>
           {error}
         </Alert>
       )}
 
       {/* Admin Dashboard Summary */}
       {adminSummary && (
-        <Card title="📈 Dashboard Overview" className="mb-6">
+        <Card title="📈 Dashboard Overview" className="flex-shrink-0">
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {/* Vaccination Summary */}
             <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
@@ -662,7 +683,7 @@ const Reports = () => {
       )}
 
       {/* Quick Report Generation Cards */}
-      <Card title="🚀 Quick Report Generation" className="mb-6">
+      <Card title="🚀 Quick Report Generation" className="flex-shrink-0">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {reportTemplates.slice(0, 5).map((template) => (
             <Button
@@ -697,8 +718,8 @@ const Reports = () => {
       </Card>
 
       {/* Generated Reports */}
-      <Card title="📁 Generated Reports">
-        <div className="flex justify-between items-center mb-4">
+      <Card title="📁 Generated Reports" className="flex-1 min-h-0 flex flex-col">
+        <div className="flex justify-between items-center mb-4 flex-shrink-0">
           <div className="text-sm text-gray-600 dark:text-gray-400">
             Total Reports: <strong>{reports.length}</strong>
           </div>
@@ -724,10 +745,13 @@ const Reports = () => {
             </Button>
           </div>
         ) : (
-          <DataTable columns={reportColumns} data={reports} pagination />
+          <div className="flex-1 min-h-0 overflow-y-auto auto-hide-scrollbar rounded-lg border border-gray-200 dark:border-gray-700">
+            <DataTable columns={reportColumns} data={reports} pagination />
+          </div>
         )}
       </Card>
 
+      </div>
       {/* Generate Report Modal */}
       <Modal
         isOpen={showGenerateModal}
@@ -839,6 +863,47 @@ const Reports = () => {
             </div>
           )}
         </form>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={closeDeleteModal}
+        title="Delete Report"
+        size="sm"
+        footer={
+          <AdminModalActions>
+            <Button
+              variant="cancel"
+              type="button"
+              onClick={closeDeleteModal}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              type="button"
+              onClick={confirmDeleteReport}
+              loading={isDeleting}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting..." : "OK"}
+            </Button>
+          </AdminModalActions>
+        }
+      >
+        <div className="text-center py-4">
+          <div className="mb-4">
+            <span className="text-4xl">⚠️</span>
+          </div>
+          <p className="text-gray-700 dark:text-gray-300 text-lg">
+            Are you sure you want to delete this report?
+          </p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">
+            This action cannot be undone.
+          </p>
+        </div>
       </Modal>
     </div>
   );

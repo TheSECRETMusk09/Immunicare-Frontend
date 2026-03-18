@@ -86,7 +86,6 @@ export default function ManagementDashboard() {
     { id: "appointments", name: "Appointments", icon: "📅" },
     { id: "inventory", name: "Inventory", icon: "📦" },
     { id: "vaccinations", name: "Vaccinations", icon: "💉" },
-    { id: "vaccine-tracking", name: "Vaccine Tracking", icon: "📍" },
     { id: "analytics", name: "Analytics", icon: "📈" },
     { id: "digital-papers", name: "Digital Papers", icon: "📄" },
     { id: "announcements", name: "Announcements", icon: "📢" },
@@ -217,9 +216,6 @@ export default function ManagementDashboard() {
         return null;
       case "vaccinations":
         navigate("/vaccination-management");
-        return null;
-      case "vaccine-tracking":
-        navigate("/vaccine-tracking");
         return null;
       case "analytics":
         navigate("/analytics");
@@ -441,18 +437,6 @@ export default function ManagementDashboard() {
                 </p>
               </Card>
               <Card
-                className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-primary-400"
-                onClick={() => navigate("/vaccine-tracking")}
-              >
-                <div className="text-4xl mb-3">📍</div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                  Vaccine Tracking
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  Track vaccine distribution
-                </p>
-              </Card>
-              <Card
                 className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-purple-500"
                 onClick={() => navigate("/analytics")}
               >
@@ -633,23 +617,6 @@ export default function ManagementDashboard() {
                 </Button>
               </Card>
 
-              <Card
-                className="p-6 flex flex-col h-full"
-                title="📍 Vaccine Tracking"
-              >
-                <p className="text-gray-600 dark:text-gray-400 mb-6 flex-grow">
-                  Track vaccine distribution across facilities. Monitor supply
-                  chain and inventory movements.
-                </p>
-                <Button
-                  onClick={() => setActiveSection("vaccine-tracking")}
-                  variant="secondary"
-                  className="w-full"
-                >
-                  Track Vaccines
-                </Button>
-              </Card>
-
               <Card className="p-6 flex flex-col h-full" title="📈 Analytics">
                 <p className="text-gray-600 dark:text-gray-400 mb-6 flex-grow">
                   View comprehensive analytics and insights. Analyze vaccination
@@ -819,7 +786,7 @@ export default function ManagementDashboard() {
   };
 
   return (
-    <div className="space-y-8 p-6 max-w-7xl mx-auto">
+    <div className="space-y-8 px-6 max-w-7xl mx-auto">
       {/* Section Content */}
       <div className="animate-fade-in">{renderSection()}</div>
     </div>

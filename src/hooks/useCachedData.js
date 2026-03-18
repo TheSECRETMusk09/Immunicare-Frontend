@@ -225,24 +225,41 @@ export const useGuardianStats = (guardianId) => {
   });
 };
 
-/**
- * Hook for fetching guardian notifications
- * Cached for 2 minutes (more frequently updated)
- */
-export const useGuardianNotifications = (limit = 10) => {
-  return useQuery({
-    queryKey: [...queryKeys.guardian.notifications(), limit],
-    queryFn: async () => {
-      const response = await apiClient.getGuardianNotifications({ limit });
-      const payload = response?.data ?? response;
+  /**
+   * Hook for fetching guardian notifications
+   * Cached for 2 minutes (more frequently updated)
+   */
+  export const useGuardianNotifications = (limit = 10) => {
+    return useQuery({
+      queryKey: [...queryKeys.guardian.notifications(), limit],
+      queryFn: async () => {
+        const response = await apiClient.getGuardianNotifications({ limit });
+        const payload = response?.data ?? response;
 
-      if (Array.isArray(payload)) return payload;
-      if (Array.isArray(payload?.notifications)) return payload.notifications;
-      return [];
-    },
-    staleTime: 2 * 60 * 1000, // 2 minutes
-  });
-};
+        if (Array.isArray(payload)) return payload;
+        if (Array.isArray(payload?.notifications)) return payload.notifications;
+        return [];
+      },
+      staleTime: 2 * 60 * 1000, // 2 minutes
+    });
+  };
+
+  /**
+   * Hook for fetching appointment suggestions for an infant
+   * Cached for 1 minute to balance freshness with performance
+   */
+  export const useAppointmentSuggestions = (infantId, guardianId = null, clinicId = null) => {
+    return useQuery({
+      queryKey: ['appointment-suggestions', infantId, guardianId, clinicId],
+      queryFn: async () => {
+        if (!infantId) return null;
+        const response = await apiClient.getAppointmentSuggestions({ infantId, guardianId, clinicId });
+        return response?.data || response;
+      },
+      staleTime: 60 * 1000, // 1 minute
+      enabled: !!infantId,
+    });
+  };
 
 /**
  * Prefetch dashboard data

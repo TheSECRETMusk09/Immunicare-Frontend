@@ -1403,8 +1403,10 @@ export default function UserManagement() {
   }
 
   return (
-    <div className="space-y-8 p-6">
-      <PageHeader
+    <div className="flex flex-col h-screen overflow-hidden">
+      {/* Sticky Header Section - Stays fixed at top while scrolling */}
+      <div className="flex-shrink-0 sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6">
+        <PageHeader
         title="User Management"
         subtitle="Manage admins, system users, and guardians"
         icon="👥"
@@ -1446,34 +1448,27 @@ export default function UserManagement() {
           </div>
         }
       />
+      </div>
 
+      <div className="flex-1 flex flex-col p-4 sm:px-6 sm:pb-6 pt-3 overflow-hidden space-y-4">
       {/* Security Warning for Admin Features */}
       {isAdmin && (
         <Alert
           variant="warning"
           title="Administrator Access"
           icon={<ShieldAlert className="h-5 w-5" />}
+          className="flex-shrink-0"
         >
           Password management is restricted to admin users only. All password
           access is logged for security purposes.
         </Alert>
       )}
 
-      {/* Tab Navigation */}
-      <div className="border-b border-gray-200 dark:border-gray-700">
-        <nav className="-mb-px flex space-x-8">
-          <button
-            onClick={() => handleTabChange("admins")}
-            className={`py-4 px-1 border-b-2 font-bold text-sm transition-all flex items-center gap-2 ${
-              activeTab === "admins"
-                ? "border-danger-500 text-danger-600 dark:text-danger-400"
-                : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-            }`}
-          >
-            <ShieldAlert className="w-4 h-4" />
-            Admins ({admins.length})
-          </button>
-          <button
+      {/* Tab Navigation - Sticky at top */}
+      <div className="flex-shrink-0 bg-white dark:bg-gray-900">
+        <div className="border-b border-gray-200 dark:border-gray-700">
+          <nav className="-mb-px flex space-x-8">
+            <button
             onClick={() => handleTabChange("system")}
             className={`py-4 px-1 border-b-2 font-bold text-sm transition-all flex items-center gap-2 ${
               activeTab === "system"
@@ -1485,6 +1480,18 @@ export default function UserManagement() {
             System Users (
             {normalizedSystemUsers ? normalizedSystemUsers.length : 0})
           </button>
+            <button
+            onClick={() => handleTabChange("admins")}
+            className={`py-4 px-1 border-b-2 font-bold text-sm transition-all flex items-center gap-2 ${
+              activeTab === "admins"
+                ? "border-danger-500 text-danger-600 dark:text-danger-400"
+                : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4" />
+            Admins ({admins.length})
+          </button>
+
           <button
             onClick={() => handleTabChange("guardians")}
             className={`py-4 px-1 border-b-2 font-bold text-sm transition-all flex items-center gap-2 ${
@@ -1496,11 +1503,12 @@ export default function UserManagement() {
             <span className="text-lg">👥</span>
             Guardians ({normalizedGuardians.length})
           </button>
-        </nav>
+          </nav>
+        </div>
       </div>
 
       {/* Content based on active tab */}
-      <div className="animate-fade-in">
+      <div className="flex-1 min-h-0 flex flex-col animate-fade-in">
         {activeTab === "admins" ? (
           isAdmin ? (
             admins.length === 0 ? (
@@ -1513,9 +1521,9 @@ export default function UserManagement() {
                 className="py-20"
               />
             ) : (
-              <div className="space-y-4">
+              <div className="flex-1 flex flex-col overflow-hidden space-y-4">
                 {/* Filter and Search Controls */}
-                <div className="flex flex-wrap gap-4 items-center">
+                <div className="flex-shrink-0 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4 flex flex-wrap gap-4 items-center">
                   <div className="relative flex-1 min-w-[200px]">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
@@ -1562,10 +1570,10 @@ export default function UserManagement() {
                 </div>
 
                 {/* Admin Table */}
-                <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                      <thead className="bg-gray-50 dark:bg-gray-800">
+                <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="flex-1 overflow-auto auto-hide-scrollbar">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 relative">
+                      <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
                         <tr>
                           {adminColumns.map((column) => (
                             <th
@@ -1633,7 +1641,7 @@ export default function UserManagement() {
 
                   {/* Pagination */}
                   {totalAdminPages > 1 && (
-                    <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                    <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-900">
                       <div className="text-sm text-gray-500">
                         Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
                         {Math.min(
@@ -1708,6 +1716,7 @@ export default function UserManagement() {
         ) : activeTab === "system" ? (
           isAdmin ? (
             normalizedSystemUsers && normalizedSystemUsers.length > 0 ? (
+              <div className="flex-1 min-h-0 overflow-y-auto auto-hide-scrollbar rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
               <SystemUsersTable
                 users={normalizedSystemUsers}
                 isTogglingActive={isTogglingActive}
@@ -1722,6 +1731,7 @@ export default function UserManagement() {
                 onDelete={(row) => handleDeleteUser(row, "system")}
                 currentUserId={currentUserId}
               />
+              </div>
             ) : (
               <EmptyState
                 title="No users found"
@@ -1747,17 +1757,20 @@ export default function UserManagement() {
             className="py-20"
           />
         ) : (
-          <DataTable
-            data={normalizedGuardians}
-            columns={guardianColumns}
-            actions={guardianActions}
-            getRowKey={(row) => `guardian:${String(row?.id)}`}
-            actionsHeaderClassName="w-[100px] min-w-[100px]"
-            actionsCellClassName="w-[100px] min-w-[100px]"
-            emptyMessage="No guardians registered yet."
-            emptyIcon={<span className="text-4xl">👥</span>}
-          />
+          <div className="flex-1 min-h-0 overflow-y-auto auto-hide-scrollbar rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+            <DataTable
+              data={normalizedGuardians}
+              columns={guardianColumns}
+              actions={guardianActions}
+              getRowKey={(row) => `guardian:${String(row?.id)}`}
+              actionsHeaderClassName="w-[100px] min-w-[100px]"
+              actionsCellClassName="w-[100px] min-w-[100px]"
+              emptyMessage="No guardians registered yet."
+              emptyIcon={<span className="text-4xl">👥</span>}
+            />
+          </div>
         )}
+      </div>
       </div>
 
       {/* User Add/Edit Modal */}

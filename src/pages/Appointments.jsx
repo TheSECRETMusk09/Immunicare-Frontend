@@ -17,10 +17,9 @@ import {
 import { useAppointments, useInfants } from "../hooks/useDashboard";
 import apiClient from "../utils/api";
 import { isPhilippineHoliday } from "../utils/holidays";
-import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Plus, Search, ArrowUp, ArrowDown } from "lucide-react";
 import {
   hasFieldErrors,
-  sanitizeIdentifier,
   sanitizeText,
   validateLength,
   validateRequired,
@@ -169,6 +168,7 @@ export default function Appointments() {
   const [monthCursor, setMonthCursor] = useState(new Date());
   const [availabilityByDate, setAvailabilityByDate] = useState({});
   const [calendarLoading, setCalendarLoading] = useState(false);
+  const [blockedDates, setBlockedDates] = useState({});
   const [selectedDate, setSelectedDate] = useState(toDateKey(new Date()));
   const [selectedDateDetails, setSelectedDateDetails] = useState(null);
   const [showDateDetailsModal, setShowDateDetailsModal] = useState(false);
@@ -182,20 +182,85 @@ export default function Appointments() {
   const [cancelReason, setCancelReason] = useState("");
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
-  const [filteredAppointments, setFilteredAppointments] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // Update filtered appointments when main appointments change
-  useEffect(() => {
-    if (statusFilter === 'all') {
-      setFilteredAppointments(appointments);
-    } else {
-      setFilteredAppointments(
-        appointments.filter(apt => apt.status === statusFilter)
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Date filtering state
+  const [dateFilterStart, setDateFilterStart] = useState("");
+  const [dateFilterEnd, setDateFilterEnd] = useState("");
+
+  // Sorting state
+  const [sortField, setSortField] = useState("scheduled_date");
+  const [sortDirection, setSortDirection] = useState("desc");
+
+  // Enhanced filtered appointments with search, date filtering, and sorting
+  const filteredAppointments = useMemo(() => {
+    let result = [...appointments];
+
+    // Search query filtering - search by infant details, guardian info, control number, contact
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(apt =>
+        apt.first_name?.toLowerCase().includes(query) ||
+        apt.last_name?.toLowerCase().includes(query) ||
+        apt.guardian_name?.toLowerCase().includes(query) ||
+        apt.control_number?.toLowerCase().includes(query) ||
+        apt.infant_name?.toLowerCase().includes(query) ||
+        apt.contact?.toLowerCase().includes(query) ||
+        apt.phone?.toLowerCase().includes(query)
       );
     }
-  }, [appointments, statusFilter]);
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      result = result.filter(apt => apt.status === statusFilter);
+    }
+
+    // Date range filtering
+    if (dateFilterStart) {
+      const startDate = new Date(dateFilterStart);
+      startDate.setHours(0, 0, 0, 0);
+      result = result.filter(apt => {
+        if (!apt.scheduled_date) return false;
+        const aptDate = new Date(apt.scheduled_date);
+        return aptDate >= startDate;
+      });
+    }
+    if (dateFilterEnd) {
+      const endDate = new Date(dateFilterEnd);
+      endDate.setHours(23, 59, 59, 999);
+      result = result.filter(apt => {
+        if (!apt.scheduled_date) return false;
+        const aptDate = new Date(apt.scheduled_date);
+        return aptDate <= endDate;
+      });
+    }
+
+    // Sorting
+    result.sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+
+      // Handle dates
+      if (sortField === "scheduled_date") {
+        aVal = aVal ? new Date(aVal).getTime() : 0;
+        bVal = bVal ? new Date(bVal).getTime() : 0;
+      }
+
+      // Handle null/undefined
+      if (aVal == null) aVal = "";
+      if (bVal == null) bVal = "";
+
+      if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [appointments, searchQuery, statusFilter, dateFilterStart, dateFilterEnd, sortField, sortDirection]);
   const [dateDetailsLoading, setDateDetailsLoading] = useState(false);
   const [createFormError, setCreateFormError] = useState("");
   const [editFormErrors, setEditFormErrors] = useState({});
@@ -254,10 +319,42 @@ export default function Appointments() {
     }
   }, [monthCursor]);
 
+  // Fetch blocked dates from API
+  const fetchBlockedDates = useCallback(async () => {
+    try {
+      const response = await apiClient.getBlockedDates({
+        month: toMonthKey(monthCursor),
+      });
+
+      setBlockedDates(response?.blockedDates || {});
+    } catch (err) {
+      setBlockedDates({});
+    }
+  }, [monthCursor]);
+
+  // Toggle blocked date handler
+  const handleToggleBlockedDate = async (dateKey) => {
+    try {
+      const result = await apiClient.toggleBlockedDate({
+        date: dateKey,
+        reason: '',
+      });
+
+      // Refresh blocked dates after toggle
+      await fetchBlockedDates();
+
+      return result;
+    } catch (err) {
+      console.error('Failed to toggle blocked date:', err);
+      throw err;
+    }
+  };
+
   // Fetch calendar availability when month changes
   useEffect(() => {
     fetchCalendarAvailability();
-  }, [fetchCalendarAvailability]);
+    fetchBlockedDates();
+  }, [fetchCalendarAvailability, fetchBlockedDates]);
 
   useEffect(() => {
     const fetchBookingDateDetails = async () => {
@@ -618,7 +715,7 @@ export default function Appointments() {
         notes: normalizedNotes,
       };
 
-      const newAppointment = await apiClient.createAppointment(appointmentData);
+      await apiClient.createAppointment(appointmentData);
       // Refresh from API to ensure data consistency
       await refreshAppointments();
       setShowBookingModal(false);
@@ -706,7 +803,7 @@ export default function Appointments() {
         notes: normalizedEditNotes,
       };
 
-      const updatedAppointment = await apiClient.updateAppointment(
+      await apiClient.updateAppointment(
         editFormData.id,
         appointmentData,
       );
@@ -764,58 +861,60 @@ export default function Appointments() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <PageHeader
-        title="Appointments Management"
-        subtitle="Schedule, manage, and track vaccination appointments"
-        icon={<CalendarDays className="w-8 h-8 text-white" />}
-        actions={
-          <div className="flex flex-col sm:flex-row items-center gap-4">
-            <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1" role="group" aria-label="View toggle">
-              <button
-                onClick={() => setView("list")}
-                aria-pressed={view === "list"}
-                aria-label="List view"
-                className={`px-3 py-1 rounded text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
-                  view === "list"
-                    ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
-                }`}
+    <div className="flex flex-col h-screen overflow-hidden">
+      {/* Page Header - Fixed/Sticky at top */}
+      <div className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6">
+        <PageHeader
+          title="Appointments Management"
+          subtitle="Schedule, manage, and track vaccination appointments"
+          icon={<CalendarDays className="w-8 h-8 text-white" />}
+          actions={
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1" role="group" aria-label="View toggle">
+                <button
+                  onClick={() => setView("list")}
+                  aria-pressed={view === "list"}
+                  aria-label="List view"
+                  className={`px-3 py-1 rounded text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+                    view === "list"
+                      ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                  }`}
+                >
+                  📋 List
+                </button>
+                <button
+                  onClick={() => setView("calendar")}
+                  aria-pressed={view === "calendar"}
+                  aria-label="Calendar view"
+                  className={`px-3 py-1 rounded text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+                    view === "calendar"
+                      ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                  }`}
+                >
+                  📅 Calendar
+                </button>
+              </div>
+              <Button
+                variant="secondary"
+                onClick={() => refreshAppointments()}
+                disabled={isRefreshing}
+                className="gap-2"
               >
-                📋 List
-              </button>
-              <button
-                onClick={() => setView("calendar")}
-                aria-pressed={view === "calendar"}
-                aria-label="Calendar view"
-                className={`px-3 py-1 rounded text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
-                  view === "calendar"
-                    ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
-                }`}
+                {isRefreshing ? '⟳' : '↻'} Refresh
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => setShowBookingModal(true)}
+                className="gap-2"
               >
-                📅 Calendar
-              </button>
+                Schedule New Appointment
+              </Button>
             </div>
-            <Button
-              variant="secondary"
-              onClick={() => refreshAppointments()}
-              disabled={isRefreshing}
-              className="gap-2"
-            >
-              {isRefreshing ? '⟳' : '↻'} Refresh
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => setShowBookingModal(true)}
-              className="gap-2"
-            >
-              Schedule New Appointment
-            </Button>
-          </div>
-        }
-      />
+          }
+        />
+      </div>
 
       {view === "calendar" ? (
         <PageContainer title="Calendar View">
@@ -899,6 +998,7 @@ export default function Appointments() {
                 <div className="grid grid-cols-7 gap-1 sm:gap-2 p-2 sm:p-4 min-h-[360px] sm:min-h-[420px]">
                   {calendarCells.map((cell) => {
                     const info = availabilityByDate[cell.dateKey];
+                    const isBlocked = blockedDates[cell.dateKey]?.is_blocked;
                     const isCurrentMonth = cell.isCurrentMonth;
                     const dayAppointments = getAppointmentsForDate(cell.dateKey);
                     const hasAppointments = dayAppointments.length > 0;
@@ -911,6 +1011,9 @@ export default function Appointments() {
                     if (!isCurrentMonth) {
                       // Non-current month days - faded
                       cellClass += "border-gray-100 bg-gray-50/50 dark:border-gray-800 dark:bg-gray-900/30 opacity-50 ";
+                    } else if (isBlocked) {
+                      // Admin blocked date
+                      cellClass += "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-900/20 ";
                     } else if (holiday) {
                       // Holiday
                       cellClass += "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 ";
@@ -930,10 +1033,18 @@ export default function Appointments() {
                       <button
                         key={cell.dateKey}
                         type="button"
-                        onClick={() => isCurrentMonth && handleDateCellClick(cell.dateKey)}
+                        onClick={() => {
+                          if (isCurrentMonth && !isWeekendDay && !holiday) {
+                            // If clicking on a weekday, toggle blocked status for admins
+                            handleToggleBlockedDate(cell.dateKey);
+                          } else {
+                            // Otherwise show date details
+                            handleDateCellClick(cell.dateKey);
+                          }
+                        }}
                         disabled={!isCurrentMonth}
                         className={cellClass}
-                        aria-label={`${isCurrentMonth ? 'Select' : 'Date from other month'} ${cell.dateKey}`}
+                        aria-label={`${isCurrentMonth ? (isBlocked ? 'Unblock' : 'Block') : 'Date from other month'} ${cell.dateKey}`}
                       >
                         <div className="flex items-center justify-between">
                           <span
@@ -941,28 +1052,42 @@ export default function Appointments() {
                               cell.isToday
                                 ? "text-primary-600 bg-primary-100 dark:bg-primary-900/30 rounded-full w-6 h-6 flex items-center justify-center"
                                 : isCurrentMonth
-                                  ? isWeekendDay
-                                    ? "text-gray-500 dark:text-gray-400"
-                                    : "text-gray-800 dark:text-gray-100"
+                                  ? isBlocked
+                                    ? "text-red-600 dark:text-red-400"
+                                    : isWeekendDay
+                                      ? "text-gray-500 dark:text-gray-400"
+                                      : "text-gray-800 dark:text-gray-100"
                                   : "text-gray-400 dark:text-gray-600"
                             }`}
                           >
                             {cell.date.getDate()}
                           </span>
-                          {isCurrentMonth && hasAppointments && (
-                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary-600 text-white">
-                              {dayAppointments.length}
-                            </span>
+                          {isCurrentMonth && (
+                            <div className="flex items-center gap-1">
+                              {isBlocked && (
+                                <span className="w-2 h-2 rounded-full bg-red-500" title="Blocked by Admin" />
+                              )}
+                              {hasAppointments && (
+                                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary-600 text-white">
+                                  {dayAppointments.length}
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
 
                         <div className="mt-1 space-y-0.5">
+                          {isCurrentMonth && isBlocked && (
+                            <p className="text-[9px] sm:text-[10px] font-semibold text-red-600 dark:text-red-400 truncate">
+                              Blocked
+                            </p>
+                          )}
                           {isCurrentMonth && holiday && (
                             <p className="text-[9px] sm:text-[10px] font-semibold text-amber-700 dark:text-amber-300 truncate">
                               {holiday.name}
                             </p>
                           )}
-                          {isCurrentMonth && isWeekendDay && !holiday && (
+                          {isCurrentMonth && isWeekendDay && !holiday && !isBlocked && (
                             <p className="text-[9px] sm:text-[10px] font-semibold text-gray-500 dark:text-gray-400">
                               Weekend
                             </p>
@@ -992,6 +1117,10 @@ export default function Appointments() {
 
           {/* Calendar Legend */}
           <div className="mt-4 flex flex-wrap gap-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-red-50 border border-red-300 dark:bg-red-900/20 dark:border-red-800"></div>
+              <span className="text-gray-600 dark:text-gray-400">Blocked by Admin</span>
+            </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded bg-gray-100 border border-gray-300 dark:bg-gray-800 dark:border-gray-600"></div>
               <span className="text-gray-600 dark:text-gray-400">Weekend (Sat/Sun)</span>
@@ -1061,23 +1190,149 @@ export default function Appointments() {
             </div>
           )}
         </PageContainer>
-      ) : filteredAppointments.length === 0 ? (
-        <EmptyState
-          title="No appointments scheduled"
-          description="There are no appointments in the selected date range. You can schedule a new one using the button above."
-          icon="📅"
-          actionLabel="Schedule New Appointment"
-          onAction={() => setShowBookingModal(true)}
-          className="py-20"
-        />
       ) : (
-        <DataTable
-          data={filteredAppointments}
-          columns={columns}
-          actions={tableActions}
-          emptyMessage="No appointments scheduled."
-          emptyIcon={<span>📅</span>}
-        />
+        <div className="flex-1 flex flex-col p-4 sm:px-6 sm:pb-6 pt-3 overflow-hidden">
+          {/* Filter Controls */}
+          <div className="flex-shrink-0 z-20 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4 mb-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* 1. Search Input */}
+              <div className="relative flex-shrink-0 w-48">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+
+              {/* 2. Status Dropdown */}
+              <div className="flex-shrink-0">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-[120px]"
+                >
+                  <option value="all">All Status</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="pending">Pending</option>
+                  <option value="attended">Attended</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+
+              {/* 3. Date Range Start */}
+              <div className="flex-shrink-0">
+                <input
+                  type="date"
+                  value={dateFilterStart}
+                  onChange={(e) => setDateFilterStart(e.target.value)}
+                  className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-36"
+                  aria-label="Start date"
+                />
+              </div>
+
+              {/* 4. Separator Text */}
+              <span className="text-gray-500 dark:text-gray-400 text-sm flex-shrink-0">to</span>
+
+              {/* 5. Date Range End */}
+              <div className="flex-shrink-0">
+                <input
+                  type="date"
+                  value={dateFilterEnd}
+                  onChange={(e) => setDateFilterEnd(e.target.value)}
+                  className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-36"
+                  aria-label="End date"
+                />
+              </div>
+
+              {/* 6. Sort Dropdown */}
+              <div className="flex-shrink-0">
+                <select
+                  value={sortField}
+                  onChange={(e) => setSortField(e.target.value)}
+                  className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-[100px]"
+                >
+                  <option value="scheduled_date">Date</option>
+                  <option value="first_name">Name</option>
+                  <option value="status">Status</option>
+                  <option value="type">Type</option>
+                </select>
+              </div>
+
+              {/* 7. Sort Direction Toggle */}
+              <button
+                onClick={() => {
+                  setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                }}
+                className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-600 flex-shrink-0"
+                aria-label={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+                title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+              >
+                {sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+              </button>
+
+              {/* 8. Refresh Button */}
+              <button
+                onClick={() => refreshAppointments()}
+                disabled={isRefreshing}
+                className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-600 flex-shrink-0"
+                aria-label="Refresh appointments"
+                title="Refresh"
+              >
+                {isRefreshing ? (
+                  <span className="animate-spin w-4 h-4 block">⟳</span>
+                ) : (
+                  <span className="w-4 h-4 block">↻</span>
+                )}
+              </button>
+
+              {/* 9. Clear Filters Button (optional, when filters are active) */}
+              {(searchQuery || statusFilter !== 'all' || dateFilterStart || dateFilterEnd) && (
+                <button
+                  onClick={() => {
+                    setSearchQuery("");
+                    setStatusFilter("all");
+                    setDateFilterStart("");
+                    setDateFilterEnd("");
+                  }}
+                  className="px-3 py-2 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium flex-shrink-0"
+                >
+                  Clear
+                </button>
+              )}
+
+              {/* Results Count - Spacer */}
+              <div className="flex-1 min-w-[100px]">
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  {filteredAppointments.length} of {appointments.length}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {filteredAppointments.length === 0 ? (
+            <EmptyState
+              title="No appointments found"
+              description="No appointments match your search criteria. Try adjusting your filters or schedule a new appointment."
+              icon="📅"
+              actionLabel="Schedule New Appointment"
+              onAction={() => setShowBookingModal(true)}
+              className="py-20 flex-1"
+            />
+          ) : (
+            <div className="flex-1 min-h-0 overflow-y-auto auto-hide-scrollbar rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+              <DataTable
+                data={filteredAppointments}
+                columns={columns}
+                actions={tableActions}
+                emptyMessage="No appointments scheduled."
+                emptyIcon={<span>📅</span>}
+              />
+            </div>
+          )}
+        </div>
       )}
 
       {/* Date Details Modal */}
@@ -1114,10 +1369,12 @@ export default function Appointments() {
                 dateDetailsLoading ||
                 (selectedDateDetails
                   ? selectedDateDetails.isWeekend ||
-                    Boolean(selectedDateDetails.holiday)
+                    Boolean(selectedDateDetails.holiday) ||
+                    blockedDates[selectedDate]?.is_blocked
                   : selectedDate &&
                     (isWeekend(selectedDate) ||
-                      Boolean(isPhilippineHoliday(selectedDate))))
+                      Boolean(isPhilippineHoliday(selectedDate)) ||
+                      blockedDates[selectedDate]?.is_blocked))
               }
             >
               Book Appointment
@@ -1137,7 +1394,15 @@ export default function Appointments() {
             const holiday = selectedDateDetails?.holiday || isPhilippineHoliday(selectedDate);
             const isWeekendDay =
               selectedDateDetails?.isWeekend ?? isWeekend(selectedDate);
+            const isBlocked = blockedDates[selectedDate]?.is_blocked;
 
+            if (isBlocked) {
+              return (
+                <Alert variant="danger">
+                  <strong>Blocked by Administrator</strong> - This date has been blocked and appointments cannot be scheduled. Click on the date in the calendar to unblock it.
+                </Alert>
+              );
+            }
             if (holiday) {
               return (
                 <Alert variant="warning">
@@ -1177,12 +1442,14 @@ export default function Appointments() {
               </p>
             </div>
             <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
-              <p className="text-xs text-gray-500">Weekend</p>
+              <p className="text-xs text-gray-500">Status</p>
               <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                {(selectedDateDetails?.isWeekend ??
-                  (selectedDate && isWeekend(selectedDate)))
-                  ? "Yes (Sat/Sun)"
-                  : "No"}
+                {(blockedDates[selectedDate]?.is_blocked)
+                  ? "Blocked by Admin"
+                  : (selectedDateDetails?.isWeekend ??
+                    (selectedDate && isWeekend(selectedDate)))
+                    ? "Weekend (Sat/Sun)"
+                    : "Available"}
               </p>
             </div>
           </div>

@@ -10,8 +10,9 @@ import {
   Alert,
   PageHeader,
 } from "../components/UI";
-import { Volume2 } from "lucide-react";
+import { Volume2, Trash2 } from "lucide-react";
 import apiClient from "../utils/api";
+import { useAuth } from "../contexts/AuthContext";
 import {
   findDuplicateRecord,
   hasFieldErrors,
@@ -54,6 +55,8 @@ const Announcements = () => {
     useState(null);
   const [deliveryRows, setDeliveryRows] = useState([]);
   const [deliveryRowsLoading, setDeliveryRowsLoading] = useState(false);
+  const [deleteModalAnnouncement, setDeleteModalAnnouncement] = useState(null);
+  const [isDeletingAnnouncementId, setIsDeletingAnnouncementId] = useState(null);
   const [formData, setFormData] = useState({
     title: "",
     content: "",
@@ -61,6 +64,7 @@ const Announcements = () => {
     priority: "medium",
     status: "draft",
   });
+  const { user } = useAuth();
 
   // Fetch announcements from API
   const fetchDeliverySummaries = useCallback(async (announcementRows = []) => {
@@ -243,18 +247,36 @@ const Announcements = () => {
     }
   };
 
-  const handleArchiveAnnouncement = async (announcement) => {
-    try {
-      setIsArchivingAnnouncementId(announcement.id);
-      setError(null);
-      await apiClient.archiveAnnouncement(announcement.id);
-      await fetchAnnouncements();
-    } catch (err) {
-      setError(err.message || "Failed to archive announcement");
-    } finally {
-      setIsArchivingAnnouncementId(null);
-    }
-  };
+    const handleArchiveAnnouncement = async (announcement) => {
+      try {
+        setIsArchivingAnnouncementId(announcement.id);
+        setError(null);
+        await apiClient.archiveAnnouncement(announcement.id);
+        await fetchAnnouncements();
+      } catch (err) {
+        setError(err.message || "Failed to archive announcement");
+      } finally {
+        setIsArchivingAnnouncementId(null);
+      }
+    };
+
+    const handleDeleteAnnouncement = async (announcement) => {
+      try {
+        setIsDeletingAnnouncementId(announcement.id);
+        setError(null);
+        await apiClient.deleteAnnouncement(announcement.id);
+        // Optimistically remove the announcement from the list
+        setAnnouncements(prevAnnouncements => prevAnnouncements.filter(a => a.id !== announcement.id));
+        await fetchDeliverySummaries(); // Update delivery summaries
+      } catch (err) {
+        setError(err.message || "Failed to delete announcement");
+        // Refetch announcements on error to ensure consistency
+        await fetchAnnouncements();
+      } finally {
+        setIsDeletingAnnouncementId(null);
+        setDeleteModalAnnouncement(null);
+      }
+    };
 
   const openDeliveryModal = async (announcement) => {
     try {
@@ -334,17 +356,20 @@ const Announcements = () => {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <PageHeader
-        title="Announcements"
-        subtitle="Create and manage facility announcements and updates"
-        icon={<Volume2 className="w-6 h-6" />}
-        actions={
-          <Button variant="primary" onClick={() => setShowCreateModal(true)}>
-            Create Announcement
-          </Button>
-        }
-      />
+    <div className="space-y-6 px-6">
+      {/* Sticky Header Section - Stays fixed at top while scrolling */}
+      <div className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6 -mx-6 -mt-6">
+        <PageHeader
+          title="Announcements"
+          subtitle="Create and manage facility announcements and updates"
+          icon={<Volume2 className="w-6 h-6" />}
+          actions={
+            <Button variant="primary" onClick={() => setShowCreateModal(true)}>
+              Create Announcement
+            </Button>
+          }
+        />
+      </div>
 
       {error && (
         <Alert variant="error" className="mb-4" onClose={() => setError(null)}>
@@ -352,109 +377,124 @@ const Announcements = () => {
         </Alert>
       )}
 
-      {announcements.length === 0 ? (
-        <Card>
-          <div className="text-center py-12">
-            <div className="text-4xl mb-4">📢</div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-              No Announcements
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              There are no announcements yet. Create one to get started.
-            </p>
+      <div className="animate-fade-in px-6 -mx-6">
+        {announcements.length === 0 ? (
+          <Card>
+            <div className="text-center py-12">
+              <div className="text-4xl mb-4">📢</div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                No Announcements
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                There are no announcements yet. Create one to get started.
+              </p>
+            </div>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-4">
+            {announcements.map((announcement) => (
+              <Card key={announcement.id}>
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">
+                        {announcement.title}
+                      </h3>
+                      <Badge variant={getStatusVariant(announcement.status)}>
+                        {announcement.status || "draft"}
+                      </Badge>
+                      <Badge variant="secondary">
+                        {announcement.target_audience || "all"}
+                      </Badge>
+                    </div>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">
+                      {announcement.content}
+                    </p>
+                    <p className="text-gray-500 text-sm mt-2">
+                      Posted on{" "}
+                      {new Date(
+                        announcement.created_at || announcement.date,
+                      ).toLocaleDateString()}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                      {deliverySummaryLoading ? (
+                        <span className="text-gray-500">Loading delivery summary...</span>
+                      ) : (
+                        <>
+                          <Badge variant="secondary">
+                            Recipients: {getDeliverySummary(announcement.id).total_recipients}
+                          </Badge>
+                          <Badge variant="success">
+                            Delivered: {getDeliverySummary(announcement.id).delivered_count}
+                          </Badge>
+                          <Badge variant="warning">
+                            Pending: {getDeliverySummary(announcement.id).pending_count}
+                          </Badge>
+                          <Badge variant="info">
+                            Read: {getDeliverySummary(announcement.id).read_count}
+                          </Badge>
+                          <Badge variant="danger">
+                            Failed: {getDeliverySummary(announcement.id).failed_count}
+                          </Badge>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                     <div className="flex flex-col items-end gap-2">
+                       <Badge variant={getPriorityVariant(announcement.priority)}>
+                         {announcement.priority}
+                       </Badge>
+                       <div className="flex flex-wrap justify-end gap-2">
+                         {announcement.status === "draft" && (
+                           <Button
+                             variant="primary"
+                             size="sm"
+                             onClick={() => handlePublishAnnouncement(announcement)}
+                             disabled={isPublishingAnnouncementId === announcement.id}
+                             loading={isPublishingAnnouncementId === announcement.id}
+                           >
+                             Publish
+                           </Button>
+                         )}
+                         {announcement.status === "published" && (
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={() => handleArchiveAnnouncement(announcement)}
+                             disabled={isArchivingAnnouncementId === announcement.id}
+                             loading={isArchivingAnnouncementId === announcement.id}
+                           >
+                             Archive
+                           </Button>
+                         )}
+                         {(user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'SYSTEM_ADMIN') && (
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={() => {
+                               setDeleteModalAnnouncement(announcement);
+                             }}
+                             disabled={isDeletingAnnouncementId === announcement.id}
+                             loading={isDeletingAnnouncementId === announcement.id}
+                           >
+                             Delete
+                           </Button>
+                         )}
+                         <Button
+                           variant="secondary"
+                           size="sm"
+                           onClick={() => openDeliveryModal(announcement)}
+                         >
+                           Delivery Details
+                         </Button>
+                       </div>
+                     </div>
+                </div>
+              </Card>
+            ))}
           </div>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 gap-4">
-          {announcements.map((announcement) => (
-            <Card key={announcement.id}>
-              <div className="flex justify-between items-start gap-4">
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">
-                      {announcement.title}
-                    </h3>
-                    <Badge variant={getStatusVariant(announcement.status)}>
-                      {announcement.status || "draft"}
-                    </Badge>
-                    <Badge variant="secondary">
-                      {announcement.target_audience || "all"}
-                    </Badge>
-                  </div>
-                  <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">
-                    {announcement.content}
-                  </p>
-                  <p className="text-gray-500 text-sm mt-2">
-                    Posted on{" "}
-                    {new Date(
-                      announcement.created_at || announcement.date,
-                    ).toLocaleDateString()}
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                    {deliverySummaryLoading ? (
-                      <span className="text-gray-500">Loading delivery summary...</span>
-                    ) : (
-                      <>
-                        <Badge variant="secondary">
-                          Recipients: {getDeliverySummary(announcement.id).total_recipients}
-                        </Badge>
-                        <Badge variant="success">
-                          Delivered: {getDeliverySummary(announcement.id).delivered_count}
-                        </Badge>
-                        <Badge variant="warning">
-                          Pending: {getDeliverySummary(announcement.id).pending_count}
-                        </Badge>
-                        <Badge variant="info">
-                          Read: {getDeliverySummary(announcement.id).read_count}
-                        </Badge>
-                        <Badge variant="danger">
-                          Failed: {getDeliverySummary(announcement.id).failed_count}
-                        </Badge>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <Badge variant={getPriorityVariant(announcement.priority)}>
-                    {announcement.priority}
-                  </Badge>
-                  <div className="flex flex-wrap justify-end gap-2">
-                    {announcement.status === "draft" && (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => handlePublishAnnouncement(announcement)}
-                        disabled={isPublishingAnnouncementId === announcement.id}
-                        loading={isPublishingAnnouncementId === announcement.id}
-                      >
-                        Publish
-                      </Button>
-                    )}
-                    {announcement.status === "published" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleArchiveAnnouncement(announcement)}
-                        disabled={isArchivingAnnouncementId === announcement.id}
-                        loading={isArchivingAnnouncementId === announcement.id}
-                      >
-                        Archive
-                      </Button>
-                    )}
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => openDeliveryModal(announcement)}
-                    >
-                      Delivery Details
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Create Announcement Modal */}
       <Modal
@@ -577,68 +617,124 @@ const Announcements = () => {
         </form>
       </Modal>
 
-      {/* Delivery details modal */}
-      <Modal
-        isOpen={Boolean(deliveryModalAnnouncement)}
-        onClose={() => setDeliveryModalAnnouncement(null)}
-        title={`Delivery Details${deliveryModalAnnouncement ? `: ${deliveryModalAnnouncement.title}` : ""}`}
-        size="lg"
-        footer={
-          <AdminModalActions>
-            <Button
-              variant="cancel"
-              type="button"
-              onClick={() => setDeliveryModalAnnouncement(null)}
-            >
-              Close
-            </Button>
-          </AdminModalActions>
-        }
-      >
-        {deliveryRowsLoading ? (
-          <div className="py-6 text-sm text-gray-500">Loading delivery details...</div>
-        ) : deliveryRows.length === 0 ? (
-          <div className="py-6 text-sm text-gray-500">
-            No delivery records found for this announcement.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left border-b border-gray-200 dark:border-gray-700">
-                  <th className="py-2 pr-3">Recipient</th>
-                  <th className="py-2 pr-3">Audience</th>
-                  <th className="py-2 pr-3">Status</th>
-                  <th className="py-2 pr-3">Attempts</th>
-                  <th className="py-2 pr-3">Delivered At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deliveryRows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b border-gray-100 dark:border-gray-800"
-                  >
-                    <td className="py-2 pr-3">{row.recipient_label || "N/A"}</td>
-                    <td className="py-2 pr-3">{row.resolved_target_audience || "N/A"}</td>
-                    <td className="py-2 pr-3">
-                      <Badge variant={getStatusVariant(row.delivery_status)}>
-                        {row.delivery_status || "pending"}
-                      </Badge>
-                    </td>
-                    <td className="py-2 pr-3">{row.delivery_attempts ?? 0}</td>
-                    <td className="py-2 pr-3">
-                      {row.delivered_at
-                        ? new Date(row.delivered_at).toLocaleString()
-                        : "-"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Modal>
+       {/* Delivery details modal */}
+       <Modal
+         isOpen={Boolean(deliveryModalAnnouncement)}
+         onClose={() => setDeliveryModalAnnouncement(null)}
+         title={`Delivery Details${deliveryModalAnnouncement ? ": " + deliveryModalAnnouncement.title : ""}`}
+         size="lg"
+         footer={
+           <AdminModalActions>
+             <Button
+               variant="cancel"
+               type="button"
+               onClick={() => setDeliveryModalAnnouncement(null)}
+             >
+               Close
+             </Button>
+           </AdminModalActions>
+         }
+       >
+         {deliveryRowsLoading ? (
+           <div className="py-6 text-sm text-gray-500">Loading delivery details...</div>
+         ) : deliveryRows.length === 0 ? (
+           <div className="py-6 text-sm text-gray-500">
+             No delivery records found for this announcement.
+           </div>
+         ) : (
+           <div className="overflow-x-auto">
+             <table className="w-full text-sm">
+               <thead>
+                 <tr className="text-left border-b border-gray-200 dark:border-gray-700">
+                   <th className="py-2 pr-3">Recipient</th>
+                   <th className="py-2 pr-3">Audience</th>
+                   <th className="py-2 pr-3">Status</th>
+                   <th className="py-2 pr-3">Attempts</th>
+                   <th className="py-2 pr-3">Delivered At</th>
+                 </tr>
+               </thead>
+               <tbody>
+                 {deliveryRows.map((row) => (
+                   <tr
+                     key={row.id}
+                     className="border-b border-gray-100 dark:border-gray-800"
+                   >
+                     <td className="py-2 pr-3">{row.recipient_label || "N/A"}</td>
+                     <td className="py-2 pr-3">{row.resolved_target_audience || "N/A"}</td>
+                     <td className="py-2 pr-3">
+                       <Badge variant={getStatusVariant(row.delivery_status)}>
+                         {row.delivery_status || "pending"}
+                       </Badge>
+                     </td>
+                     <td className="py-2 pr-3">{row.delivery_attempts ?? 0}</td>
+                     <td className="py-2 pr-3">
+                       {row.delivered_at
+                         ? new Date(row.delivered_at).toLocaleString()
+                         : "-"}
+                     </td>
+                   </tr>
+                 ))}
+               </tbody>
+             </table>
+           </div>
+         )}
+       </Modal>
+
+       {/* Delete Confirmation Modal */}
+       <Modal
+         isOpen={Boolean(deleteModalAnnouncement)}
+         onClose={() => setDeleteModalAnnouncement(null)}
+         title="Delete Announcement"
+         size="sm"
+         footer={
+           <div className="flex justify-end space-x-3">
+             <Button
+               variant="cancel"
+               type="button"
+               onClick={() => setDeleteModalAnnouncement(null)}
+               disabled={isDeletingAnnouncementId === deleteModalAnnouncement?.id}
+             >
+               Cancel
+             </Button>
+             <Button
+               variant="danger"
+               type="button"
+               onClick={() => handleDeleteAnnouncement(deleteModalAnnouncement)}
+               disabled={isDeletingAnnouncementId === deleteModalAnnouncement?.id}
+               loading={isDeletingAnnouncementId === deleteModalAnnouncement?.id}
+             >
+               {isDeletingAnnouncementId === deleteModalAnnouncement?.id ? "Deleting..." : "Delete"}
+             </Button>
+           </div>
+         }
+       >
+         {deleteModalAnnouncement && (
+           <div className="space-y-4">
+             <div className="flex items-center justify-center mb-4">
+               <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center">
+                 <Trash2 className="w-6 h-6" />
+               </div>
+             </div>
+             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 text-center">
+               Are you sure you want to delete this announcement?
+             </h3>
+             <p className="text-gray-600 dark:text-gray-400 text-center">
+               This action cannot be undone. The announcement will be permanently removed.
+             </p>
+             <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded">
+               <p className="font-medium text-gray-900 dark:text-gray-100">
+                 {deleteModalAnnouncement.title}
+               </p>
+               <p className="text-gray-500 dark:text-gray-400 text-sm">
+                 Posted on{" "}
+                 {new Date(
+                   deleteModalAnnouncement.created_at || deleteModalAnnouncement.date,
+                 ).toLocaleDateString()}
+               </p>
+             </div>
+           </div>
+         )}
+       </Modal>
     </div>
   );
 };

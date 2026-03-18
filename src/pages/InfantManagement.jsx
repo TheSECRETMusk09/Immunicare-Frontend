@@ -454,69 +454,75 @@ export default function InfantManagement() {
   }
 
   return (
-    <div className="space-y-8 p-6">
-      <PageHeader
-        title="Infant Management"
-        subtitle="Digital booklets and records for pediatric patients"
-        icon={<Baby className="w-6 h-6" />}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={handleExportInfants}
-              variant="secondary"
-              className="flex items-center gap-2"
-            >
-              <Download className="w-4 h-4" /> Export Data
-            </Button>
-            <Button
-              onClick={() => setShowInjectModal(true)}
-              variant="success"
-              className="flex items-center gap-2"
-            >
-              <Syringe className="w-4 h-4" /> Record Vaccination
-            </Button>
-            <Button
-              onClick={() => setShowAddModal(true)}
-              variant="primary"
-              className="flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" /> Add New Infant
-            </Button>
-          </div>
-        }
-      />
-
-      {/* Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <Input
-            placeholder="Search infants by name or guardian..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          {refreshing && (
-            <span className="text-xs text-gray-500 dark:text-gray-400">Refreshing...</span>
-          )}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => fetchInfants(true)}
-            disabled={refreshing}
-            title="Refresh infant list"
-          >
-            <span className="mr-1">🔄</span> {refreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
-          <div className="text-sm text-gray-600 dark:text-gray-400 self-center">
-            Showing {filteredInfants.length} of {infants.length} infants
-          </div>
-        </div>
+    <div className="flex flex-col h-screen overflow-hidden">
+      {/* Sticky Header Section - Stays fixed at top while scrolling */}
+      <div className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6">
+        <PageHeader
+          title="Infant Management"
+          subtitle="Digital booklets and records for pediatric patients"
+          icon={<Baby className="w-6 h-6" />}
+          actions={
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={handleExportInfants}
+                variant="secondary"
+                className="flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" /> Export Data
+              </Button>
+              <Button
+                onClick={() => setShowInjectModal(true)}
+                variant="success"
+                className="flex items-center gap-2"
+              >
+                <Syringe className="w-4 h-4" /> Record Vaccination
+              </Button>
+              <Button
+                onClick={() => setShowAddModal(true)}
+                variant="primary"
+                className="flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> Add New Infant
+              </Button>
+            </div>
+          }
+        />
       </div>
 
-      <div className="animate-fade-in">
+      <div className="flex-1 flex flex-col p-4 sm:px-6 sm:pb-6 pt-3 overflow-hidden">
+        {/* Search Bar */}
+        <div className="flex-shrink-0 z-20 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4 mb-3">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Input
+                placeholder="Search infants by name or guardian..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              {refreshing && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">Refreshing...</span>
+              )}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => fetchInfants(true)}
+                disabled={refreshing}
+                title="Refresh infant list"
+              >
+                <span className="mr-1">🔄</span> {refreshing ? 'Refreshing...' : 'Refresh'}
+              </Button>
+              <div className="text-sm text-gray-600 dark:text-gray-400 self-center">
+                Showing {filteredInfants.length} of {infants.length} infants
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto auto-hide-scrollbar rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 animate-fade-in">
         <DataTable
           data={filteredInfants}
           columns={columns}
@@ -527,6 +533,7 @@ export default function InfantManagement() {
           searchQuery={searchQuery}
           onSearch={setSearchQuery}
         />
+        </div>
       </div>
 
       {/* Add Infant Modal */}

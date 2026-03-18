@@ -237,13 +237,15 @@ export default function DashboardOverview() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <Card title={<span className="font-bold">Admin Vaccination Monitoring</span>} className="xl:col-span-2">
-          <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
+      {/* Three Column Layout - Monitoring, Notifications, and Appointments inline */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Admin Vaccination Monitoring */}
+        <Card title={<span className="font-bold">Admin Vaccination Monitoring</span>} className="lg:col-span-1">
+          <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
             {monitoringRows.length === 0 ? (
               <p className="text-sm text-gray-500">No monitoring records available.</p>
             ) : (
-              monitoringRows.slice(0, 15).map((row) => (
+              monitoringRows.slice(0, 8).map((row) => (
                 <div
                   key={`${row.infant_id}-${row.next_due_date || "na"}`}
                   className="rounded-xl border border-gray-200 dark:border-gray-700 p-3"
@@ -267,10 +269,6 @@ export default function DashboardOverview() {
                   <div className="mt-1 text-xs text-gray-500 space-y-1">
                     <p>Guardian: {row.guardian_name || "N/A"}</p>
                     <p>Next dose: {formatDate(row.next_due_date)}</p>
-                    <p>
-                      Completed/Pending doses: {row.completed_count || 0}/{row.pending_count || 0}
-                    </p>
-                    <p>Upcoming appointments: {row.upcoming_appointments_count || 0}</p>
                   </div>
                 </div>
               ))
@@ -278,21 +276,22 @@ export default function DashboardOverview() {
           </div>
         </Card>
 
-        <Card title={<span className="font-bold">Notifications Panel Behavior</span>}>
+        {/* Notifications Panel */}
+        <Card title={<span className="font-bold">Notifications Panel</span>}>
           <div className="space-y-3">
             <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
               <p className="text-xs uppercase tracking-wide text-gray-500">Realtime Status</p>
               <p className="mt-1 font-semibold flex items-center gap-2">
                 <Bell className="w-4 h-4" />
-                {isConnected ? "Live socket connected" : "Socket offline (polling active)"}
+                {isConnected ? "Live connected" : "Socket offline"}
               </p>
             </div>
 
-            <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
               {priorityNotifications.length === 0 ? (
-                <p className="text-sm text-gray-500">No urgent notifications generated from monitoring.</p>
+                <p className="text-sm text-gray-500">No urgent notifications.</p>
               ) : (
-                priorityNotifications.map((entry) => (
+                priorityNotifications.slice(0, 5).map((entry) => (
                   <button
                     type="button"
                     key={`notif-${entry.id}-${entry.status}`}
@@ -301,55 +300,53 @@ export default function DashboardOverview() {
                   >
                     <p className="text-sm font-semibold">{entry.infantName}</p>
                     <p className="text-xs text-gray-500 mt-1">
-                      {entry.status === "overdue" ? "Overdue next dose" : "Due soon next dose"} • {entry.guardianName}
+                      {entry.status === "overdue" ? "Overdue" : "Due soon"} • {entry.guardianName}
                     </p>
-                    <p className="text-xs text-gray-500">Next due: {formatDate(entry.nextDueDate)}</p>
                   </button>
                 ))
               )}
             </div>
 
             <Button variant="primary" className="w-full" onClick={() => navigate("/notifications")}>
-              Go to Notifications
+              View All
             </Button>
           </div>
         </Card>
-      </div>
 
-      <Card title={<span className="font-bold">Upcoming Appointments</span>}>
-        <div className="space-y-2">
-          {appointmentsLoading ? (
-            <div className="py-4 text-center text-gray-500">
-              <span className="inline-block animate-pulse">Loading appointments...</span>
-            </div>
-          ) : (appointments || []).length === 0 ? (
-            <p className="text-sm text-gray-500">No upcoming appointments.</p>
-          ) : (
-            (appointments || []).slice(0, 6).map((apt) => (
-              <div
-                key={`apt-${apt.id || apt.infant_id || apt.patient_name || Math.random()}`}
-                className="rounded-lg border border-gray-200 dark:border-gray-700 p-2 text-sm flex items-center justify-between gap-2"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-gray-900 dark:text-gray-100">
-                    {apt.patient_name ||
-                      apt.infantName ||
-                      apt.infant_name ||
-                      `${apt.first_name || ""} ${apt.last_name || ""}`.trim() ||
-                      "Infant"}
-                  </p>
-                  <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-                    Guardian: {apt.guardian_name || apt.guardianName || "Guardian unavailable"}
-                  </p>
+        {/* Upcoming Appointments */}
+        <Card title={<span className="font-bold">Upcoming Appointments</span>}>
+          <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+            {appointmentsLoading ? (
+              <SkeletonTable rows={5} columns={2} />
+            ) : (appointments || []).length === 0 ? (
+              <p className="text-sm text-gray-500">No upcoming appointments.</p>
+            ) : (
+              (appointments || []).slice(0, 6).map((apt) => (
+                <div
+                  key={`apt-${apt.id || apt.infant_id || apt.patient_name || Math.random()}`}
+                  className="rounded-lg border border-gray-200 dark:border-gray-700 p-2 text-sm flex items-center justify-between gap-2"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-gray-900 dark:text-gray-100">
+                      {apt.patient_name ||
+                          apt.infantName ||
+                          apt.infant_name ||
+                          `${apt.first_name || ""} ${apt.last_name || ""}`.trim() ||
+                          "Infant"}
+                    </p>
+                    <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                      Guardian: {apt.guardian_name || apt.guardianName || "Guardian unavailable"}
+                    </p>
+                  </div>
+                  <span className="text-gray-500 whitespace-nowrap">
+                    {formatDate(apt.scheduled_date || apt.scheduledDate)}
+                  </span>
                 </div>
-                <span className="text-gray-500 whitespace-nowrap">
-                  {formatDate(apt.scheduled_date || apt.scheduledDate)}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      </Card>
+              ))
+            )}
+          </div>
+        </Card>
+      </div>
 
       <p className="text-xs text-gray-500">Live refresh ticks: {localRefreshTick}</p>
     </div>

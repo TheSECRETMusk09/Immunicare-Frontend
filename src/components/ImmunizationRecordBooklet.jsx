@@ -39,7 +39,7 @@ export default function ImmunizationRecordBooklet({ infantId }) {
     const requestId = ++requestIdRef.current;
 
     if (!infantId) {
-      if (!isMountedRef.current || requestId !== requestIdRef.current) {
+      if (!isMountedRef.current) {
         return;
       }
 

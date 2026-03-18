@@ -26,6 +26,14 @@ import {
   validateNumberRange,
 } from "../utils/adminFormValidation";
 
+// SheetJS for Excel export - loaded dynamically
+let XLSX = null;
+try {
+  XLSX = require("xlsx");
+} catch (e) {
+  console.warn("SheetJS (xlsx) not available, Excel export will use CSV fallback");
+}
+
 /**
  * Paper Configuration Inventory Management Component
  * Implements the layout from INVENTORY SHEET.docx with:
@@ -37,8 +45,7 @@ import {
 
 const INVENTORY_TAB_CONFIG = [
   { key: "inventory_sheet", label: "Inventory Sheet" },
-  { key: "stock_alerts", label: "Stock Alerts" },
-  { key: "reports", label: "Reports" },
+  { key: "stock_alerts", label: "Stock Management" }
 ];
 
 const INVENTORY_DEFAULT_TAB_KEY = INVENTORY_TAB_CONFIG[0].key;
@@ -52,7 +59,6 @@ const INVENTORY_TAB_ALIASES = {
   stock_alerts: "stock_alerts",
   "stock-alerts": "stock_alerts",
   alerts: "stock_alerts",
-  reports: "reports",
 };
 
 const normalizeInventoryTabKey = (value) => {
@@ -157,8 +163,10 @@ const buildInventoryPrintTotals = (rows) =>
     },
   );
 
-const InventorySheetPrintReport = ({ reportDate, printRows, printTotals }) => {
-  const monthYear = formatInventoryMonthYear(reportDate);
+const InventorySheetPrintReport = ({ reportDate, printRows, printTotals, dateRangeStart, dateRangeEnd, isFiltering }) => {
+  const monthYear = isFiltering && dateRangeStart && dateRangeEnd
+    ? `${dateRangeStart} to ${dateRangeEnd}`
+    : formatInventoryMonthYear(reportDate);
 
   return (
     <section
@@ -179,7 +187,7 @@ const InventorySheetPrintReport = ({ reportDate, printRows, printTotals }) => {
             className="inventory-sheet-print-header__line inventory-sheet-print-header__line--period"
             data-testid="inventory-print-month-year"
           >
-            {monthYear}
+            {isFiltering && dateRangeStart && dateRangeEnd ? `Date Range: ${monthYear}` : `Report Period: ${monthYear}`}
           </p>
         </header>
 
@@ -365,6 +373,11 @@ export default function InventoryManagement() {
     new Date().toISOString().split("T")[0],
   );
 
+  // Date range filter state
+  const [dateRangeStart, setDateRangeStart] = useState("");
+  const [dateRangeEnd, setDateRangeEnd] = useState("");
+  const [isFiltering, setIsFiltering] = useState(false);
+
   // Facility info for print
   const [facilityInfo, setFacilityInfo] = useState({
     healthCenter: "IMMUNICARE HEALTH CENTER",
@@ -441,28 +454,29 @@ export default function InventoryManagement() {
               (inv) => inv.vaccine_name === item.name || inv.vaccine_id === item.id
             );
 
-            if (apiRecord) {
-              return {
-                ...item,
-                beginning_balance: apiRecord.beginning_balance || 0,
-                received: apiRecord.received_during_period || 0,
-                lot_batch_number: apiRecord.lot_batch_number || '',
-                transferred_in: apiRecord.transferred_in || 0,
-                transferred_out: apiRecord.transferred_out || 0,
-                expired_wasted: apiRecord.expired_wasted || 0,
-                issuance: apiRecord.issuance || 0,
-                total_available: (apiRecord.beginning_balance || 0) + (apiRecord.received_during_period || 0),
-                stock_on_hand:
-                  (apiRecord.beginning_balance || 0) +
-                  (apiRecord.received_during_period || 0) +
-                  (apiRecord.transferred_in || 0) -
-                  (apiRecord.transferred_out || 0) -
-                  (apiRecord.expired_wasted || 0) -
-                  (apiRecord.issuance || 0),
-                _apiId: apiRecord.id,
-                _vaccineId: apiRecord.vaccine_id,
-              };
-            }
+             if (apiRecord) {
+               return {
+                 ...item,
+                 beginning_balance: apiRecord.beginning_balance || 0,
+                 received: apiRecord.received_during_period || 0,
+                 lot_batch_number: apiRecord.lot_batch_number || '',
+                 transferred_in: apiRecord.transferred_in || 0,
+                 transferred_out: apiRecord.transferred_out || 0,
+                 expired_wasted: apiRecord.expired_wasted || 0,
+                 issuance: apiRecord.issuance || 0,
+                 total_available: (apiRecord.beginning_balance || 0) + (apiRecord.received_during_period || 0),
+                 stock_on_hand:
+                   (apiRecord.beginning_balance || 0) +
+                   (apiRecord.received_during_period || 0) +
+                   (apiRecord.transferred_in || 0) -
+                   (apiRecord.transferred_out || 0) -
+                   (apiRecord.expired_wasted || 0) -
+                   (apiRecord.issuance || 0),
+                 _apiId: apiRecord.id,
+                 _vaccineId: apiRecord.vaccine_id,
+                 _facilityId: apiRecord.clinic_id || apiRecord.facility_id,
+               };
+             }
 
             // Return default values if no API record found
             return {
@@ -547,9 +561,53 @@ export default function InventoryManagement() {
     };
   }, []);
 
-  // Calculate totals
+  // Filter inventory by date range
+  const filteredInventory = useMemo(() => {
+    if (!isFiltering || !dateRangeStart || !dateRangeEnd) {
+      return inventory;
+    }
+
+    const startDate = new Date(dateRangeStart);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(dateRangeEnd);
+    endDate.setHours(23, 59, 59, 999);
+
+    return inventory.filter((item) => {
+      // Check if item has transaction dates that fall within range
+      const itemDate = item.last_transaction_date
+        ? new Date(item.last_transaction_date)
+        : null;
+
+      if (itemDate) {
+        return itemDate >= startDate && itemDate <= endDate;
+      }
+
+      // If no specific date, include all items when filtering is active
+      return true;
+    });
+  }, [inventory, isFiltering, dateRangeStart, dateRangeEnd]);
+
+  // Handle date range filter toggle
+  const handleDateRangeFilter = useCallback(() => {
+    if (dateRangeStart && dateRangeEnd) {
+      setIsFiltering(true);
+    } else {
+      // Show alert if dates are not selected
+      alert("Please select both start and end dates to filter the inventory.");
+    }
+  }, [dateRangeStart, dateRangeEnd]);
+
+  // Clear date range filter
+  const clearDateFilter = useCallback(() => {
+    setDateRangeStart("");
+    setDateRangeEnd("");
+    setIsFiltering(false);
+  }, []);
+
+  // Calculate totals - uses filtered inventory when filtering is active
   const calculateTotals = useCallback(() => {
-    return inventory.reduce(
+    const dataToUse = isFiltering ? filteredInventory : inventory;
+    return dataToUse.reduce(
       (acc, item) => ({
         beginning_balance: acc.beginning_balance + item.beginning_balance,
         received: acc.received + item.received,
@@ -575,7 +633,7 @@ export default function InventoryManagement() {
         stock_on_hand: 0,
       },
     );
-  }, [inventory]);
+  }, [inventory, filteredInventory, isFiltering]);
 
   // Update inventory item
   const updateItem = (id, field, value) => {
@@ -744,15 +802,16 @@ export default function InventoryManagement() {
         return;
       }
 
-      const payload = {
-        vaccine_inventory_id: dbInventoryId,
-        vaccine_id: matchedInventory._vaccineId || matchedInventory.vaccine_id || (matchedInventory._apiId ? matchedInventory.id : null),
-        transaction_type: mapModalTypeToApiType(modalType),
-        quantity: qty,
-        lot_number: lotNumber || undefined,
-        transaction_date: formData.date,
-        notes: normalizedNotes || undefined,
-      };
+        const payload = {
+          vaccine_inventory_id: dbInventoryId,
+          vaccine_id: matchedInventory._vaccineId,
+          transaction_type: mapModalTypeToApiType(modalType),
+          quantity: qty,
+          lot_number: lotNumber || undefined,
+          transaction_date: formData.date,
+          notes: normalizedNotes || undefined,
+          clinic_id: matchedInventory._facilityId,
+        };
 
       await apiClient.createVaccineInventoryTransaction(payload);
 
@@ -927,15 +986,23 @@ export default function InventoryManagement() {
     return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped;
   }, []);
 
-  // Download report as CSV
-  const downloadCSV = () => {
+  // Download report as CSV - uses filtered data when filtering is active
+  // Stabilized with useCallback to prevent unnecessary re-renders
+  const downloadCSV = useCallback(() => {
+    const dataToUse = isFiltering ? filteredInventory : inventory;
     const headers = inventoryExportColumns.map((column) => column.label);
     const totals = calculateTotals();
-    const rows = getInventoryExportRows(inventory, totals);
+    const rows = getInventoryExportRows(dataToUse, totals);
+
+    // Add date range info to CSV if filtering is active
+    const dateRangeInfo = isFiltering && dateRangeStart && dateRangeEnd
+      ? `Date Range: ${dateRangeStart} to ${dateRangeEnd}`
+      : `Report Date: ${reportDate}`;
 
     const csvContent = [
       `IMMUNICARE HEALTH CENTER - VACCINE INVENTORY`,
-      `Report Date: ${reportDate}`,
+      `Barangay San Nicolas, Pasig City`,
+      dateRangeInfo,
       `Generated: ${new Date().toLocaleString()}`,
       "",
       headers.map((cell) => formatCsvCell(cell)).join(","),
@@ -946,14 +1013,113 @@ export default function InventoryManagement() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `vaccine_inventory_${reportDate}.csv`;
+    const filenameDate = isFiltering && dateRangeStart && dateRangeEnd
+      ? `${dateRangeStart}_to_${dateRangeEnd}`
+      : reportDate;
+    link.download = `vaccine_inventory_${filenameDate}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  };
+  }, [inventory, filteredInventory, isFiltering, dateRangeStart, dateRangeEnd, reportDate, inventoryExportColumns, calculateTotals, getInventoryExportRows, formatCsvCell]);
+
+  // Excel export with SheetJS and proper column widths
+  const downloadExcel = useCallback(() => {
+    if (!XLSX) {
+      // Fallback to CSV if SheetJS is not available
+      alert("SheetJS not available. Downloading as CSV instead.");
+      downloadCSV();
+      return;
+    }
+
+    const dataToUse = isFiltering ? filteredInventory : inventory;
+    const totals = calculateTotals();
+
+    // Prepare data for Excel
+    const excelData = dataToUse.map((item, index) => ({
+      "A #": index + 1,
+      "Items": item.name,
+      "B Beginning Balance": item.beginning_balance,
+      "C Received": item.received,
+      "Lot / Batch Number": item.lot_batch_number || "---",
+      "Stock In": item.transferred_in,
+      "Stock Out": item.transferred_out,
+      "Expired / Wasted": item.expired_wasted,
+      "G Total Available": item.total_available,
+      "H Issued": item.issuance,
+      "I+J Stock On Hand": item.stock_on_hand,
+    }));
+
+    // Add total row
+    excelData.push({
+      "A #": "",
+      "Items": "TOTAL",
+      "B Beginning Balance": totals.beginning_balance,
+      "C Received": totals.received,
+      "Lot / Batch Number": "-",
+      "Stock In": totals.transferred_in,
+      "Stock Out": totals.transferred_out,
+      "Expired / Wasted": totals.expired_wasted,
+      "G Total Available": totals.total_available,
+      "H Issued": totals.issuance,
+      "I+J Stock On Hand": totals.stock_on_hand,
+    });
+
+    // Create workbook and worksheet
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(excelData);
+
+    // Set column widths for optimal readability
+    const colWidths = [
+      { wch: 5 },   // A #
+      { wch: 25 },  // Items (wider for vaccine names)
+      { wch: 18 },  // Beginning Balance
+      { wch: 12 },  // Received
+      { wch: 20 },  // Lot / Batch Number (wider)
+      { wch: 10 },  // Stock In
+      { wch: 10 },  // Stock Out
+      { wch: 16 },  // Expired / Wasted
+      { wch: 16 },  // Total Available
+      { wch: 10 },  // Issued
+      { wch: 16 },  // Stock On Hand
+    ];
+    ws["!cols"] = colWidths;
+
+    // Add title rows above the data
+    const titleRows = [
+      { A: "IMMUNICARE HEALTH CENTER - VACCINE INVENTORY", B: "", C: "", D: "", E: "", F: "", G: "", H: "", I: "", J: "", K: "" },
+      { A: "Barangay San Nicolas, Pasig City", B: "", C: "", D: "", E: "", F: "", G: "", H: "", I: "", J: "", K: "" },
+    ];
+
+    if (isFiltering && dateRangeStart && dateRangeEnd) {
+      titleRows.push({ A: `Date Range: ${dateRangeStart} to ${dateRangeEnd}`, B: "", C: "", D: "", E: "", F: "", G: "", H: "", I: "", J: "", K: "" });
+    } else {
+      titleRows.push({ A: `Report Date: ${reportDate}`, B: "", C: "", D: "", E: "", F: "", G: "", H: "", I: "", J: "", K: "" });
+    }
+    titleRows.push({ A: `Generated: ${new Date().toLocaleString()}`, B: "", C: "", D: "", E: "", F: "", G: "", H: "", I: "", J: "", K: "" });
+    titleRows.push({ A: "", B: "", C: "", D: "", E: "", F: "", G: "", H: "", I: "", J: "", K: "" });
+
+    // Insert title rows at the beginning
+    XLSX.utils.sheet_add_json(ws, titleRows, { skipHeader: true, origin: "A1" });
+
+    // Merge title cells for header
+    if (!ws["!merges"]) ws["!merges"] = [];
+    ws["!merges"].push(XLSX.utils.decode_range("A1:K1"));
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, "Inventory");
+
+    // Generate filename
+    const filenameDate = isFiltering && dateRangeStart && dateRangeEnd
+      ? `${dateRangeStart}_to_${dateRangeEnd}`
+      : reportDate;
+
+    // Download the file
+    XLSX.writeFile(wb, `vaccine_inventory_${filenameDate}.xlsx`);
+  }, [inventory, filteredInventory, isFiltering, dateRangeStart, dateRangeEnd, reportDate, calculateTotals, downloadCSV]);
 
   // Print report with proper formatting - only prints inventory sheet
+  // Uses filtered data when date range is active
   const printReport = () => {
     // Ensure we're on the inventory sheet tab
     if (activeTab !== INVENTORY_DEFAULT_TAB_KEY) {
@@ -1036,7 +1202,11 @@ export default function InventoryManagement() {
 
   const stockAlerts = getStockAlerts();
 
-  const printRows = useMemo(() => buildInventoryPrintRows(inventory), [inventory]);
+  // Use filtered inventory for print/export when filtering is active
+  const printRows = useMemo(
+    () => buildInventoryPrintRows(isFiltering ? filteredInventory : inventory),
+    [inventory, filteredInventory, isFiltering],
+  );
 
   const printTotals = useMemo(
     () => buildInventoryPrintTotals(printRows),
@@ -1076,48 +1246,7 @@ export default function InventoryManagement() {
           icon="💉"
           actions={
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="headerOutline"
-                size="sm"
-                onClick={downloadCSV}
-                className="gap-2"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                  />
-                </svg>
-                Export CSV
-              </Button>
-              <Button
-                variant="headerOutline"
-                size="sm"
-                onClick={downloadPDF}
-                className="gap-2"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                  />
-                </svg>
-                Print / PDF
-              </Button>
+              {/* No export buttons here - moved to filter row */}
             </div>
           }
         />
@@ -1150,16 +1279,6 @@ export default function InventoryManagement() {
                 </span>
               )}
             </button>
-            <button
-              onClick={() => handleTabChange("reports")}
-              className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${
-                activeTab === "reports"
-                  ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-              }`}
-            >
-              Reports
-            </button>
           </div>
         </Card>
       </div>
@@ -1170,18 +1289,22 @@ export default function InventoryManagement() {
           reportDate={reportDate}
           printRows={printRows}
           printTotals={printTotals}
+          dateRangeStart={dateRangeStart}
+          dateRangeEnd={dateRangeEnd}
+          isFiltering={isFiltering}
         />
       )}
 
       {/* Inventory Sheet Tab - This is the ONLY content that will print */}
       {activeTab === "inventory_sheet" && (
         <div className="inventory-sheet-print-area space-y-3 print:space-y-1">
-          {/* Report Date - Hidden on Print, Visible on Screen */}
-          <div className="flex justify-end print:hidden">
+           {/* Report Date and Date Range Filter - Hidden on Print, Visible on Screen */}
+          <div className="flex flex-wrap items-center gap-3 print:hidden">
+            {/* Single Date Picker */}
             <div className="flex items-center gap-2">
               <label
                 htmlFor="inventory-report-date"
-                className="text-sm font-medium text-gray-700"
+                className="text-sm font-medium text-gray-700 dark:text-gray-300"
               >
                 Report Date:
               </label>
@@ -1193,6 +1316,133 @@ export default function InventoryManagement() {
                 onChange={(e) => setReportDate(e.target.value)}
                 className="w-36 text-sm"
               />
+            </div>
+
+            {/* Date Range Filter */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Or filter by date range:</span>
+              <Input
+                aria-label="Start Date"
+                type="date"
+                value={dateRangeStart}
+                onChange={(e) => {
+                  setDateRangeStart(e.target.value);
+                  if (e.target.value && dateRangeEnd) {
+                    setIsFiltering(true);
+                  }
+                }}
+                className="w-36 text-sm"
+                placeholder="Start"
+              />
+              <span className="text-gray-500">to</span>
+              <Input
+                aria-label="End Date"
+                type="date"
+                value={dateRangeEnd}
+                onChange={(e) => {
+                  setDateRangeEnd(e.target.value);
+                  if (dateRangeStart && e.target.value) {
+                    setIsFiltering(true);
+                  }
+                }}
+                className="w-36 text-sm"
+                placeholder="End"
+              />
+              {!isFiltering ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleDateRangeFilter}
+                  className="text-xs"
+                  title="Apply filter"
+                >
+                  Apply Filter
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearDateFilter}
+                  className="text-xs"
+                  title="Clear filter"
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+
+            {/* Filter indicator */}
+            {isFiltering && dateRangeStart && dateRangeEnd && (
+              <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded">
+                Showing: {dateRangeStart} to {dateRangeEnd}
+              </span>
+            )}
+
+            {/* Export buttons */}
+            <div className="flex items-center gap-2 ml-auto">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={downloadExcel}
+                className="gap-2"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                Export Excel
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={downloadCSV}
+                className="gap-2"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                  />
+                </svg>
+                Export CSV
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={downloadPDF}
+                className="gap-2"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                  />
+                </svg>
+                Print / PDF
+              </Button>
             </div>
           </div>
 
@@ -1267,7 +1517,8 @@ export default function InventoryManagement() {
                   </tr>
                 </thead>
                 <tbody>
-                  {inventory.map((item, index) => (
+                  {/* Use filtered inventory for display when filtering is active */}
+                  {(isFiltering ? filteredInventory : inventory).map((item, index) => (
                     <tr
                       key={item.id}
                       className={
@@ -1505,6 +1756,163 @@ export default function InventoryManagement() {
       {/* Stock Alerts Tab - NOT printed */}
       {activeTab === "stock_alerts" && (
         <div className="space-y-4">
+          {/* Action Cards - Inline horizontally in a single row */}
+          <div className="grid grid-cols-4 gap-3">
+            {/* Excel Export */}
+            <Card
+              className="p-3 text-center cursor-pointer hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700"
+              onClick={downloadExcel}
+            >
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/50 rounded-full w-10 h-10 mx-auto flex items-center justify-center mb-2">
+                <svg
+                  className="w-5 h-5 text-purple-600 dark:text-purple-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1">
+                Export to Excel
+              </h3>
+            </Card>
+
+            {/* CSV Export */}
+            <Card
+              className="p-3 text-center cursor-pointer hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700"
+              onClick={downloadCSV}
+            >
+              <div className="p-2 bg-green-100 dark:bg-green-900/50 rounded-full w-10 h-10 mx-auto flex items-center justify-center mb-2">
+                <svg
+                  className="w-5 h-5 text-green-600 dark:text-green-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1">
+                Export to CSV
+              </h3>
+            </Card>
+
+            {/* Print / PDF */}
+            <Card
+              className="p-3 text-center cursor-pointer hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700"
+              onClick={printReport}
+            >
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-full w-10 h-10 mx-auto flex items-center justify-center mb-2">
+                <svg
+                  className="w-5 h-5 text-blue-600 dark:text-blue-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1">
+                Print / PDF
+              </h3>
+            </Card>
+
+            {/* Summary */}
+            <Card className="p-3 text-center dark:bg-gray-800 dark:border-gray-700">
+              <div className="p-2 bg-orange-100 dark:bg-orange-900/50 rounded-full w-10 h-10 mx-auto flex items-center justify-center mb-2">
+                <svg
+                  className="w-5 h-5 text-orange-600 dark:text-orange-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1">
+                Summary
+              </h3>
+            </Card>
+          </div>
+
+          {/* Inventory Summary */}
+          <Card className="p-4 dark:bg-gray-800 dark:border-gray-700">
+            <h3 className="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-200">
+              Inventory Summary
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+              <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded">
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  Vaccines
+                </p>
+                <p className="text-lg font-bold text-gray-800 dark:text-gray-200">
+                  {inventory.length}
+                </p>
+              </div>
+              <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/30 rounded">
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  Beginning
+                </p>
+                <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                  {totals.beginning_balance}
+                </p>
+              </div>
+              <div className="text-center p-3 bg-green-50 dark:bg-green-900/30 rounded">
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  Received
+                </p>
+                <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                  {totals.received}
+                </p>
+              </div>
+              <div className="text-center p-3 bg-yellow-50 dark:bg-yellow-900/30 rounded">
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  Issued
+                </p>
+                <p className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                  {totals.issuance}
+                </p>
+              </div>
+              <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/30 rounded">
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  On Hand
+                </p>
+                <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                  {totals.stock_on_hand}
+                </p>
+              </div>
+              <div className="text-center p-3 bg-red-50 dark:bg-red-900/30 rounded">
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  Nearly Expiring
+                </p>
+                <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                  {stockAlerts.expiring.length}
+                </p>
+              </div>
+            </div>
+          </Card>
+
           {/* Alert Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {/* Critical Stock Alert */}
@@ -1826,149 +2234,6 @@ export default function InventoryManagement() {
                 </div>
               </Card>
             )}
-        </div>
-      )}
-
-      {/* Reports Tab - NOT printed */}
-      {activeTab === "reports" && (
-        <div className="space-y-4">
-          {/* Report Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card
-              className="p-4 text-center cursor-pointer hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700"
-              onClick={downloadCSV}
-            >
-              <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-full w-12 h-12 mx-auto flex items-center justify-center mb-2">
-                <svg
-                  className="w-6 h-6 text-green-600 dark:text-green-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">
-                Export to CSV
-              </h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400">
-                Download as spreadsheet
-              </p>
-            </Card>
-
-            <Card
-              className="p-4 text-center cursor-pointer hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700"
-              onClick={printReport}
-            >
-              <div className="p-3 bg-blue-100 dark:bg-blue-900/50 rounded-full w-12 h-12 mx-auto flex items-center justify-center mb-2">
-                <svg
-                  className="w-6 h-6 text-blue-600 dark:text-blue-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">
-                Print / PDF
-              </h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400">
-                Save as PDF document
-              </p>
-            </Card>
-
-            <Card className="p-4 text-center dark:bg-gray-800 dark:border-gray-700">
-              <div className="p-3 bg-purple-100 dark:bg-purple-900/50 rounded-full w-12 h-12 mx-auto flex items-center justify-center mb-2">
-                <svg
-                  className="w-6 h-6 text-purple-600 dark:text-purple-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">
-                Summary
-              </h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400">
-                Statistics overview
-              </p>
-            </Card>
-          </div>
-
-          {/* Report Summary */}
-          <Card className="p-4 dark:bg-gray-800 dark:border-gray-700">
-            <h3 className="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-200">
-              Inventory Summary
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-              <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded">
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Vaccines
-                </p>
-                <p className="text-lg font-bold text-gray-800 dark:text-gray-200">
-                  {inventory.length}
-                </p>
-              </div>
-              <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/30 rounded">
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Beginning
-                </p>
-                <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                  {totals.beginning_balance}
-                </p>
-              </div>
-              <div className="text-center p-3 bg-green-50 dark:bg-green-900/30 rounded">
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Received
-                </p>
-                <p className="text-lg font-bold text-green-600 dark:text-green-400">
-                  {totals.received}
-                </p>
-              </div>
-              <div className="text-center p-3 bg-yellow-50 dark:bg-yellow-900/30 rounded">
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Issued
-                </p>
-                <p className="text-lg font-bold text-orange-600 dark:text-orange-400">
-                  {totals.issuance}
-                </p>
-              </div>
-              <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/30 rounded">
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  On Hand
-                </p>
-                <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
-                  {totals.stock_on_hand}
-                </p>
-              </div>
-              <div className="text-center p-3 bg-red-50 dark:bg-red-900/30 rounded">
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Nearly Expiring
-                </p>
-                <p className="text-lg font-bold text-red-600 dark:text-red-400">
-                  {stockAlerts.expiring.length}
-                </p>
-              </div>
-            </div>
-          </Card>
         </div>
       )}
 

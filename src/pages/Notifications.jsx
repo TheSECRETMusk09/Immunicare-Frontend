@@ -781,23 +781,27 @@ const Notifications = () => {
   const isExternalUrl = (value) => /^https?:\/\//i.test(value);
 
   return (
-    <div className="space-y-6 p-4 sm:p-6">
-      <PageHeader
-        title="Notifications"
-        subtitle="Automation-focused notification center for appointments, schedules, stock risks, registrations, reports, announcements, and outbound delivery failures"
-        icon={<Bell className="w-8 h-8 text-white" />}
-        actions={
-          <Button
-            variant="secondary"
-            onClick={handleMarkAllRead}
-            loading={markingAllRead}
-            disabled={markingAllRead || !hasData}
-          >
-            Mark All Read
-          </Button>
-        }
-      />
+    <div className="flex flex-col h-screen overflow-hidden">
+      {/* Page Header - Fixed/Sticky at top */}
+      <div className="flex-shrink-0 sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6">
+        <PageHeader
+          title="Notifications"
+          subtitle="Automation-focused notification center for appointments, schedules, stock risks, registrations, reports, announcements, and outbound delivery failures"
+          icon={<Bell className="w-8 h-8 text-white" />}
+          actions={
+            <Button
+              variant="secondary"
+              onClick={handleMarkAllRead}
+              loading={markingAllRead}
+              disabled={markingAllRead || !hasData}
+            >
+              Mark All Read
+            </Button>
+          }
+        />
+      </div>
 
+      <div className="flex-1 min-h-0 overflow-y-auto auto-hide-scrollbar p-4 sm:px-6 sm:pb-6 pt-3 space-y-4 sm:space-y-6">
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-200">
           {error}
@@ -894,7 +898,7 @@ const Notifications = () => {
             </button>
           </section>
 
-          <Card className="border border-slate-200 bg-white/90 dark:border-slate-700 dark:bg-slate-900/70">
+          <Card className="sticky top-0 z-20 border border-slate-200 bg-white/90 dark:border-slate-700 dark:bg-slate-900/70">
             <div className="flex flex-col gap-4">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <div>
@@ -1144,6 +1148,7 @@ const Notifications = () => {
           </p>
         </Card>
       )}
+      </div>
     </div>
   );
 };

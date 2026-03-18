@@ -9,7 +9,6 @@ import {
   Users,
   Baby,
   Syringe,
-  Pill,
   Package,
   Calendar,
   ClipboardList,
@@ -64,7 +63,6 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
     { name: "User Management", icon: Users },
     { name: "Infant Management", icon: Baby },
     { name: "Vaccinations", icon: Syringe },
-    { name: "Vaccine Tracking", icon: Pill },
     { name: "Inventory", icon: Package },
     { name: "Appointments", icon: Calendar },
     { name: "Reports", icon: ClipboardList },
@@ -103,7 +101,6 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
       "User Management": "/users",
       "Infant Management": "/infants",
       Vaccinations: "/vaccination-management",
-      "Vaccine Tracking": "/vaccine-tracking",
       Inventory: "/inventory",
       Appointments: "/appointments",
       Reports: "/reports",
@@ -129,7 +126,6 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
 
     // Check paths
     if (path.includes("/inventory")) return "Inventory";
-    if (path.includes("/vaccine-tracking")) return "Vaccine Tracking";
     if (path.includes("/vaccination-management")) return "Vaccinations";
     if (path.includes("/users")) return "User Management";
     if (path.includes("/infants")) return "Infant Management";
@@ -331,16 +327,20 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
         {/* User Profile Section - Top of sidebar */}
         <div className="mt-auto border-t dark:border-gray-700">
           {/* Health Center Info - Displayed at top */}
-          <div className="px-4 py-3 border-b dark:border-gray-700 bg-indigo-50 dark:bg-indigo-900/20">
-            <div className="flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-              <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
-                {user?.clinic ||
-                  user?.healthCenter ||
-                  "San Nicolas Health Center"}
-              </span>
-            </div>
-          </div>
+<div className="px-4 py-3 border-b dark:border-gray-700 bg-indigo-50 dark:bg-indigo-900/20">
+  <div className="flex items-center gap-2">
+    <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+    <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
+      {(() => {
+        const healthCenter = user?.clinic || user?.healthCenter;
+        if (!healthCenter) return "San Nicolas Health Center";
+        // Map "Main Health Center" to "San Nicolas Health Center" for display
+        if (healthCenter === "Main Health Center") return "San Nicolas Health Center";
+        return healthCenter;
+      })()}
+    </span>
+  </div>
+</div>
 
           <AdminHeader
             darkMode={darkMode}

@@ -994,3 +994,142 @@ textarea:focus-visible {
     font-size: 12px;
   }
 }
+
+/* ==========================================================================
+   Auto-Hiding Scrollbars for Admin Dashboard Modules
+   ========================================================================== */
+
+/* Base auto-hide scrollbar - hidden by default, shows on hover/scroll */
+.auto-hide-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
+  transition: scrollbar-color 0.3s ease;
+}
+
+/* Show scrollbar on hover */
+.auto-hide-scrollbar:hover {
+  scrollbar-color: rgba(156, 163, 175, 0.7) transparent;
+}
+
+/* WebKit scrollbar styling */
+.auto-hide-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.auto-hide-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.auto-hide-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.4);
+  border-radius: 3px;
+  transition: background-color 0.3s ease;
+}
+
+.auto-hide-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.7);
+}
+
+/* Modern sleek scrollbar - auto-show on scroll with fade effect */
+.modern-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(107, 114, 128, 0.5) transparent;
+}
+
+.modern-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.modern-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modern-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(107, 114, 128, 0.5);
+  border-radius: 10px;
+}
+
+.modern-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(107, 114, 128, 0.8);
+}
+
+/* Admin table scrollbar */
+.admin-table-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af transparent;
+}
+
+.admin-table-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.admin-table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.admin-table-scroll::-webkit-scrollbar-thumb {
+  background-color: #9ca3af;
+  border-radius: 3px;
+}
+
+.admin-table-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: #6b7280;
+}
+
+/* Smooth scrollbar fade - for containers that need modern feel */
+.smooth-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.6) transparent;
+}
+
+.smooth-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.smooth-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.smooth-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.6);
+  border-radius: 4px;
+  -webkit-transition: background-color 0.2s ease-in-out;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.smooth-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.9);
+}
+
+/* Dark mode scrollbar adjustments */
+.dark .auto-hide-scrollbar {
+  scrollbar-color: rgba(75, 85, 99, 0.5) transparent;
+}
+
+.dark .auto-hide-scrollbar:hover {
+  scrollbar-color: rgba(75, 85, 99, 0.8) transparent;
+}
+
+.dark .auto-hide-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(75, 85, 99, 0.5);
+}
+
+.dark .auto-hide-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(75, 85, 99, 0.8);
+}
+
+.dark .modern-scrollbar {
+  scrollbar-color: rgba(100, 116, 139, 0.6) transparent;
+}
+
+.dark .modern-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.6);
+}
+
+.dark .modern-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(100, 116, 139, 0.9);
+}

@@ -1093,11 +1093,14 @@ const FilterBar = ({
   return (
     <Card
       sx={{
-        mb: 3,
+        mb: 0,
         bgcolor: surfaceBg,
         border: "1px solid",
         borderColor: surfaceBorder,
         boxShadow: isDark ? "0 12px 28px rgba(2,6,23,0.35)" : "0 8px 22px rgba(15,23,42,0.06)",
+        '& .MuiCardContent-root': {
+          backgroundColor: isDark ? 'rgba(15,23,42,0.9)' : 'transparent',
+        },
         "& .MuiInputLabel-root": {
           color: helperColor,
           fontWeight: 500,
@@ -1304,9 +1307,16 @@ const KpiCard = ({ title, value, subtitle, icon, color = "primary", loading, isD
         border: "1px solid",
         borderColor: surfaceBorder,
         boxShadow: isDark ? "0 10px 22px rgba(2,6,23,0.34)" : "0 6px 16px rgba(15,23,42,0.06)",
+        '& .MuiCardContent-root': {
+          backgroundColor: isDark ? 'rgba(15,23,42,0.72)' : 'transparent',
+        },
       }}
     >
-      <CardContent>
+      <CardContent
+        sx={{
+          backgroundColor: isDark ? 'rgba(15,23,42,0.72)' : 'transparent',
+        }}
+      >
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
           <Typography variant="body2" sx={{ color: titleColor }}>
             {title}
@@ -1455,9 +1465,17 @@ const ChartCard = ({
         background: chartAppearance.cardBackground,
         boxShadow: chartAppearance.cardShadow,
         overflow: "hidden",
+        '& .MuiCardContent-root': {
+          backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+        },
       }}
     >
-      <CardContent sx={{ p: { xs: 2, sm: 2.25 } }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.25 },
+          backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.72)' : 'transparent',
+        }}
+      >
         <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: "-0.01em", color: chartAppearance.isDark ? '#FFFFFF' : 'text.primary' }}>
           {title}
         </Typography>
@@ -1651,9 +1669,16 @@ const AppointmentAndFollowupSection = ({ data, loading, chartAppearance }) => {
             boxShadow: chartAppearance.isDark
               ? "0 12px 26px rgba(2,6,23,0.36)"
               : "0 8px 18px rgba(15,23,42,0.06)",
+            '& .MuiCardContent-root': {
+              backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            },
           }}
         >
-          <CardContent>
+          <CardContent
+            sx={{
+              backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            }}
+          >
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: chartAppearance.isDark ? '#FFFFFF' : 'text.primary' }}>
               Appointment and Follow-up Summary
             </Typography>
@@ -1779,9 +1804,16 @@ const InventorySection = ({ data, loading, chartAppearance, viewportWidth }) => 
             boxShadow: chartAppearance.isDark
               ? "0 12px 26px rgba(2,6,23,0.36)"
               : "0 8px 18px rgba(15,23,42,0.06)",
+            '& .MuiCardContent-root': {
+              backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            },
           }}
         >
-          <CardContent>
+          <CardContent
+            sx={{
+              backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            }}
+          >
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: chartAppearance.isDark ? '#FFFFFF' : 'text.primary' }}>
               Vaccine Inventory Summary            </Typography>
             {loading ? (
@@ -2016,9 +2048,16 @@ const SmsAndDemographicsSection = ({
             boxShadow: chartAppearance.isDark
               ? "0 12px 26px rgba(2,6,23,0.36)"
               : "0 8px 18px rgba(15,23,42,0.06)",
+            '& .MuiCardContent-root': {
+              backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            },
           }}
         >
-          <CardContent>
+          <CardContent
+            sx={{
+              backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            }}
+          >
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: chartAppearance.isDark ? '#FFFFFF' : 'text.primary' }}>
               SMS Reminder Analytics            </Typography>
             {loading ? (
@@ -2368,9 +2407,16 @@ const AlertsActivityReportsSection = ({
             border: "1px solid",
             borderColor: surfaceBorder,
             boxShadow: isDark ? "0 12px 26px rgba(2,6,23,0.36)" : "0 8px 18px rgba(15,23,42,0.06)",
+            '& .MuiCardContent-root': {
+              backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            },
           }}
         >
-          <CardContent>
+          <CardContent
+            sx={{
+              backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            }}
+          >
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: headingColor }}>
               Critical Alerts
             </Typography>
@@ -2442,9 +2488,16 @@ const AlertsActivityReportsSection = ({
             border: "1px solid",
             borderColor: surfaceBorder,
             boxShadow: isDark ? "0 12px 26px rgba(2,6,23,0.36)" : "0 8px 18px rgba(15,23,42,0.06)",
+            '& .MuiCardContent-root': {
+              backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            },
           }}
         >
-          <CardContent>
+          <CardContent
+            sx={{
+              backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            }}
+          >
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: headingColor }}>
               Recent Activity Feed
             </Typography>
@@ -2540,9 +2593,16 @@ const AlertsActivityReportsSection = ({
             border: "1px solid",
             borderColor: surfaceBorder,
             boxShadow: isDark ? "0 12px 26px rgba(2,6,23,0.36)" : "0 8px 18px rgba(15,23,42,0.06)",
+            '& .MuiCardContent-root': {
+              backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            },
           }}
         >
-          <CardContent>
+          <CardContent
+            sx={{
+              backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            }}
+          >
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: headingColor }}>
               Report Shortcuts
             </Typography>
@@ -2995,10 +3055,21 @@ const AnalyticsDashboard = () => {
   return (
     <Box sx={{
       p: { xs: 2, sm: 2.5, md: 3 },
-      bgcolor: isDark ? 'background.default' : 'transparent',
+      bgcolor: isDark ? '#111827' : 'transparent',
       minHeight: '100vh',
       borderRadius: isDark ? 2 : 0,
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+      overflow: 'hidden',
     }}>
+      {/* Sticky Header Section */}
+      <Box sx={{
+        flexShrink: 0,
+        px: { xs: 2, sm: 3 },
+        pt: { xs: 1.5, sm: 2 },
+        pb: 0,
+      }}>
         <FilterBar
           filters={filters}
           onChange={handleFilterChange}
@@ -3018,6 +3089,9 @@ const AnalyticsDashboard = () => {
           scrollButtons="auto"
           sx={{
             mb: 2,
+            mt: 3,
+            borderBottom: 1,
+            borderColor: 'divider',
             '& .MuiTab-root': {
               color: isDark ? '#FFFFFF' : '#64748B',
               fontWeight: 700,
@@ -3040,6 +3114,20 @@ const AnalyticsDashboard = () => {
             />
           ))}
         </Tabs>
+      </Box>
+
+      {/* Scrollable Content Area */}
+      <Box sx={{
+        flex: 1,
+        overflowY: 'auto',
+        px: { xs: 2, sm: 3 },
+        pb: { xs: 2, sm: 3 },
+        pt: 3,
+        display: 'flex',
+        flexDirection: 'column',
+        '&::-webkit-scrollbar': { width: '8px' },
+        '&::-webkit-scrollbar-thumb': { backgroundColor: isDark ? 'rgba(148,163,184,0.3)' : 'rgba(148,163,184,0.4)', borderRadius: '4px' },
+      }}>
 
         {error ? (
           <Alert
@@ -3149,6 +3237,7 @@ const AnalyticsDashboard = () => {
           </Alert>
         </Snackbar>
       </Box>
+    </Box>
   );
 };
 

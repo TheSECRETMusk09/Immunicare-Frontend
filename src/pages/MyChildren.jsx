@@ -1,6 +1,9 @@
-import React, { useState, useEffect, useCallback } from "react";
+ import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { useNotification } from "../contexts/NotificationContext";
 import apiClient from "../utils/api";
+import vaccineRulesEngine from "../utils/vaccineRulesEngine";
+import notificationService from "../services/notificationService";
 import GuardianTopHeader from "../components/GuardianTopHeader";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
 import {
@@ -10,18 +13,21 @@ import {
   Modal,
 } from "../components/UI";
 import {
-  Baby,
-  Calendar,
-  FileText,
-  Plus,
-  Loader2,
-  Edit2,
-  Trash2,
-  User,
-  AlertTriangle,
-  RefreshCw,
-  Bell,
-} from "lucide-react";
+   Baby,
+   Calendar,
+   FileText,
+   Plus,
+   Loader2,
+   Edit2,
+   Trash2,
+   User,
+   AlertTriangle,
+   RefreshCw,
+   Bell,
+   CheckCircle,
+   Clock,
+   AlertCircle,
+ } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   GUARDIAN_OPEN_ADD_CHILD_MODAL_EVENT,
@@ -112,8 +118,49 @@ export default function MyChildren() {
   const [editError, setEditError] = useState(null);
   const [editSuccess, setEditSuccess] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
+  const { transferInSubmitted, success, info } = useNotification();
   const [registerFieldErrors, setRegisterFieldErrors] = useState({});
   const [editFieldErrors, setEditFieldErrors] = useState({});
+  // Readiness state for each child
+  const [childrenReadiness, setChildrenReadiness] = useState({});
+
+  // Transfer-in specific state
+  const [registrationType, setRegistrationType] = useState("new"); // "new" or "transfer"
+  const [transferFormData, setTransferFormData] = useState({
+    source_facility: "",
+    prior_vaccines: [],
+    vaccination_card: null,
+    vaccination_card_preview: "",
+    notes: "",
+  });
+  const [vaccineOptions] = useState([
+    { value: "bcg", label: "BCG" },
+    { value: "hep_b_1", label: "Hepatitis B (1st dose)" },
+    { value: "hep_b_2", label: "Hepatitis B (2nd dose)" },
+    { value: "hep_b_3", label: "Hepatitis B (3rd dose)" },
+    { value: "dtp_1", label: "DTP (1st dose)" },
+    { value: "dtp_2", label: "DTP (2nd dose)" },
+    { value: "dtp_3", label: "DTP (3rd dose)" },
+    { value: "dtp_booster", label: "DTP Booster" },
+    { value: "hib_1", label: "Hib (1st dose)" },
+    { value: "hib_2", label: "Hib (2nd dose)" },
+    { value: "hib_3", label: "Hib (3rd dose)" },
+    { value: "ipv_1", label: "IPV (1st dose)" },
+    { value: "ipv_2", label: "IPV (2nd dose)" },
+    { value: "pcv_1", label: "PCV (1st dose)" },
+    { value: "pcv_2", label: "PCV (2nd dose)" },
+    { value: "pcv_3", label: "PCV (3rd dose)" },
+    { value: "rota_1", label: "Rotavirus (1st dose)" },
+    { value: "rota_2", label: "Rotavirus (2nd dose)" },
+    { value: "rota_3", label: "Rotavirus (3rd dose)" },
+    { value: "mmr_1", label: "MMR (1st dose)" },
+    { value: "mmr_2", label: "MMR (2nd dose)" },
+    { value: "vita_1", label: "Vitamin A (1st dose)" },
+    { value: "vita_2", label: "Vitamin A (2nd dose)" },
+  ]);
+  const [selectedVaccines, setSelectedVaccines] = useState([]);
+
+
 
   // Check if we're on the "new" route
   const isNewRoute = location.pathname.endsWith("/new");
@@ -150,6 +197,32 @@ export default function MyChildren() {
     };
   }, []);
 
+  // Fetch vaccine readiness for a child
+  const fetchChildReadiness = useCallback(async (childId) => {
+    try {
+      const response = await apiClient.get(`/vaccination-readiness/${childId}`);
+      if (response?.success) {
+        return response.data;
+      }
+      return null;
+    } catch (err) {
+      console.error(`Error fetching readiness for child ${childId}:`, err);
+      return null;
+    }
+  }, []);
+
+  // Fetch readiness for all children
+  const fetchAllChildrenReadiness = useCallback(async (childrenList) => {
+    const readinessMap = {};
+    for (const child of childrenList) {
+      const readiness = await fetchChildReadiness(child.id);
+      if (readiness) {
+        readinessMap[child.id] = readiness;
+      }
+    }
+    setChildrenReadiness(readinessMap);
+  }, [fetchChildReadiness]);
+
   const fetchChildren = useCallback(async () => {
     if (!guardianId) {
       setLoading(false);
@@ -163,12 +236,14 @@ export default function MyChildren() {
         ? response
         : response?.data || response || [];
       setChildren(childrenData);
+      // Fetch readiness for each child
+      await fetchAllChildrenReadiness(childrenData);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [guardianId]);
+  }, [guardianId, fetchAllChildrenReadiness]);
 
   useEffect(() => {
     if (guardianId) {
@@ -359,6 +434,231 @@ export default function MyChildren() {
     }
   };
 
+  // Handle transfer-in form changes
+  const handleTransferChange = (e) => {
+    const { name, value } = e.target;
+    setTransferFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // Handle vaccine selection for transfer-in
+  const handleVaccineToggle = (vaccineValue) => {
+    setSelectedVaccines((prev) => {
+      if (prev.includes(vaccineValue)) {
+        return prev.filter((v) => v !== vaccineValue);
+      }
+      return [...prev, vaccineValue];
+    });
+  };
+
+  // Handle vaccination card file upload
+  const handleCardUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setTransferFormData((prev) => ({
+        ...prev,
+        vaccination_card: file,
+        vaccination_card_preview: URL.createObjectURL(file),
+      }));
+    }
+  };
+
+  // Reset transfer form
+  const resetTransferForm = () => {
+    setTransferFormData({
+      source_facility: "",
+      prior_vaccines: [],
+      vaccination_card: null,
+      vaccination_card_preview: "",
+      notes: "",
+    });
+    setSelectedVaccines([]);
+    setRegistrationType("new");
+  };
+
+  // Handle transfer-in submission
+  const handleTransferSubmit = async (e) => {
+    e.preventDefault();
+    if (!guardianId) {
+      setRegisterError("You must be logged in to register a child");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setRegisterError(null);
+    setRegisterSuccess(null);
+    setRegisterFieldErrors({});
+
+    try {
+      // First create the infant record
+      const infantData = {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        dob: formData.dob,
+        sex: normalizeSexForSubmission(formData.sex),
+        guardian_id: guardianId,
+        birth_weight: formData.birth_weight || null,
+        birth_height: formData.birth_length || null,
+        place_of_birth: formData.birthplace || null,
+        // Transfer-in specific fields
+        transfer_in_source: transferFormData.source_facility,
+        validation_status: "pending_validation",
+        source_facility: transferFormData.source_facility,
+      };
+
+      const infantResponse = await apiClient.createGuardianInfant(infantData);
+
+      // Get the created infant ID
+      const infantId = infantResponse?.id || infantResponse?.infant?.id;
+
+       if (infantId) {
+         // Fetch vaccination schedule for calculations
+         const schedule = await vaccineRulesEngine.fetchVaccinationSchedule();
+
+         // Convert selected vaccines to format expected by rules engine
+         const vaccinationHistory = selectedVaccines.map((vaccineCode) => ({
+           vaccine: vaccineCode,
+           dose_no: 1, // Assuming dose 1 for simplicity - could be enhanced
+           date_administered: new Date().toISOString(), // Placeholder
+         }));
+
+         // Calculate next valid vaccine
+         const nextDoseInfo = vaccineRulesEngine.calculateNextValidDose(
+           { dob: formData.dob },
+           vaccinationHistory,
+           schedule
+         );
+
+         // Assign triage category
+         const triageCategory = vaccineRulesEngine.assignTriageCategory(
+           {
+             submittedVaccines: selectedVaccines.map((vaccineCode) => ({
+               vaccine: vaccineCode,
+               doseNumber: 1,
+               dateReceived: new Date().toISOString().split('T')[0], // Today's date
+             })),
+             childDOB: formData.dob,
+           },
+           schedule
+         );
+
+         // Create transfer-in case with vaccine history
+         const transferCaseData = {
+           guardian_id: guardianId,
+           infant_id: infantId,
+           source_facility: transferFormData.source_facility,
+           submitted_vaccines: selectedVaccines.map((v) => ({
+             vaccine_code: v,
+             date_administered: null, // Guardian will provide dates separately
+             verified: false,
+           })),
+           vaccination_card_url: transferFormData.vaccination_card ? "pending_upload" : null,
+           notes: transferFormData.notes,
+           validation_status: "pending_validation",
+           validation_priority: selectedVaccines.length > 0 ? "normal" : "high",
+           auto_computed_next_vaccine: nextDoseInfo ? nextDoseInfo.vaccine : null,
+           triage_category: triageCategory,
+         };
+
+           // Submit transfer-in case
+           await apiClient.createTransferInCase(transferCaseData);
+
+            // Send notification to guardian
+            success(
+              "Transfer-in case submitted successfully! Our staff will review your child's vaccination history.",
+              { title: "Transfer-In Submitted" }
+            );
+
+            // Trigger transfer-in submitted notification via notification context
+            transferInSubmitted({
+              childName: `${formData.first_name} ${formData.last_name}`,
+              vaccines: selectedVaccines.map(v =>
+                vaccineOptions.find(opt => opt.value === v)?.label || v
+              ).join(', ')
+            });
+
+            // Send persistent transfer-in submitted notification via notification service
+            try {
+              await notificationService.sendTransferInSubmittedNotification({
+                childName: `${formData.first_name} ${formData.last_name}`,
+                vaccines: selectedVaccines.map(v =>
+                  vaccineOptions.find(opt => opt.value === v)?.label || v
+                ).join(', '),
+                guardianId: guardianId,
+                infantId: infantId
+              });
+            } catch (notificationError) {
+              console.error('Failed to send transfer-in submitted notification:', notificationError);
+              // Don't fail the whole operation if notification fails
+            }
+
+            // If we have an auto-computed next vaccine, notify about it
+            if (nextDoseInfo && nextDoseInfo.vaccine) {
+              const vaccineLabel = vaccineOptions.find(
+                opt => opt.value === nextDoseInfo.vaccine
+              )?.label || nextDoseInfo.vaccine;
+
+              info(
+                `Based on the vaccines you've submitted, the next recommended vaccine for your child is ${vaccineLabel}.`,
+                { title: "Next Vaccine Recommended" }
+              );
+
+              // Send persistent next vaccine computed notification via notification service
+              try {
+                await notificationService.sendNextVaccineComputedNotification({
+                  vaccineName: vaccineLabel,
+                  guardianId: guardianId,
+                  infantId: infantId
+                });
+              } catch (notificationError) {
+                console.error('Failed to send next vaccine computed notification:', notificationError);
+                // Don't fail the whole operation if notification fails
+              }
+            }
+       }
+
+      setRegisterSuccess("Transfer-in case submitted successfully! Our staff will review your child's vaccination history.");
+
+      triggerGuardianInfantRegistered(infantData);
+
+      // Refresh children list
+      await fetchChildren();
+
+      // Close modal and reset forms after delay
+      setTimeout(() => {
+        setShowRegisterModal(false);
+        setFormData({
+          first_name: "",
+          last_name: "",
+          dob: "",
+          sex: "M",
+          birth_weight: "",
+          birth_length: "",
+          birthplace: "",
+        });
+        resetTransferForm();
+        setRegisterSuccess(null);
+        if (isNewRoute) {
+          navigate("/guardian/children");
+        }
+      }, 2000);
+    } catch (err) {
+      const backendFields = getErrorFieldMap(err);
+      const mappedFields = mapInfantFieldErrors(backendFields);
+      if (hasFieldErrors(mappedFields)) {
+        setRegisterFieldErrors(mappedFields);
+      }
+
+      setRegisterError(
+        getActionErrorMessage(err, "Failed to submit transfer case. Please try again."),
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Handle child registration
   const handleRegisterChild = async (e) => {
     e.preventDefault();
@@ -529,9 +829,25 @@ export default function MyChildren() {
                         <User className="w-8 h-8 guardian-card-icon-accent guardian-card-icon-accent--pink" />
                       )}
                     </div>
-                    <span className="guardian-status-pill guardian-status-pill--active px-3 py-1 text-xs font-bold rounded-full uppercase tracking-wider">
-                      Active
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="guardian-status-pill guardian-status-pill--active px-3 py-1 text-xs font-bold rounded-full uppercase tracking-wider">
+                        Active
+                      </span>
+                      {childrenReadiness[child.id] && (
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full flex items-center gap-1 ${
+                          childrenReadiness[child.id].readinessStatus === 'READY' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                          childrenReadiness[child.id].readinessStatus === 'OVERDUE' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                          childrenReadiness[child.id].readinessStatus === 'PENDING_CONFIRMATION' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                          'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                        }`}>
+                          {childrenReadiness[child.id].readinessStatus === 'READY' && <CheckCircle className="w-3 h-3" />}
+                          {childrenReadiness[child.id].readinessStatus === 'OVERDUE' && <AlertCircle className="w-3 h-3" />}
+                          {childrenReadiness[child.id].readinessStatus === 'PENDING_CONFIRMATION' && <Clock className="w-3 h-3" />}
+                          {childrenReadiness[child.id].readinessStatus === 'UPCOMING' && <Clock className="w-3 h-3" />}
+                          {childrenReadiness[child.id].readinessStatus}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <h3 className="text-xl font-bold guardian-card-text-primary mb-4">
@@ -579,6 +895,14 @@ export default function MyChildren() {
                         {child.health_center || "Not specified"}
                       </span>
                     </div>
+                    {childrenReadiness[child.id]?.nextAppointmentPrediction && (
+                      <div className="mt-3 pt-3 border-t border-theme-border-primary">
+                        <p className="text-xs text-theme-secondary mb-1">Next Vaccine:</p>
+                        <p className="font-semibold text-theme-primary text-sm">
+                          {childrenReadiness[child.id].nextAppointmentPrediction.date}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -689,170 +1013,396 @@ export default function MyChildren() {
           </section>
         )}
 
-        {/* Registration Modal */}
-        <Modal
-          isOpen={showRegisterModal}
-          onClose={() => {
-            setShowRegisterModal(false);
-            setRegisterError(null);
-            setRegisterSuccess(null);
-            // Navigate away from /new route if we're there
-            if (isNewRoute) {
-              navigate("/guardian/children");
-            }
-          }}
-          title="Register New Child"
-          size="md"
-          footer={
-            <div className="form-actions-modern ui-form-actions ui-form-actions--stack-mobile">
-              <Button
-                variant="cancel"
-                actionRole="cancel"
-                onClick={() => {
-                  setShowRegisterModal(false);
-                  setRegisterError(null);
-                  setRegisterSuccess(null);
-                  if (isNewRoute) {
-                    navigate("/guardian/children");
-                  }
-                }}
-                disabled={isSubmitting}
-                className="ui-form-action-btn ui-form-action-btn--secondary"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                actionRole="primary"
-                form="registerChildForm"
-                disabled={isSubmitting}
-                loading={isSubmitting}
-                className="ui-form-action-btn ui-form-action-btn--primary"
-              >
-                {isSubmitting ? "Registering..." : "Register Child"}
-              </Button>
-            </div>
-          }
-        >
-          {registerError && (
-            <Alert
-              variant="danger"
-              className="mb-4"
-              onClose={() => setRegisterError(null)}
-            >
-              {registerError}
-            </Alert>
-          )}
-
-          {registerSuccess && (
-            <Alert
-              variant="success"
-              className="mb-4"
-              onClose={() => setRegisterSuccess(null)}
-            >
-              {registerSuccess}
-            </Alert>
-          )}
-
-          <form
-            id="registerChildForm"
-            onSubmit={handleRegisterChild}
-            className="space-y-4"
-          >
-            {/* Personal Information */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label="First Name"
-                name="first_name"
-                value={formData.first_name}
-                onChange={handleRegisterChange}
-                error={registerFieldErrors.first_name}
-                required
-                placeholder="Enter first name"
-              />
-              <Input
-                label="Last Name"
-                name="last_name"
-                value={formData.last_name}
-                onChange={handleRegisterChange}
-                error={registerFieldErrors.last_name}
-                required
-                placeholder="Enter last name"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label="Date of Birth"
-                name="dob"
-                type="date"
-                value={formData.dob}
-                onChange={handleRegisterChange}
-                error={registerFieldErrors.dob}
-                required
-              />
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-theme-secondary">
-                  Gender *
-                </label>
-                <select
-                  name="sex"
-                  value={formData.sex}
-                  onChange={handleRegisterChange}
-                  required
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-theme-bg-input text-theme-primary ${
-                    registerFieldErrors.sex ? "border-red-400" : "border-theme-border-primary"
-                  }`}
+          {/* Registration Modal */}
+          <Modal
+            isOpen={showRegisterModal}
+            onClose={() => {
+              setShowRegisterModal(false);
+              setRegisterError(null);
+              setRegisterSuccess(null);
+              // Navigate away from /new route if we're there
+              if (isNewRoute) {
+                navigate("/guardian/children");
+              }
+            }}
+            title={registrationType === "new" ? "Register New Child" : "Transfer Vaccination History"}
+            size="md"
+            footer={
+              <div className="form-actions-modern ui-form-actions ui-form-actions--stack-mobile">
+                <Button
+                  variant="cancel"
+                  actionRole="cancel"
+                  onClick={() => {
+                    setShowRegisterModal(false);
+                    setRegisterError(null);
+                    setRegisterSuccess(null);
+                    if (isNewRoute) {
+                      navigate("/guardian/children");
+                    }
+                  }}
+                  disabled={isSubmitting}
+                  className="ui-form-action-btn ui-form-action-btn--secondary"
                 >
-                  <option value="M">Male</option>
-                  <option value="F">Female</option>
-                </select>
-                {registerFieldErrors.sex && (
-                  <p className="text-xs text-red-300 mt-1">{registerFieldErrors.sex}</p>
-                )}
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  actionRole="primary"
+                  form={registrationType === "new" ? "registerChildForm" : "transferChildForm"}
+                  disabled={isSubmitting}
+                  loading={isSubmitting}
+                  className="ui-form-action-btn ui-form-action-btn--primary"
+                >
+                  {isSubmitting ? (registrationType === "new" ? "Registering..." : "Submitting...") : (registrationType === "new" ? "Register Child" : "Submit Transfer")}
+                </Button>
               </div>
-            </div>
+            }
+          >
+            {registerError && (
+              <Alert
+                variant="danger"
+                className="mb-4"
+                onClose={() => setRegisterError(null)}
+              >
+                {registerError}
+              </Alert>
+            )}
 
-            {/* Birth Information */}
-            <div className="border-t border-theme-border-primary pt-4 mt-4">
-              <h4 className="text-sm font-medium text-theme-secondary mb-3">
-                Birth Information (Optional)
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input
-                  label="Birth Weight (kg)"
-                  name="birth_weight"
-                  type="number"
-                  step="0.01"
-                  value={formData.birth_weight}
-                  onChange={handleRegisterChange}
-                  error={registerFieldErrors.birth_weight}
-                  placeholder="e.g., 3.2"
-                />
-                <Input
-                  label="Birth Length (cm)"
-                  name="birth_length"
-                  type="number"
-                  step="0.1"
-                  value={formData.birth_length}
-                  onChange={handleRegisterChange}
-                  error={registerFieldErrors.birth_length}
-                  placeholder="e.g., 50"
-                />
+            {registerSuccess && (
+              <Alert
+                variant="success"
+                className="mb-4"
+                onClose={() => setRegisterSuccess(null)}
+              >
+                {registerSuccess}
+              </Alert>
+            )}
+
+            <div className="space-y-4">
+              {/* Registration Type Tabs */}
+              <div className="flex border-b border-theme-border-primary mb-6">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`${registrationType === "new" ? "bg-theme-bg-primary text-theme-primary" : "bg-transparent text-theme-secondary"} px-4 py-2 mr-2 rounded-t-lg`}
+                  onClick={() => {
+                    setRegistrationType("new");
+                    setRegisterError(null);
+                    setRegisterSuccess(null);
+                    setRegisterFieldErrors({});
+                  }}
+                >
+                  New Registration
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`${registrationType === "transfer" ? "bg-theme-bg-primary text-theme-primary" : "bg-transparent text-theme-secondary"} px-4 py-2 rounded-t-lg`}
+                  onClick={() => {
+                    setRegistrationType("transfer");
+                    setRegisterError(null);
+                    setRegisterSuccess(null);
+                    setRegisterFieldErrors({});
+                  }}
+                >
+                  Transfer from Another Center
+                </Button>
               </div>
-              <div className="mt-4">
-                <Input
-                  label="Place of Birth"
-                  name="birthplace"
-                  value={formData.birthplace}
-                  onChange={handleRegisterChange}
-                  error={registerFieldErrors.birthplace}
-                  placeholder="Hospital or address"
-                />
-              </div>
+
+              {registrationType === "new" ? (
+                <form
+                  id="registerChildForm"
+                  onSubmit={handleRegisterChild}
+                  className="space-y-4"
+                >
+                  {/* Personal Information */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input
+                      label="First Name"
+                      name="first_name"
+                      value={formData.first_name}
+                      onChange={handleRegisterChange}
+                      error={registerFieldErrors.first_name}
+                      required
+                      placeholder="Enter first name"
+                    />
+                    <Input
+                      label="Last Name"
+                      name="last_name"
+                      value={formData.last_name}
+                      onChange={handleRegisterChange}
+                      error={registerFieldErrors.last_name}
+                      required
+                      placeholder="Enter last name"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input
+                      label="Date of Birth"
+                      name="dob"
+                      type="date"
+                      value={formData.dob}
+                      onChange={handleRegisterChange}
+                      error={registerFieldErrors.dob}
+                      required
+                    />
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-theme-secondary">
+                        Gender *
+                      </label>
+                      <select
+                        name="sex"
+                        value={formData.sex}
+                        onChange={handleRegisterChange}
+                        required
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-theme-bg-input text-theme-primary ${
+                          registerFieldErrors.sex ? "border-red-400" : "border-theme-border-primary"
+                        }`}
+                      >
+                        <option value="M">Male</option>
+                        <option value="F">Female</option>
+                      </select>
+                      {registerFieldErrors.sex && (
+                        <p className="text-xs text-red-300 mt-1">{registerFieldErrors.sex}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Birth Information */}
+                  <div className="border-t border-theme-border-primary pt-4 mt-4">
+                    <h4 className="text-sm font-medium text-theme-secondary mb-3">
+                      Birth Information (Optional)
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <Input
+                        label="Birth Weight (kg)"
+                        name="birth_weight"
+                        type="number"
+                        step="0.01"
+                        value={formData.birth_weight}
+                        onChange={handleRegisterChange}
+                        error={registerFieldErrors.birth_weight}
+                        placeholder="e.g., 3.2"
+                      />
+                      <Input
+                        label="Birth Length (cm)"
+                        name="birth_length"
+                        type="number"
+                        step="0.1"
+                        value={formData.birth_length}
+                        onChange={handleRegisterChange}
+                        error={registerFieldErrors.birth_length}
+                        placeholder="e.g., 50"
+                      />
+                    </div>
+                    <div className="mt-4">
+                      <Input
+                        label="Place of Birth"
+                        name="birthplace"
+                        value={formData.birthplace}
+                        onChange={handleRegisterChange}
+                        error={registerFieldErrors.birthplace}
+                        placeholder="Hospital or address"
+                      />
+                    </div>
+                  </div>
+                </form>
+              ) : (
+                <form
+                  id="transferChildForm"
+                  onSubmit={handleTransferSubmit}
+                  className="space-y-4"
+                >
+                  {/* Personal Information */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input
+                      label="First Name"
+                      name="first_name"
+                      value={formData.first_name}
+                      onChange={handleRegisterChange}
+                      error={registerFieldErrors.first_name}
+                      required
+                      placeholder="Enter first name"
+                    />
+                    <Input
+                      label="Last Name"
+                      name="last_name"
+                      value={formData.last_name}
+                      onChange={handleRegisterChange}
+                      error={registerFieldErrors.last_name}
+                      required
+                      placeholder="Enter last name"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input
+                      label="Date of Birth"
+                      name="dob"
+                      type="date"
+                      value={formData.dob}
+                      onChange={handleRegisterChange}
+                      error={registerFieldErrors.dob}
+                      required
+                    />
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-theme-secondary">
+                        Gender *
+                      </label>
+                      <select
+                        name="sex"
+                        value={formData.sex}
+                        onChange={handleRegisterChange}
+                        required
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-theme-bg-input text-theme-primary ${
+                          registerFieldErrors.sex ? "border-red-400" : "border-theme-border-primary"
+                        }`}
+                      >
+                        <option value="M">Male</option>
+                        <option value="F">Female</option>
+                      </select>
+                      {registerFieldErrors.sex && (
+                        <p className="text-xs text-red-300 mt-1">{registerFieldErrors.sex}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Birth Information */}
+                  <div className="border-t border-theme-border-primary pt-4 mt-4">
+                    <h4 className="text-sm font-medium text-theme-secondary mb-3">
+                      Birth Information (Optional)
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <Input
+                        label="Birth Weight (kg)"
+                        name="birth_weight"
+                        type="number"
+                        step="0.01"
+                        value={formData.birth_weight}
+                        onChange={handleRegisterChange}
+                        error={registerFieldErrors.birth_weight}
+                        placeholder="e.g., 3.2"
+                      />
+                      <Input
+                        label="Birth Length (cm)"
+                        name="birth_length"
+                        type="number"
+                        step="0.1"
+                        value={formData.birth_length}
+                        onChange={handleRegisterChange}
+                        error={registerFieldErrors.birth_length}
+                        placeholder="e.g., 50"
+                      />
+                    </div>
+                    <div className="mt-4">
+                      <Input
+                        label="Place of Birth"
+                        name="birthplace"
+                        value={formData.birthplace}
+                        onChange={handleRegisterChange}
+                        error={registerFieldErrors.birthplace}
+                        placeholder="Hospital or address"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Transfer-in Specific Fields */}
+                  <div className="border-t border-theme-border-primary pt-4 mt-4">
+                    <h4 className="text-sm font-medium text-theme-secondary mb-3">
+                      Transfer Information
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <Input
+                        label="Previous Health Center/Facility"
+                        name="source_facility"
+                        value={transferFormData.source_facility}
+                        onChange={handleTransferChange}
+                        required
+                        placeholder="Name of health center where vaccines were previously administered"
+                      />
+                      <Input
+                        label="Notes (Optional)"
+                        name="notes"
+                        value={transferFormData.notes}
+                        onChange={handleTransferChange}
+                        textarea
+                        rows={3}
+                        placeholder="Any additional information about vaccination history..."
+                      />
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-theme-secondary mb-2">
+                        Vaccines Previously Administered
+                      </label>
+                      <div className="space-y-2">
+                        <p className="text-xs text-theme-secondary mb-1">
+                          Select all vaccines your child has previously received:
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {vaccineOptions.map((option) => (
+                            <label key={option.value} className="flex items-center p-2 border rounded hover:bg-theme-bg-primary/50 transition-colors">
+                              <input
+                                type="checkbox"
+                                value={option.value}
+                                checked={selectedVaccines.includes(option.value)}
+                                onChange={() => handleVaccineToggle(option.value)}
+                                className="h-4 w-4 text-theme-primary focus:ring-theme-primary"
+                              />
+                              <span className="ml-2 text-sm">{option.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                        {selectedVaccines.length > 0 && (
+                          <div className="mt-2 p-3 bg-theme-bg-primary/50 rounded">
+                            <p className="font-medium text-theme-primary">Selected Vaccines:</p>
+                            <ul className="list-disc list-inside text-sm text-theme-secondary mt-1">
+                              {selectedVaccines.map((vaccine) => (
+                                <li key={vaccine}>
+                                  {vaccineOptions.find((opt) => opt.value === vaccine)?.label || vaccine}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-theme-secondary mb-2">
+                        Vaccination Card/Record (Optional)
+                      </label>
+                      <Input
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={handleCardUpload}
+                        className="w-full"
+                      />
+                      {transferFormData.vaccination_card_preview && (
+                        <div className="mt-3">
+                          <p className="text-xs text-theme-secondary mb-1">Preview:</p>
+                          {transferFormData.vaccination_card_preview.startsWith('http') ? (
+                            <img
+                              src={transferFormData.vaccination_card_preview}
+                              alt="Vaccination card preview"
+                              className="max-w-xs h-auto rounded border"
+                            />
+                          ) : (
+                            <img
+                              src={transferFormData.vaccination_card_preview}
+                              alt="Vaccination card preview"
+                              className="max-w-xs h-auto rounded border"
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </form>
+              )}
             </div>
-          </form>
-        </Modal>
+          </Modal>
 
         {/* Edit Child Modal */}
         <Modal

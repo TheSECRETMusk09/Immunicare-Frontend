@@ -66,6 +66,13 @@ const VaccinationsDashboard = lazy(() =>
   })),
 );
 
+// Transfer-In Cases - lazy loaded
+const TransferInCases = lazy(() =>
+  import("./pages/TransferInCases").then((module) => ({
+    default: module.default,
+  })),
+);
+
 // Page components - lazy loaded with prefetching
 const Analytics = lazy(() => import("./pages/Analytics"));
 const Appointments = lazy(() => import("./pages/Appointments"));
@@ -77,12 +84,6 @@ const HealthInformation = lazy(() => import("./pages/HealthInformation"));
 
 const GuardianImmunizationChartPage = lazy(() =>
   import("./pages/GuardianImmunizationChartPage").then((module) => ({
-    default: module.default,
-  })),
-);
-
-const GuardianGrowthChartPage = lazy(() =>
-  import("./pages/GuardianGrowthChartPage").then((module) => ({
     default: module.default,
   })),
 );
@@ -112,8 +113,6 @@ const GuardianAppointmentBooking = lazy(() =>
 );
 
 // Missing page components - lazy loaded
-const VaccineTracking = lazy(() => import("./pages/VaccineTracking"));
-const VaccineTrackingDashboardPage = lazy(() => import("./pages/VaccineTrackingDashboard"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Announcements = lazy(() => import("./pages/Announcements"));
 const Notifications = lazy(() => import("./pages/Notifications"));
@@ -525,36 +524,36 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
-          {/* Vaccination Management Route - Using main VaccinationsDashboard with full UI design */}
-          <Route
-            path="/vaccination-management/*"
-            element={
-              <ProtectedRoute requireSystemAdmin>
-                <AdminLayout>
-                  <VaccinationsDashboard />
-                </AdminLayout>
-              </ProtectedRoute>
-            }
-          />
+           {/* Vaccination Management Route - Using main VaccinationsDashboard with full UI design */}
+           <Route
+             path="/vaccination-management/*"
+             element={
+               <ProtectedRoute requireSystemAdmin>
+                 <AdminLayout>
+                   <VaccinationsDashboard />
+                 </AdminLayout>
+               </ProtectedRoute>
+             }
+           />
+           {/* Transfer-In Cases Route */}
+           <Route
+             path="/transfer-in-cases"
+             element={
+               <ProtectedRoute requireSystemAdmin>
+                 <AdminLayout>
+                   <TransferInCases />
+                 </AdminLayout>
+               </ProtectedRoute>
+             }
+           />
+          {/* Redirect old vaccine-tracking routes to vaccination-management */}
           <Route
             path="/vaccine-tracking"
-            element={
-              <ProtectedRoute requireSystemAdmin>
-                <AdminLayout>
-                  <VaccineTracking />
-                </AdminLayout>
-              </ProtectedRoute>
-            }
+            element={<Navigate to="/vaccination-management" replace />}
           />
           <Route
             path="/vaccine-tracking-dashboard"
-            element={
-              <ProtectedRoute requireSystemAdmin>
-                <AdminLayout>
-                  <VaccineTrackingDashboardPage />
-                </AdminLayout>
-              </ProtectedRoute>
-            }
+            element={<Navigate to="/vaccination-management" replace />}
           />
           <Route
             path="/reports"
@@ -657,14 +656,6 @@ function AppContent() {
               element={<UserVaccinationRecords />}
             />
             <Route
-              path="health-charts"
-              element={<GuardianGrowthChartPage />}
-            />
-            <Route
-              path="health-charts/:childId"
-              element={<GuardianGrowthChartPage />}
-            />
-            <Route
               path="immunization-chart"
               element={<GuardianImmunizationChartPage />}
             />
@@ -695,18 +686,6 @@ function AppContent() {
             <Route
               path="vaccinations/*"
               element={<Navigate to="/guardian/vaccination-records" replace />}
-            />
-            <Route
-              path="health-records"
-              element={<Navigate to="/guardian/health-charts" replace />}
-            />
-            <Route
-              path="growth-chart"
-              element={<Navigate to="/guardian/health-charts" replace />}
-            />
-            <Route
-              path="medical-history"
-              element={<Navigate to="/guardian/health-charts" replace />}
             />
             <Route
               path="reports"

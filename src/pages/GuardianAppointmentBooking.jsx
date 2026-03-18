@@ -61,10 +61,15 @@ const isPhilippineHoliday = (dateStr) => {
     { month: 4, day: 9, name: "Araw ng Kagitingan" },
     { month: 5, day: 1, name: "Labor Day" },
     { month: 6, day: 12, name: "Independence Day" },
+    { month: 8, day: 21, name: "Ninoy Aquino Day" },
     { month: 8, day: 31, name: "National Heroes Day" },
+    { month: 11, day: 1, name: "All Saints Day" },
     { month: 11, day: 30, name: "Bonifacio Day" },
+    { month: 12, day: 8, name: "Feast of the Immaculate Conception" },
+    { month: 12, day: 24, name: "Christmas Eve" },
     { month: 12, day: 25, name: "Christmas Day" },
     { month: 12, day: 30, name: "Rizal Day" },
+    { month: 12, day: 31, name: "New Year's Eve" },
   ];
 
   for (const holiday of regularHolidays) {
@@ -120,6 +125,11 @@ export default function GuardianAppointmentBooking() {
   const [timeSlotsLoading, setTimeSlotsLoading] = useState(false);
   const [timeSlots, setTimeSlots] = useState([]);
   const [timeSlotsFeedback, setTimeSlotsFeedback] = useState(null);
+
+  // Readiness state for automation
+  const [childReadiness, setChildReadiness] = useState(null);
+  const [readinessLoading, setReadinessLoading] = useState(false);
+  const [suggestedAppointments, setSuggestedAppointments] = useState([]);
 
   const [formData, setFormData] = useState({
     infant_id: childId || "",
@@ -220,6 +230,44 @@ export default function GuardianAppointmentBooking() {
     fetchTimeSlots();
   }, [fetchTimeSlots]);
 
+  // Fetch child readiness when a child is selected
+  const fetchChildReadiness = useCallback(async (infantId) => {
+    if (!infantId) return;
+
+    setReadinessLoading(true);
+    try {
+      const result = await apiClient.getVaccinationReadiness(infantId);
+      if (result?.success && result?.data) {
+        setChildReadiness(result.data);
+      } else {
+        setChildReadiness(null);
+      }
+    } catch (err) {
+      console.error("Error fetching readiness:", err);
+      setChildReadiness(null);
+    } finally {
+      setReadinessLoading(false);
+    }
+  }, []);
+
+  // Fetch suggested appointments based on readiness
+  const fetchSuggestedAppointments = useCallback(async (infantId) => {
+    if (!infantId) return;
+
+    try {
+      // Use the appointment suggestion endpoint
+      const result = await apiClient.getAppointmentSuggestions(infantId);
+      if (result?.success && Array.isArray(result?.data)) {
+        setSuggestedAppointments(result.data);
+      } else {
+        setSuggestedAppointments([]);
+      }
+    } catch (err) {
+      console.error("Error fetching suggestions:", err);
+      setSuggestedAppointments([]);
+    }
+  }, []);
+
   // Handle child selection
   const handleChildSelect = (infantId) => {
     const child = children.find((c) => c.id === parseInt(infantId));
@@ -229,6 +277,12 @@ export default function GuardianAppointmentBooking() {
     if (errors.infant_id) {
       setErrors((prev) => ({ ...prev, infant_id: null }));
     }
+    // Clear previous readiness and suggestions
+    setChildReadiness(null);
+    setSuggestedAppointments([]);
+    // Fetch readiness and suggestions for the selected child
+    fetchChildReadiness(infantId);
+    fetchSuggestedAppointments(infantId);
   };
 
   // Handle form field blur for real-time validation
@@ -574,6 +628,115 @@ export default function GuardianAppointmentBooking() {
                     ))}
                   </div>
                 )}
+
+                {/* Readiness Status Display */}
+                {selectedChild && (
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    {readinessLoading ? (
+                      <div className="flex items-center justify-center py-3">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-500 mr-2"></div>
+                        <span className="text-gray-500 dark:text-gray-400">Checking eligibility...</span>
+                      </div>
+                    ) : childReadiness ? (
+                      <div className="space-y-3">
+                        {/* Readiness Badge */}
+                        <div className={`flex items-center justify-between p-3 rounded-lg ${
+                          childReadiness.readinessStatus === 'READY'
+                            ? 'bg-green-50 dark:bg-green-900/20'
+                            : childReadiness.readinessStatus === 'OVERDUE'
+                              ? 'bg-red-50 dark:bg-red-900/20'
+                              : childReadiness.readinessStatus === 'PENDING_CONFIRMATION'
+                                ? 'bg-yellow-50 dark:bg-yellow-900/20'
+                                : 'bg-blue-50 dark:bg-blue-900/20'
+                        }`}>
+                          <div className="flex items-center gap-2">
+                            {childReadiness.readinessStatus === 'READY' ? (
+                              <CheckCircle className="w-5 h-5 text-green-600" />
+                            ) : childReadiness.readinessStatus === 'OVERDUE' ? (
+                              <AlertCircle className="w-5 h-5 text-red-600" />
+                            ) : (
+                              <Calendar className="w-5 h-5 text-blue-600" />
+                            )}
+                            <span className={`font-medium ${
+                              childReadiness.readinessStatus === 'READY'
+                                ? 'text-green-700 dark:text-green-400'
+                                : childReadiness.readinessStatus === 'OVERDUE'
+                                  ? 'text-red-700 dark:text-red-400'
+                                  : childReadiness.readinessStatus === 'PENDING_CONFIRMATION'
+                                    ? 'text-yellow-700 dark:text-yellow-400'
+                                    : 'text-blue-700 dark:text-blue-400'
+                            }`}>
+                              Status: {childReadiness.readinessStatus === 'READY' ? 'Ready for Vaccination' :
+                                       childReadiness.readinessStatus === 'OVERDUE' ? 'Overdue' :
+                                       childReadiness.readinessStatus === 'PENDING_CONFIRMATION' ? 'Pending' : 'Upcoming'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Due Vaccines */}
+                        {childReadiness.dueVaccines && childReadiness.dueVaccines.length > 0 && (
+                          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3">
+                            <p className="text-sm font-medium text-amber-800 dark:text-amber-300 mb-2">
+                              Due Vaccines:
+                            </p>
+                            <div className="space-y-1">
+                              {childReadiness.dueVaccines.map((vaccine, idx) => (
+                                <div key={idx} className="text-sm text-amber-700 dark:text-amber-400 flex justify-between">
+                                  <span>{vaccine.label}</span>
+                                  <span>{vaccine.earliestDate ? `Eligible: ${new Date(vaccine.earliestDate).toLocaleDateString()}` : ''}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Overdue Vaccines */}
+                        {childReadiness.overdueVaccines && childReadiness.overdueVaccines.length > 0 && (
+                          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3">
+                            <p className="text-sm font-medium text-red-800 dark:text-red-300 mb-2">
+                              Overdue Vaccines:
+                            </p>
+                            <div className="space-y-1">
+                              {childReadiness.overdueVaccines.map((vaccine, idx) => (
+                                <div key={idx} className="text-sm text-red-700 dark:text-red-400">
+                                  {vaccine.label}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Next Appointment Prediction */}
+                        {childReadiness.nextAppointmentPrediction && (
+                          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+                            <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-1">
+                              Recommended Appointment:
+                            </p>
+                            <p className="text-sm text-blue-700 dark:text-blue-400">
+                              {childReadiness.nextAppointmentPrediction.date
+                                ? new Date(childReadiness.nextAppointmentPrediction.date).toLocaleDateString('en-US', {
+                                    weekday: 'long',
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric'
+                                  })
+                                : 'No prediction available'}
+                            </p>
+                            {childReadiness.nextAppointmentPrediction.reason && (
+                              <p className="text-xs text-blue-600 dark:text-blue-500 mt-1">
+                                {childReadiness.nextAppointmentPrediction.reason}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
+                        Unable to load eligibility status
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Schedule Details Card */}
@@ -829,6 +992,64 @@ export default function GuardianAppointmentBooking() {
             className="guardian-form-actions guardian-form-actions--guardian-order guardian-form-actions--booking-page pt-4"
             data-testid="guardian-booking-page-form-actions"
           >
+            {selectedChild && childReadiness && childReadiness.readinessStatus !== 'READY' && (
+              <Alert variant="warning" className="mb-4">
+                <AlertCircle className="w-5 h-5 mr-2" />
+                {childReadiness.readinessStatus === 'OVERDUE'
+                  ? 'This child has overdue vaccines. Please schedule an appointment as soon as possible.'
+                  : childReadiness.blockedVaccines && childReadiness.blockedVaccines.length > 0
+                    ? `Booking is blocked: ${childReadiness.blockedVaccines.map(v => v.reason).join(', ')}`
+                    : 'This child is not yet eligible for vaccination. Please check the recommended appointment date.'}
+              </Alert>
+            )}
+
+            {/* Suggested Appointments */}
+            {suggestedAppointments.length > 0 && selectedChild && (
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 mb-4">
+                <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-emerald-500" />
+                  Recommended Slots
+                </h4>
+                <div className="space-y-2">
+                  {suggestedAppointments.slice(0, 3).map((slot, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        const date = new Date(slot.date || slot.suggestedDate);
+                        setFormData(prev => ({
+                          ...prev,
+                          scheduled_date: date.toISOString().split('T')[0],
+                          scheduled_time: slot.time || slot.suggestedTime || ''
+                        }));
+                      }}
+                      className="w-full text-left p-3 rounded-lg border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-medium text-gray-900 dark:text-white">
+                            {slot.date
+                              ? new Date(slot.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                              : slot.suggestedDate
+                                ? new Date(slot.suggestedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                                : 'Available'}
+                          </p>
+                          {slot.reason && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{slot.reason}</p>
+                          )}
+                        </div>
+                        {slot.time && (
+                          <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                            {slot.time}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <Button
               type="submit"
               actionRole="primary"
@@ -836,7 +1057,8 @@ export default function GuardianAppointmentBooking() {
               disabled={
                 !selectedChild ||
                 !formData.scheduled_date ||
-                !formData.scheduled_time
+                !formData.scheduled_time ||
+                (childReadiness && childReadiness.readinessStatus === 'PENDING_CONFIRMATION')
               }
               className="guardian-btn guardian-form-actions__primary ui-form-action-btn ui-form-action-btn--primary"
               data-testid="guardian-booking-page-submit-btn"

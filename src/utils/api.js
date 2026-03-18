@@ -704,10 +704,35 @@ class ApiClient {
     });
   }
 
-  async updateInfant(id, infantData) {
-    return this.request(`/infants/${id}`, {
+  // Transfer-in case management
+  async createTransferInCase(caseData) {
+    return this.request("/transfer-in-cases", {
+      method: "POST",
+      data: caseData,
+    });
+  }
+
+  async getTransferInCases(filters = {}) {
+    const params = new URLSearchParams(filters);
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return this.request(`/transfer-in-cases${suffix}`);
+  }
+
+  async getTransferInCase(id) {
+    return this.request(`/transfer-in-cases/${id}`);
+  }
+
+  async updateTransferInCase(id, caseData) {
+    return this.request(`/transfer-in-cases/${id}`, {
       method: "PUT",
-      data: infantData,
+      data: caseData,
+    });
+  }
+
+  async approveTransferCaseVaccines(caseId, data) {
+    return this.request(`/transfer-in-cases/${caseId}/approve-vaccines`, {
+      method: "PUT",
+      data,
     });
   }
 
@@ -736,6 +761,38 @@ class ApiClient {
 
   async getInfantsByGuardian(guardianId) {
     return this.request(`/infants/guardian/${guardianId}`);
+  }
+
+  // Infant Age Management endpoints
+  async getInfantAges(limit = 100, offset = 0) {
+    return this.request(`/infant-ages?limit=${limit}&offset=${offset}`);
+  }
+
+  async getInfantAgeStats() {
+    return this.request('/infant-ages/stats');
+  }
+
+  async getInfantAgeInfo(infantId) {
+    return this.request(`/infant-ages/${infantId}`);
+  }
+
+  async updateInfantAge(infantId) {
+    return this.request(`/infant-ages/${infantId}`, {
+      method: 'PUT',
+    });
+  }
+
+  async updateAllInfantAges() {
+    return this.request('/infant-ages/update-all', {
+      method: 'POST',
+    });
+  }
+
+  async calculateAge(dob) {
+    return this.request('/infant-ages/calculate', {
+      method: 'POST',
+      data: { dob },
+    });
   }
 
   // Vaccinations Management endpoints
@@ -788,6 +845,56 @@ class ApiClient {
     return this.request(`/vaccinations/schedules/infant/${infantId}`);
   }
 
+  // Dynamic Immunization Schedule endpoints
+  async getDynamicSchedule(infantId) {
+    return this.request(`/vaccinations/schedule/${infantId}`);
+  }
+
+  async getOverdueVaccines(infantId) {
+    return this.request(`/vaccinations/overdue/${infantId}`);
+  }
+
+  async getUpcomingVaccines(infantId, days = 14) {
+    return this.request(`/vaccinations/upcoming/${infantId}?days=${days}`);
+  }
+
+  async getCatchUpSchedule(infantId) {
+    return this.request(`/vaccinations/catchup/${infantId}`);
+  }
+
+  async getScheduleStatus(infantId) {
+    return this.request(`/vaccinations/status/${infantId}`);
+  }
+
+  async getExtendedSchedule(infantId) {
+    return this.request(`/vaccinations/extended/${infantId}`);
+  }
+
+  // Vaccination readiness - automated vaccine readiness calculation
+  async getVaccinationReadiness(infantId) {
+    return this.request(`/vaccination-readiness/${infantId}`);
+  }
+
+  // Vaccine Eligibility - Get eligible vaccines for an infant
+  async getEligibleVaccines(infantId) {
+    return this.request(`/vaccinations/eligible/${infantId}`);
+  }
+
+  // Vaccine Eligibility - Get next dose info for a specific vaccine
+  async getNextDoseInfo(infantId, vaccineId) {
+    return this.request(`/vaccinations/next-dose/${infantId}/${vaccineId}`);
+  }
+
+  // Vaccine Eligibility - Get vaccine readiness for a specific vaccine
+  async getVaccineReadiness(infantId, vaccineId) {
+    return this.request(`/vaccinations/readiness/${infantId}/${vaccineId}`);
+  }
+
+  // Vaccine Eligibility - Check contraindications
+  async checkVaccineContraindications(infantId, vaccineId) {
+    return this.request(`/vaccinations/contraindications/${infantId}/${vaccineId}`);
+  }
+
   async createVaccine(vaccineData) {
     return this.request("/vaccinations/vaccines", {
       method: "POST",
@@ -837,9 +944,23 @@ class ApiClient {
     });
   }
 
-  async getVaccineInventoryStatus(vaccineId) {
-    return this.request(`/vaccinations/inventory-status/${vaccineId}`);
-  }
+   async getVaccineInventoryStatus(vaccineId) {
+     return this.request(`/vaccinations/inventory-status/${vaccineId}`);
+   }
+
+   async getAppointmentSuggestions({ infantId, guardianId = null, clinicId = null }) {
+     // Build query parameters
+     const params = new URLSearchParams();
+     if (guardianId !== null) params.append('guardianId', guardianId);
+     if (clinicId !== null) params.append('clinicId', clinicId);
+
+     const queryString = params.toString();
+     const url = `/appointments/suggestions/${infantId}${queryString ? `?${queryString}` : ''}`;
+
+     return this.request(url, {
+       method: 'GET',
+     });
+   }
 
   async getVaccinationTransactions(filters = {}) {
     const params = new URLSearchParams(filters);
@@ -1094,6 +1215,41 @@ class ApiClient {
 
   async getAppointmentsByInfant(infantId) {
     return this.request(`/appointments?infant_id=${infantId}`);
+  }
+
+  // Blocked Dates Management endpoints (Admin)
+  async getBlockedDates({ month, clinic_id } = {}) {
+    const params = new URLSearchParams();
+    if (month) params.append('month', month);
+    if (clinic_id) params.append('clinic_id', clinic_id);
+    return this.request(`/appointments/blocked-dates?${params}`);
+  }
+
+  async toggleBlockedDate({ date, reason, clinic_id }) {
+    return this.request('/appointments/blocked-dates/toggle', {
+      method: 'POST',
+      data: { date, reason, clinic_id },
+    });
+  }
+
+  async setBlockedDate({ date, is_blocked, reason, clinic_id }) {
+    return this.request('/appointments/blocked-dates/set', {
+      method: 'POST',
+      data: { date, is_blocked, reason, clinic_id },
+    });
+  }
+
+  async deleteBlockedDate(id) {
+    return this.request(`/appointments/blocked-dates/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async checkBlockedDate({ date, clinic_id }) {
+    const params = new URLSearchParams();
+    params.append('date', date);
+    if (clinic_id) params.append('clinic_id', clinic_id);
+    return this.request(`/appointments/blocked-dates/check?${params}`);
   }
 
   // Announcements Management endpoints

@@ -943,7 +943,9 @@ const Settings = () => {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 px-6">
+      {/* Sticky Header Section - Stays fixed at top while scrolling */}
+      <div className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6 -mx-6 -mt-6">
       {/* Top Header - Consistent with Dashboard and Analytics */}
       {/* Modern Gradient Page Header */}
       <header
@@ -983,7 +985,10 @@ const Settings = () => {
           </div>
         </div>
       </header>
+      </div>
 
+      {/* Sticky Search Bar - Below header */}
+      <div className="sticky top-[88px] z-20 bg-white dark:bg-gray-900 py-4 -mx-6 px-6">
       {/* Status Messages */}
       {error && <Alert variant="error">{error}</Alert>}
       {saveStatus === "saving" && (
@@ -1035,6 +1040,7 @@ const Settings = () => {
             </Button>
           )}
         </div>
+      </div>
       </div>
 
       {/* Main Content - Responsive Layout */}

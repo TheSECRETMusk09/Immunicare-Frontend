@@ -5,6 +5,7 @@
 
 import apiClient from "../utils/api";
 import { handleApiResponse } from "./baseService";
+import { renderNotification } from "../utils/notificationTemplates";
 
 const notificationService = {
   /**
@@ -96,6 +97,84 @@ const notificationService = {
     return handleApiResponse(
       apiClient.getUnreadNotificationCount(),
       "Fetch unread notification count",
+    );
+  },
+
+  /**
+   * Send a transfer-in submitted notification
+   * @param {Object} data - Data for template substitution
+   * @returns {Promise<Object>}
+   */
+  async sendTransferInSubmittedNotification(data) {
+    const notification = renderNotification('transfer_in_submitted', data);
+    return handleApiResponse(
+      apiClient.createNotification(notification),
+      "Send transfer-in submitted notification",
+    );
+  },
+
+  /**
+   * Send a next vaccine computed notification
+   * @param {Object} data - Data for template substitution
+   * @returns {Promise<Object>}
+   */
+  async sendNextVaccineComputedNotification(data) {
+    const notification = renderNotification('next_vaccine_computed', data);
+    return handleApiResponse(
+      apiClient.createNotification(notification),
+      "Send next vaccine computed notification",
+    );
+  },
+
+  /**
+   * Send an appointment suggested notification
+   * @param {Object} data - Data for template substitution
+   * @returns {Promise<Object>}
+   */
+  async sendAppointmentSuggestedNotification(data) {
+    const notification = renderNotification('appointment_suggested', data);
+    return handleApiResponse(
+      apiClient.createNotification(notification),
+      "Send appointment suggested notification",
+    );
+  },
+
+  /**
+   * Send a vaccine overdue warning notification
+   * @param {Object} data - Data for template substitution
+   * @returns {Promise<Object>}
+   */
+  async sendVaccineOverdueNotification(data) {
+    const notification = renderNotification('vaccine_overdue', data);
+    return handleApiResponse(
+      apiClient.createNotification(notification),
+      "Send vaccine overdue warning notification",
+    );
+  },
+
+  /**
+   * Send a missed appointment notification
+   * @param {Object} data - Data for template substitution
+   * @returns {Promise<Object>}
+   */
+  async sendMissedAppointmentNotification(data) {
+    const notification = renderNotification('missed_appointment', data);
+    return handleApiResponse(
+      apiClient.createNotification(notification),
+      "Send missed appointment notification",
+    );
+  },
+
+  /**
+   * Send a stock unavailable notification
+   * @param {Object} data - Data for template substitution
+   * @returns {Promise<Object>}
+   */
+  async sendStockUnavailableNotification(data) {
+    const notification = renderNotification('stock_unavailable', data);
+    return handleApiResponse(
+      apiClient.createNotification(notification),
+      "Send stock unavailable notification",
     );
   },
 };

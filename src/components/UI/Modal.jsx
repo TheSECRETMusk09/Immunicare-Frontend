@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from "lucide-react";
 import Button from "./Button";
 import FormActions from "./FormActions";
@@ -99,7 +100,7 @@ const Modal = ({
   };
   const resolvedSizeClass = sizeClasses[size] || sizeClasses.md;
 
-  return (
+  const modalElement = (
     <div className="fixed inset-0 z-[1000]">
       <div
         className="absolute inset-0 bg-black/55 backdrop-blur-[1px]"
@@ -201,6 +202,10 @@ const Modal = ({
       </div>
     </div>
   );
+
+  // Use React Portal to render modal outside of parent container hierarchy
+  // This ensures the backdrop covers the full viewport without being constrained by parent overflow/position
+  return createPortal(modalElement, document.body);
 };
 
 // Confirmation Modal Component

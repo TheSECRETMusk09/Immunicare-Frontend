@@ -157,7 +157,7 @@ export default function ImmunizationChart({ infantId }) {
     const requestId = ++requestIdRef.current;
 
     if (!infantId) {
-      if (!isMountedRef.current || requestId !== requestIdRef.current) {
+      if (!isMountedRef.current) {
         return;
       }
 

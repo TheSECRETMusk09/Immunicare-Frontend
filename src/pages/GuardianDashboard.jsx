@@ -21,12 +21,14 @@ import {
   MessageSquare,
   Info,
   X,
+  ArrowRightCircle,
 } from 'lucide-react';
 import GuardianTopHeader from '../components/GuardianTopHeader';
 import GuardianModuleHeader from '../components/GuardianModuleHeader';
 import { useAuth } from '../contexts/AuthContext';
 import apiClient from '../utils/api';
 import { triggerGuardianAddChildModal } from '../components/QuickActionFAB';
+import TransferVaccinationHistory from '../components/VaccinationManagement/TransferVaccinationHistory';
 
 const unwrapApiPayload = (value) => {
   if (value && typeof value === 'object' && 'data' in value) {
@@ -370,6 +372,10 @@ const GuardianDashboard = () => {
   const [dueVaccines, setDueVaccines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // State for transfer vaccination modal
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [selectedInfant, setSelectedInfant] = useState(null);
 
   // Fetch data from API
   const fetchDashboardData = useCallback(async () => {
@@ -839,6 +845,24 @@ const GuardianDashboard = () => {
               <FileText className="w-6 h-6 sm:w-7 sm:h-7 guardian-dashboard-quick-action__icon mb-2" />
               <span className="text-xs sm:text-sm font-semibold guardian-dashboard-quick-action__label text-center">Records</span>
             </button>
+            <button
+              onClick={() => {
+                // Open transfer modal - need to select a child first
+                if (children.length > 0) {
+                  setSelectedInfant(children[0]);
+                  setShowTransferModal(true);
+                } else {
+                  navigate('/guardian/children');
+                  setTimeout(() => {
+                    triggerGuardianAddChildModal();
+                  }, 0);
+                }
+              }}
+              className="guardian-quick-action-btn guardian-dashboard-quick-action flex flex-col items-center justify-center p-4 sm:p-5 bg-gradient-to-br from-cyan-500 to-cyan-600 dark:from-cyan-600 dark:to-cyan-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 min-h-[100px] sm:min-h-[120px]"
+            >
+              <ArrowRightCircle className="w-6 h-6 sm:w-7 sm:h-7 guardian-dashboard-quick-action__icon mb-2" />
+              <span className="text-xs sm:text-sm font-semibold guardian-dashboard-quick-action__label text-center">Transfer</span>
+            </button>
           </div>
         </div>
 
@@ -1049,6 +1073,24 @@ const GuardianDashboard = () => {
         </div>
         </main>
       </div>
+
+      {/* Transfer Vaccination History Modal */}
+      {showTransferModal && selectedInfant && (
+        <TransferVaccinationHistory
+          infantId={selectedInfant.id}
+          infantName={selectedInfant.name || `${selectedInfant.first_name} ${selectedInfant.last_name}`}
+          onClose={() => {
+            setShowTransferModal(false);
+            setSelectedInfant(null);
+          }}
+          onSuccess={(result) => {
+            setShowTransferModal(false);
+            setSelectedInfant(null);
+            // Optionally show success message or refresh data
+            console.log('Vaccines imported:', result);
+          }}
+        />
+      )}
     </div>
   );
 };
