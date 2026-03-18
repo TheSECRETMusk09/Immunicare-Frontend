@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import apiClient from "../utils/api";
-import { Button, Input, Alert, LoadingSpinner } from "./UI";
+import { Button, Input, Alert, LoadingSpinner, Select } from "./UI";
 import { useAuth } from "../contexts/AuthContext";
 import { normalizeInfantResponse } from "../utils/adminDataAdapters";
 import InfantDocuments from "./InfantDocuments";
@@ -33,7 +33,50 @@ const EDITABLE_INFANT_FIELDS = [
   // NEW: allergy and health care provider fields
   "allergy_information",
   "health_care_provider",
+  "purok",
+  "street_color",
 ];
+
+const PUROK_OPTIONS = [
+  { value: "", label: "Select Purok" },
+  { value: "Purok 1", label: "Purok 1" },
+  { value: "Purok 2", label: "Purok 2" },
+  { value: "Purok 3", label: "Purok 3" },
+  { value: "Purok 4 & 5", label: "Purok 4 & 5" },
+  { value: "Purok 6", label: "Purok 6" },
+  { value: "Purok 7", label: "Purok 7" },
+];
+
+const STREET_COLOR_OPTIONS = {
+  "Purok 1": [
+    { value: "Purok 1 - Son Risa St. - Pink", label: "Purok 1 - Son Risa St. - Pink" },
+    { value: "Purok 1 - G. Monaco St. - Yellow", label: "Purok 1 - G. Monaco St. - Yellow" },
+    { value: "Purok 1 - Fatalla St. - Violet", label: "Purok 1 - Fatalla St. - Violet" },
+  ],
+  "Purok 2": [
+    { value: "Purok 2 - M.H Del Pilar - Blue", label: "Purok 2 - M.H Del Pilar - Blue" },
+  ],
+  "Purok 3": [
+    { value: "Purok 3 - M.H Del Pilar - Orange", label: "Purok 3 - M.H Del Pilar - Orange" },
+  ],
+  "Purok 4 & 5": [
+    { value: "Purok 4 & 5 - M.H Del Pilar - Green", label: "Purok 4 & 5 - M.H Del Pilar - Green" },
+  ],
+  "Purok 6": [
+    { value: "Purok 6 - Dimanlig St. - White", label: "Purok 6 - Dimanlig St. - White" },
+  ],
+  "Purok 7": [
+    { value: "Purok 7 - Bedana / Dimanlig St. - Red", label: "Purok 7 - Bedana / Dimanlig St. - Red" },
+  ]
+};
+
+const getStreetColorOptions = (selectedPurok) => {
+  const options = [{ value: "", label: "Select Purok - Street - Color" }];
+  if (selectedPurok && STREET_COLOR_OPTIONS[selectedPurok]) {
+    return [...options, ...STREET_COLOR_OPTIONS[selectedPurok]];
+  }
+  return options;
+};
 
 const sanitizeInfantUpdatePayload = (raw = {}) => {
   return EDITABLE_INFANT_FIELDS.reduce((acc, field) => {
@@ -496,6 +539,46 @@ export default function InfantPersonalRecord({
                     </p>
                   }
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    PUROK
+                  </label>
+                  {isEditing ? (
+                    <Select
+                      name="purok"
+                      value={formData.purok || ""}
+                      onChange={(e) => {
+                        handleInputChange("purok", e.target.value);
+                        handleInputChange("street_color", "");
+                      }}
+                      options={PUROK_OPTIONS}
+                    />
+                  ) : (
+                    <p className="text-gray-900 dark:text-gray-100">
+                      {infant.purok || "Not specified"}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    PUROK - STREET - COLOR
+                  </label>
+                  {isEditing ? (
+                    <Select
+                      name="street_color"
+                      value={formData.street_color || ""}
+                      onChange={(e) => handleInputChange("street_color", e.target.value)}
+                      options={getStreetColorOptions(formData.purok)}
+                      disabled={!formData.purok}
+                    />
+                  ) : (
+                    <p className="text-gray-900 dark:text-gray-100">
+                      {infant.street_color || "Not specified"}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -669,12 +752,12 @@ export default function InfantPersonalRecord({
               </div>
             </div>
 
-            {/* Health Center Information */}
+            {/* Health Center, Allergy & Health Care Information */}
             <div>
               <h4 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4">
-                HEALTH CENTER INFORMATION
+                HEALTH CENTER, ALLERGY & HEALTH CARE INFORMATION
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     BARANGAY
@@ -728,28 +811,17 @@ export default function InfantPersonalRecord({
                     </p>
                   )}
                 </div>
-              </div>
-            </div>
-
-            {/* NEW: Allergy & Health Care Provider Information */}
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-              <h4 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4">
-                ALLERGY & HEALTH CARE INFORMATION
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     ALLERGY INFORMATION
                   </label>
                   {isEditing ? (
-                    <textarea
+                    <Input
                       value={formData.allergy_information || ""}
                       onChange={(e) =>
                         handleInputChange("allergy_information", e.target.value)
                       }
-                      placeholder="Enter any known allergies (e.g., drug allergies, food allergies)"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                      rows={3}
+                      placeholder="Known allergies"
                     />
                   ) : (
                     <p className="text-gray-900 dark:text-gray-100">
@@ -768,7 +840,7 @@ export default function InfantPersonalRecord({
                       onChange={(e) =>
                         handleInputChange("health_care_provider", e.target.value)
                       }
-                      placeholder="Enter health care provider name"
+                      placeholder="Provider name"
                     />
                   ) : (
                     <p className="text-gray-900 dark:text-gray-100">

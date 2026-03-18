@@ -53,6 +53,8 @@ export default function InfantManagement() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showInjectModal, setShowInjectModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   const isMountedRef = useRef(true);
   const fetchRequestIdRef = useRef(0);
@@ -152,12 +154,23 @@ export default function InfantManagement() {
   };
 
   const filteredInfants = infants.filter(
-    (infant) =>
-      infant.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      infant.last_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      infant.guardian_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      infant.mother_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      infant.father_name?.toLowerCase().includes(searchQuery.toLowerCase()),
+    (infant) => {
+      const matchesSearch = infant.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        infant.last_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        infant.guardian_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        infant.mother_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        infant.father_name?.toLowerCase().includes(searchQuery.toLowerCase());
+
+      if (!matchesSearch) return false;
+
+      if (infant.dob) {
+        const infantDate = new Date(infant.dob).toISOString().split('T')[0];
+        if (startDate && infantDate < startDate) return false;
+        if (endDate && infantDate > endDate) return false;
+      }
+
+      return true;
+    }
   );
 
   // Export infant data to CSV
@@ -500,6 +513,23 @@ export default function InfantManagement() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
+              />
+            </div>
+            <div className="flex-1 max-w-[150px]">
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                title="Start Date"
+              />
+            </div>
+            <span className="text-gray-500 self-center">-</span>
+            <div className="flex-1 max-w-[150px]">
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                title="End Date"
               />
             </div>
             <div className="flex items-center gap-2">

@@ -723,10 +723,13 @@ export default function UserManagement() {
         (activeTab === "system" || activeTab === "admins") &&
         isAdmin
       ) {
+        const targetClinic = clinics?.find(c => c.name.toLowerCase().includes("san nicolas")) || clinics?.[0];
+        const resolvedClinicId = targetClinic ? targetClinic.id : 1;
+
         const userData = {
           username: formData.username,
           role_id: parseInt(formData.role_id),
-          clinic_id: parseInt(formData.clinic_id),
+          clinic_id: resolvedClinicId,
           contact: formData.contact,
           ...(formData.password && { password: formData.password }),
         };
@@ -962,9 +965,6 @@ export default function UserManagement() {
       if (name === "role_id") {
         if (!value) return "Please select a role";
       }
-      if (name === "clinic_id") {
-        if (!value) return "Please select a clinic";
-      }
     }
     return null;
   }, [activeTab]);
@@ -1013,9 +1013,6 @@ export default function UserManagement() {
     if (name === "role_id") {
       if (!value) return "Please select a role";
     }
-    if (name === "clinic_id") {
-      if (!value) return "Please select a clinic";
-    }
     if (name === "password") {
       if (!value) return "Password is required";
       if (value.length < 6) return "Must be at least 6 characters";
@@ -1052,10 +1049,13 @@ export default function UserManagement() {
     setIsSubmitting(true);
 
     try {
+      const targetClinic = clinics?.find(c => c.name.toLowerCase().includes("san nicolas")) || clinics?.[0];
+      const resolvedClinicId = targetClinic ? targetClinic.id : 1;
+
       const userData = {
         username: adminFormData.username,
         role_id: parseInt(adminFormData.role_id),
-        clinic_id: parseInt(adminFormData.clinic_id),
+        clinic_id: resolvedClinicId,
         contact: adminFormData.contact,
         password: adminFormData.password,
       };
@@ -2037,21 +2037,12 @@ export default function UserManagement() {
                       />
                     </div>
                     <div className="admin-field-group">
-                      <Select
+                      <TextInput
                         label="Clinic"
-                        name="clinic_id"
-                        value={formData.clinic_id}
-                        onChange={handleChange}
-                        onBlur={handleBlur}
-                        error={formTouched.clinic_id ? formErrors.clinic_id : undefined}
-                        required
-                        options={[
-                          { value: "", label: "Select a clinic" },
-                          ...clinics.map((clinic) => ({
-                            value: clinic.id.toString(),
-                            label: clinic.name,
-                          })),
-                        ]}
+                        name="clinic_name"
+                        value="San Nicolas Health Center, Pasig City"
+                        readOnly
+                        disabled
                       />
                     </div>
                   </div>
@@ -2325,21 +2316,12 @@ export default function UserManagement() {
                 </div>
               </div>
               <div className="admin-field-group">
-                <Select
+                <TextInput
                   label="Clinic"
-                  name="clinic_id"
-                  value={adminFormData.clinic_id}
-                  onChange={handleAdminChange}
-                  onBlur={handleAdminBlur}
-                  error={adminFormTouched.clinic_id ? adminFormErrors.clinic_id : undefined}
-                  required
-                  options={[
-                    { value: "", label: "Select a clinic" },
-                    ...clinics.map((clinic) => ({
-                      value: clinic.id.toString(),
-                      label: clinic.name,
-                    })),
-                  ]}
+                  name="clinic_name"
+                  value="San Nicolas Health Center, Pasig City"
+                  readOnly
+                  disabled
                 />
               </div>
             </div>
