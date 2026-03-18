@@ -1322,14 +1322,48 @@ export default function Appointments() {
               className="py-20 flex-1"
             />
           ) : (
-            <div className="flex-1 min-h-0 overflow-y-auto auto-hide-scrollbar rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-              <DataTable
-                data={filteredAppointments}
-                columns={columns}
-                actions={tableActions}
-                emptyMessage="No appointments scheduled."
-                emptyIcon={<span>📅</span>}
-              />
+            <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="flex-1 overflow-auto auto-hide-scrollbar">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 relative">
+                  <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
+                    <tr>
+                      {columns.map((col) => (
+                        <th
+                          key={col.key}
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700"
+                        >
+                          {col.label}
+                        </th>
+                      ))}
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700"
+                      >
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {filteredAppointments.map((row) => (
+                      <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                        {columns.map((col, colIndex) => (
+                          <td key={col.key || colIndex} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                            {col.render
+                              ? col.render(row[col.key], row)
+                              : col.type === "datetime" && row[col.key]
+                                ? moment(row[col.key]).format("MMM D, YYYY h:mm A")
+                                : row[col.key]}
+                          </td>
+                        ))}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          {tableActions(row)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
