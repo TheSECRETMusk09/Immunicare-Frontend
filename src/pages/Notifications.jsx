@@ -809,15 +809,15 @@ const Notifications = () => {
         />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto auto-hide-scrollbar p-4 sm:px-6 sm:pb-6 pt-3 space-y-4 sm:space-y-6">
+      <div className="flex-1 min-h-0 flex flex-col p-4 sm:px-6 sm:pb-6 pt-3 gap-4 sm:gap-6">
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-200">
+        <div className="flex-shrink-0 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-200">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-white/85 py-14 dark:border-slate-700 dark:bg-slate-900/70">
+        <div className="flex-shrink-0 flex items-center justify-center rounded-xl border border-slate-200 bg-white/85 py-14 dark:border-slate-700 dark:bg-slate-900/70">
           <svg
             className="animate-spin h-8 w-8 text-primary-600"
             fill="none"
@@ -839,8 +839,9 @@ const Notifications = () => {
           </svg>
         </div>
       ) : (
-        <div className="space-y-4 sm:space-y-6">
-          <section className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="flex-1 min-h-0 flex flex-col gap-4 sm:gap-6">
+          <div className="flex-shrink-0 space-y-4 sm:space-y-6">
+            <section className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <button
               type="button"
               onClick={() =>
@@ -906,7 +907,7 @@ const Notifications = () => {
             </button>
           </section>
 
-          <Card className="sticky top-0 z-20 border border-slate-200 bg-white/90 dark:border-slate-700 dark:bg-slate-900/70">
+          <Card className="border border-slate-200 bg-white/90 dark:border-slate-700 dark:bg-slate-900/70">
             <div className="flex flex-col gap-4">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
                 <div>
@@ -1025,6 +1026,9 @@ const Notifications = () => {
               </div>
             </div>
           </Card>
+          </div>
+
+          <div className="flex-1 overflow-y-auto auto-hide-scrollbar pr-2 pb-2">
 
           {filteredNotifications.length === 0 ? (
             <Card className="border border-dashed border-slate-300 bg-white/80 p-8 text-center dark:border-slate-600 dark:bg-slate-900/70">
@@ -1174,11 +1178,12 @@ const Notifications = () => {
               })}
             </div>
           )}
+          </div>
         </div>
       )}
 
       {!hasData && !loading && (
-        <Card className="border border-dashed border-slate-300 bg-white/80 p-8 text-center text-slate-600 dark:border-slate-600 dark:bg-slate-900/70 dark:text-slate-300">
+        <Card className="flex-shrink-0 border border-dashed border-slate-300 bg-white/80 p-8 text-center text-slate-600 dark:border-slate-600 dark:bg-slate-900/70 dark:text-slate-300">
           <div className="text-3xl" aria-hidden="true">
             🧭
           </div>

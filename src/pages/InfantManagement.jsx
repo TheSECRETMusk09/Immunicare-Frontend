@@ -53,8 +53,7 @@ export default function InfantManagement() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showInjectModal, setShowInjectModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
 
   const isMountedRef = useRef(true);
   const fetchRequestIdRef = useRef(0);
@@ -159,14 +158,16 @@ export default function InfantManagement() {
         infant.last_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         infant.guardian_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         infant.mother_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        infant.father_name?.toLowerCase().includes(searchQuery.toLowerCase());
+            infant.father_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            infant.control_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            infant.cellphone_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            infant.guardian_phone?.toLowerCase().includes(searchQuery.toLowerCase());
 
       if (!matchesSearch) return false;
 
-      if (infant.dob) {
+      if (dateFilter && infant.dob) {
         const infantDate = new Date(infant.dob).toISOString().split('T')[0];
-        if (startDate && infantDate < startDate) return false;
-        if (endDate && infantDate > endDate) return false;
+        if (infantDate !== dateFilter) return false;
       }
 
       return true;
@@ -509,27 +510,18 @@ export default function InfantManagement() {
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <Input
-                placeholder="Search infants by name or guardian..."
+                  placeholder="Search by name, control no, or contact..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
             </div>
-            <div className="flex-1 max-w-[150px]">
+            <div className="flex-1 max-w-[200px]">
               <Input
                 type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                title="Start Date"
-              />
-            </div>
-            <span className="text-gray-500 self-center">-</span>
-            <div className="flex-1 max-w-[150px]">
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                title="End Date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                title="Filter by Date of Birth"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -552,17 +544,64 @@ export default function InfantManagement() {
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto auto-hide-scrollbar rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 animate-fade-in">
-        <DataTable
-          data={filteredInfants}
-          columns={columns}
-          actions={tableActions}
-          emptyMessage="No infants registered yet."
-          emptyIcon={<span>👶</span>}
-          title="Registered Infants - Click to View Digital Booklets"
-          searchQuery={searchQuery}
-          onSearch={setSearchQuery}
-        />
+        <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-fade-in">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+              Registered Infants - Click to View Digital Booklets
+            </h3>
+          </div>
+          <div className="flex-1 overflow-auto auto-hide-scrollbar">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 relative">
+              <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
+                <tr>
+                  {columns.map((col) => (
+                    <th
+                      key={col.key}
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700"
+                    >
+                      {col.label}
+                    </th>
+                  ))}
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700"
+                  >
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {filteredInfants.length === 0 ? (
+                  <tr>
+                    <td colSpan={columns.length + 1} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                      <div className="flex flex-col items-center justify-center">
+                        <span className="text-4xl mb-3">👶</span>
+                        <p className="text-lg font-medium">No infants registered yet.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredInfants.map((row) => (
+                    <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      {columns.map((col, colIndex) => (
+                        <td key={col.key || colIndex} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                          {col.render
+                            ? col.render(row[col.key], row)
+                            : col.type === "date" && row[col.key]
+                              ? new Date(row[col.key]).toLocaleDateString()
+                              : row[col.key]}
+                        </td>
+                      ))}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        {tableActions(row)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 

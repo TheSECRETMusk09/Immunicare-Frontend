@@ -406,8 +406,8 @@ const VaccinationsDashboard = () => {
 
       {/* Tab Navigation */}
       <div className="flex-shrink-0 bg-white dark:bg-gray-900">
-        <div className="border-b border-gray-200 dark:border-gray-700">
-          <nav className="-mb-px flex space-x-8 overflow-x-auto">
+        <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+          <nav className="flex space-x-2 overflow-x-auto">
             {[
               { key: "records", label: "💉 Vaccination Records" },
               { key: "tracking", label: "📊 Vaccination Tracking" },
@@ -416,10 +416,10 @@ const VaccinationsDashboard = () => {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
                   activeTab === tab.key
-                    ? "border-primary-500 text-primary-600 dark:text-primary-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
                 }`}
               >
                 {tab.label}

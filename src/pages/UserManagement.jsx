@@ -40,7 +40,6 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import useUserManagementSocket from "../hooks/useUserManagementSocket";
-import SystemUsersTable from "../components/UserManagement/SystemUsersTable";
 
 const isSameEntityId = (left, right) => String(left) === String(right);
 
@@ -178,6 +177,8 @@ export default function UserManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -437,6 +438,52 @@ export default function UserManagement() {
     });
   }, [localGuardians]);
 
+  const filteredSystemUsers = useMemo(() => {
+    let result = [...normalizedSystemUsers];
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        (user) =>
+          user.username?.toLowerCase().includes(query) ||
+          user.role_name?.toLowerCase().includes(query) ||
+          user.clinic_name?.toLowerCase().includes(query) ||
+          user.contact?.toLowerCase().includes(query),
+      );
+    }
+    if (roleFilter) {
+      const roleFilterNum = parseInt(roleFilter);
+      const roleIdToName = {
+        1: 'super_admin',
+        2: 'admin',
+        3: 'system_admin',
+        4: 'doctor',
+        5: 'nurse',
+        6: 'midwife'
+      };
+      const roleName = roleIdToName[roleFilterNum];
+      if (roleName) {
+        result = result.filter((user) =>
+          (user.role_name || '').toLowerCase() === roleName.toLowerCase()
+        );
+      }
+    }
+    if (statusFilter) {
+      const isActive = statusFilter === "active";
+      result = result.filter((user) => user.is_active === isActive);
+    }
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      result = result.filter(u => u.created_at && new Date(u.created_at) >= start);
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      result = result.filter(u => u.created_at && new Date(u.created_at) <= end);
+    }
+    return result;
+  }, [normalizedSystemUsers, searchQuery, roleFilter, statusFilter, startDate, endDate]);
+
   // Filter, sort, and paginate admins
   const filteredAdmins = useMemo(() => {
     let result = [...admins];
@@ -478,6 +525,16 @@ export default function UserManagement() {
       const isActive = statusFilter === "active";
       result = result.filter((user) => user.is_active === isActive);
     }
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      result = result.filter(u => u.created_at && new Date(u.created_at) >= start);
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      result = result.filter(u => u.created_at && new Date(u.created_at) <= end);
+    }
 
     // Apply sorting
     result.sort((a, b) => {
@@ -500,7 +557,33 @@ export default function UserManagement() {
     });
 
     return result;
-  }, [admins, searchQuery, roleFilter, statusFilter, sortField, sortDirection]);
+  }, [admins, searchQuery, roleFilter, statusFilter, startDate, endDate, sortField, sortDirection]);
+
+  const filteredGuardians = useMemo(() => {
+    let result = [...normalizedGuardians];
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        (g) =>
+          g.username?.toLowerCase().includes(query) ||
+          g.name?.toLowerCase().includes(query) ||
+          g.email?.toLowerCase().includes(query) ||
+          g.phone?.toLowerCase().includes(query) ||
+          g.address?.toLowerCase().includes(query)
+      );
+    }
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      result = result.filter(u => u.created_at && new Date(u.created_at) >= start);
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      result = result.filter(u => u.created_at && new Date(u.created_at) <= end);
+    }
+    return result;
+  }, [normalizedGuardians, searchQuery, startDate, endDate]);
 
   // Paginate filtered admins
   const paginatedAdmins = useMemo(() => {
@@ -1464,16 +1547,16 @@ export default function UserManagement() {
         </Alert>
       )}
 
-      {/* Tab Navigation - Sticky at top */}
-      <div className="flex-shrink-0 bg-white dark:bg-gray-900">
-        <div className="border-b border-gray-200 dark:border-gray-700">
-          <nav className="-mb-px flex space-x-8">
+      {/* Tab Navigation & Global Filters - Sticky at top */}
+      <div className="flex-shrink-0 bg-white dark:bg-gray-900 z-20">
+        <div className="border-b border-gray-200 dark:border-gray-700 flex flex-col xl:flex-row xl:items-center justify-between px-4 py-3 gap-4">
+          <nav className="flex space-x-2 overflow-x-auto">
             <button
             onClick={() => handleTabChange("system")}
-            className={`py-4 px-1 border-b-2 font-bold text-sm transition-all flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
               activeTab === "system"
-                ? "border-primary-500 text-primary-600 dark:text-primary-400"
-                : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
             }`}
           >
             <span className="text-lg">🛡️</span>
@@ -1482,10 +1565,10 @@ export default function UserManagement() {
           </button>
             <button
             onClick={() => handleTabChange("admins")}
-            className={`py-4 px-1 border-b-2 font-bold text-sm transition-all flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
               activeTab === "admins"
-                ? "border-danger-500 text-danger-600 dark:text-danger-400"
-                : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
             }`}
           >
             <ShieldAlert className="w-4 h-4" />
@@ -1494,16 +1577,85 @@ export default function UserManagement() {
 
           <button
             onClick={() => handleTabChange("guardians")}
-            className={`py-4 px-1 border-b-2 font-bold text-sm transition-all flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
               activeTab === "guardians"
-                ? "border-primary-500 text-primary-600 dark:text-primary-400"
-                : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
             }`}
           >
             <span className="text-lg">👥</span>
             Guardians ({normalizedGuardians.length})
           </button>
           </nav>
+
+          {/* Global Search and Filters */}
+          <div className="flex flex-wrap items-center gap-3 pb-3 xl:pb-0">
+            <div className="relative w-full sm:w-56 flex-shrink-0">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder={`Search ${activeTab}...`}
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full pl-9 pr-4 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-32"
+                title="Start Date"
+              />
+              <span className="text-gray-500">-</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-32"
+                title="End Date"
+              />
+            </div>
+
+            {activeTab !== "guardians" && (
+              <>
+                <select
+                  value={roleFilter}
+                  onChange={(e) => {
+                    setRoleFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-32"
+                >
+                  <option value="">All Roles</option>
+                  <option value="1">Super Admin</option>
+                  <option value="2">Admin</option>
+                  <option value="3">System Admin</option>
+                  <option value="4">Doctor</option>
+                  <option value="5">Nurse</option>
+                  <option value="6">Midwife</option>
+                </select>
+
+                <select
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-32"
+                >
+                  <option value="">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="disabled">Disabled</option>
+                </select>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1521,59 +1673,12 @@ export default function UserManagement() {
                 className="py-20"
               />
             ) : (
-              <div className="flex-1 flex flex-col overflow-hidden space-y-4">
-                {/* Filter and Search Controls */}
-                <div className="flex-shrink-0 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4 flex flex-wrap gap-4 items-center">
-                  <div className="relative flex-1 min-w-[200px]">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search admins..."
-                      value={searchQuery}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value);
-                        setCurrentPage(1);
-                      }}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800"
-                    />
-                  </div>
-                  <Select
-                    value={roleFilter}
-                    onChange={(e) => {
-                      setRoleFilter(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    options={[
-                      { value: "", label: "All Roles" },
-                      { value: "1", label: "Super Admin" },
-                      { value: "2", label: "Admin" },
-                      { value: "3", label: "System Admin" },
-                      { value: "4", label: "Doctor" },
-                      { value: "5", label: "Nurse" },
-                      { value: "6", label: "Midwife" },
-                    ]}
-                    className="w-40"
-                  />
-                  <Select
-                    value={statusFilter}
-                    onChange={(e) => {
-                      setStatusFilter(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    options={[
-                      { value: "", label: "All Status" },
-                      { value: "active", label: "Active" },
-                      { value: "disabled", label: "Disabled" },
-                    ]}
-                    className="w-40"
-                  />
-                </div>
-
+              <div className="flex-1 flex flex-col overflow-hidden space-y-4 mt-4">
                 {/* Admin Table */}
                 <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                   <div className="flex-1 overflow-auto auto-hide-scrollbar">
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 relative">
-                      <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
+                      <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10 shadow-sm">
                         <tr>
                           {adminColumns.map((column) => (
                             <th
@@ -1715,22 +1820,107 @@ export default function UserManagement() {
           )
         ) : activeTab === "system" ? (
           isAdmin ? (
-            normalizedSystemUsers && normalizedSystemUsers.length > 0 ? (
-              <div className="flex-1 min-h-0 overflow-y-auto auto-hide-scrollbar rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-              <SystemUsersTable
-                users={normalizedSystemUsers}
-                isTogglingActive={isTogglingActive}
-                isResettingPassword={isResettingPassword}
-                isDeleting={isDeleting}
-                onToggleActive={handleToggleUserActive}
-                onResetPassword={(row) => {
-                  setSelectedUserForPassword(row);
-                  setShowPasswordModal(true);
-                }}
-                onEdit={(row) => handleEditUser(row, "system")}
-                onDelete={(row) => handleDeleteUser(row, "system")}
-                currentUserId={currentUserId}
-              />
+              filteredSystemUsers && filteredSystemUsers.length > 0 ? (
+              <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden mt-4">
+                <div className="flex-1 overflow-auto auto-hide-scrollbar">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 relative">
+                    <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
+                      <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Username</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Role</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Password</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Clinic</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Contact</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Status</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                      {filteredSystemUsers.map((row) => (
+                        <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {row.username}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                            <Badge variant="primary" className="capitalize">{row.display_name || row.role_name}</Badge>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                            {row.is_password_set ? (
+                              <Badge variant="success" className="flex items-center gap-1 w-fit"><Key className="w-3 h-3" /> Set</Badge>
+                            ) : (
+                              <Badge variant="warning">Not Set</Badge>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                            {row.clinic_name || "San Nicolas Health Center"}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                            {row.contact || <span className="text-gray-400 italic">N/A</span>}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                            {row.is_active ? (
+                              <Badge variant="success" className="flex items-center gap-1 w-fit"><Power className="w-3 h-3" /> Active</Badge>
+                            ) : (
+                              <Badge variant="default" className="flex items-center gap-1 w-fit"><PowerOff className="w-3 h-3" /> Disabled</Badge>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex items-center justify-start gap-1">
+                              <Button
+                                variant={row.is_active ? "warning" : "success"}
+                                size="xs"
+                                onClick={() => handleToggleUserActive(row)}
+                                className="p-1.5"
+                                title={row.is_active ? "Disable User" : "Enable User"}
+                                disabled={isTogglingActive}
+                                aria-label={row.is_active ? "Disable user" : "Enable user"}
+                              >
+                                {row.is_active ? <PowerOff className="w-3.5 h-3.5" /> : <Power className="w-3.5 h-3.5" />}
+                              </Button>
+                              <Button
+                                variant="info"
+                                size="xs"
+                                onClick={() => {
+                                  setSelectedUserForPassword(row);
+                                  setShowPasswordModal(true);
+                                }}
+                                className="p-1.5"
+                                title="Reset Password"
+                                aria-label="Reset password"
+                                disabled={isResettingPassword}
+                              >
+                                <Key className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                variant="success"
+                                size="xs"
+                                onClick={() => handleEditUser(row, "system")}
+                                className="p-1.5"
+                                title="Edit User"
+                                aria-label="Edit user"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </Button>
+                              {String(row.id) !== String(currentUserId) && (
+                                <LoadingButton
+                                  variant="danger"
+                                  size="xs"
+                                  onClick={() => handleDeleteUser(row, "system")}
+                                  loading={isDeleting}
+                                  className="p-1.5"
+                                  title="Delete User"
+                                  aria-label="Delete user"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </LoadingButton>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ) : (
               <EmptyState
@@ -1747,27 +1937,68 @@ export default function UserManagement() {
               Admin privileges required to view system users.
             </Alert>
           )
-        ) : normalizedGuardians.length === 0 ? (
+        ) : filteredGuardians.length === 0 ? (
           <EmptyState
-            title="No guardians registered"
-            description="There are no guardians registered in the system yet. Start by adding a new guardian."
+            title={searchQuery || startDate || endDate ? "No guardians match filters" : "No guardians registered"}
+            description={searchQuery || startDate || endDate ? "Adjust your search or date filters." : "There are no guardians registered in the system yet. Start by adding a new guardian."}
             icon="👥"
             actionLabel="Add New Guardian"
             onAction={() => handleAddUser("guardians")}
             className="py-20"
           />
         ) : (
-          <div className="flex-1 min-h-0 overflow-y-auto auto-hide-scrollbar rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-            <DataTable
-              data={normalizedGuardians}
-              columns={guardianColumns}
-              actions={guardianActions}
-              getRowKey={(row) => `guardian:${String(row?.id)}`}
-              actionsHeaderClassName="w-[100px] min-w-[100px]"
-              actionsCellClassName="w-[100px] min-w-[100px]"
-              emptyMessage="No guardians registered yet."
-              emptyIcon={<span className="text-4xl">👥</span>}
-            />
+          <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden mt-4">
+            <div className="flex-1 overflow-auto auto-hide-scrollbar">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 relative">
+                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
+                  <tr>
+                    {guardianColumns.map((col) => (
+                      <th
+                        key={col.key}
+                        scope="col"
+                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 ${col.headerClassName || ''}`}
+                        style={col.width ? { width: col.width } : {}}
+                      >
+                        {col.label}
+                      </th>
+                    ))}
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 w-[100px] min-w-[100px]"
+                    >
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {filteredGuardians.length === 0 ? (
+                    <tr>
+                      <td colSpan={guardianColumns.length + 1} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                        <div className="flex flex-col items-center justify-center">
+                          <span className="text-4xl mb-3">👥</span>
+                          <p className="text-lg font-medium">No guardians registered yet.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                  filteredGuardians.map((row) => (
+                      <tr key={`guardian:${String(row?.id)}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                        {guardianColumns.map((col, colIndex) => (
+                          <td key={col.key || colIndex} className={`px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 ${col.cellClassName || ''}`}>
+                            {col.render
+                              ? col.render(row[col.key], row)
+                              : row[col.key]}
+                          </td>
+                        ))}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium w-[100px] min-w-[100px]">
+                          {guardianActions(row)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
