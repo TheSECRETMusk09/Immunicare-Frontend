@@ -14,6 +14,7 @@ import {
 import { Calendar } from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import apiClient from "../../utils/api";
+import { APPROVED_VACCINE_NAMES } from "../../constants/approvedVaccines";
 
 export const AppointmentScheduling = () => {
   const [appointments, setAppointments] = useState([]);
@@ -78,7 +79,7 @@ export const AppointmentScheduling = () => {
         id: 1,
         patientId: "INF-001",
         patientName: "Baby Alex Santos",
-        vaccine: "Pentavalent (DPT 3)",
+        vaccine: "Penta Valent",
         date: "2024-01-15",
         time: "10:00",
         location: "Room 2",
@@ -91,7 +92,7 @@ export const AppointmentScheduling = () => {
         id: 2,
         patientId: "INF-002",
         patientName: "Maria Gonzales",
-        vaccine: "OPV 3",
+        vaccine: "OPV 20-doses",
         date: "2024-01-15",
         time: "10:30",
         location: "Room 2",
@@ -104,7 +105,7 @@ export const AppointmentScheduling = () => {
         id: 3,
         patientId: "INF-003",
         patientName: "Juan Dela Cruz",
-        vaccine: "MMR 1",
+        vaccine: "MMR",
         date: "2024-01-16",
         time: "09:00",
         location: "Room 1",
@@ -196,11 +197,11 @@ export const AppointmentScheduling = () => {
   };
 
   const getVaccineIcon = (vaccine) => {
-    if (vaccine.includes("Pentavalent")) return "💉";
+    if (vaccine.includes("Penta Valent")) return "💉";
     if (vaccine.includes("OPV")) return "🩹";
     if (vaccine.includes("MMR")) return "🛡️";
     if (vaccine.includes("BCG")) return "🦠";
-    if (vaccine.includes("Hepatitis")) return "💉";
+    if (vaccine.includes("Hepa B")) return "💉";
     return "💉";
   };
 
@@ -399,10 +400,7 @@ export const AppointmentScheduling = () => {
             onChange={(e) => setFilterVaccine(e.target.value)}
             options={[
               { value: "all", label: "All Vaccines" },
-              { value: "pentavalent", label: "Pentavalent" },
-              { value: "opv", label: "OPV" },
-              { value: "mmr", label: "MMR" },
-              { value: "bcg", label: "BCG" },
+              ...APPROVED_VACCINE_NAMES.map((name) => ({ value: name, label: name })),
             ]}
           />
         </div>
@@ -696,23 +694,7 @@ export const AppointmentScheduling = () => {
               onChange={(e) =>
                 setFormData({ ...formData, vaccine: e.target.value })
               }
-              options={[
-                { value: "BCG (Tuberculosis)", label: "BCG (Tuberculosis)" },
-                { value: "Hepatitis B", label: "Hepatitis B" },
-                { value: "Pentavalent (DPT 1)", label: "Pentavalent (DPT 1)" },
-                { value: "Pentavalent (DPT 2)", label: "Pentavalent (DPT 2)" },
-                { value: "Pentavalent (DPT 3)", label: "Pentavalent (DPT 3)" },
-                { value: "OPV 1", label: "OPV 1" },
-                { value: "OPV 2", label: "OPV 2" },
-                { value: "OPV 3", label: "OPV 3" },
-                { value: "IPV 1", label: "IPV 1" },
-                { value: "IPV 2", label: "IPV 2" },
-                { value: "PCV 1", label: "PCV 1" },
-                { value: "PCV 2", label: "PCV 2" },
-                { value: "PCV 3", label: "PCV 3" },
-                { value: "MMR 1", label: "MMR 1" },
-                { value: "MMR 2", label: "MMR 2" },
-              ]}
+              options={APPROVED_VACCINE_NAMES.map((name) => ({ value: name, label: name }))}
               required
             />
 

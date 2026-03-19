@@ -24,6 +24,7 @@ import {
   normalizeVaccinationRecordResponse,
   computeVaccinationComplianceSummary,
 } from "../utils/adminDataAdapters";
+import { isApprovedVaccineName } from "../constants/approvedVaccines";
 
 const pollingIntervalMs = 60000;
 
@@ -244,8 +245,13 @@ const VaccinationsDashboard = () => {
   };
 
   const filteredRecords = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-    if (!normalizedQuery) return vaccinationRecords;
+    const rawQuery = searchQuery;
+    const normalizedQuery = rawQuery.trim().toLowerCase();
+    const exactApprovedVaccineQuery = isApprovedVaccineName(rawQuery)
+      ? rawQuery
+      : null;
+
+    if (!rawQuery) return vaccinationRecords;
 
     return vaccinationRecords.filter((record) => {
       const { infant, vaccine } = findRecordWithRelations(record);
@@ -258,7 +264,8 @@ const VaccinationsDashboard = () => {
 
       return (
         infantName.includes(normalizedQuery) ||
-        vaccineName.includes(normalizedQuery) ||
+        (exactApprovedVaccineQuery !== null &&
+          vaccineName === exactApprovedVaccineQuery) ||
         status.includes(normalizedQuery)
       );
     });
@@ -268,6 +275,11 @@ const VaccinationsDashboard = () => {
     if (!selectedInfantId) return [];
     return vaccinationRecords.filter((record) => record.infant_id === selectedInfantId);
   }, [selectedInfantId, vaccinationRecords]);
+
+  const approvedVaccinationSchedules = useMemo(
+    () => vaccinationSchedules.filter((schedule) => isApprovedVaccineName(schedule.vaccine_name)),
+    [vaccinationSchedules],
+  );
 
   const dashboardStats = useMemo(() => {
     const completed = vaccinationRecords.filter(
@@ -324,7 +336,7 @@ const VaccinationsDashboard = () => {
         );
 
         const summary = computeVaccinationComplianceSummary({
-          schedules: vaccinationSchedules,
+          schedules: approvedVaccinationSchedules,
           records: infantRecords,
           infantDob: infant.dob,
         });
@@ -334,7 +346,7 @@ const VaccinationsDashboard = () => {
           ...summary,
         };
       });
-  }, [infants, vaccinationRecords, vaccinationSchedules, trackingStartDate, trackingEndDate, trackingSearchQuery]);
+  }, [infants, vaccinationRecords, approvedVaccinationSchedules, trackingStartDate, trackingEndDate, trackingSearchQuery]);
 
   const availableVaccinesForClinic = useMemo(() => {
     const scopedInventory = inventoryRecords.filter((record) => {
@@ -351,12 +363,14 @@ const VaccinationsDashboard = () => {
       if (!vaccineId || uniqueByVaccine.has(vaccineId)) return;
 
       const catalogMatch = vaccines.find((vaccine) => vaccine.id === vaccineId);
+      const resolvedVaccineName = catalogMatch?.name || record.vaccine_name || null;
+      if (!isApprovedVaccineName(resolvedVaccineName)) {
+        return;
+      }
+
       uniqueByVaccine.set(vaccineId, {
         id: vaccineId,
-        name:
-          catalogMatch?.name ||
-          record.vaccine_name ||
-          `Vaccine #${vaccineId}`,
+        name: resolvedVaccineName,
         code: catalogMatch?.code || record.vaccine_code || "",
       });
     });
@@ -540,7 +554,7 @@ const VaccinationsDashboard = () => {
             Vaccination Schedule Overview
           </h3>
 
-          {vaccinationSchedules.length === 0 ? (
+          {approvedVaccinationSchedules.length === 0 ? (
             <EmptyState
               title="No vaccination schedules"
               description="No active schedule definitions were returned by the backend."
@@ -567,7 +581,7 @@ const VaccinationsDashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {vaccinationSchedules.map((schedule) => (
+                  {approvedVaccinationSchedules.map((schedule) => (
                     <tr key={schedule.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                         {schedule.vaccine_name}

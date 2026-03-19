@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import apiClient from "../utils/api";
 import { Button, Input, Modal, Card } from "./UI";
 import { useAuth } from "../contexts/AuthContext";
+import { isApprovedVaccineName } from "../constants/approvedVaccines";
 
 export default function VaccineInventory() {
   const { isAdmin } = useAuth();
@@ -156,8 +157,8 @@ export default function VaccineInventory() {
   const filteredInventory = vaccineInventory.filter((record) => {
     const vaccine = vaccines.find((v) => v.id === record.vaccine_id);
     const matchesSearch =
-      vaccine?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      vaccine?.code.toLowerCase().includes(searchQuery.toLowerCase());
+      !searchQuery ||
+      (isApprovedVaccineName(searchQuery) && vaccine?.name === searchQuery);
 
     const matchesPeriod =
       !selectedPeriod.start ||
@@ -273,7 +274,7 @@ export default function VaccineInventory() {
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Input
-                placeholder="Search vaccines..."
+                placeholder="Search exact approved vaccine name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />

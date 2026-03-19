@@ -26,6 +26,13 @@ jest.mock("../contexts/AuthContext", () => ({
   useAuth: () => mockAuthContext,
 }));
 
+jest.mock("../contexts/NotificationContext", () => ({
+  useNotification: () => ({
+    transferInSubmitted: jest.fn(),
+    success: jest.fn(),
+  }),
+}));
+
 jest.mock("../contexts/SocketContext", () => ({
   useSocket: () => ({
     isConnected: true,
@@ -123,6 +130,7 @@ jest.mock("../utils/api", () => ({
       pendingVaccinations: 3,
     }),
     getGuardianNotifications: jest.fn().mockResolvedValue({ data: [] }),
+    get: jest.fn().mockResolvedValue({ success: false }),
     getDashboardAppointments: jest.fn().mockResolvedValue([
       {
         id: 1,
@@ -308,6 +316,45 @@ describe("Guardian module pages", () => {
 
     expect(
       await screen.findByRole("heading", { name: /register new child/i }),
+    ).toBeInTheDocument();
+  });
+
+  test("MyChildren links purok and street-color selections in the registration form", async () => {
+    renderWithRoutes("/guardian/children", {
+      "/guardian/children": <MyChildren />,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/my children/i)).toBeInTheDocument();
+    });
+
+    window.dispatchEvent(new CustomEvent(GUARDIAN_OPEN_ADD_CHILD_MODAL_EVENT));
+
+    const purokSelect = await screen.findByLabelText(/^purok$/i);
+    const streetColorSelect = screen.getByLabelText(/^purok-street-color$/i);
+
+    expect(streetColorSelect).toBeDisabled();
+
+    fireEvent.change(purokSelect, { target: { value: "Purok 1" } });
+
+    expect(streetColorSelect).not.toBeDisabled();
+    expect(
+      screen.getByRole("option", { name: "Son Risa St. - Pink" }),
+    ).toBeInTheDocument();
+
+    fireEvent.change(streetColorSelect, {
+      target: { value: "Son Risa St. - Pink" },
+    });
+    expect(streetColorSelect).toHaveValue("Son Risa St. - Pink");
+
+    fireEvent.change(purokSelect, { target: { value: "Purok 2" } });
+
+    expect(streetColorSelect).toHaveValue("");
+    expect(
+      screen.queryByRole("option", { name: "Son Risa St. - Pink" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "M.H Del Pilar - Blue" }),
     ).toBeInTheDocument();
   });
 

@@ -18,9 +18,7 @@ import {
 import VaccinationsDashboard from "../pages/VaccinationsDashboard";
 
 import apiClient from "../utils/api";
-
-const mockSocketOn = jest.fn();
-const mockSocketOff = jest.fn();
+import useVaccinationSocket from "../hooks/useVaccinationSocket";
 
 jest.mock("../utils/api", () => ({
   __esModule: true,
@@ -33,9 +31,6 @@ jest.mock("../utils/api", () => ({
     updateVaccinationRecord: jest.fn(),
     deleteVaccinationRecord: jest.fn(),
     getVaccineInventory: jest.fn(),
-    getVaccineInventoryTransactions: jest.fn(),
-    getVaccineStockAlerts: jest.fn(),
-    acknowledgeVaccineStockAlert: jest.fn(),
   },
 }));
 
@@ -48,13 +43,9 @@ jest.mock("../contexts/AuthContext", () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-jest.mock("../contexts/SocketContext", () => ({
-  useSocket: () => ({
-    socket: {
-      on: mockSocketOn,
-      off: mockSocketOff,
-    },
-  }),
+jest.mock("../hooks/useVaccinationSocket", () => ({
+  __esModule: true,
+  default: jest.fn(),
 }));
 
 const renderVaccinationsDashboard = () =>
@@ -78,7 +69,7 @@ const scheduleRows = [
   {
     id: 12,
     vaccine_id: 2,
-    vaccine_name: "Pentavalent",
+    vaccine_name: "Penta Valent",
     dose_number: 1,
     total_doses: 3,
     age_in_months: 2,
@@ -106,7 +97,7 @@ const infantRows = [
 
 const vaccineRows = [
   { id: 1, name: "BCG", code: "BCG", doses_required: 1 },
-  { id: 2, name: "Pentavalent", code: "PENTA", doses_required: 3 },
+  { id: 2, name: "Penta Valent", code: "PENTA", doses_required: 3 },
 ];
 
 const vaccinationRecordRows = [
@@ -126,7 +117,7 @@ const vaccinationRecordRows = [
     id: 502,
     patient_id: 2,
     vaccine_id: 2,
-    vaccine_name: "Pentavalent",
+    vaccine_name: "Penta Valent",
     dose_no: 1,
     admin_date: null,
     next_due_date: "2025-10-10",
@@ -139,6 +130,7 @@ const vaccinationRecordRows = [
 describe("Admin integration sync and mapping checks", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    useVaccinationSocket.mockImplementation(() => undefined);
     mockUseAuth.mockReturnValue({
       isAdmin: true,
       user: { id: 100, role_type: "SYSTEM_ADMIN", clinic_id: 7, facility_id: 7 },
@@ -275,7 +267,7 @@ describe("Admin integration sync and mapping checks", () => {
       expect(apiClient.getVaccinationRecords).toHaveBeenCalledTimes(1);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /add vaccination/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^➕\s*add$/i }));
 
     expect(
       await screen.findByRole("heading", { name: /add new vaccination record/i }),
@@ -302,11 +294,13 @@ describe("Admin integration sync and mapping checks", () => {
     });
   });
 
-  test("socket subscription and polling synchronization behavior is active", async () => {
+  test("vaccinations dashboard keeps scoped inventory polling active", async () => {
     jest.useFakeTimers();
 
     try {
       apiClient.getVaccines.mockResolvedValue(vaccineRows);
+      apiClient.getVaccinationSchedules.mockResolvedValue(scheduleRows);
+      apiClient.getInfants.mockResolvedValue(infantRows);
       apiClient.getVaccinationRecords.mockResolvedValue(vaccinationRecordRows);
       apiClient.getVaccineInventory.mockResolvedValue([
         {
@@ -319,47 +313,19 @@ describe("Admin integration sync and mapping checks", () => {
           is_low_stock: false,
         },
       ]);
-      apiClient.getVaccineInventoryTransactions.mockResolvedValue([
-        {
-          id: 900,
-          vaccine_inventory_id: 11,
-          vaccine_id: 1,
-          transaction_type: "ISSUE",
-          quantity: 1,
-          previous_balance: 10,
-          new_balance: 9,
-          created_at: "2026-03-08T00:00:00.000Z",
-          vaccine_name: "BCG",
-        },
-      ]);
-      apiClient.getVaccineStockAlerts.mockResolvedValue([]);
 
       renderVaccinationsDashboard();
 
-      expect(await screen.findByText(/vaccine tracking/i)).toBeInTheDocument();
+      expect(
+        await screen.findByRole("button", { name: /vaccination tracking/i }),
+      ).toBeInTheDocument();
 
       await waitFor(() => {
         expect(apiClient.getVaccineInventory).toHaveBeenCalledTimes(1);
       });
 
       expect(apiClient.getVaccineInventory).toHaveBeenCalledWith({ clinic_id: 7 });
-      expect(apiClient.getVaccineInventoryTransactions).toHaveBeenCalledWith(null, {
-        clinic_id: 7,
-      });
-      expect(apiClient.getVaccineStockAlerts).toHaveBeenCalledWith({
-        status: "ACTIVE",
-        clinic_id: 7,
-      });
-
-      expect(mockSocketOn).toHaveBeenCalled();
-      expect(mockSocketOn).toHaveBeenCalledWith(
-        "vaccination_created",
-        expect.any(Function),
-      );
-      expect(mockSocketOn).toHaveBeenCalledWith(
-        "vaccine_inventory_transaction_created",
-        expect.any(Function),
-      );
+      expect(useVaccinationSocket).toHaveBeenCalled();
 
       const callsBeforePolling = apiClient.getVaccineInventory.mock.calls.length;
 
@@ -385,10 +351,10 @@ describe("Admin integration sync and mapping checks", () => {
     });
 
     apiClient.getVaccines.mockResolvedValue(vaccineRows);
+    apiClient.getVaccinationSchedules.mockResolvedValue(scheduleRows);
+    apiClient.getInfants.mockResolvedValue(infantRows);
     apiClient.getVaccinationRecords.mockResolvedValue(vaccinationRecordRows);
     apiClient.getVaccineInventory.mockResolvedValue([]);
-    apiClient.getVaccineInventoryTransactions.mockResolvedValue([]);
-    apiClient.getVaccineStockAlerts.mockResolvedValue([]);
 
     renderVaccinationsDashboard();
 
@@ -397,12 +363,15 @@ describe("Admin integration sync and mapping checks", () => {
     });
 
     expect(apiClient.getVaccineInventory).toHaveBeenCalledWith({});
-    expect(apiClient.getVaccineInventoryTransactions).toHaveBeenCalledWith(null, {});
-    expect(apiClient.getVaccineStockAlerts).toHaveBeenCalledWith({ status: "ACTIVE" });
   });
 
-  test("vaccine tracking acknowledges active alert via real API action", async () => {
-    apiClient.getVaccines.mockResolvedValue(vaccineRows);
+  test("add-record vaccine selection excludes unapproved vaccine names", async () => {
+    apiClient.getVaccines.mockResolvedValue([
+      ...vaccineRows,
+      { id: 99, name: "Pentavalent", code: "LEGACY", doses_required: 3 },
+    ]);
+    apiClient.getVaccinationSchedules.mockResolvedValue(scheduleRows);
+    apiClient.getInfants.mockResolvedValue(infantRows);
     apiClient.getVaccinationRecords.mockResolvedValue(vaccinationRecordRows);
     apiClient.getVaccineInventory.mockResolvedValue([
       {
@@ -415,42 +384,33 @@ describe("Admin integration sync and mapping checks", () => {
         is_low_stock: true,
         is_critical_stock: true,
       },
-    ]);
-    apiClient.getVaccineInventoryTransactions.mockResolvedValue([]);
-    apiClient.getVaccineStockAlerts.mockResolvedValue([
       {
-        id: 1001,
-        vaccine_id: 1,
-        vaccine_name: "BCG",
-        alert_type: "CRITICAL_STOCK",
-        priority: "URGENT",
-        status: "active",
-        message: "Critical: 2 units remaining",
+        id: 12,
+        vaccine_id: 99,
+        vaccine_name: "Pentavalent",
+        vaccine_code: "LEGACY",
+        stock_on_hand: 5,
+        low_stock_threshold: 5,
+        is_low_stock: true,
+        is_critical_stock: true,
       },
     ]);
-    apiClient.acknowledgeVaccineStockAlert.mockResolvedValueOnce({
-      id: 1001,
-      status: "ACKNOWLEDGED",
-    });
 
     renderVaccinationsDashboard();
 
+    expect(await screen.findByRole("button", { name: /vaccination schedule/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^➕\s*add$/i }));
+
     expect(
-      await screen.findByRole("button", { name: /inventory tracking/i }),
+      await screen.findByRole("heading", { name: /add new vaccination record/i }),
     ).toBeInTheDocument();
 
-    await waitFor(() => {
-      expect(apiClient.getVaccineStockAlerts).toHaveBeenCalled();
-    });
+    const vaccineSelect = screen.getByDisplayValue("Select Vaccine");
+    expect(screen.getByRole("option", { name: /BCG/i })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Pentavalent/i })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /active alerts/i }));
-
-    await screen.findByText(/critical: 2 units remaining/i);
-
-    fireEvent.click(screen.getByRole("button", { name: /acknowledge/i }));
-
-    await waitFor(() => {
-      expect(apiClient.acknowledgeVaccineStockAlert).toHaveBeenCalledWith(1001);
-    });
+    fireEvent.change(vaccineSelect, { target: { value: "1" } });
+    expect(vaccineSelect).toHaveValue("1");
   });
 });

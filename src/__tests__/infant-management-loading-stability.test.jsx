@@ -11,8 +11,11 @@ import apiClient from "../utils/api";
 jest.mock("../utils/api", () => ({
   __esModule: true,
   default: {
+    request: jest.fn(),
+    customRequest: jest.fn(),
     getInfant: jest.fn(),
     updateInfant: jest.fn(),
+    getDynamicSchedule: jest.fn(),
     getVaccinationSchedules: jest.fn(),
     getVaccinationRecordsByInfant: jest.fn(),
     getAppointmentsByInfant: jest.fn(),
@@ -44,6 +47,8 @@ const baseInfant = {
   address: "San Nicolas",
   barangay: "San Nicolas",
   health_center: "Barangay San Nicolas Health Center",
+  purok: "Purok 7",
+  street_color: "Bedana / Dimanlig St. - Red",
 };
 
 const baseSchedule = [
@@ -58,6 +63,38 @@ const baseSchedule = [
   },
 ];
 
+const baseDynamicSchedule = {
+  infantInfo: {
+    firstName: "Baby",
+    lastName: "One",
+    controlNumber: "001",
+    dateOfBirth: "2025-01-01",
+    guardianName: "Mother One",
+  },
+  summary: {
+    totalScheduled: 1,
+    completedCount: 0,
+    overdueCount: 0,
+    upcomingCount: 1,
+  },
+  schedules: [
+    {
+      vaccineId: 1,
+      vaccineName: "BCG",
+      ageMonths: 0,
+      ageDescription: "At Birth",
+      doseNumber: 1,
+      totalDoses: 1,
+      status: "upcoming",
+      dueDate: "2025-01-01",
+      adminDate: null,
+      daysOverdue: 0,
+      isOverdue: false,
+      isUpcoming: true,
+    },
+  ],
+};
+
 const renderStrict = (ui) => render(<React.StrictMode>{ui}</React.StrictMode>);
 
 describe("Infant module loading stability under StrictMode lifecycle", () => {
@@ -67,6 +104,9 @@ describe("Infant module loading stability under StrictMode lifecycle", () => {
 
     apiClient.getInfant.mockResolvedValue(baseInfant);
     apiClient.updateInfant.mockResolvedValue(baseInfant);
+    apiClient.request.mockResolvedValue({ success: true, data: [] });
+    apiClient.customRequest.mockResolvedValue({ data: [] });
+    apiClient.getDynamicSchedule.mockResolvedValue(baseDynamicSchedule);
     apiClient.getVaccinationSchedules.mockResolvedValue(baseSchedule);
     apiClient.getVaccinationRecordsByInfant.mockResolvedValue([]);
     apiClient.getAppointmentsByInfant.mockResolvedValue([]);
@@ -90,6 +130,17 @@ describe("Infant module loading stability under StrictMode lifecycle", () => {
     expect(apiClient.getInfant).toHaveBeenCalled();
   });
 
+  test("InfantPersonalRecord renders saved purok details in health center information", async () => {
+    renderStrict(<InfantPersonalRecord infantId={1} />);
+
+    await screen.findByText(/health center information/i);
+
+    expect(screen.getByText("Purok 7")).toBeInTheDocument();
+    expect(
+      screen.getByText("Bedana / Dimanlig St. - Red"),
+    ).toBeInTheDocument();
+  });
+
   test("VaccineScheduleBooklet exits loading state after StrictMode effect replay", async () => {
     renderStrict(<VaccineScheduleBooklet infantId={1} />);
 
@@ -101,7 +152,7 @@ describe("Infant module loading stability under StrictMode lifecycle", () => {
     expect(scheduleHeadings.length).toBeGreaterThanOrEqual(1);
 
     expect(screen.queryByText(/loading vaccine schedule/i)).not.toBeInTheDocument();
-    expect(apiClient.getVaccinationSchedules).toHaveBeenCalled();
+    expect(apiClient.getDynamicSchedule).toHaveBeenCalledWith(1);
   });
 
   test("ImmunizationRecordBooklet exits loading state after StrictMode effect replay", async () => {

@@ -25,6 +25,7 @@ import {
   validateLength,
   validateNumberRange,
 } from "../utils/adminFormValidation";
+import { APPROVED_VACCINE_NAMES } from "../constants/approvedVaccines";
 
 // SheetJS for Excel export - loaded dynamically
 let XLSX = null;
@@ -392,18 +393,12 @@ export default function InventoryManagement() {
 
   // Vaccine items based on paper configuration
   const vaccineItems = useMemo(
-    () => [
-      { id: "bcg", name: "BCG", unit: "vials" },
-      { id: "bcg_diluent", name: "BCG, Diluent", unit: "vials" },
-      { id: "hepa_b", name: "Hepa B", unit: "vials" },
-      { id: "pentavalent", name: "Penta Valent", unit: "vials" },
-      { id: "opv", name: "OPV 20-doses", unit: "vials" },
-      { id: "pcv", name: "PCV 13 / PCV 10", unit: "vials" },
-      { id: "mr", name: "Measles & Rubella (MR)", unit: "vials" },
-      { id: "mmr", name: "MMR", unit: "vials" },
-      { id: "mmr_diluent", name: "MMR, Diluent 5ml", unit: "vials" },
-      { id: "ipv", name: "IPV multi dose", unit: "vials" },
-    ],
+    () =>
+      APPROVED_VACCINE_NAMES.map((name) => ({
+        id: name.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+        name,
+        unit: "vials",
+      })),
     [],
   );
 
@@ -1252,29 +1247,29 @@ export default function InventoryManagement() {
         />
 
         {/* Tab Navigation */}
-        <Card className="mt-4 dark:bg-gray-800 dark:border-gray-700">
-          <div className="flex border-b border-gray-200 dark:border-gray-600 overflow-x-auto">
+        <Card className="mt-4 dark:bg-gray-800 dark:border-gray-700 p-3">
+          <div className="flex space-x-2 overflow-x-auto">
             <button
               onClick={() => handleTabChange("inventory_sheet")}
-              className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${
+              className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
                 activeTab === "inventory_sheet"
-                  ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                  ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
+                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
               }`}
             >
               Inventory Sheet
             </button>
             <button
               onClick={() => handleTabChange("stock_alerts")}
-              className={`px-6 py-3 font-medium text-sm whitespace-nowrap relative ${
+              className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap relative ${
                 activeTab === "stock_alerts"
-                  ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                  ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
+                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
               }`}
             >
               Stock Alerts
               {stockAlerts.critical.length > 0 && (
-                <span className="ml-2 px-2 py-0.5 text-xs bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 rounded-full absolute top-2">
+                <span className="ml-2 px-2 py-0.5 text-xs bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 rounded-full">
                   {stockAlerts.critical.length}
                 </span>
               )}

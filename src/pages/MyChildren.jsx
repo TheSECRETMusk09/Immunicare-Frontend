@@ -2,7 +2,6 @@
 import { useAuth } from "../contexts/AuthContext";
 import { useNotification } from "../contexts/NotificationContext";
 import apiClient from "../utils/api";
-import vaccineRulesEngine from "../utils/vaccineRulesEngine";
 import notificationService from "../services/notificationService";
 import GuardianTopHeader from "../components/GuardianTopHeader";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
@@ -11,6 +10,7 @@ import {
   Alert,
   Input,
   Modal,
+  Select,
 } from "../components/UI";
 import {
    Baby,
@@ -33,6 +33,12 @@ import {
   GUARDIAN_OPEN_ADD_CHILD_MODAL_EVENT,
   triggerGuardianInfantRegistered,
 } from "../components/QuickActionFAB";
+import { APPROVED_VACCINE_NAMES } from "../constants/approvedVaccines";
+import {
+  PUROK_OPTIONS,
+  getPurokStreetColorOptions,
+  isValidPurokStreetColorSelection,
+} from "../constants/purokOptions";
 
 const getErrorFieldMap = (error) => {
   if (!error || !error.response || !error.response.data) {
@@ -83,11 +89,96 @@ const mapInfantFieldErrors = (fields = {}) => {
   if (fields.place_of_birth) {
     mapped.birthplace = fields.place_of_birth;
   }
+  if (fields.purok) {
+    mapped.purok = fields.purok;
+  }
+  if (fields.street_color) {
+    mapped.street_color = fields.street_color;
+  }
 
   return mapped;
 };
 
 const hasFieldErrors = (errors = {}) => Object.keys(errors).length > 0;
+
+const createInitialChildForm = () => ({
+  first_name: "",
+  last_name: "",
+  dob: "",
+  sex: "M",
+  birth_weight: "",
+  birth_length: "",
+  birthplace: "",
+  purok: "",
+  street_color: "",
+});
+
+const validateChildRegistrationForm = (values = {}) => {
+  const errors = {};
+  const firstName = String(values.first_name || "").trim();
+  const lastName = String(values.last_name || "").trim();
+  const dobValue = String(values.dob || "").trim();
+  const sexValue = String(values.sex || "").trim();
+  const purokValue = String(values.purok || "").trim();
+  const streetColorValue = String(values.street_color || "").trim();
+
+  if (!firstName) {
+    errors.first_name = "First name is required";
+  } else if (firstName.length < 2) {
+    errors.first_name = "First name must be at least 2 characters long";
+  }
+
+  if (!lastName) {
+    errors.last_name = "Last name is required";
+  } else if (lastName.length < 2) {
+    errors.last_name = "Last name must be at least 2 characters long";
+  }
+
+  if (!dobValue) {
+    errors.dob = "Date of birth is required";
+  } else {
+    const parsedDob = new Date(dobValue);
+    if (Number.isNaN(parsedDob.getTime())) {
+      errors.dob = "Date of birth must be a valid date";
+    } else {
+      const today = new Date();
+      const todayMidnight = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+      );
+      const dobMidnight = new Date(
+        parsedDob.getFullYear(),
+        parsedDob.getMonth(),
+        parsedDob.getDate(),
+      );
+
+      if (dobMidnight > todayMidnight) {
+        errors.dob = "Date of birth cannot be in the future";
+      }
+    }
+  }
+
+  if (!sexValue) {
+    errors.sex = "Sex is required";
+  }
+
+  if (!purokValue) {
+    errors.purok = "Purok is required";
+  }
+
+  if (!streetColorValue) {
+    errors.street_color = "Purok-Street-Color is required";
+  } else if (
+    purokValue &&
+    !isValidPurokStreetColorSelection(purokValue, streetColorValue)
+  ) {
+    errors.street_color =
+      "Selected Purok-Street-Color does not match the selected Purok";
+  }
+
+  return errors;
+};
 
 const getActionErrorMessage = (error, fallback) => {
   if (error?.response?.data?.error && typeof error.response.data.error === "string") {
@@ -118,7 +209,7 @@ export default function MyChildren() {
   const [editError, setEditError] = useState(null);
   const [editSuccess, setEditSuccess] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
-  const { transferInSubmitted, success, info } = useNotification();
+  const { transferInSubmitted, success } = useNotification();
   const [registerFieldErrors, setRegisterFieldErrors] = useState({});
   const [editFieldErrors, setEditFieldErrors] = useState({});
   // Readiness state for each child
@@ -133,31 +224,9 @@ export default function MyChildren() {
     vaccination_card_preview: "",
     notes: "",
   });
-  const [vaccineOptions] = useState([
-    { value: "bcg", label: "BCG" },
-    { value: "hep_b_1", label: "Hepatitis B (1st dose)" },
-    { value: "hep_b_2", label: "Hepatitis B (2nd dose)" },
-    { value: "hep_b_3", label: "Hepatitis B (3rd dose)" },
-    { value: "dtp_1", label: "DTP (1st dose)" },
-    { value: "dtp_2", label: "DTP (2nd dose)" },
-    { value: "dtp_3", label: "DTP (3rd dose)" },
-    { value: "dtp_booster", label: "DTP Booster" },
-    { value: "hib_1", label: "Hib (1st dose)" },
-    { value: "hib_2", label: "Hib (2nd dose)" },
-    { value: "hib_3", label: "Hib (3rd dose)" },
-    { value: "ipv_1", label: "IPV (1st dose)" },
-    { value: "ipv_2", label: "IPV (2nd dose)" },
-    { value: "pcv_1", label: "PCV (1st dose)" },
-    { value: "pcv_2", label: "PCV (2nd dose)" },
-    { value: "pcv_3", label: "PCV (3rd dose)" },
-    { value: "rota_1", label: "Rotavirus (1st dose)" },
-    { value: "rota_2", label: "Rotavirus (2nd dose)" },
-    { value: "rota_3", label: "Rotavirus (3rd dose)" },
-    { value: "mmr_1", label: "MMR (1st dose)" },
-    { value: "mmr_2", label: "MMR (2nd dose)" },
-    { value: "vita_1", label: "Vitamin A (1st dose)" },
-    { value: "vita_2", label: "Vitamin A (2nd dose)" },
-  ]);
+  const [vaccineOptions] = useState(
+    APPROVED_VACCINE_NAMES.map((name) => ({ value: name, label: name })),
+  );
   const [selectedVaccines, setSelectedVaccines] = useState([]);
 
 
@@ -300,15 +369,7 @@ export default function MyChildren() {
       });
     }
   };
-  const [formData, setFormData] = useState({
-    first_name: "",
-    last_name: "",
-    dob: "",
-    sex: "M",
-    birth_weight: "",
-    birth_length: "",
-    birthplace: "",
-  });
+  const [formData, setFormData] = useState(createInitialChildForm);
 
   // Handle Edit Child Click
   const handleEditChild = (child) => {
@@ -423,12 +484,16 @@ export default function MyChildren() {
     setFormData((prev) => ({
       ...prev,
       [name]: value,
+      ...(name === "purok" ? { street_color: "" } : {}),
     }));
 
-    if (registerFieldErrors[name]) {
+    if (registerFieldErrors[name] || (name === "purok" && registerFieldErrors.street_color)) {
       setRegisterFieldErrors((prev) => {
         const next = { ...prev };
         delete next[name];
+        if (name === "purok") {
+          delete next.street_color;
+        }
         return next;
       });
     }
@@ -486,6 +551,13 @@ export default function MyChildren() {
       return;
     }
 
+    const validationErrors = validateChildRegistrationForm(formData);
+    if (hasFieldErrors(validationErrors)) {
+      setRegisterFieldErrors(validationErrors);
+      setRegisterError("Please correct the highlighted child registration fields.");
+      return;
+    }
+
     setIsSubmitting(true);
     setRegisterError(null);
     setRegisterSuccess(null);
@@ -502,6 +574,8 @@ export default function MyChildren() {
         birth_weight: formData.birth_weight || null,
         birth_height: formData.birth_length || null,
         place_of_birth: formData.birthplace || null,
+        purok: formData.purok,
+        street_color: formData.street_color,
         // Transfer-in specific fields
         transfer_in_source: transferFormData.source_facility,
         validation_status: "pending_validation",
@@ -514,53 +588,22 @@ export default function MyChildren() {
       const infantId = infantResponse?.id || infantResponse?.infant?.id;
 
        if (infantId) {
-         // Fetch vaccination schedule for calculations
-         const schedule = await vaccineRulesEngine.fetchVaccinationSchedule();
+          const submittedVaccines = selectedVaccines.map((vaccineName) => ({
+            vaccine_name: vaccineName,
+            dose_number: 1,
+            date_administered: null,
+            batch_number: null,
+            facility_name: transferFormData.source_facility || null,
+          }));
 
-         // Convert selected vaccines to format expected by rules engine
-         const vaccinationHistory = selectedVaccines.map((vaccineCode) => ({
-           vaccine: vaccineCode,
-           dose_no: 1, // Assuming dose 1 for simplicity - could be enhanced
-           date_administered: new Date().toISOString(), // Placeholder
-         }));
-
-         // Calculate next valid vaccine
-         const nextDoseInfo = vaccineRulesEngine.calculateNextValidDose(
-           { dob: formData.dob },
-           vaccinationHistory,
-           schedule
-         );
-
-         // Assign triage category
-         const triageCategory = vaccineRulesEngine.assignTriageCategory(
-           {
-             submittedVaccines: selectedVaccines.map((vaccineCode) => ({
-               vaccine: vaccineCode,
-               doseNumber: 1,
-               dateReceived: new Date().toISOString().split('T')[0], // Today's date
-             })),
-             childDOB: formData.dob,
-           },
-           schedule
-         );
-
-         // Create transfer-in case with vaccine history
-         const transferCaseData = {
-           guardian_id: guardianId,
-           infant_id: infantId,
-           source_facility: transferFormData.source_facility,
-           submitted_vaccines: selectedVaccines.map((v) => ({
-             vaccine_code: v,
-             date_administered: null, // Guardian will provide dates separately
-             verified: false,
-           })),
-           vaccination_card_url: transferFormData.vaccination_card ? "pending_upload" : null,
-           notes: transferFormData.notes,
-           validation_status: "pending_validation",
-           validation_priority: selectedVaccines.length > 0 ? "normal" : "high",
-           auto_computed_next_vaccine: nextDoseInfo ? nextDoseInfo.vaccine : null,
-           triage_category: triageCategory,
-         };
+          // Create transfer-in case with vaccine history
+          const transferCaseData = {
+            infant_id: infantId,
+            source_facility: transferFormData.source_facility,
+            submitted_vaccines: submittedVaccines,
+            vaccination_card_url: transferFormData.vaccination_card ? "pending_upload" : null,
+            remarks: transferFormData.notes || null,
+          };
 
            // Submit transfer-in case
            await apiClient.createTransferInCase(transferCaseData);
@@ -594,29 +637,6 @@ export default function MyChildren() {
               // Don't fail the whole operation if notification fails
             }
 
-            // If we have an auto-computed next vaccine, notify about it
-            if (nextDoseInfo && nextDoseInfo.vaccine) {
-              const vaccineLabel = vaccineOptions.find(
-                opt => opt.value === nextDoseInfo.vaccine
-              )?.label || nextDoseInfo.vaccine;
-
-              info(
-                `Based on the vaccines you've submitted, the next recommended vaccine for your child is ${vaccineLabel}.`,
-                { title: "Next Vaccine Recommended" }
-              );
-
-              // Send persistent next vaccine computed notification via notification service
-              try {
-                await notificationService.sendNextVaccineComputedNotification({
-                  vaccineName: vaccineLabel,
-                  guardianId: guardianId,
-                  infantId: infantId
-                });
-              } catch (notificationError) {
-                console.error('Failed to send next vaccine computed notification:', notificationError);
-                // Don't fail the whole operation if notification fails
-              }
-            }
        }
 
       setRegisterSuccess("Transfer-in case submitted successfully! Our staff will review your child's vaccination history.");
@@ -629,15 +649,7 @@ export default function MyChildren() {
       // Close modal and reset forms after delay
       setTimeout(() => {
         setShowRegisterModal(false);
-        setFormData({
-          first_name: "",
-          last_name: "",
-          dob: "",
-          sex: "M",
-          birth_weight: "",
-          birth_length: "",
-          birthplace: "",
-        });
+        setFormData(createInitialChildForm());
         resetTransferForm();
         setRegisterSuccess(null);
         if (isNewRoute) {
@@ -667,6 +679,13 @@ export default function MyChildren() {
       return;
     }
 
+    const validationErrors = validateChildRegistrationForm(formData);
+    if (hasFieldErrors(validationErrors)) {
+      setRegisterFieldErrors(validationErrors);
+      setRegisterError("Please correct the highlighted child registration fields.");
+      return;
+    }
+
     setIsSubmitting(true);
     setRegisterError(null);
     setRegisterSuccess(null);
@@ -682,6 +701,8 @@ export default function MyChildren() {
         birth_weight: formData.birth_weight || null,
         birth_height: formData.birth_length || null,
         place_of_birth: formData.birthplace || null,
+        purok: formData.purok,
+        street_color: formData.street_color,
       };
 
       await apiClient.createGuardianInfant(infantData);
@@ -695,15 +716,7 @@ export default function MyChildren() {
       // Close modal and reset form after delay
       setTimeout(() => {
         setShowRegisterModal(false);
-        setFormData({
-          first_name: "",
-          last_name: "",
-          dob: "",
-          sex: "M",
-          birth_weight: "",
-          birth_length: "",
-          birthplace: "",
-        });
+        setFormData(createInitialChildForm());
         setRegisterSuccess(null);
         // Navigate away from /new route if we're there
         if (isNewRoute) {
@@ -1196,7 +1209,7 @@ export default function MyChildren() {
                         placeholder="e.g., 50"
                       />
                     </div>
-                    <div className="mt-4">
+                    <div className="mt-4 space-y-4">
                       <Input
                         label="Place of Birth"
                         name="birthplace"
@@ -1205,6 +1218,27 @@ export default function MyChildren() {
                         error={registerFieldErrors.birthplace}
                         placeholder="Hospital or address"
                       />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Select
+                          label="Purok"
+                          name="purok"
+                          value={formData.purok}
+                          onChange={handleRegisterChange}
+                          options={PUROK_OPTIONS}
+                          error={registerFieldErrors.purok}
+                          required
+                        />
+                        <Select
+                          label="Purok-Street-Color"
+                          name="street_color"
+                          value={formData.street_color}
+                          onChange={handleRegisterChange}
+                          options={getPurokStreetColorOptions(formData.purok)}
+                          error={registerFieldErrors.street_color}
+                          disabled={!formData.purok}
+                          required
+                        />
+                      </div>
                     </div>
                   </div>
                 </form>
@@ -1295,7 +1329,7 @@ export default function MyChildren() {
                         placeholder="e.g., 50"
                       />
                     </div>
-                    <div className="mt-4">
+                    <div className="mt-4 space-y-4">
                       <Input
                         label="Place of Birth"
                         name="birthplace"
@@ -1304,6 +1338,27 @@ export default function MyChildren() {
                         error={registerFieldErrors.birthplace}
                         placeholder="Hospital or address"
                       />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Select
+                          label="Purok"
+                          name="purok"
+                          value={formData.purok}
+                          onChange={handleRegisterChange}
+                          options={PUROK_OPTIONS}
+                          error={registerFieldErrors.purok}
+                          required
+                        />
+                        <Select
+                          label="Purok-Street-Color"
+                          name="street_color"
+                          value={formData.street_color}
+                          onChange={handleRegisterChange}
+                          options={getPurokStreetColorOptions(formData.purok)}
+                          error={registerFieldErrors.street_color}
+                          disabled={!formData.purok}
+                          required
+                        />
+                      </div>
                     </div>
                   </div>
 

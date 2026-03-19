@@ -10,6 +10,7 @@ import {
   normalizeVaccinationRecordResponse,
   normalizeVaccineInventoryResponse,
 } from "../utils/adminDataAdapters";
+import { getApprovedBrandsForVaccine } from "../constants/approvedVaccines";
 
 const injectionSiteOptions = [
   { value: "", label: "Select Site" },
@@ -261,6 +262,19 @@ export default function InjectVaccineModal({
     [inventoryRecords, formData.vaccine_inventory_id],
   );
 
+  const selectedVaccineBrandOptions = useMemo(() => {
+    if (!selectedVaccine?.name) return [];
+
+    if (
+      Array.isArray(selectedVaccine.allowed_brands) &&
+      selectedVaccine.allowed_brands.length > 0
+    ) {
+      return selectedVaccine.allowed_brands;
+    }
+
+    return getApprovedBrandsForVaccine(selectedVaccine.name);
+  }, [selectedVaccine]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -404,6 +418,7 @@ export default function InjectVaccineModal({
           vaccine_inventory_id: "",
           lot_number: "",
           batch_number: "",
+          manufacturer: "",
           dose_number: selectedVaccine.nextDoseNumber || 1
         }));
         return;
@@ -414,7 +429,12 @@ export default function InjectVaccineModal({
       ...prev,
       [name]: value,
       ...(name === "vaccine_id"
-        ? { vaccine_inventory_id: "", lot_number: "", batch_number: "" }
+        ? {
+            vaccine_inventory_id: "",
+            lot_number: "",
+            batch_number: "",
+            manufacturer: "",
+          }
         : {}),
     }));
   };
@@ -592,8 +612,10 @@ export default function InjectVaccineModal({
               {selectedVaccine.name}
             </div>
             <div className="text-gray-600 dark:text-gray-300">
-              Code: {selectedVaccine.code || "N/A"} | Manufacturer: {" "}
-              {selectedVaccine.manufacturer || "N/A"}
+              Code: {selectedVaccine.code || "N/A"} | Approved brand options:{" "}
+              {selectedVaccineBrandOptions.length > 0
+                ? selectedVaccineBrandOptions.join(", ")
+                : "None configured"}
             </div>
             {selectedInventoryRecord && (
               <div className="flex flex-wrap items-center gap-4 mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -664,14 +686,32 @@ export default function InjectVaccineModal({
             value={formData.expiration_date}
             onChange={handleChange}
           />
-          <Input
-            label="Manufacturer"
+          <Select
+            label="Vaccine Brand"
             name="manufacturer"
             value={formData.manufacturer}
             onChange={handleChange}
-            placeholder="e.g., Pfizer, Moderna"
+            options={[
+              {
+                value: "",
+                label: selectedVaccineBrandOptions.length > 0
+                  ? "Select approved brand"
+                  : "No approved brands configured",
+              },
+              ...selectedVaccineBrandOptions.map((brand) => ({
+                value: brand,
+                label: brand,
+              })),
+            ]}
+            disabled={!formData.vaccine_id || selectedVaccineBrandOptions.length === 0}
           />
         </div>
+
+        {formData.vaccine_id && selectedVaccineBrandOptions.length === 0 && (
+          <p className="text-xs text-amber-700 dark:text-amber-300 -mt-2">
+            No approved vaccine brands are configured for the selected vaccine. Leave the brand field blank unless an approved brand is registered.
+          </p>
+        )}
 
         <div className="admin-form-row-2">
           <Select

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import apiClient from "../utils/api";
 import { Button, Modal } from "./UI";
 import VisitRecordingForm from "./VisitRecordingForm";
+import { isApprovedVaccineName } from "../constants/approvedVaccines";
 import {
   normalizeInfantResponse,
   normalizeVaccinationRecordsResponse,
@@ -70,7 +71,11 @@ export default function ImmunizationChart({ infantId }) {
     {
       age: "6 WEEKS",
       title: "6 Weeks Visit",
-      vaccines: ["PENTA 1 / HEXA 1", "OPV 1", "PCV 1"],
+      vaccines: [
+        { name: "Penta Valent", doseNo: 1 },
+        { name: "OPV 20-doses", doseNo: 1 },
+        { name: "PCV 10", doseNo: 1 },
+      ],
       fields: [
         "hr",
         "rr",
@@ -84,7 +89,11 @@ export default function ImmunizationChart({ infantId }) {
     {
       age: "10 WEEKS",
       title: "10 Weeks Visit",
-      vaccines: ["PENTA 2 / HEXA 2", "OPV 2", "PCV 2"],
+      vaccines: [
+        { name: "Penta Valent", doseNo: 2 },
+        { name: "OPV 20-doses", doseNo: 2 },
+        { name: "PCV 10", doseNo: 2 },
+      ],
       fields: [
         "hr",
         "rr",
@@ -98,7 +107,12 @@ export default function ImmunizationChart({ infantId }) {
     {
       age: "14 WEEKS",
       title: "14 Weeks Visit",
-      vaccines: ["PENTA 3 / HEXA 3", "OPV 3", "PCV 3", "IPV 1"],
+      vaccines: [
+        { name: "Penta Valent", doseNo: 3 },
+        { name: "OPV 20-doses", doseNo: 3 },
+        { name: "PCV 10", doseNo: 3 },
+        { name: "IPV multi dose", doseNo: 1 },
+      ],
       fields: [
         "hr",
         "rr",
@@ -112,7 +126,7 @@ export default function ImmunizationChart({ infantId }) {
     {
       age: "6 MONTHS",
       title: "6 Months Visit",
-      vaccines: ["VIT. A"],
+      vaccines: [],
       fields: [
         "hr",
         "rr",
@@ -126,7 +140,10 @@ export default function ImmunizationChart({ infantId }) {
     {
       age: "9 MONTHS",
       title: "9 Months Visit",
-      vaccines: ["MCV 1", "IPV 2"],
+      vaccines: [
+        { name: "Measles & Rubella (MR)", doseNo: 1 },
+        { name: "IPV multi dose", doseNo: 2 },
+      ],
       fields: [
         "hr",
         "rr",
@@ -140,7 +157,7 @@ export default function ImmunizationChart({ infantId }) {
     {
       age: "12 MONTHS",
       title: "12 Months Visit",
-      vaccines: ["MCV 2"],
+      vaccines: [{ name: "MMR", doseNo: 1 }],
       fields: [
         "hr",
         "rr",
@@ -378,16 +395,14 @@ export default function ImmunizationChart({ infantId }) {
 
       // Save vaccination records with automatic inventory deduction
       if (visitData.vaccines && visitData.vaccines.length > 0) {
-        const vaccines = toArrayPayload(await apiClient.getVaccines(), ["vaccines"]);
+        const vaccines = toArrayPayload(await apiClient.getVaccines(), ["vaccines"]).filter(
+          (entry) => isApprovedVaccineName(entry?.name),
+        );
         const batches = toArrayPayload(await apiClient.getVaccineBatches(), ["batches"]);
 
-        for (const vaccineName of visitData.vaccines) {
-          if (vaccineName.administered) {
-            const vaccine = vaccines.find((v) =>
-              v.name
-                .toLowerCase()
-                .includes(vaccineName.name.toLowerCase().split(" ")[0]),
-            );
+        for (const vaccineEntry of visitData.vaccines) {
+          if (vaccineEntry.administered) {
+            const vaccine = vaccines.find((v) => v.name === vaccineEntry.name);
 
             if (vaccine) {
               // Find available batch with stock
@@ -400,10 +415,10 @@ export default function ImmunizationChart({ infantId }) {
                 await apiClient.recordVaccinationWithInventory({
                   patient_id: infantId,
                   vaccine_id: vaccine.id,
-                  dose_no: 1,
+                  dose_no: vaccineEntry.dose_no || 1,
                   admin_date: visitData.visit_date,
                   administered_by: 1,
-                  site_of_injection: vaccineName.site || "Left arm",
+                  site_of_injection: vaccineEntry.site || "Left arm",
                   batch_id: batch.id,
                   notes: `Administered during ${visitData.visit_age} visit`,
                 });
@@ -413,10 +428,10 @@ export default function ImmunizationChart({ infantId }) {
                 await apiClient.createVaccinationRecord({
                   patient_id: infantId,
                   vaccine_id: vaccine.id,
-                  dose_no: 1,
+                  dose_no: vaccineEntry.dose_no || 1,
                   admin_date: visitData.visit_date,
                   administered_by: 1,
-                  site_of_injection: vaccineName.site || "Left arm",
+                  site_of_injection: vaccineEntry.site || "Left arm",
                   notes: `Administered during ${visitData.visit_age} visit (no inventory deducted - no batch available)`,
                 });
               }
@@ -573,7 +588,7 @@ export default function ImmunizationChart({ infantId }) {
                 BCG:
               </span>
               <span className="ml-2 text-gray-900 dark:text-gray-100">
-                {vaccinations.find((v) => v.vaccine_name?.includes("BCG"))
+                {vaccinations.find((v) => v.vaccine_name === "BCG")
                   ? "✓"
                   : "○"}
               </span>
@@ -591,11 +606,7 @@ export default function ImmunizationChart({ infantId }) {
                 Hepa B:
               </span>
               <span className="ml-2 text-gray-900 dark:text-gray-100">
-                {vaccinations.find(
-                  (v) =>
-                    v.vaccine_name?.includes("Hepa") ||
-                    v.vaccine_name?.includes("Hepatitis B"),
-                )
+                {vaccinations.find((v) => v.vaccine_name === "Hepa B")
                   ? "✓"
                   : "○"}
               </span>
@@ -766,20 +777,29 @@ export default function ImmunizationChart({ infantId }) {
                       VACCINES
                     </h5>
                     <div className="space-y-2 text-sm">
-                      {visit.vaccines.map((vaccine) => (
-                        <div key={vaccine} className="flex justify-between">
-                          <span>{vaccine}:</span>
-                          <span>
-                            {visitVaccines.find((v) =>
-                              v.vaccine_name
-                                ?.toLowerCase()
-                                .includes(vaccine.toLowerCase().split(" ")[0]),
-                            )
-                              ? "✓"
-                              : "○"}
-                          </span>
+                      {visit.vaccines.length === 0 ? (
+                        <div className="text-gray-500 dark:text-gray-400">
+                          No approved vaccine scheduled for this visit.
                         </div>
-                      ))}
+                      ) : (
+                        visit.vaccines.map((vaccine) => {
+                          const matchingRecord = visitVaccines.find(
+                            (entry) =>
+                              entry.vaccine_name === vaccine.name &&
+                              Number(entry.dose_no || entry.dose_number || 1) === vaccine.doseNo,
+                          );
+
+                          return (
+                            <div
+                              key={`${vaccine.name}-${vaccine.doseNo}`}
+                              className="flex justify-between"
+                            >
+                              <span>{`${vaccine.name} (Dose ${vaccine.doseNo})`}:</span>
+                              <span>{matchingRecord ? "✓" : "○"}</span>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
                     <div className="mt-4">
                       <div className="flex justify-between text-sm">

@@ -307,8 +307,13 @@ export default function DashboardOverview() {
               )}
             </div>
 
-            <Button variant="primary" className="w-full" onClick={() => navigate("/notifications")}>
-              View All
+            <Button
+              variant="primary"
+              className="w-full"
+              onClick={() => navigate("/notifications")}
+              aria-label="Go to Notifications"
+            >
+              Go to Notifications
             </Button>
           </div>
         </Card>

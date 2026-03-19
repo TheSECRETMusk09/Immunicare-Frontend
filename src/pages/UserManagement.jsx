@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   useGuardians,
   useSystemUsers,
@@ -98,7 +99,15 @@ const normalizeGuardianUsernameForDisplay = (value = "") =>
     .trim()
     .toLowerCase();
 
+const USER_MANAGEMENT_TABS = new Set(["admins", "system", "guardians"]);
+
+const resolveUserManagementTab = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  return USER_MANAGEMENT_TABS.has(normalized) ? normalized : "admins";
+};
+
 export default function UserManagement() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     guardians,
     loading: guardiansLoading,
@@ -127,7 +136,9 @@ export default function UserManagement() {
   const currentUserId = user?.id;
 
   // Memoized tab state to prevent unnecessary re-renders
-  const [activeTab, setActiveTab] = useState("admins"); // Default to admins tab
+  const [activeTab, setActiveTab] = useState(() =>
+    resolveUserManagementTab(searchParams.get("tab")),
+  );
   const [showModal, setShowModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showAddAdminModal, setShowAddAdminModal] = useState(false);
@@ -210,6 +221,11 @@ export default function UserManagement() {
       setIsHydrated(true);
     }
   }, [guardiansLoading, systemUsersLoading]);
+
+  useEffect(() => {
+    const requestedTab = resolveUserManagementTab(searchParams.get("tab"));
+    setActiveTab((prev) => (prev === requestedTab ? prev : requestedTab));
+  }, [searchParams]);
 
   const upsertGuardianAcrossStores = useCallback((guardian, options = {}) => {
     if (!guardian || guardian.id === undefined || guardian.id === null) {
@@ -595,8 +611,14 @@ export default function UserManagement() {
 
   // Tab change handler - preserves tab state
   const handleTabChange = useCallback((tab) => {
-    setActiveTab(tab);
-  }, []);
+    const nextTab = resolveUserManagementTab(tab);
+    setActiveTab(nextTab);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", nextTab);
+      return next;
+    });
+  }, [setSearchParams]);
 
   const handleAddUser = useCallback((userType) => {
     setEditingUser(null);

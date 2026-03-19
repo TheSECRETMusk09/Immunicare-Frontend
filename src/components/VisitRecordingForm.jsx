@@ -15,7 +15,12 @@ export default function VisitRecordingForm({ infant, visit, onClose, onSave }) {
       breastfeeding: false,
     },
     vaccines: visit.vaccines.map((vaccine) => ({
-      name: vaccine,
+      name: typeof vaccine === "string" ? vaccine : vaccine.name,
+      displayLabel:
+        typeof vaccine === "string"
+          ? vaccine
+          : `${vaccine.name} (Dose ${vaccine.doseNo || 1})`,
+      dose_no: typeof vaccine === "string" ? 1 : vaccine.doseNo || 1,
       administered: false,
       lot_number: "",
       expiry_date: "",
@@ -264,7 +269,7 @@ export default function VisitRecordingForm({ infant, visit, onClose, onSave }) {
         <div className="space-y-4">
           {formData.vaccines.map((vaccine, index) => (
             <div
-              key={vaccine.name}
+              key={`${vaccine.name}-${vaccine.dose_no}`}
               className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-700"
             >
               <div className="flex items-center justify-between mb-3">
@@ -282,7 +287,7 @@ export default function VisitRecordingForm({ infant, visit, onClose, onSave }) {
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="font-medium text-gray-800 dark:text-gray-100">
-                    {vaccine.name}
+                    {vaccine.displayLabel}
                   </span>
                 </label>
               </div>

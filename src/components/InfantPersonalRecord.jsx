@@ -4,6 +4,10 @@ import { Button, Input, Alert, LoadingSpinner, Select } from "./UI";
 import { useAuth } from "../contexts/AuthContext";
 import { normalizeInfantResponse } from "../utils/adminDataAdapters";
 import InfantDocuments from "./InfantDocuments";
+import {
+  PUROK_OPTIONS,
+  getPurokStreetColorOptions,
+} from "../constants/purokOptions";
 
 const EDITABLE_INFANT_FIELDS = [
   "first_name",
@@ -37,51 +41,19 @@ const EDITABLE_INFANT_FIELDS = [
   "street_color",
 ];
 
-const PUROK_OPTIONS = [
-  { value: "", label: "Select Purok" },
-  { value: "Purok 1", label: "Purok 1" },
-  { value: "Purok 2", label: "Purok 2" },
-  { value: "Purok 3", label: "Purok 3" },
-  { value: "Purok 4 & 5", label: "Purok 4 & 5" },
-  { value: "Purok 6", label: "Purok 6" },
-  { value: "Purok 7", label: "Purok 7" },
-];
-
-const STREET_COLOR_OPTIONS = {
-  "Purok 1": [
-    { value: "Purok 1 - Son Risa St. - Pink", label: "Purok 1 - Son Risa St. - Pink" },
-    { value: "Purok 1 - G. Monaco St. - Yellow", label: "Purok 1 - G. Monaco St. - Yellow" },
-    { value: "Purok 1 - Fatalla St. - Violet", label: "Purok 1 - Fatalla St. - Violet" },
-  ],
-  "Purok 2": [
-    { value: "Purok 2 - M.H Del Pilar - Blue", label: "Purok 2 - M.H Del Pilar - Blue" },
-  ],
-  "Purok 3": [
-    { value: "Purok 3 - M.H Del Pilar - Orange", label: "Purok 3 - M.H Del Pilar - Orange" },
-  ],
-  "Purok 4 & 5": [
-    { value: "Purok 4 & 5 - M.H Del Pilar - Green", label: "Purok 4 & 5 - M.H Del Pilar - Green" },
-  ],
-  "Purok 6": [
-    { value: "Purok 6 - Dimanlig St. - White", label: "Purok 6 - Dimanlig St. - White" },
-  ],
-  "Purok 7": [
-    { value: "Purok 7 - Bedana / Dimanlig St. - Red", label: "Purok 7 - Bedana / Dimanlig St. - Red" },
-  ]
-};
-
-const getStreetColorOptions = (selectedPurok) => {
-  const options = [{ value: "", label: "Select Purok - Street - Color" }];
-  if (selectedPurok && STREET_COLOR_OPTIONS[selectedPurok]) {
-    return [...options, ...STREET_COLOR_OPTIONS[selectedPurok]];
-  }
-  return options;
-};
-
 const sanitizeInfantUpdatePayload = (raw = {}) => {
   return EDITABLE_INFANT_FIELDS.reduce((acc, field) => {
     if (Object.prototype.hasOwnProperty.call(raw, field)) {
-      acc[field] = raw[field];
+      let value = raw[field];
+
+      // Convert empty strings to null to avoid backend validation errors on dates/times/numbers
+      if (value === "") {
+        acc[field] = null;
+      } else if (field === "birth_weight" || field === "birth_height") {
+        acc[field] = value !== null ? Number(value) : null;
+      } else {
+        acc[field] = value;
+      }
     }
     return acc;
   }, {});
@@ -203,7 +175,16 @@ export default function InfantPersonalRecord({
         return;
       }
 
-      setSaveError(err.message || "Failed to save changes. Please try again.");
+      let errorMessage = err.message || "Failed to save changes. Please try again.";
+
+      // Extract detailed validation fields if provided by the backend error
+      const validationFields = err.fields || err.response?.data?.fields;
+      if (validationFields && typeof validationFields === 'object') {
+        const details = Object.entries(validationFields).map(([k, v]) => `${k}: ${v}`).join(", ");
+        errorMessage += ` (${details})`;
+      }
+
+      setSaveError(errorMessage);
     } finally {
       if (!isMountedRef.current) {
         return;
@@ -543,45 +524,6 @@ export default function InfantPersonalRecord({
                   }
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    PUROK
-                  </label>
-                  {isEditing ? (
-                    <Select
-                      name="purok"
-                      value={formData.purok || ""}
-                      onChange={(e) => {
-                        handleInputChange("purok", e.target.value);
-                        handleInputChange("street_color", "");
-                      }}
-                      options={PUROK_OPTIONS}
-                    />
-                  ) : (
-                    <p className="text-gray-900 dark:text-gray-100">
-                      {infant.purok || "Not specified"}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    PUROK - STREET - COLOR
-                  </label>
-                  {isEditing ? (
-                    <Select
-                      name="street_color"
-                      value={formData.street_color || ""}
-                      onChange={(e) => handleInputChange("street_color", e.target.value)}
-                      options={getStreetColorOptions(formData.purok)}
-                      disabled={!formData.purok}
-                    />
-                  ) : (
-                    <p className="text-gray-900 dark:text-gray-100">
-                      {infant.street_color || "Not specified"}
-                    </p>
-                  )}
-                </div>
               </div>
             </div>
 
@@ -755,12 +697,12 @@ export default function InfantPersonalRecord({
               </div>
             </div>
 
-            {/* Health Center, Allergy & Health Care Information */}
+            {/* Health Center Information */}
             <div>
               <h4 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4">
-                HEALTH CENTER, ALLERGY & HEALTH CARE INFORMATION
+                HEALTH CENTER INFORMATION
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     BARANGAY
@@ -793,6 +735,46 @@ export default function InfantPersonalRecord({
                   ) : (
                     <p className="text-gray-900 dark:text-gray-100">
                       {infant.health_center || "Not specified"}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    PUROK
+                  </label>
+                  {isEditing ? (
+                    <Select
+                      name="purok"
+                      value={formData.purok || ""}
+                      onChange={(e) => {
+                        handleInputChange("purok", e.target.value);
+                        handleInputChange("street_color", "");
+                      }}
+                      options={PUROK_OPTIONS}
+                    />
+                  ) : (
+                    <p className="text-gray-900 dark:text-gray-100">
+                      {infant.purok || "Not specified"}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    PUROK - STREET - COLOR
+                  </label>
+                  {isEditing ? (
+                    <Select
+                      name="street_color"
+                      value={formData.street_color || ""}
+                      onChange={(e) => handleInputChange("street_color", e.target.value)}
+                      options={getPurokStreetColorOptions(formData.purok)}
+                      disabled={!formData.purok}
+                    />
+                  ) : (
+                    <p className="text-gray-900 dark:text-gray-100">
+                      {infant.street_color || "Not specified"}
                     </p>
                   )}
                 </div>

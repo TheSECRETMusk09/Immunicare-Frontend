@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import apiClient from "../utils/api";
 import { Button, Card, PageHeader, Alert, LoadingSpinner } from "./UI";
 import { Download, Printer, FileText } from "lucide-react";
+import { isApprovedVaccineName } from "../constants/approvedVaccines";
 
 /**
  * ImmunizationChartDownload Component
@@ -36,43 +37,59 @@ export default function ImmunizationChartDownload({
     {
       age: "6 WEEKS",
       title: "6 WEEKS",
-      vaccines: ["PENTA 1 / HEXA 1", "OPV 1", "PCV 1"],
-      vaccineCodes: ["PENTA 1", "HEXA 1", "OPV 1", "PCV 1"],
+      vaccines: [
+        { name: "Penta Valent", doseNo: 1 },
+        { name: "OPV 20-doses", doseNo: 1 },
+        { name: "PCV 10", doseNo: 1 },
+      ],
+      vaccineCodes: ["Penta Valent", "OPV 20-doses", "PCV 10"],
       ageRange: { minWeeks: 5, maxWeeks: 7 },
     },
     {
       age: "10 WEEKS",
       title: "10 WEEKS",
-      vaccines: ["PENTA 2 / HEXA 2", "OPV 2", "PCV 2"],
-      vaccineCodes: ["PENTA 2", "HEXA 2", "OPV 2", "PCV 2"],
+      vaccines: [
+        { name: "Penta Valent", doseNo: 2 },
+        { name: "OPV 20-doses", doseNo: 2 },
+        { name: "PCV 10", doseNo: 2 },
+      ],
+      vaccineCodes: ["Penta Valent", "OPV 20-doses", "PCV 10"],
       ageRange: { minWeeks: 9, maxWeeks: 11 },
     },
     {
       age: "14 WEEKS",
       title: "14 WEEKS",
-      vaccines: ["PENTA 3 / HEXA 3", "OPV 3", "PCV 3", "IPV 1"],
-      vaccineCodes: ["PENTA 3", "HEXA 3", "OPV 3", "PCV 3", "IPV 1"],
+      vaccines: [
+        { name: "Penta Valent", doseNo: 3 },
+        { name: "OPV 20-doses", doseNo: 3 },
+        { name: "PCV 10", doseNo: 3 },
+        { name: "IPV multi dose", doseNo: 1 },
+      ],
+      vaccineCodes: ["Penta Valent", "OPV 20-doses", "PCV 10", "IPV multi dose"],
       ageRange: { minWeeks: 13, maxWeeks: 15 },
     },
     {
       age: "6 MONTHS",
       title: "6 MONTHS",
-      vaccines: ["VIT. A"],
-      vaccineCodes: ["VITAMIN A", "VIT A"],
+      vaccines: [],
+      vaccineCodes: [],
       ageRange: { minWeeks: 24, maxWeeks: 28 },
     },
     {
       age: "9 MONTHS",
       title: "9 MONTHS",
-      vaccines: ["MCV 1", "IPV 2"],
-      vaccineCodes: ["MEASLES", "MCV 1", "IPV 2"],
+      vaccines: [
+        { name: "Measles & Rubella (MR)", doseNo: 1 },
+        { name: "IPV multi dose", doseNo: 2 },
+      ],
+      vaccineCodes: ["Measles & Rubella (MR)", "IPV multi dose"],
       ageRange: { minWeeks: 36, maxWeeks: 40 },
     },
     {
       age: "12 MONTHS",
       title: "12 MONTHS",
-      vaccines: ["MCV 2"],
-      vaccineCodes: ["MEASLES", "MCV 2"],
+      vaccines: [{ name: "MMR", doseNo: 1 }],
+      vaccineCodes: ["MMR"],
       ageRange: { minWeeks: 48, maxWeeks: 56 },
     },
   ];
@@ -218,10 +235,8 @@ export default function ImmunizationChartDownload({
 
   const isVaccineAdministered = (vaccineName) => {
     return vaccinations.some((v) => {
-      if (!v?.vaccine_name) return false;
-      const vName = v.vaccine_name.toLowerCase();
-      const searchName = vaccineName.toLowerCase();
-      return vName.includes(searchName.split(" ")[0]);
+      if (!isApprovedVaccineName(v?.vaccine_name)) return false;
+      return v.vaccine_name === vaccineName;
     });
   };
 
@@ -480,7 +495,7 @@ export default function ImmunizationChartDownload({
             <div className="col">
               <span className="font-bold">HEPA B:</span>{" "}
               <span className="checkbox">
-                {isVaccineAdministered("HEPATITIS B") ? "✓" : "□"}
+                {isVaccineAdministered("Hepa B") ? "✓" : "□"}
               </span>
             </div>
           </div>
@@ -582,23 +597,33 @@ export default function ImmunizationChartDownload({
                     </div>
                   </div>
 
-                  {/* Vaccines */}
-                  <div className="col w-1/2 pl-4">
-                    <div className="font-bold mb-1">VACCINES</div>
-                    {visit.vaccines.map((vaccine) => (
-                      <div key={vaccine} className="vaccine-row">
-                        <span>{vaccine}:</span>
-                        <span>
-                          {visitVaccines.some((v) =>
-                            v.vaccine_name
-                              ?.toLowerCase()
-                              .includes(vaccine.toLowerCase().split(" ")[0]),
-                          )
-                            ? "✓"
-                            : "○"}
-                        </span>
+                    {/* Vaccines */}
+                    <div className="col w-1/2 pl-4">
+                      <div className="font-bold mb-1">VACCINES</div>
+                    {visit.vaccines.length === 0 ? (
+                      <div className="vaccine-row">
+                        <span>No approved vaccine scheduled</span>
+                        <span>○</span>
                       </div>
-                    ))}
+                    ) : (
+                      visit.vaccines.map((vaccine) => (
+                        <div
+                          key={`${vaccine.name}-${vaccine.doseNo}`}
+                          className="vaccine-row"
+                        >
+                          <span>{`${vaccine.name} (Dose ${vaccine.doseNo})`}:</span>
+                          <span>
+                            {visitVaccines.some(
+                              (entry) =>
+                                entry.vaccine_name === vaccine.name &&
+                                Number(entry.dose_no || entry.dose_number || 1) === vaccine.doseNo,
+                            )
+                              ? "✓"
+                              : "○"}
+                          </span>
+                        </div>
+                      ))
+                    )}
                     <div className="mt-2">
                       <span className="font-bold">Others/Remarks:</span>{" "}
                       {visitVaccines[0]?.notes || "__________"}

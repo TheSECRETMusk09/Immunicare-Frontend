@@ -150,14 +150,9 @@ export default function DigitalPapersDashboard() {
         subtitle="Configure, monitor, and manage digitized paper forms and documents"
         icon={<FileText className="w-6 h-6" />}
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Button
           <div className="flex space-x-2 overflow-x-auto bg-gray-100 dark:bg-gray-800 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700">
             <button
               onClick={() => setActiveTab("paper_configuration")}
-              variant={
-                activeTab === "paper_configuration" ? "primary" : "secondary"
-              }
               className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
                 activeTab === "paper_configuration"
                   ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
@@ -165,14 +160,9 @@ export default function DigitalPapersDashboard() {
               }`}
             >
               Paper Configuration
-            </Button>
-            <Button
             </button>
             <button
               onClick={() => setActiveTab("download_center")}
-              variant={
-                activeTab === "download_center" ? "primary" : "secondary"
-              }
               className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
                 activeTab === "download_center"
                   ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
@@ -180,14 +170,9 @@ export default function DigitalPapersDashboard() {
               }`}
             >
               Download Center
-            </Button>
-            <Button
             </button>
             <button
               onClick={() => setActiveTab("monitoring_dashboard")}
-              variant={
-                activeTab === "monitoring_dashboard" ? "primary" : "secondary"
-              }
               className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
                 activeTab === "monitoring_dashboard"
                   ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
@@ -195,14 +180,9 @@ export default function DigitalPapersDashboard() {
               }`}
             >
               Monitoring Dashboard
-            </Button>
-            <Button
             </button>
             <button
               onClick={() => setActiveTab("document_templates")}
-              variant={
-                activeTab === "document_templates" ? "primary" : "secondary"
-              }
               className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
                 activeTab === "document_templates"
                   ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
@@ -210,7 +190,6 @@ export default function DigitalPapersDashboard() {
               }`}
             >
               Document Templates
-            </Button>
             </button>
           </div>
         }

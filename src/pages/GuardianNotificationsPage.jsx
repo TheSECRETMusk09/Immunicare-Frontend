@@ -1,10 +1,15 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import useGuardianNotifications from "../hooks/useGuardianNotifications";
 import { useSocket } from "../contexts/SocketContext";
 import { format, isToday, isYesterday, isThisWeek } from "date-fns";
 import GuardianTopHeader from "../components/GuardianTopHeader";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
+import {
+  CATEGORY_META,
+  resolveNotificationActionUrl,
+  resolveNotificationCategory,
+} from "../utils/notificationRouting";
 import {
   Bell,
   Search,
@@ -23,21 +28,56 @@ import {
   MessageSquare
 } from 'lucide-react';
 
-const NOTIFICATION_TYPE_CONFIG = {
-  appointment_reminder: {
+const NOTIFICATION_CATEGORY_CONFIG = {
+  appointment: {
     icon: Calendar,
-    label: "Appointment Reminder",
+    label: "Appointments",
     bg: "bg-blue-100 text-blue-600"
   },
-  appointment_status: {
-    icon: Calendar,
-    label: "Appointment Update",
-    bg: "bg-green-100 text-green-600"
-  },
-  vaccination_reminder: {
+  vaccination_schedule: {
     icon: Syringe,
-    label: "Vaccination Reminder",
+    label: "Vaccination Schedules",
     bg: "bg-purple-100 text-purple-600"
+  },
+  missed_schedule: {
+    icon: AlertCircle,
+    label: "Missed Schedules",
+    bg: "bg-red-100 text-red-600"
+  },
+  inventory_low_stock: {
+    icon: CheckCheck,
+    label: "Low Vaccine Stock",
+    bg: "bg-violet-100 text-violet-600"
+  },
+  inventory_out_of_stock: {
+    icon: AlertCircle,
+    label: "Out-of-Stock Vaccines",
+    bg: "bg-red-100 text-red-600"
+  },
+  guardian_registration: {
+    icon: User,
+    label: "Guardian Registrations",
+    bg: "bg-emerald-100 text-emerald-600"
+  },
+  infant_registration: {
+    icon: User,
+    label: "Infant Registrations",
+    bg: "bg-pink-100 text-pink-600"
+  },
+  report: {
+    icon: CheckCheck,
+    label: "Reports",
+    bg: "bg-cyan-100 text-cyan-600"
+  },
+  system_announcement: {
+    icon: Info,
+    label: "System Announcements",
+    bg: "bg-amber-100 text-amber-600"
+  },
+  outbound_message_failed: {
+    icon: AlertCircle,
+    label: "Failed Outbound Messages",
+    bg: "bg-red-100 text-red-600"
   },
   profile_update: {
     icon: User,
@@ -54,16 +94,6 @@ const NOTIFICATION_TYPE_CONFIG = {
     label: "Health Alert",
     bg: "bg-red-100 text-red-600"
   },
-  vaccine_availability: {
-    icon: CheckCheck,
-    label: "Vaccine Available",
-    bg: "bg-violet-100 text-violet-600"
-  },
-  system_announcement: {
-    icon: Info,
-    label: "Announcement",
-    bg: "bg-amber-100 text-amber-600"
-  },
   default: {
     icon: Bell,
     label: "Notification",
@@ -71,8 +101,43 @@ const NOTIFICATION_TYPE_CONFIG = {
   },
 };
 
+const GUARDIAN_FILTER_TABS = [
+  { id: 'all', label: 'All' },
+  { id: 'unread', label: 'Unread' },
+  ...Object.entries(CATEGORY_META).map(([id, meta]) => ({
+    id,
+    label: meta.label,
+  })),
+];
+
+const normalizeGuardianNotification = (notification = {}) => {
+  const category = resolveNotificationCategory(notification, { isGuardian: true });
+
+  return {
+    ...notification,
+    category,
+    category_label:
+      CATEGORY_META[category]?.label || CATEGORY_META.general.label,
+    action_url: resolveNotificationActionUrl(notification, { isGuardian: true }),
+    created_at:
+      notification.created_at ||
+      notification.createdAt ||
+      notification.timestamp ||
+      new Date().toISOString(),
+    is_read: Boolean(
+      notification.is_read ??
+        notification.read ??
+        notification.isRead ??
+        false,
+    ),
+  };
+};
+
 const NotificationItem = ({ notification, onMarkRead, onMarkUnread, onDelete }) => {
-  const config = NOTIFICATION_TYPE_CONFIG[notification.notification_type] || NOTIFICATION_TYPE_CONFIG.default;
+  const config =
+    NOTIFICATION_CATEGORY_CONFIG[notification.category] ||
+    NOTIFICATION_CATEGORY_CONFIG[notification.notification_type] ||
+    NOTIFICATION_CATEGORY_CONFIG.default;
   const Icon = config.icon;
   const [showActions, setShowActions] = useState(false);
 
@@ -103,17 +168,19 @@ const NotificationItem = ({ notification, onMarkRead, onMarkUnread, onDelete }) 
             {notification.message}
           </p>
 
-          {/* Metadata Chips - Example based on content */}
-          {(notification.related_entity_type === 'appointment' || notification.related_entity_type === 'vaccination') && (
-            <div className="mt-3">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+              {notification.category_label}
+            </span>
+            {notification.action_url && (
               <Link
                 to={notification.action_url}
                 className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 px-2.5 py-1 rounded-full transition-colors"
               >
-                View Details <ChevronRight size={12} />
+                Open Module <ChevronRight size={12} />
               </Link>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Actions Menu */}
@@ -182,6 +249,7 @@ const GuardianNotificationsPage = () => {
   // Get socket connection for real-time updates
   const { isConnected, notifications: socketNotifications, on, off } = useSocket();
   const [socketRealTimeNotifications, setSocketRealTimeNotifications] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Handle real-time socket notifications
   useEffect(() => {
@@ -238,7 +306,7 @@ const GuardianNotificationsPage = () => {
   }, [isConnected, on, off, refresh]);
 
   // Combine API notifications with real-time socket notifications
-  const combinedNotifications = React.useMemo(() => {
+  const combinedNotifications = useMemo(() => {
     const allNotifications = [...socketRealTimeNotifications, ...notifications];
     // Remove duplicates by ID
     const uniqueMap = new Map();
@@ -253,6 +321,45 @@ const GuardianNotificationsPage = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
 
+  const normalizedNotifications = useMemo(
+    () =>
+      combinedNotifications
+        .map((notification) => normalizeGuardianNotification(notification))
+        .sort(
+          (left, right) =>
+            new Date(right.created_at).getTime() -
+            new Date(left.created_at).getTime(),
+        ),
+    [combinedNotifications],
+  );
+
+  const filteredNotifications = useMemo(() => {
+    const normalizedSearch = searchQuery.trim().toLowerCase();
+
+    return normalizedNotifications.filter((notification) => {
+      if (activeTab === 'unread' && notification.is_read) {
+        return false;
+      }
+
+      if (
+        activeTab !== 'all' &&
+        activeTab !== 'unread' &&
+        notification.category !== activeTab
+      ) {
+        return false;
+      }
+
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      const haystack = `${notification.title || ''} ${notification.message || ''} ${notification.category_label || ''}`
+        .toLowerCase();
+
+      return haystack.includes(normalizedSearch);
+    });
+  }, [activeTab, normalizedNotifications, searchQuery]);
+
   // Handle refresh
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -263,20 +370,10 @@ const GuardianNotificationsPage = () => {
   // Handle filter change
   const handleFilterChange = (tabId) => {
     setActiveTab(tabId);
-
-    if (tabId === 'unread') {
-      updateFilters({ unreadOnly: true, type: null });
-      return;
-    }
-
-    updateFilters({
-      unreadOnly: false,
-      type: tabId === 'all' ? null : tabId,
-    });
   };
 
   // Group notifications by date
-  const groupedNotifications = combinedNotifications.reduce((acc, notification) => {
+  const groupedNotifications = filteredNotifications.reduce((acc, notification) => {
     const date = new Date(notification.created_at);
     let key = 'Earlier';
 
@@ -288,6 +385,9 @@ const GuardianNotificationsPage = () => {
     acc[key].push(notification);
     return acc;
   }, {});
+
+  const hasNotifications = normalizedNotifications.length > 0;
+  const hasFilteredNotifications = filteredNotifications.length > 0;
 
   return (
     <div className="guardian-page-wrapper min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
@@ -337,7 +437,8 @@ const GuardianNotificationsPage = () => {
                 type="text"
                 placeholder="Search notifications..."
                 className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-gray-700 border-none rounded-lg text-sm focus:ring-2 focus:ring-primary-500 transition-shadow dark:text-white"
-                onChange={(e) => updateFilters({ search: e.target.value })}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
 
@@ -365,14 +466,7 @@ const GuardianNotificationsPage = () => {
               </span>
             </div>
 
-            {[
-              { id: 'all', label: 'All' },
-              { id: 'unread', label: 'Unread' },
-              { id: 'vaccination_reminder', label: 'Vaccinations' },
-              { id: 'appointment_reminder', label: 'Appointments' },
-              { id: 'vaccine_availability', label: 'Availability' },
-              { id: 'system_announcement', label: 'Announcements' }
-            ].map((tab) => (
+            {GUARDIAN_FILTER_TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => handleFilterChange(tab.id)}
@@ -395,7 +489,7 @@ const GuardianNotificationsPage = () => {
               <div key={i} className="animate-pulse bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 h-24" />
             ))}
           </div>
-        ) : combinedNotifications.length === 0 ? (
+        ) : !hasNotifications ? (
           <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 border-dashed">
             <div className="w-16 h-16 bg-gray-50 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
               <Bell className="w-8 h-8 text-gray-400 dark:text-gray-500" />
@@ -412,6 +506,16 @@ const GuardianNotificationsPage = () => {
                 My Children
               </Link>
             </div>
+          </div>
+        ) : !hasFilteredNotifications ? (
+          <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 border-dashed">
+            <div className="w-16 h-16 bg-gray-50 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Search className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">No notifications match the active filters</h3>
+            <p className="text-gray-500 dark:text-gray-400 mt-1 max-w-sm mx-auto">
+              Try another category or search keyword to find a different notification.
+            </p>
           </div>
         ) : (
           <div className="space-y-6">

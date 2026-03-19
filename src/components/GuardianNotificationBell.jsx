@@ -27,6 +27,10 @@ import {
 } from "lucide-react";
 import guardianNotificationService from "../services/guardianNotificationService";
 import { useAuth } from "../contexts/AuthContext";
+import {
+  isExternalNotificationUrl,
+  resolveNotificationActionUrl,
+} from "../utils/notificationRouting";
 
 // Notification type icons and colors
 const NOTIFICATION_TYPE_CONFIG = {
@@ -232,29 +236,21 @@ const GuardianNotificationBell = () => {
   const handleNotificationClick = (notification) => {
     setIsOpen(false);
 
-    // Navigate to relevant page based on notification type and action URL
-    if (notification.action_url) {
-      navigate(notification.action_url);
-    } else {
-      // Default navigation based on notification type
-      switch (notification.notification_type) {
-        case "appointment_reminder":
-        case "appointment_status":
-          navigate("/guardian/appointments");
-          break;
-        case "vaccination_reminder":
-          navigate("/guardian/vaccination-records");
-          break;
-        case "health_alert":
-          navigate("/guardian/children");
-          break;
-        case "new_message":
-          navigate("/guardian/messages");
-          break;
-        default:
-          navigate("/guardian/notifications");
-      }
+    const targetUrl = resolveNotificationActionUrl(notification, {
+      isGuardian: true,
+    });
+
+    if (!targetUrl) {
+      navigate("/guardian/notifications");
+      return;
     }
+
+    if (isExternalNotificationUrl(targetUrl)) {
+      window.location.assign(targetUrl);
+      return;
+    }
+
+    navigate(targetUrl);
   };
 
   // Toggle dropdown

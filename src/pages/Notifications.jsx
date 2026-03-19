@@ -1,31 +1,17 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Card, Button, PageHeader } from "../components/UI";
 import apiClient from "../utils/api";
 import { useAuth } from "../contexts/AuthContext";
 import guardianNotificationService from "../services/guardianNotificationService";
 import { Bell } from "lucide-react";
-
-const CATEGORY_META = {
-  appointment: { label: "Appointments", icon: "📅" },
-  vaccination_schedule: { label: "Vaccination Schedules", icon: "💉" },
-  missed_schedule: { label: "Missed Schedules", icon: "⏰" },
-  inventory_low_stock: { label: "Low Vaccine Stock", icon: "📦" },
-  inventory_out_of_stock: { label: "Out-of-Stock Vaccines", icon: "🚨" },
-  guardian_registration: { label: "Guardian Registrations", icon: "👨‍👩‍👧" },
-  infant_registration: { label: "Infant Registrations", icon: "👶" },
-  report: { label: "Reports", icon: "📊" },
-  system_announcement: { label: "System Announcements", icon: "📢" },
-  outbound_message_failed: { label: "Failed Outbound Messages", icon: "📵" },
-  general: { label: "General", icon: "🔔" },
-};
-
-const CATEGORY_FILTER_OPTIONS = [
-  { value: "all", label: "All categories" },
-  ...Object.entries(CATEGORY_META)
-    .filter(([value]) => value !== "general")
-    .map(([value, meta]) => ({ value, label: meta.label })),
-  { value: "general", label: "General" },
-];
+import {
+  CATEGORY_FILTER_OPTIONS,
+  CATEGORY_META,
+  isExternalNotificationUrl,
+  resolveNotificationActionUrl as deriveNotificationActionUrl,
+  resolveNotificationCategory as resolveNotificationCategoryKey,
+} from "../utils/notificationRouting";
 
 const SEVERITY_META = {
   critical: {
@@ -101,6 +87,19 @@ const STATUS_FILTER_OPTIONS = [
   { value: "delivered", label: "Delivered" },
   { value: "failed", label: "Failed" },
 ];
+
+const CATEGORY_FILTER_VALUES = new Set(
+  CATEGORY_FILTER_OPTIONS.map((option) => option.value),
+);
+const SEVERITY_FILTER_VALUES = new Set(
+  SEVERITY_FILTER_OPTIONS.map((option) => option.value),
+);
+const STATUS_FILTER_VALUES = new Set(
+  STATUS_FILTER_OPTIONS.map((option) => option.value),
+);
+
+const getAllowedFilterValue = (value, allowedValues) =>
+  allowedValues.has(value) ? value : "all";
 
 const toLowerValue = (value) =>
   typeof value === "string" ? value.toLowerCase() : "";
@@ -302,13 +301,7 @@ const inferCategoryFromText = (text) => {
 };
 
 const resolveCategory = (raw, text) => {
-  const explicit =
-    mapExplicitCategory(raw?.category) ||
-    mapExplicitCategory(raw?.notification_type) ||
-    mapExplicitCategory(raw?.event_type) ||
-    mapExplicitCategory(raw?.type);
-
-  return explicit || inferCategoryFromText(text);
+  return resolveNotificationCategoryKey(raw, { sourceText: text });
 };
 
 const parseTimestamp = (raw) => {
@@ -446,15 +439,7 @@ const resolveStatus = (raw, isRead, text) => {
 };
 
 const resolveActionUrl = (raw) => {
-  const value =
-    raw?.action_url || raw?.actionUrl || raw?.target_url || raw?.url || raw?.link;
-
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
+  return deriveNotificationActionUrl(raw, { isGuardian: false });
 };
 
 const normalizeNotificationRecord = (raw, index) => {
@@ -606,16 +591,41 @@ const formatAbsoluteTimestamp = (date) =>
 
 const Notifications = () => {
   const { isGuardian } = useAuth();
+  const [searchParams] = useSearchParams();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const [markingItemIds, setMarkingItemIds] = useState([]);
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [severityFilter, setSeverityFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState(() =>
+    getAllowedFilterValue(
+      searchParams.get("category"),
+      CATEGORY_FILTER_VALUES,
+    ),
+  );
+  const [severityFilter, setSeverityFilter] = useState(() =>
+    getAllowedFilterValue(
+      searchParams.get("severity"),
+      SEVERITY_FILTER_VALUES,
+    ),
+  );
+  const [statusFilter, setStatusFilter] = useState(() =>
+    getAllowedFilterValue(searchParams.get("status"), STATUS_FILTER_VALUES),
+  );
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  useEffect(() => {
+    setCategoryFilter(
+      getAllowedFilterValue(searchParams.get("category"), CATEGORY_FILTER_VALUES),
+    );
+    setSeverityFilter(
+      getAllowedFilterValue(searchParams.get("severity"), SEVERITY_FILTER_VALUES),
+    );
+    setStatusFilter(
+      getAllowedFilterValue(searchParams.get("status"), STATUS_FILTER_VALUES),
+    );
+  }, [searchParams]);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -786,7 +796,6 @@ const Notifications = () => {
   }, [filteredNotifications]);
 
   const hasData = adaptedNotifications.length > 0;
-  const isExternalUrl = (value) => /^https?:\/\//i.test(value);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
@@ -1148,24 +1157,24 @@ const Notifications = () => {
                                     </Button>
                                   )}
 
-                                  {notification.actionUrl && (
-                                    <a
-                                      href={notification.actionUrl}
-                                      target={
-                                        isExternalUrl(notification.actionUrl)
-                                          ? "_blank"
-                                          : undefined
-                                      }
-                                      rel={
-                                        isExternalUrl(notification.actionUrl)
-                                          ? "noreferrer"
-                                          : undefined
-                                      }
-                                      className="inline-flex h-9 items-center rounded-lg border border-violet-200 bg-violet-50 px-3 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-100 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-200 dark:hover:bg-violet-500/20"
-                                    >
-                                      Open Source
-                                    </a>
-                                  )}
+                                  {notification.actionUrl &&
+                                    (isExternalNotificationUrl(notification.actionUrl) ? (
+                                      <a
+                                        href={notification.actionUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex h-9 items-center rounded-lg border border-violet-200 bg-violet-50 px-3 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-100 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-200 dark:hover:bg-violet-500/20"
+                                      >
+                                        Open Module
+                                      </a>
+                                    ) : (
+                                      <Link
+                                        to={notification.actionUrl}
+                                        className="inline-flex h-9 items-center rounded-lg border border-violet-200 bg-violet-50 px-3 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-100 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-200 dark:hover:bg-violet-500/20"
+                                      >
+                                        Open Module
+                                      </Link>
+                                    ))}
                                 </div>
                               </div>
                             </div>

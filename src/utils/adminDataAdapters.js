@@ -250,6 +250,7 @@ export const normalizeVaccine = (row = {}) => {
     code: row.code ?? row.vaccine_code ?? "",
     doses_required: toNumber(row.doses_required ?? row.total_doses, 1),
     manufacturer: row.manufacturer ?? null,
+    allowed_brands: Array.isArray(row.allowed_brands) ? row.allowed_brands : [],
     current_stock: currentStock,
     stock_on_hand: toNumber(row.stock_on_hand, currentStock),
     low_stock_threshold: lowStockThreshold,

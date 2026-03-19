@@ -17,6 +17,7 @@ jest.mock("../utils/api", () => ({
   __esModule: true,
   default: {
     getFacilityInfo: jest.fn(),
+    getVaccineInventory: jest.fn(),
     createVaccineInventoryTransaction: jest.fn(),
   },
 }));
@@ -125,6 +126,7 @@ describe("Inventory Management readability, CSV export, and print behavior", () 
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useRealTimers();
     localStorage.clear();
     sessionStorage.clear();
 
@@ -134,6 +136,7 @@ describe("Inventory Management readability, CSV export, and print behavior", () 
       city: "Test City",
       barangay: "Test Barangay",
     });
+    apiClient.getVaccineInventory.mockResolvedValue([]);
   });
 
   test("shows expanded inventory headers and bold vaccine names without layout changes", async () => {
@@ -201,10 +204,11 @@ describe("Inventory Management readability, CSV export, and print behavior", () 
     const lines = csvText.split("\n");
 
     expect(lines[0]).toMatch(/IMMUNICARE HEALTH CENTER - VACCINE INVENTORY/i);
-    expect(lines[1]).toMatch(/^Report Date:/i);
-    expect(lines[2]).toMatch(/^Generated:/i);
+    expect(lines[1]).toMatch(/Barangay San Nicolas, Pasig City/i);
+    expect(lines[2]).toMatch(/^Report Date:/i);
+    expect(lines[3]).toMatch(/^Generated:/i);
 
-    const headerLine = lines[4];
+    const headerLine = lines[5];
     expect(headerLine).toContain("A");
     expect(headerLine).toContain("ITEMS");
     expect(headerLine).toContain("B Beginning Balance");
@@ -216,7 +220,7 @@ describe("Inventory Management readability, CSV export, and print behavior", () 
     expect(headerLine).toContain("H Issued");
     expect(headerLine).toContain("I+J Stock On Hand");
 
-    const dataRows = lines.slice(5);
+    const dataRows = lines.slice(6);
     expect(dataRows[0]).toMatch(/^1,BCG,/);
     expect(dataRows[dataRows.length - 1]).toContain("TOTAL");
 
@@ -281,7 +285,7 @@ describe("Inventory Management readability, CSV export, and print behavior", () 
     });
 
     const bcgDiluentRow = screenRows.find(
-      (row) => within(row).queryByText("BCG, Diluent") !== null,
+      (row) => within(row).queryByText("Diluent") !== null,
     );
     const bcgDiluentInputs = within(bcgDiluentRow).getAllByRole("spinbutton");
     fireEvent.change(bcgDiluentInputs[0], { target: { value: "5" } });
