@@ -400,7 +400,7 @@ export default function InventoryManagement() {
   const vaccineItems = useMemo(
     () =>
       APPROVED_VACCINE_NAMES
-        .filter((name) => !name.toLowerCase().includes("diluent 5ml"))
+        .filter((name) => !name.toLowerCase().includes("diluent 5ml") && name !== "Diluent")
         .map((name) => ({
           id: name.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
           name,
