@@ -1,59 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { useAuth } from '../../contexts/AuthContext';
+import React, { useState } from 'react';
+import apiClient from '../../utils/api';
+import { APPROVED_VACCINE_NAMES } from '../../constants/approvedVaccines';
+import {
+  buildTransferCaseVaccinesPayload,
+  createTransferVaccineEntry,
+  validateTransferHistoryEntries,
+} from '../../utils/transferCasePayloads';
 
 const TransferVaccinationHistory = ({ infantId, infantName, onClose, onSuccess }) => {
-  const { token } = useAuth();
-  const [vaccines, setVaccines] = useState([]);
-  const [vaccineList, setVaccineList] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [validationResults, setValidationResults] = useState(null);
   const [sourceFacility, setSourceFacility] = useState('');
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  const vaccineList = APPROVED_VACCINE_NAMES.map((name) => ({
+    id: name,
+    name,
+  }));
 
   // Initial vaccine entry
   const [vaccineEntries, setVaccineEntries] = useState([
-    {
-      id: 1,
-      vaccineName: '',
-      doseNumber: 1,
-      dateAdministered: '',
-      facilityName: '',
-      batchNumber: '',
-    },
+    createTransferVaccineEntry(1),
   ]);
-
-  useEffect(() => {
-    fetchVaccines();
-  }, []);
-
-  const fetchVaccines = async () => {
-    try {
-      const response = await axios.get('/api/vaccination-transfer/vaccines', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.data.success) {
-        setVaccineList(response.data.data);
-      }
-    } catch (err) {
-      console.error('Error fetching vaccines:', err);
-    }
-  };
 
   const addVaccineEntry = () => {
     const newId = Math.max(...vaccineEntries.map((v) => v.id), 0) + 1;
-    setVaccineEntries([
-      ...vaccineEntries,
-      {
-        id: newId,
-        vaccineName: '',
-        doseNumber: 1,
-        dateAdministered: '',
-        facilityName: '',
-        batchNumber: '',
-      },
-    ]);
+    setVaccineEntries([...vaccineEntries, createTransferVaccineEntry(newId, sourceFacility)]);
   };
 
   const removeVaccineEntry = (id) => {
@@ -86,96 +58,67 @@ const TransferVaccinationHistory = ({ infantId, infantName, onClose, onSuccess }
   };
 
   const validateVaccines = async () => {
-    setLoading(true);
     setError('');
-    setValidationResults(null);
+    setSuccessMessage('');
 
-    try {
-      const response = await axios.post(
-        '/api/vaccination-transfer/validate',
-        {
-          infantId,
-          vaccines: vaccineEntries.map((v) => ({
-            vaccineName: v.vaccineName,
-            doseNumber: v.doseNumber,
-            dateAdministered: v.dateAdministered,
-            facilityName: v.facilityName,
-            batchNumber: v.batchNumber,
-          })),
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (response.data.success) {
-        setValidationResults(response.data.data);
-      } else {
-        setError(response.data.error || 'Validation failed');
-      }
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to validate vaccines');
-    } finally {
-      setLoading(false);
+    if (!String(sourceFacility || '').trim()) {
+      setError('Health facility name is required before submitting a transfer case.');
+      return false;
     }
+
+    const validationResult = validateTransferHistoryEntries(vaccineEntries);
+    if (!validationResult.isValid) {
+      setError(validationResult.errors[0]);
+      return false;
+    }
+
+    return true;
   };
 
   const submitVaccines = async () => {
-    setSubmitting(true);
-    setError('');
-
     try {
-      // Filter only valid vaccines
-      const validVaccines = validationResults.validationResults
-        .filter((v) => v.status === 'valid')
-        .map((v) => ({
-          vaccineName: v.vaccineName,
-          doseNumber: v.doseNumber,
-          dateAdministered: v.dateAdministered,
-          facilityName: v.facilityName,
-          batchNumber: v.batchNumber,
-        }));
-
-      if (validVaccines.length === 0) {
-        setError('No valid vaccines to import');
-        setSubmitting(false);
+      const isLocallyValid = await validateVaccines();
+      if (!isLocallyValid) {
         return;
       }
 
-      const response = await axios.post(
-        '/api/vaccination-transfer/import',
-        {
-          infantId,
-          vaccines: validVaccines,
-          sourceFacility,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      setSubmitting(true);
+      setError('');
+      setSuccessMessage('');
+
+      const submittedVaccines = buildTransferCaseVaccinesPayload(
+        vaccineEntries,
+        sourceFacility,
       );
 
-      if (response.data.success) {
+      const response = await apiClient.createTransferInCase({
+        infant_id: infantId,
+        source_facility: sourceFacility,
+        submitted_vaccines: submittedVaccines,
+        vaccination_card_url: null,
+        remarks: null,
+      });
+
+      if (response.success) {
+        const transferMessage =
+          response.message ||
+          'Transfer vaccination history submitted successfully for admin review.';
+
+        setSuccessMessage(transferMessage);
+
         if (onSuccess) {
-          onSuccess(response.data.data);
+          onSuccess(response.data);
         }
-        // Reset form
+
         setVaccineEntries([
-          {
-            id: 1,
-            vaccineName: '',
-            doseNumber: 1,
-            dateAdministered: '',
-            facilityName: '',
-            batchNumber: '',
-          },
+          createTransferVaccineEntry(1),
         ]);
         setSourceFacility('');
-        setValidationResults(null);
       } else {
-        setError(response.data.error || 'Import failed');
+        setError(response.error || 'Transfer case submission failed');
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to import vaccines');
+      setError(err.message || 'Failed to submit transfer case');
     } finally {
       setSubmitting(false);
     }
@@ -209,19 +152,6 @@ const TransferVaccinationHistory = ({ infantId, infantName, onClose, onSuccess }
       setSourceFacility(draft.sourceFacility || '');
       setVaccineEntries(draft.vaccines || []);
     }
-  };
-
-  const getStatusBadge = (status) => {
-    const badges = {
-      valid: 'bg-green-100 text-green-800',
-      duplicate: 'bg-yellow-100 text-yellow-800',
-      invalid_date: 'bg-red-100 text-red-800',
-      future_date: 'bg-red-100 text-red-800',
-      before_birth: 'bg-red-100 text-red-800',
-      unknown_vaccine: 'bg-red-100 text-red-800',
-      invalid_dose: 'bg-red-100 text-red-800',
-    };
-    return badges[status] || 'bg-gray-100 text-gray-800';
   };
 
   return (
@@ -262,6 +192,12 @@ const TransferVaccinationHistory = ({ infantId, infantName, onClose, onSuccess }
           {error && (
             <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
               {error}
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
+              {successMessage}
             </div>
           )}
 
@@ -422,51 +358,11 @@ const TransferVaccinationHistory = ({ infantId, infantName, onClose, onSuccess }
             ))}
           </div>
 
-          {/* Validation Results */}
-          {validationResults && (
-            <div className="mb-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Validation Results
-              </h3>
-              <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 mb-4">
-                <div className="flex gap-4 text-sm">
-                  <span className="font-medium">
-                    Total: {validationResults.summary.total}
-                  </span>
-                  <span className="text-green-600">
-                    Valid: {validationResults.summary.valid}
-                  </span>
-                  <span className="text-red-600">
-                    Invalid: {validationResults.summary.invalid}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                {validationResults.validationResults.map((result, index) => (
-                  <div
-                    key={index}
-                    className={`p-3 rounded-lg border ${getStatusBadge(result.status)}`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <span className="font-medium">{result.vaccineName}</span>
-                        <span className="text-sm ml-2">
-                          Dose {result.doseNumber} - {result.dateAdministered}
-                        </span>
-                      </div>
-                      <span className="text-sm font-medium uppercase">
-                        {result.status.replace('_', ' ')}
-                      </span>
-                    </div>
-                    {result.message && (
-                      <p className="text-sm mt-1">{result.message}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+            Enter each previously administered dose with the exact administered date.
+            Submission now creates a transfer-in case for admin review instead of importing
+            vaccines directly into the official record.
+          </div>
         </div>
 
         {/* Footer */}
@@ -481,36 +377,14 @@ const TransferVaccinationHistory = ({ infantId, infantName, onClose, onSuccess }
           </button>
 
           <div className="flex gap-3">
-            {!validationResults ? (
-              <button
-                type="button"
-                onClick={validateVaccines}
-                disabled={loading || !sourceFacility}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-              >
-                {loading ? 'Validating...' : 'Validate'}
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setValidationResults(null)}
-                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-                >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  onClick={submitVaccines}
-                  disabled={submitting || validationResults.summary.valid === 0}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
-                >
-                  {submitting
-                    ? 'Importing...'
-                    : `Import ${validationResults.summary.valid} Valid Vaccines`}
-                </button>
-              </>
-            )}
+            <button
+              type="button"
+              onClick={submitVaccines}
+              disabled={submitting}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+            >
+              {submitting ? 'Submitting...' : 'Submit Transfer Case'}
+            </button>
           </div>
         </div>
       </div>

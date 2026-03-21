@@ -246,6 +246,64 @@ export default function InfantPersonalRecord({
 
         <form onSubmit={handleSubmit}>
           <div className="p-6 space-y-6">
+            <div className="border-b border-gray-200 dark:border-gray-700 pb-6">
+              <h4 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4">
+                WORKFLOW STATUS
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    TRANSFER STATUS
+                  </label>
+                  <p className="text-gray-900 dark:text-gray-100">
+                    {infant.latest_transfer_case_status || infant.validation_status || "Not started"}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    TRANSFER SOURCE
+                  </label>
+                  <p className="text-gray-900 dark:text-gray-100">
+                    {infant.latest_transfer_source_facility || "Not specified"}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    COMPLETED DOSES
+                  </label>
+                  <p className="text-gray-900 dark:text-gray-100">
+                    {Number(infant.completed_vaccinations || 0)}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    PENDING DOSES
+                  </label>
+                  <p className="text-gray-900 dark:text-gray-100">
+                    {Number(infant.pending_vaccinations || 0)}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    IMPORTED HISTORY
+                  </label>
+                  <p className="text-gray-900 dark:text-gray-100">
+                    {Number(infant.imported_vaccinations || 0)}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    LAST TRANSFER UPDATE
+                  </label>
+                  <p className="text-gray-900 dark:text-gray-100">
+                    {infant.latest_transfer_case_updated_at
+                      ? new Date(infant.latest_transfer_case_updated_at).toLocaleString()
+                      : "No transfer updates"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Personal Information Section */}
             <div className="border-b border-gray-200 dark:border-gray-700 pb-6">
               <h4 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4">

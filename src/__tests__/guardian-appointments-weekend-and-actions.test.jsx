@@ -104,7 +104,10 @@ jest.mock("../utils/api", () => ({
     getAppointmentCalendarAvailability: jest.fn(),
     getAppointmentDateDetails: jest.fn(),
     checkAppointmentAvailability: jest.fn(),
+    getAppointmentSuggestions: jest.fn(),
+    getAppointmentTimeSlots: jest.fn(),
     getInfantsByGuardian: jest.fn(),
+    getVaccinationReadiness: jest.fn(),
     getVaccines: jest.fn(),
     createAppointment: jest.fn(),
     updateAppointment: jest.fn(),
@@ -235,6 +238,51 @@ describe("Guardian appointments weekend blocking and action order", () => {
     apiClient.checkAppointmentAvailability.mockResolvedValue({
       available: true,
       message: "Available",
+    });
+
+    apiClient.getVaccinationReadiness.mockResolvedValue({
+      success: true,
+      data: {
+        readinessStatus: "READY",
+        dueVaccines: [
+          {
+            vaccineId: 11,
+            label: "BCG (Dose 1)",
+            earliestDate: "2030-03-04",
+            recommendedDate: "2030-03-04",
+          },
+        ],
+        overdueVaccines: [],
+        blockedVaccines: [],
+        nextAppointmentPrediction: {
+          date: "2030-03-04",
+          reason: "Earliest safe date for next eligible dose",
+        },
+      },
+    });
+
+    apiClient.getAppointmentSuggestions.mockResolvedValue({
+      success: true,
+      data: {
+        suggestions: [
+          {
+            infant_id: 1,
+            infant_name: "John Doe",
+            date: "2030-03-04",
+            time: "09:00",
+            vaccineId: 11,
+            vaccine: "BCG (Dose 1)",
+            reason: "Earliest clinic slot that meets schedule and stock rules",
+            isOverdue: false,
+          },
+        ],
+      },
+    });
+
+    apiClient.getAppointmentTimeSlots.mockResolvedValue({
+      available: true,
+      message: "Available",
+      slots: ["09:00", "09:30"],
     });
 
     apiClient.createAppointment.mockResolvedValue({ id: 1001 });
@@ -375,5 +423,53 @@ describe("Guardian appointments weekend blocking and action order", () => {
 
     expect(buttons[0]).toHaveTextContent(/book appointment/i);
     expect(buttons[1]).toHaveTextContent(/cancel/i);
+  });
+
+  test("booking page submits a vaccine-aware appointment from smart suggestions", async () => {
+    render(
+      <MemoryRouter>
+        <GuardianAppointmentBooking />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /john doe/i }));
+
+    await waitFor(() => {
+      expect(apiClient.getVaccinationReadiness).toHaveBeenCalledWith(1);
+    });
+
+    await waitFor(() => {
+      expect(apiClient.getAppointmentSuggestions).toHaveBeenCalledWith(
+        expect.objectContaining({ infantId: 1, guardianId: 1 }),
+      );
+    });
+
+    expect(await screen.findByText(/recommended vaccine/i)).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /bcg \(dose 1\)/i }),
+    );
+
+    await waitFor(() => {
+      expect(apiClient.getAppointmentTimeSlots).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scheduled_date: "2030-03-04",
+          vaccine_id: "11",
+        }),
+      );
+    });
+
+    fireEvent.click(screen.getByTestId("guardian-booking-page-submit-btn"));
+
+    await waitFor(() => {
+      expect(apiClient.createAppointment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          infant_id: 1,
+          vaccine_id: 11,
+          type: "Vaccination",
+          scheduled_date: "2030-03-04T09:00:00",
+        }),
+      );
+    });
   });
 });

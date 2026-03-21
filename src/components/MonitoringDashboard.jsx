@@ -3,13 +3,14 @@ import {
   Button,
   Input,
   Card,
-  LoadingSpinner,
   EmptyState,
   SkeletonCard,
 } from "./UI";
 import apiClient from "../utils/api";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function MonitoringDashboard({ onRefresh }) {
+  const { hasPermission, isAdmin, isAdminOrSuperAdmin, user } = useAuth();
   const [monitoringData, setMonitoringData] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,8 +22,17 @@ export default function MonitoringDashboard({ onRefresh }) {
       .split("T")[0],
     end_date: new Date().toISOString().split("T")[0],
   });
+  const canAccessMonitoring = hasPermission("dashboard:analytics");
 
   const fetchData = useCallback(async () => {
+    if (!canAccessMonitoring) {
+      setLoading(false);
+      setMonitoringData(null);
+      setAlerts([]);
+      setAlertsError(null);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -56,9 +66,8 @@ export default function MonitoringDashboard({ onRefresh }) {
       } else {
         const errorResponse = alertsResponse.reason?.response;
         if (errorResponse?.status === 403) {
-          // Alerts require elevated permissions - this is expected for some users
           setAlertsError(
-            "Access to alerts requires admin, nurse, or doctor permissions",
+            "Access to monitoring alerts requires analytics permission.",
           );
           setAlerts([]);
         } else {
@@ -71,7 +80,7 @@ export default function MonitoringDashboard({ onRefresh }) {
     } finally {
       setLoading(false);
     }
-  }, [timeRange]);
+  }, [canAccessMonitoring, timeRange]);
 
   useEffect(() => {
     fetchData();
@@ -101,6 +110,16 @@ export default function MonitoringDashboard({ onRefresh }) {
         return "bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-200";
     }
   };
+
+  if (!canAccessMonitoring) {
+    return (
+      <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          You do not have permission to access monitoring analytics.
+        </p>
+      </div>
+    );
+  }
 
   if (loading && !monitoringData) {
     return (

@@ -23,7 +23,6 @@ export default function PaperConfiguration({ onRefresh }) {
     description: "",
     template_type: "VACCINE_SCHEDULE",
     fields: [],
-    validation_rules: {},
   });
 
   useEffect(() => {
@@ -49,7 +48,6 @@ export default function PaperConfiguration({ onRefresh }) {
       description: "",
       template_type: "VACCINE_SCHEDULE",
       fields: [],
-      validation_rules: {},
     });
     setShowModal(true);
   };
@@ -61,7 +59,6 @@ export default function PaperConfiguration({ onRefresh }) {
       description: template.description || "",
       template_type: template.template_type || "VACCINE_SCHEDULE",
       fields: template.fields || [],
-      validation_rules: template.validation_rules || {},
     });
     setShowModal(true);
   };
@@ -402,30 +399,6 @@ export default function PaperConfiguration({ onRefresh }) {
                 </Card>
               ))}
             </div>
-          </div>
-
-          {/* Validation Rules */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Validation Rules (JSON)
-            </label>
-            <textarea
-              value={JSON.stringify(templateForm.validation_rules, null, 2)}
-              onChange={(e) => {
-                try {
-                  const parsed = JSON.parse(e.target.value);
-                  setTemplateForm({
-                    ...templateForm,
-                    validation_rules: parsed,
-                  });
-                } catch (err) {
-                  // Invalid JSON, keep current value
-                }
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 font-mono text-sm"
-              rows={4}
-              placeholder='{"required_fields": ["field1", "field2"]}'
-            />
           </div>
         </form>
       </Modal>

@@ -425,16 +425,14 @@ export default function ImmunizationChartDownload({
             <div className="col">
               <span className="font-bold">ADDRESS:</span>{" "}
               <span className="underline">
-                {displayInfant?.address || "__________"}
+                {displayInfant?.address || ""}
               </span>
             </div>
           </div>
           <div className="row">
             <div className="col">
               <span className="font-bold">DATE OF BIRTH:</span>{" "}
-              <span className="underline">
                 {formatDate(displayInfant?.dob)}
-              </span>
             </div>
             <div className="col">
               <span className="font-bold">BIRTH WEIGHT:</span>{" "}
@@ -544,62 +542,112 @@ export default function ImmunizationChartDownload({
             const visitDate = getVisitDate(visit.age);
             const visitVaccines = getVaccinesForVisit(visit.age);
             const growthData = getGrowthForVisit(visit.age);
+            const showBreastfeeding = [
+              "6 WEEKS",
+              "10 WEEKS",
+              "14 WEEKS",
+              "6 MONTHS",
+            ].includes(visit.age);
+            const showTcb = visit.age !== "12 MONTHS";
+            const breastfeedingValue =
+              growthData?.feeding_status === "breastfeeding"
+                ? "Y"
+                : growthData?.feeding_status === "not_breastfeeding"
+                  ? "N"
+                  : "____";
+            const remarksText = visitVaccines[0]?.notes || "__________";
 
             return (
               <div
                 key={visit.age}
                 className="visit-record mb-4 border border-gray-300 p-4"
+                style={{ border: "1px solid #d1d5db", padding: "16px", marginBottom: "16px" }}
               >
-                <div className="flex justify-between items-center mb-2">
-                  <div className="font-bold">{visit.title}</div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    gap: "16px",
+                    marginBottom: "12px",
+                    paddingBottom: "8px",
+                    borderBottom: "1px solid #d1d5db",
+                  }}
+                >
                   <div>
+                    <div
+                      style={{
+                        fontSize: "16px",
+                        fontWeight: 700,
+                        textDecoration: "underline",
+                        lineHeight: 1.1,
+                      }}
+                    >
+                      {visit.title}
+                    </div>
+                  </div>
+
+                  <div style={{ minWidth: "120px", textAlign: "right" }}>
                     <span className="font-bold">DATE:</span>{" "}
                     <span className="underline">{formatDate(visitDate)}</span>
                   </div>
                 </div>
 
-                <div className="row">
-                  {/* Vital Signs */}
-                  <div className="col w-1/2 pr-4">
-                    <div className="font-bold mb-1">VITAL SIGNS</div>
-                    <div className="vital-signs">
-                      <div>
-                        <span className="font-bold">HR:</span>{" "}
-                        {growthData?.heart_rate || "____"} bpm
-                      </div>
-                      <div>
-                        <span className="font-bold">RR:</span>{" "}
-                        {growthData?.respiratory_rate || "____"} rpm
-                      </div>
-                      <div>
-                        <span className="font-bold">Temp:</span>{" "}
-                        {growthData?.temperature_celsius || "____"}°C
-                      </div>
-                      <div>
-                        <span className="font-bold">HT:</span>{" "}
-                        {growthData?.length_cm || "____"} cm
-                      </div>
-                      <div>
-                        <span className="font-bold">WT:</span>{" "}
-                        {growthData?.weight_kg || "____"} kg
-                      </div>
-                      <div>
+                <div
+                  className="row"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                    gap: "16px",
+                    alignItems: "start",
+                  }}
+                >
+                  <div className="col w-1/2 pr-4" style={{ padding: 0 }}>
+                    <div className="font-bold mb-1">VISIT DETAILS</div>
+
+                    {showBreastfeeding && (
+                      <div style={{ marginBottom: "8px" }}>
                         <span className="font-bold">BREASTFEEDING:</span>{" "}
-                        {growthData?.feeding_status === "breastfeeding"
-                          ? "Y"
-                          : growthData?.feeding_status === "not_breastfeeding"
-                            ? "N"
-                            : "____"}
+                        <span>{breastfeedingValue}</span>
                       </div>
-                      <div>
-                        <span className="font-bold">TCB:</span> ____
+                    )}
+
+                    {showTcb && (
+                      <div style={{ marginBottom: "8px" }}>
+                        <span className="font-bold">TCB:</span>{" "}
+                        <span
+                          className="underline"
+                          style={{
+                            width: "118px",
+                            minWidth: "118px",
+                            maxWidth: "118px",
+                          }}
+                        >
+                          ____
+                        </span>
                       </div>
+                    )}
+
+                    <div style={{ marginTop: "8px" }}>
+                      <span className="font-bold">Others/Remarks:</span>{" "}
+                      <span
+                        className="underline"
+                        style={{
+                          width: "154px",
+                          minWidth: "154px",
+                          maxWidth: "154px",
+                          whiteSpace: "normal",
+                          verticalAlign: "bottom",
+                          lineHeight: "1.2",
+                        }}
+                      >
+                        {remarksText}
+                      </span>
                     </div>
                   </div>
 
-                    {/* Vaccines */}
-                    <div className="col w-1/2 pl-4">
-                      <div className="font-bold mb-1">VACCINES</div>
+                  <div className="col w-1/2 pl-4" style={{ padding: 0 }}>
+                    <div className="font-bold mb-1">VACCINES</div>
                     {visit.vaccines.length === 0 ? (
                       <div className="vaccine-row">
                         <span>No approved vaccine scheduled</span>
@@ -624,10 +672,6 @@ export default function ImmunizationChartDownload({
                         </div>
                       ))
                     )}
-                    <div className="mt-2">
-                      <span className="font-bold">Others/Remarks:</span>{" "}
-                      {visitVaccines[0]?.notes || "__________"}
-                    </div>
                   </div>
                 </div>
               </div>

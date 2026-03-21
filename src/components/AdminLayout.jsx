@@ -9,7 +9,7 @@ const AdminLayout = memo(({ children }) => {
 
   return (
     <div className={darkMode ? "dark" : ""}>
-      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex transition-colors">
+      <div className="flex h-[100dvh] min-h-screen overflow-hidden bg-gray-100 transition-colors dark:bg-gray-900">
         {/* Sidebar - Stays persistent across all pages */}
         <Sidebar
           isOpen={sidebarOpen}
@@ -19,7 +19,7 @@ const AdminLayout = memo(({ children }) => {
         />
 
         {/* Main Content - Changes based on route */}
-        <main className="flex-1 overflow-auto transition-all duration-300">
+        <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden transition-all duration-300">
           {children}
         </main>
       </div>

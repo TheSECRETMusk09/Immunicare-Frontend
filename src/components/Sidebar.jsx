@@ -2,6 +2,7 @@ import React, { useState, useEffect, memo, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { usePrefetchDashboard } from "../hooks/useCachedData";
+import { adminRoutePaths } from "../utils/routePaths";
 import AdminHeader from "./UI/AdminHeader";
 import {
   LayoutDashboard,
@@ -15,6 +16,8 @@ import {
   Megaphone,
   Bell,
   Settings,
+  FileText,
+  ArrowRightLeft,
   ChevronDown,
   ChevronRight,
   Building2,
@@ -65,6 +68,7 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
     { name: "Vaccinations", icon: Syringe },
     { name: "Inventory", icon: Package },
     { name: "Appointments", icon: Calendar },
+    { name: "Digital Papers", icon: FileText },
     { name: "Reports", icon: ClipboardList },
     { name: "Announcements", icon: Megaphone },
     { name: "Notifications", icon: Bell },
@@ -96,17 +100,19 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
   // Route mapping for sidebar items
   const getRoutePath = (itemName, subItemName) => {
     const routeMap = {
-      Dashboard: "/dashboard",
-      Analytics: "/analytics",
-      "User Management": "/users",
-      "Infant Management": "/infants",
-      Vaccinations: "/vaccination-management",
-      Inventory: "/inventory",
-      Appointments: "/appointments",
-      Reports: "/reports",
-      Announcements: "/announcements",
-      Notifications: "/notifications",
-      Settings: "/settings",
+      Dashboard: adminRoutePaths.dashboard,
+      Analytics: adminRoutePaths.analytics,
+      "User Management": adminRoutePaths.users,
+      "Infant Management": adminRoutePaths.infants,
+      Vaccinations: adminRoutePaths.vaccinations,
+      "Transfer-In Cases": adminRoutePaths.transferInCases,
+      Inventory: adminRoutePaths.inventory,
+      Appointments: adminRoutePaths.appointments,
+      "Digital Papers": adminRoutePaths.digitalPapers,
+      Reports: adminRoutePaths.reports,
+      Announcements: adminRoutePaths.announcements,
+      Notifications: adminRoutePaths.notifications,
+      Settings: adminRoutePaths.settings,
     };
 
     if (subItemName) {
@@ -127,10 +133,12 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
     // Check paths
     if (path.includes("/inventory")) return "Inventory";
     if (path.includes("/vaccination-management")) return "Vaccinations";
+    if (path.includes("/transfer-in-cases")) return "Transfer-In Cases";
     if (path.includes("/users")) return "User Management";
     if (path.includes("/infants")) return "Infant Management";
     if (path.includes("/analytics")) return "Analytics";
     if (path.includes("/appointments")) return "Appointments";
+    if (path.includes("/digital-papers")) return "Digital Papers";
     if (path.includes("/reports")) return "Reports";
     if (path.includes("/announcements")) return "Announcements";
     if (path.includes("/notifications")) return "Notifications";

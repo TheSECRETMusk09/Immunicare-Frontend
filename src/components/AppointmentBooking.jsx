@@ -79,8 +79,15 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
       setSuggestionError(null);
 
       try {
-        const response = await apiClient.getAppointmentSuggestions(infantId);
-        setSuggestedSlots(response.data || []);
+        const response = await apiClient.getAppointmentSuggestions({ infantId });
+        const payload = response?.data || response;
+        setSuggestedSlots(
+          Array.isArray(payload?.suggestions)
+            ? payload.suggestions
+            : Array.isArray(payload)
+              ? payload
+              : [],
+        );
       } catch (err) {
         setSuggestionError(err.message || 'Failed to load suggested appointments');
         setSuggestedSlots([]);
@@ -125,14 +132,11 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
         status: "scheduled",
       };
 
-      // Here you would call your API to book the appointment
-      // await apiClient.createAppointment(appointmentData);
+      // Execute the actual API call
+      const response = await apiClient.createAppointment(appointmentData);
 
-      // For now, simulate success
-      setTimeout(() => {
-        setLoading(false);
-        onAppointmentBooked && onAppointmentBooked(appointmentData);
-      }, 1000);
+      setLoading(false);
+      if (onAppointmentBooked) onAppointmentBooked(response.data || appointmentData);
     } catch (err) {
       setError(err.message);
       setLoading(false);

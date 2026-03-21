@@ -129,8 +129,14 @@ export default function UserManagement() {
   const {
     resetUserPassword,
   } = useUserPasswords();
-  const { isAdmin, isSuperAdmin, user } = useAuth();
+  const { isAdmin, isSuperAdmin, user, hasPermission, permissionCapabilities } = useAuth();
   const { success, error: notifyError, warning } = useNotification();
+
+  const canCreateUsers = hasPermission("user:create");
+  const canUpdateUsers = hasPermission("user:update");
+  const canDeleteUsers = hasPermission("user:delete");
+  const canUseAdminOverrides =
+    hasPermission("admin:override") || permissionCapabilities?.canUseAdminOverrides;
 
   // Get current user ID for self-protection checks
   const currentUserId = user?.id;
@@ -1517,7 +1523,7 @@ export default function UserManagement() {
         icon="👥"
         actions={
           <div className="flex gap-2">
-            {activeTab === "admins" && isSuperAdmin && (
+            {activeTab === "admins" && isSuperAdmin && canCreateUsers && (
               <Button
                 onClick={handleAddAdmin}
                 variant="primary"
@@ -1528,7 +1534,7 @@ export default function UserManagement() {
                 Add New Admin
               </Button>
             )}
-            {activeTab === "system" && isAdmin && (
+            {activeTab === "system" && isAdmin && canCreateUsers && (
               <Button
                 onClick={() => handleAddUser("system")}
                 variant="primary"
@@ -1539,7 +1545,7 @@ export default function UserManagement() {
                 Add New Staff
               </Button>
             )}
-            {activeTab === "guardians" && (
+            {activeTab === "guardians" && canCreateUsers && (
               <Button
                 onClick={() => handleAddUser("guardians")}
                 variant="primary"
@@ -1575,7 +1581,7 @@ export default function UserManagement() {
           <nav className="flex space-x-2 overflow-x-auto">
             <button
             onClick={() => handleTabChange("system")}
-            className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
+            className={`px-4 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 whitespace-nowrap ${
               activeTab === "system"
                 ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
                 : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
@@ -1587,7 +1593,7 @@ export default function UserManagement() {
           </button>
             <button
             onClick={() => handleTabChange("admins")}
-            className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
+            className={`px-4 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 whitespace-nowrap ${
               activeTab === "admins"
                 ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
                 : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
@@ -1599,7 +1605,7 @@ export default function UserManagement() {
 
           <button
             onClick={() => handleTabChange("guardians")}
-            className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
+            className={`px-4 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 whitespace-nowrap ${
               activeTab === "guardians"
                 ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
                 : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
@@ -2282,7 +2288,21 @@ export default function UserManagement() {
                         required
                         options={[
                           { value: "", label: "Select a role" },
-                          ...roles.map((role) => ({
+                        ...roles
+                          .filter((role) => {
+                            const excludedRoles = [
+                              "inventory_manager",
+                              "dentist",
+                              "nutritionist",
+                              "system_admin",
+                              "super_admin",
+                              "admin",
+                              "administrator",
+                              "healthcare_worker"
+                            ];
+                            return !excludedRoles.includes(role.name.toLowerCase());
+                          })
+                          .map((role) => ({
                             value: role.id.toString(),
                             label: role.display_name || role.name,
                           })),

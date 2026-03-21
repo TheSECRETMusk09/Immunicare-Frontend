@@ -4,6 +4,7 @@ import {
   Card,
   Input,
   Modal,
+  Select,
   PageHeader,
   EmptyState,
   SkeletonTable,
@@ -22,9 +23,16 @@ import {
   normalizeVaccinesResponse,
   normalizeVaccineInventoryResponse,
   normalizeVaccinationRecordResponse,
+  buildNextDueVaccinationOptions,
+  buildFefoBatchOptions,
   computeVaccinationComplianceSummary,
 } from "../utils/adminDataAdapters";
 import { isApprovedVaccineName } from "../constants/approvedVaccines";
+import {
+  buildHealthWorkerOptions,
+  buildVaccinationBatchOptionLabel,
+  resolveLotBatchValue,
+} from "../utils/vaccinationFormOptions";
 
 const pollingIntervalMs = 60000;
 
@@ -36,8 +44,9 @@ const DEFAULT_FORM = {
   admin_date: "",
   next_due_date: "",
   administered_by: "",
-  batch_number: "",
-  lot_number: "",
+  batch_id: "",
+  inventory_record_id: "",
+  lot_batch_number: "",
   status: "completed",
   notes: "",
 };
@@ -55,6 +64,10 @@ const VaccinationsDashboard = () => {
   const [infants, setInfants] = useState([]);
   const [vaccines, setVaccines] = useState([]);
   const [inventoryRecords, setInventoryRecords] = useState([]);
+  const [healthWorkerUsers, setHealthWorkerUsers] = useState([]);
+  const [vaccinationBatchOptions, setVaccinationBatchOptions] = useState([]);
+  const [vaccinationBatchOptionsLoading, setVaccinationBatchOptionsLoading] = useState(false);
+  const [vaccinationBatchOptionsError, setVaccinationBatchOptionsError] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -93,7 +106,7 @@ const VaccinationsDashboard = () => {
 
         setError(null);
 
-        const [recordsData, schedulesData, infantsData, vaccinesData, inventoryData] =
+        const [recordsData, schedulesData, infantsData, vaccinesData, inventoryData, systemUsersData] =
           await Promise.all([
             apiClient.getVaccinationRecords(),
             apiClient.getVaccinationSchedules(),
@@ -102,6 +115,7 @@ const VaccinationsDashboard = () => {
             apiClient.getVaccineInventory(
               scopedClinicId ? { clinic_id: scopedClinicId } : {},
             ),
+            apiClient.getSystemUsers({ limit: 100, roles: "nurse,midwife" }).catch(() => ({ data: [] })),
           ]);
 
         const normalizedRecords = normalizeVaccinationRecordsResponse(recordsData);
@@ -110,12 +124,17 @@ const VaccinationsDashboard = () => {
         const normalizedInfants = normalizeInfantsResponse(infantsData);
         const normalizedVaccines = normalizeVaccinesResponse(vaccinesData);
         const normalizedInventory = normalizeVaccineInventoryResponse(inventoryData);
+        const normalizedHealthWorkers = buildHealthWorkerOptions(
+          systemUsersData,
+          scopedClinicId,
+        );
 
         setVaccinationRecords(normalizedRecords);
         setVaccinationSchedules(normalizedSchedules);
         setInfants(normalizedInfants);
         setVaccines(normalizedVaccines);
         setInventoryRecords(normalizedInventory);
+        setHealthWorkerUsers(normalizedHealthWorkers);
 
         if (selectedInfantId) {
           const exists = normalizedInfants.some((entry) => entry.id === selectedInfantId);
@@ -130,6 +149,7 @@ const VaccinationsDashboard = () => {
         setInfants([]);
         setVaccines([]);
         setInventoryRecords([]);
+        setHealthWorkerUsers([]);
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -161,6 +181,7 @@ const VaccinationsDashboard = () => {
     setVaccinationForm({
       ...DEFAULT_FORM,
       admin_date: new Date().toISOString().split("T")[0],
+      administered_by: defaultAdministeredBy,
       status: "completed",
     });
     setShowAddModal(true);
@@ -176,9 +197,12 @@ const VaccinationsDashboard = () => {
       next_due_date: record.next_due_date
         ? String(record.next_due_date).slice(0, 10)
         : "",
-      administered_by: record.administered_by_name || "",
-      batch_number: record.batch_number || "",
-      lot_number: record.lot_number || "",
+      administered_by: record.administered_by ? String(record.administered_by) : "",
+      batch_id: record.batch_id ? String(record.batch_id) : "",
+      inventory_record_id: "",
+      lot_batch_number:
+        resolveLotBatchValue(record.lot_batch_number, record.batch_number, record.lot_number) ||
+        "",
       status: record.status || "pending",
       notes: record.notes || "",
     });
@@ -192,16 +216,58 @@ const VaccinationsDashboard = () => {
       setSaving(true);
       setError(null);
 
-        const payload = {
-          patient_id: Number(vaccinationForm.infant_id),
-          vaccine_id: Number(vaccinationForm.vaccine_id),
-          dose_no: Number(vaccinationForm.dose_no || 1),
-          admin_date: vaccinationForm.admin_date || null,
-          next_due_date: vaccinationForm.next_due_date || null,
-          administered_by: vaccinationForm.administered_by || null,
-          notes: vaccinationForm.notes || null,
-          status: vaccinationForm.status || "pending",
-        };
+      const isCreateFlow = !vaccinationForm.id;
+      const administeredByValue = Number(vaccinationForm.administered_by);
+      const administeredById =
+        Number.isFinite(administeredByValue) && administeredByValue > 0
+          ? administeredByValue
+          : null;
+      const batchIdValue = Number(vaccinationForm.batch_id);
+      const selectedBatchId =
+        Number.isFinite(batchIdValue) && batchIdValue > 0 ? batchIdValue : null;
+      const lotBatchValue = resolveLotBatchValue(
+        vaccinationForm.lot_batch_number,
+        selectedBatchOption?.lot_batch_number,
+        selectedInventoryRecord?.lot_batch_number,
+      );
+
+      if (isCreateFlow && !administeredById) {
+        throw new Error("Please select a Nurse or Midwife in the Administered By dropdown.");
+      }
+
+      if (isCreateFlow && !selectedBatchId) {
+        throw new Error("Please select a valid FEFO batch source.");
+      }
+
+      if (isCreateFlow && !vaccinationForm.inventory_record_id) {
+        throw new Error(
+          "The selected FEFO batch is not linked to an inventory sheet record. Update Inventory Management first.",
+        );
+      }
+
+      if (isCreateFlow && !lotBatchValue) {
+        throw new Error("The selected inventory source does not have a Lot / Batch number.");
+      }
+
+      const payload = {
+        patient_id: Number(vaccinationForm.infant_id),
+        vaccine_id: Number(vaccinationForm.vaccine_id),
+        dose_no: Number(vaccinationForm.dose_no || 1),
+        admin_date: vaccinationForm.admin_date || null,
+        next_due_date: vaccinationForm.next_due_date || null,
+        notes: vaccinationForm.notes || null,
+        status: vaccinationForm.status || "pending",
+        ...(administeredById ? { administered_by: administeredById } : {}),
+        ...(isCreateFlow && lotBatchValue
+          ? {
+              batch_id: selectedBatchId,
+              vaccine_inventory_id: Number(vaccinationForm.inventory_record_id) || null,
+              lot_batch_number: lotBatchValue,
+              lot_number: lotBatchValue,
+              batch_number: lotBatchValue,
+            }
+          : {}),
+      };
 
       if (vaccinationForm.id) {
         setMutationInFlight(true);
@@ -212,8 +278,37 @@ const VaccinationsDashboard = () => {
         );
       } else {
         setMutationInFlight(true);
-        const created = await apiClient.createVaccinationRecord(payload);
-        const normalizedCreated = normalizeVaccinationRecordResponse(created);
+        let normalizedCreated;
+
+        if (typeof apiClient.recordVaccinationWithInventory === "function") {
+          const response = await apiClient.recordVaccinationWithInventory(payload);
+          normalizedCreated = normalizeVaccinationRecordResponse(
+            response?.vaccination || response?.data?.vaccination || response,
+          );
+        } else {
+          const createdRecord = await apiClient.createVaccinationRecord(payload);
+          normalizedCreated = normalizeVaccinationRecordResponse(createdRecord);
+
+          if (Number(vaccinationForm.inventory_record_id)) {
+            await apiClient.createVaccineInventoryTransaction({
+              vaccine_inventory_id: Number(vaccinationForm.inventory_record_id),
+              vaccine_id: Number(vaccinationForm.vaccine_id),
+              clinic_id: selectedInventoryRecord?.clinic_id
+                ? Number(selectedInventoryRecord.clinic_id)
+                : undefined,
+              transaction_type: "ISSUE",
+              quantity: 1,
+              lot_batch_number: lotBatchValue,
+              reference_number: normalizedCreated?.id
+                ? `VAC-${normalizedCreated.id}`
+                : null,
+              notes: normalizedCreated?.id
+                ? `Vaccination record ${normalizedCreated.id} administered to infant ID ${vaccinationForm.infant_id}`
+                : `Vaccination administered to infant ID ${vaccinationForm.infant_id}`,
+            });
+          }
+        }
+
         setVaccinationRecords((prev) => [normalizedCreated, ...prev]);
       }
 
@@ -380,6 +475,252 @@ const VaccinationsDashboard = () => {
     );
   }, [inventoryRecords, scopedClinicId, vaccines]);
 
+  const selectedBatchOption = useMemo(
+    () =>
+      vaccinationBatchOptions.find(
+        (option) => String(option.batch_id) === String(vaccinationForm.batch_id || ""),
+      ) || null,
+    [vaccinationBatchOptions, vaccinationForm.batch_id],
+  );
+
+  const selectedInventoryRecord = useMemo(
+    () =>
+      inventoryRecords.find(
+        (record) => record.id === Number(vaccinationForm.inventory_record_id),
+      ) || null,
+    [inventoryRecords, vaccinationForm.inventory_record_id],
+  );
+
+  const defaultAdministeredBy = useMemo(() => {
+    const currentUserId = Number(user?.id || 0) || null;
+    if (!currentUserId) return "";
+
+    return healthWorkerUsers.some((entry) => Number(entry.id) === currentUserId)
+      ? String(currentUserId)
+      : "";
+  }, [healthWorkerUsers, user?.id]);
+
+  const selectedInfantForForm = useMemo(
+    () =>
+      infants.find(
+        (infant) => infant.id === Number(vaccinationForm.infant_id || 0),
+      ) || null,
+    [infants, vaccinationForm.infant_id],
+  );
+
+  const vaccinationFormInfantRecords = useMemo(
+    () =>
+      vaccinationRecords.filter(
+        (record) => record.infant_id === Number(vaccinationForm.infant_id || 0),
+      ),
+    [vaccinationRecords, vaccinationForm.infant_id],
+  );
+
+  const nextDueOptionsForSelectedInfant = useMemo(
+    () =>
+      buildNextDueVaccinationOptions({
+        schedules: approvedVaccinationSchedules,
+        records: vaccinationFormInfantRecords,
+        infantDob: selectedInfantForForm?.dob,
+      }),
+    [
+      approvedVaccinationSchedules,
+      selectedInfantForForm?.dob,
+      vaccinationFormInfantRecords,
+    ],
+  );
+
+  const nextDueOptionByVaccineId = useMemo(
+    () =>
+      new Map(
+        nextDueOptionsForSelectedInfant.map((entry) => [
+          Number(entry.vaccine_id),
+          entry,
+        ]),
+      ),
+    [nextDueOptionsForSelectedInfant],
+  );
+
+  const availableVaccinesForSelectedInfant = useMemo(() => {
+    if (!vaccinationForm.infant_id) {
+      return availableVaccinesForClinic;
+    }
+
+    return availableVaccinesForClinic.filter((vaccine) =>
+      nextDueOptionByVaccineId.has(Number(vaccine.id)),
+    );
+  }, [availableVaccinesForClinic, nextDueOptionByVaccineId, vaccinationForm.infant_id]);
+
+  const selectedNextDueOption = useMemo(
+    () => nextDueOptionByVaccineId.get(Number(vaccinationForm.vaccine_id || 0)) || null,
+    [nextDueOptionByVaccineId, vaccinationForm.vaccine_id],
+  );
+
+  const healthWorkerSelectOptions = useMemo(
+    () => [
+      {
+        value: "",
+        label: healthWorkerUsers.length
+          ? "Select Nurse or Midwife"
+          : "No Nurse or Midwife users available",
+      },
+      ...healthWorkerUsers.map((entry) => ({
+        value: String(entry.id),
+        label: entry.optionLabel,
+      })),
+    ],
+    [healthWorkerUsers],
+  );
+
+  const batchSourceSelectOptions = useMemo(
+    () => [
+      {
+        value: "",
+        label: vaccinationBatchOptionsLoading
+          ? "Loading valid FEFO batch sources..."
+          : vaccinationBatchOptions.length
+            ? "Select FEFO batch source"
+            : "No valid FEFO batch source available for this vaccine",
+      },
+      ...vaccinationBatchOptions.map((record) => ({
+        value: String(record.batch_id),
+        label: buildVaccinationBatchOptionLabel(record),
+        disabled: record.selection_disabled,
+      })),
+    ],
+    [vaccinationBatchOptions, vaccinationBatchOptionsLoading],
+  );
+
+  useEffect(() => {
+    if (!showAddModal || vaccinationForm.id || vaccinationForm.administered_by || !defaultAdministeredBy) {
+      return;
+    }
+
+    setVaccinationForm((prev) => ({
+      ...prev,
+      administered_by: defaultAdministeredBy,
+    }));
+  }, [defaultAdministeredBy, showAddModal, vaccinationForm.administered_by, vaccinationForm.id]);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    if (!showAddModal || vaccinationForm.id || !vaccinationForm.vaccine_id) {
+      setVaccinationBatchOptions([]);
+      setVaccinationBatchOptionsError(null);
+      setVaccinationBatchOptionsLoading(false);
+      return () => {
+        isCurrent = false;
+      };
+    }
+
+    setVaccinationBatchOptionsLoading(true);
+    setVaccinationBatchOptionsError(null);
+
+    apiClient
+      .getVaccineInventoryStatus(Number(vaccinationForm.vaccine_id))
+      .then((response) => {
+        if (!isCurrent) return;
+
+        setVaccinationBatchOptions(
+          buildFefoBatchOptions({
+            batches: response,
+            inventoryRecords,
+            vaccineId: vaccinationForm.vaccine_id,
+            clinicId: scopedClinicId,
+          }),
+        );
+      })
+      .catch((err) => {
+        if (!isCurrent) return;
+
+        setVaccinationBatchOptions([]);
+        setVaccinationBatchOptionsError(
+          err.message || "Failed to load FEFO batch inventory for the selected vaccine.",
+        );
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setVaccinationBatchOptionsLoading(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [
+    inventoryRecords,
+    scopedClinicId,
+    showAddModal,
+    vaccinationForm.id,
+    vaccinationForm.vaccine_id,
+  ]);
+
+  useEffect(() => {
+    if (!showAddModal || vaccinationForm.id || !vaccinationForm.vaccine_id) {
+      return;
+    }
+
+    if (!vaccinationBatchOptions.length) {
+      if (
+        vaccinationForm.batch_id ||
+        vaccinationForm.inventory_record_id ||
+        vaccinationForm.lot_batch_number
+      ) {
+        setVaccinationForm((prev) => ({
+          ...prev,
+          batch_id: "",
+          inventory_record_id: "",
+          lot_batch_number: "",
+        }));
+      }
+      return;
+    }
+
+    const matchingSelectedOption = vaccinationBatchOptions.find(
+      (option) =>
+        String(option.batch_id) === String(vaccinationForm.batch_id || "") &&
+        !option.selection_disabled,
+    );
+
+    const nextSelectedOption =
+      matchingSelectedOption ||
+      vaccinationBatchOptions.find((option) => !option.selection_disabled) ||
+      null;
+
+    const nextBatchId = nextSelectedOption ? String(nextSelectedOption.batch_id) : "";
+    const nextInventoryRecordId = nextSelectedOption?.matched_inventory_record_id
+      ? String(nextSelectedOption.matched_inventory_record_id)
+      : "";
+    const nextLotBatchValue = resolveLotBatchValue(
+      nextSelectedOption?.lot_batch_number,
+      nextSelectedOption?.matched_inventory_record?.lot_batch_number,
+    );
+
+    if (
+      String(vaccinationForm.batch_id || "") === nextBatchId &&
+      String(vaccinationForm.inventory_record_id || "") === nextInventoryRecordId &&
+      String(vaccinationForm.lot_batch_number || "") === nextLotBatchValue
+    ) {
+      return;
+    }
+
+    setVaccinationForm((prev) => ({
+      ...prev,
+      batch_id: nextBatchId,
+      inventory_record_id: nextInventoryRecordId,
+      lot_batch_number: nextLotBatchValue,
+    }));
+  }, [
+    showAddModal,
+    vaccinationBatchOptions,
+    vaccinationForm.batch_id,
+    vaccinationForm.id,
+    vaccinationForm.inventory_record_id,
+    vaccinationForm.lot_batch_number,
+    vaccinationForm.vaccine_id,
+  ]);
+
   if (loading && vaccinationRecords.length === 0) {
     return (
       <div className="space-y-8 p-6">
@@ -418,10 +759,10 @@ const VaccinationsDashboard = () => {
         </Alert>
       )}
 
-      {/* Tab Navigation */}
-      <div className="flex-shrink-0 bg-white dark:bg-gray-900">
-        <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-3">
-          <nav className="flex space-x-2 overflow-x-auto">
+      {/* Tab Navigation and Controls */}
+      <div className="flex-shrink-0 z-20 bg-white dark:bg-gray-900">
+        <div className="border-b border-gray-200 dark:border-gray-700 flex flex-col xl:flex-row xl:items-center justify-between px-4 py-3 gap-4">
+          <nav className="flex space-x-2 overflow-x-auto pb-2 xl:pb-0">
             {[
               { key: "records", label: "💉 Vaccination Records" },
               { key: "tracking", label: "📊 Vaccination Tracking" },
@@ -430,7 +771,7 @@ const VaccinationsDashboard = () => {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
+                className={`px-4 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 whitespace-nowrap ${
                   activeTab === tab.key
                     ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
@@ -440,86 +781,42 @@ const VaccinationsDashboard = () => {
               </button>
             ))}
           </nav>
-        </div>
-      </div>
 
-      {/* Filter Controls */}
-      <div className="flex-shrink-0 z-10 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4 flex flex-col sm:flex-row justify-between gap-4 items-start sm:items-center">
-        <div className="w-full sm:max-w-md relative">
-          <Input
-            placeholder="Search vaccinations..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            icon={Search}
-          />
-        </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          {refreshing && (
-            <span className="text-xs text-gray-500 dark:text-gray-400">Refreshing...</span>
-          )}
-          {mutationInFlight && (
-            <span className="text-xs text-primary-600 dark:text-primary-400">
-              Syncing latest changes...
-            </span>
-          )}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => void fetchData({ silent: true })}
-            disabled={refreshing}
-            title="Refresh vaccinations"
-          >
-            <span className="mr-1">🔄</span> {refreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
-          {isAdmin && (
-            <Button onClick={handleAddVaccination} size="sm">
-              <span className="mr-1">➕</span> Add
-            </Button>
-          )}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              const headers = [
-                "Child Name",
-                "Vaccine",
-                "Dose",
-                "Date Administered",
-                "Next Due Date",
-                "Status",
-              ];
-
-              const rows = filteredRecords.map((record) => {
-                const { infant, vaccine } = findRecordWithRelations(record);
-                return [
-                  infant ? `${infant.first_name} ${infant.last_name}` : "Unknown",
-                  vaccine?.name || record.vaccine_name || "Unknown Vaccine",
-                  `Dose ${record.dose_no || record.dose_number || 1}`,
-                  record.admin_date
-                    ? new Date(record.admin_date).toLocaleDateString()
-                    : "Not administered",
-                  record.next_due_date
-                    ? new Date(record.next_due_date).toLocaleDateString()
-                    : "N/A",
-                  record.status || (record.admin_date ? "completed" : "pending"),
-                ];
-              });
-
-              const csv = [
-                headers.join(","),
-                ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-              ].join("\n");
-              const blob = new Blob([csv], { type: "text/csv" });
-              const url = URL.createObjectURL(blob);
-              const link = document.createElement("a");
-              link.href = url;
-              link.download = "vaccinations_export.csv";
-              link.click();
-              URL.revokeObjectURL(url);
-            }}
-          >
-            <span className="mr-2">📄</span> Export Data
-          </Button>
+          <div className="flex flex-wrap items-center gap-3 pb-3 xl:pb-0">
+            <div className="w-full sm:w-64 relative flex-shrink-0">
+              <Input
+                placeholder="Search vaccinations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                icon={Search}
+                containerClassName="mb-0"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2 items-center">
+              {refreshing && (
+                <span className="text-xs text-gray-500 dark:text-gray-400 hidden md:inline-block">Refreshing...</span>
+              )}
+              {mutationInFlight && (
+                <span className="text-xs text-primary-600 dark:text-primary-400 hidden md:inline-block">
+                  Syncing latest changes...
+                </span>
+              )}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => void fetchData({ silent: true })}
+                disabled={refreshing}
+                title="Refresh vaccinations"
+              >
+                <span className="mr-1">🔄</span> {refreshing ? 'Refreshing...' : 'Refresh'}
+              </Button>
+              {isAdmin && (
+                <Button onClick={handleAddVaccination} size="sm">
+                  <span className="mr-1">➕</span> Add
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -919,7 +1216,12 @@ const VaccinationsDashboard = () => {
             <Button type="button" variant="cancel" onClick={() => setShowAddModal(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" form="addVaccinationForm" disabled={saving}>
+            <Button
+              type="submit"
+              variant="primary"
+              form="addVaccinationForm"
+              disabled={saving || healthWorkerUsers.length === 0 || vaccinationBatchOptionsLoading}
+            >
               {saving ? "Saving..." : "Save Record"}
             </Button>
           </AdminModalActions>
@@ -935,7 +1237,12 @@ const VaccinationsDashboard = () => {
                   onChange={(e) =>
                     setVaccinationForm((prev) => ({
                       ...prev,
-                      infant_id: Number(e.target.value),
+                      infant_id: e.target.value ? Number(e.target.value) : "",
+                      vaccine_id: "",
+                      dose_no: 1,
+                      batch_id: "",
+                      inventory_record_id: "",
+                      lot_batch_number: "",
                     }))
                   }
                   className="admin-select"
@@ -954,26 +1261,34 @@ const VaccinationsDashboard = () => {
                 <label className="admin-field-label required">Vaccine</label>
                 <select
                   value={vaccinationForm.vaccine_id}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const nextVaccineId = e.target.value ? Number(e.target.value) : "";
+                    const nextDueOption = nextDueOptionByVaccineId.get(Number(nextVaccineId));
                     setVaccinationForm((prev) => ({
                       ...prev,
-                      vaccine_id: Number(e.target.value),
-                    }))
-                  }
+                      vaccine_id: nextVaccineId,
+                      dose_no: nextDueOption?.dose_number || 1,
+                      batch_id: "",
+                      inventory_record_id: "",
+                      lot_batch_number: "",
+                    }));
+                  }}
                   className="admin-select"
                   required
                 >
                   <option value="">Select Vaccine</option>
-                  {availableVaccinesForClinic.map((vaccine) => (
+                  {availableVaccinesForSelectedInfant.map((vaccine) => (
                     <option key={vaccine.id} value={vaccine.id}>
                       {vaccine.name}
                       {vaccine.code ? ` (${vaccine.code})` : ""}
                     </option>
                   ))}
                 </select>
-                {vaccinationForm.vaccine_id === "" && availableVaccinesForClinic.length === 0 && (
+                {vaccinationForm.vaccine_id === "" && availableVaccinesForSelectedInfant.length === 0 && (
                   <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
-                    No available vaccine stock was found for Barangay San Nicolas Health Center.
+                    {vaccinationForm.infant_id
+                      ? "This child has no pending dose options available from the current schedule."
+                      : "No available vaccine stock was found for Barangay San Nicolas Health Center."}
                   </p>
                 )}
               </div>
@@ -994,7 +1309,16 @@ const VaccinationsDashboard = () => {
                   }))
                 }
                 required
+                disabled={Boolean(selectedNextDueOption)}
               />
+              {selectedNextDueOption && (
+                <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">
+                  Next pending scheduled dose selected automatically: dose {selectedNextDueOption.dose_number}
+                  {selectedNextDueOption.due_date
+                    ? ` • due ${new Date(selectedNextDueOption.due_date).toLocaleDateString()}`
+                    : ""}
+                </p>
+              )}
             </div>
             <div className="admin-field-group">
               <Input
@@ -1027,7 +1351,7 @@ const VaccinationsDashboard = () => {
 
           <div className="admin-form-row-2">
             <div className="admin-field-group">
-              <Input
+              <Select
                 label="Administered By"
                 value={vaccinationForm.administered_by}
                 onChange={(e) =>
@@ -1036,33 +1360,85 @@ const VaccinationsDashboard = () => {
                     administered_by: e.target.value,
                   }))
                 }
-                placeholder="Name or identifier"
+                options={healthWorkerSelectOptions}
+                required
               />
+              {!healthWorkerUsers.length && (
+                <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                  No active Nurse or Midwife users were found for this facility.
+                </p>
+              )}
+            </div>
+            <div className="admin-field-group">
+              <Select
+                label="Batch Source (FEFO)"
+                value={vaccinationForm.batch_id}
+                onChange={(e) =>
+                  setVaccinationForm((prev) => {
+                    const selectedBatchId = e.target.value;
+                    const batchOption = vaccinationBatchOptions.find(
+                      (record) => record.batch_id === Number(selectedBatchId),
+                    );
+
+                    return {
+                      ...prev,
+                      batch_id: selectedBatchId,
+                      inventory_record_id: batchOption?.matched_inventory_record_id
+                        ? String(batchOption.matched_inventory_record_id)
+                        : "",
+                      lot_batch_number: resolveLotBatchValue(
+                        batchOption?.lot_batch_number,
+                        batchOption?.matched_inventory_record?.lot_batch_number,
+                      ),
+                    };
+                  })
+                }
+                options={batchSourceSelectOptions}
+                required
+              />
+              {vaccinationBatchOptionsLoading && vaccinationForm.vaccine_id && (
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  Loading FEFO-eligible batch sources for the selected vaccine...
+                </p>
+              )}
+              {vaccinationBatchOptionsError && vaccinationForm.vaccine_id && (
+                <p className="mt-2 text-xs text-red-700 dark:text-red-300">
+                  {vaccinationBatchOptionsError}
+                </p>
+              )}
+              {!vaccinationBatchOptionsLoading &&
+                !vaccinationBatchOptionsError &&
+                !vaccinationBatchOptions.length &&
+                vaccinationForm.vaccine_id && (
+                <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                  No non-expired FEFO batch with available stock was found for the selected vaccine.
+                </p>
+              )}
+              {!vaccinationBatchOptionsLoading &&
+                vaccinationBatchOptions.length > 0 &&
+                vaccinationBatchOptions.every((option) => option.selection_disabled) && (
+                  <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                    Valid batches were found, but none are linked to an inventory sheet record.
+                    Update Inventory Management before recording this vaccination.
+                  </p>
+                )}
+              {selectedBatchOption?.is_fefo_recommended && !selectedBatchOption?.selection_disabled && (
+                <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">
+                  FEFO recommended batch selected automatically to use the earliest valid expiry first.
+                </p>
+              )}
+              {selectedBatchOption?.is_expiring_soon && (
+                <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                  Selected batch expires soon on {new Date(selectedBatchOption.expiry_date).toLocaleDateString()}.
+                </p>
+              )}
             </div>
             <div className="admin-field-group">
               <Input
-                label="Batch Number"
-                value={vaccinationForm.batch_number}
-                onChange={(e) =>
-                  setVaccinationForm((prev) => ({
-                    ...prev,
-                    batch_number: e.target.value,
-                  }))
-                }
-                placeholder="Batch number"
-              />
-            </div>
-            <div className="admin-field-group">
-              <Input
-                label="Lot Number"
-                value={vaccinationForm.lot_number}
-                onChange={(e) =>
-                  setVaccinationForm((prev) => ({
-                    ...prev,
-                    lot_number: e.target.value,
-                  }))
-                }
-                placeholder="Lot number"
+                label="Lot / Batch Number"
+                value={vaccinationForm.lot_batch_number}
+                placeholder="Auto-filled from selected inventory source"
+                disabled
               />
             </div>
           </div>

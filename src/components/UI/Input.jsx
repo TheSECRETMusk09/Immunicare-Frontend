@@ -27,6 +27,7 @@ const Input = ({
   id,
   required = false,
   type = "text",
+  textarea = false,
   ...props
 }) => {
   const [internalShowPassword, setInternalShowPassword] = useState(false);
@@ -63,6 +64,23 @@ const Input = ({
     return `${basePadding} px-3 sm:px-4`;
   };
 
+  const inputClasses = `
+    w-full rounded-lg border transition-all duration-200
+    ${getPaddingClass()}
+    /* Mobile-friendly sizing - prevents zoom on iOS */
+    min-h-[48px] sm:min-h-[40px]
+    text-base
+    ${
+      error
+        ? "border-danger-300 bg-danger-50 dark:bg-danger-900/20 dark:border-danger-600 focus:ring-danger-500 focus:border-danger-500"
+        : "border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 focus:ring-primary-500 focus:border-primary-500"
+    }
+    focus:outline-none focus:ring-2 focus:ring-opacity-20
+    disabled:bg-gray-100 dark:disabled:bg-gray-600 disabled:cursor-not-allowed
+    placeholder:text-gray-400 dark:placeholder:text-gray-500
+    ${className}
+  `;
+
   return (
     <div className={`${containerClassName}`}>
       {label && (
@@ -83,35 +101,36 @@ const Input = ({
             <Icon className="h-5 w-5" aria-hidden="true" />
           </div>
         )}
-        <input
-          id={inputId}
-          type={isPassword ? (showPassword ? "text" : "password") : type}
-          className={`
-            w-full rounded-lg border transition-all duration-200
-            ${getPaddingClass()}
-            /* Mobile-friendly sizing - prevents zoom on iOS */
-            min-h-[48px] sm:min-h-[40px]
-            text-base
-            ${
+        {textarea ? (
+          <textarea
+            id={inputId}
+            className={inputClasses}
+            aria-invalid={error ? "true" : "false"}
+            aria-describedby={
               error
-                ? "border-danger-300 bg-danger-50 dark:bg-danger-900/20 dark:border-danger-600 focus:ring-danger-500 focus:border-danger-500"
-                : "border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 focus:ring-primary-500 focus:border-primary-500"
+                ? `${inputId}-error`
+                : helpText
+                  ? `${inputId}-help`
+                  : undefined
             }
-            focus:outline-none focus:ring-2 focus:ring-opacity-20
-            disabled:bg-gray-100 dark:disabled:bg-gray-600 disabled:cursor-not-allowed
-            placeholder:text-gray-400 dark:placeholder:text-gray-500
-            ${className}
-          `}
-          aria-invalid={error ? "true" : "false"}
-          aria-describedby={
-            error
-              ? `${inputId}-error`
-              : helpText
-                ? `${inputId}-help`
-                : undefined
-          }
-          {...props}
-        />
+            {...props}
+          />
+        ) : (
+          <input
+            id={inputId}
+            type={isPassword ? (showPassword ? "text" : "password") : type}
+            className={inputClasses}
+            aria-invalid={error ? "true" : "false"}
+            aria-describedby={
+              error
+                ? `${inputId}-error`
+                : helpText
+                  ? `${inputId}-help`
+                  : undefined
+            }
+            {...props}
+          />
+        )}
         {showPasswordToggle && isPassword && (
           <PasswordToggleButton
             visible={showPassword}

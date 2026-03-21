@@ -16,6 +16,7 @@ const PUBLIC_AUTH_ROUTES = [
 ];
 
 let refreshRequest = null;
+const inFlightGetRequests = new Map();
 
 const getRememberMePreference = () =>
   safeLocalStorage.getItem("rememberMe") === "true";
@@ -180,6 +181,57 @@ const canRetryRequest = (config = {}) => {
   return SAFE_RETRY_METHODS.has(method);
 };
 
+const DEDUPED_REQUEST_METHODS = new Set(["get"]);
+
+const normalizeRequestCacheValue = (value) => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (value instanceof URLSearchParams) {
+    return value.toString();
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizeRequestCacheValue(entry));
+  }
+
+  if (typeof value === "object") {
+    return Object.keys(value)
+      .sort()
+      .reduce((accumulator, key) => {
+        accumulator[key] = normalizeRequestCacheValue(value[key]);
+        return accumulator;
+      }, {});
+  }
+
+  return value;
+};
+
+const buildInFlightRequestKey = (config = {}, baseURL = "") => {
+  const method = String(config.method || "get").toLowerCase();
+
+  if (
+    !DEDUPED_REQUEST_METHODS.has(method) ||
+    config.disableRequestDeduplication === true
+  ) {
+    return null;
+  }
+
+  return JSON.stringify({
+    method,
+    baseURL,
+    url: typeof config.url === "string" ? config.url : "",
+    params: normalizeRequestCacheValue(config.params),
+    data: normalizeRequestCacheValue(config.data),
+    responseType: config.responseType || "json",
+  });
+};
+
 // Configure retry logic - don't retry on 401 Unauthorized
 axiosRetry(axiosClient, {
   retries: 2,
@@ -320,16 +372,46 @@ class ApiClient {
   }
 
   async request(endpoint, options = {}) {
-    try {
-      const response = await this.client.request({
-        url: endpoint,
-        ...options,
-      });
-      return response.data;
-    } catch (error) {
-      console.error("API request failed:", error);
-      throw error;
+    const requestConfig = {
+      url: endpoint,
+      ...options,
+    };
+
+    if (
+      String(endpoint).includes("/reports/generate") ||
+      String(endpoint).includes("/analytics/export") ||
+      String(endpoint).includes("/documents/generate")
+    ) {
+      requestConfig.timeout = 120000;
     }
+
+    const inFlightRequestKey = buildInFlightRequestKey(
+      requestConfig,
+      this.client.defaults.baseURL,
+    );
+
+    if (inFlightRequestKey && inFlightGetRequests.has(inFlightRequestKey)) {
+      return inFlightGetRequests.get(inFlightRequestKey);
+    }
+
+    const responsePromise = this.client
+      .request(requestConfig)
+      .then((response) => response.data)
+      .catch((error) => {
+        console.error("API request failed:", error);
+        throw error;
+      })
+      .finally(() => {
+        if (inFlightRequestKey) {
+          inFlightGetRequests.delete(inFlightRequestKey);
+        }
+      });
+
+    if (inFlightRequestKey) {
+      inFlightGetRequests.set(inFlightRequestKey, responsePromise);
+    }
+
+    return responsePromise;
   }
 
   // Generic HTTP helpers for backward compatibility across service modules
@@ -517,6 +599,10 @@ class ApiClient {
     return this.request(`/dashboard/activity?limit=${limit}`);
   }
 
+  async getInfantActivities(infantId, limit = 10) {
+    return this.request(`/infants/${infantId}/activities?limit=${limit}`);
+  }
+
   async getDashboardInfants() {
     return this.request("/dashboard/infants");
   }
@@ -619,8 +705,17 @@ class ApiClient {
     });
   }
 
-  async getSystemUsers() {
-    return this.request("/users/system-users");
+  async getSystemUsers(params = {}) {
+    const queryParams = new URLSearchParams();
+
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        queryParams.append(key, String(value));
+      }
+    });
+
+    const suffix = queryParams.toString() ? `?${queryParams.toString()}` : "";
+    return this.request(`/users/system-users${suffix}`);
   }
 
   async createSystemUser(userData) {
@@ -697,6 +792,13 @@ class ApiClient {
     });
   }
 
+  async updateInfant(id, infantData) {
+    return this.request(`/infants/${id}`, {
+      method: "PUT",
+      data: infantData,
+    });
+  }
+
   async createGuardianInfant(infantData) {
     return this.request("/infants/guardian", {
       method: "POST",
@@ -723,7 +825,7 @@ class ApiClient {
   }
 
   async updateTransferInCase(id, caseData) {
-    return this.request(`/transfer-in-cases/${id}`, {
+    return this.request(`/transfer-in-cases/${id}/validate`, {
       method: "PUT",
       data: caseData,
     });
@@ -824,6 +926,13 @@ class ApiClient {
     return this.request(`/vaccinations/records/${id}`, {
       method: "PUT",
       data: recordData,
+    });
+  }
+
+  async updateGuardianVaccinationAdminDate(id, admin_date) {
+    return this.request(`/vaccinations/records/${id}/guardian-date`, {
+      method: "PUT",
+      data: { admin_date },
     });
   }
 
@@ -948,8 +1057,26 @@ class ApiClient {
      return this.request(`/vaccinations/inventory-status/${vaccineId}`);
    }
 
-   async getAppointmentSuggestions({ infantId, guardianId = null, clinicId = null }) {
-     // Build query parameters
+   async getAppointmentSuggestions(input, legacyGuardianId = null, legacyClinicId = null) {
+     const normalizedInput =
+       input && typeof input === "object"
+         ? input
+         : {
+             infantId: input,
+             guardianId: legacyGuardianId,
+             clinicId: legacyClinicId,
+           };
+
+     const {
+       infantId,
+       guardianId = null,
+       clinicId = null,
+     } = normalizedInput || {};
+
+     if (!infantId) {
+       throw new Error("infantId is required to load appointment suggestions");
+     }
+
      const params = new URLSearchParams();
      if (guardianId !== null) params.append('guardianId', guardianId);
      if (clinicId !== null) params.append('clinicId', clinicId);

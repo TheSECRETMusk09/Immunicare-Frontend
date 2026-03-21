@@ -14,6 +14,37 @@ const requestApi = (endpoint, options = {}) =>
     ...options,
   });
 
+const normalizeInfantPayloadForAdmin = (data = {}) => {
+  const payload = {
+    ...data,
+  };
+
+  if (
+    Object.prototype.hasOwnProperty.call(payload, "birth_length") &&
+    !Object.prototype.hasOwnProperty.call(payload, "birth_height")
+  ) {
+    payload.birth_height = payload.birth_length;
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(payload, "birthplace") &&
+    !Object.prototype.hasOwnProperty.call(payload, "place_of_birth")
+  ) {
+    payload.place_of_birth = payload.birthplace;
+  }
+
+  if (payload.guardian_id === "") {
+    payload.guardian_id = null;
+  }
+
+  delete payload.birth_length;
+  delete payload.birthplace;
+  delete payload.birth_head_circumference;
+  delete payload.blood_type;
+
+  return payload;
+};
+
 const infantService = {
   /**
    * Get all infants
@@ -71,7 +102,10 @@ const infantService = {
    * @returns {Promise<Object>}
    */
   async create(data) {
-    return handleApiResponse(apiClient.createInfant(data), "Create infant");
+    return handleApiResponse(
+      apiClient.createInfant(normalizeInfantPayloadForAdmin(data)),
+      "Create infant",
+    );
   },
 
   /**
@@ -81,7 +115,10 @@ const infantService = {
    * @returns {Promise<Object>}
    */
   async update(id, data) {
-    return handleApiResponse(apiClient.updateInfant(id, data), "Update infant");
+    return handleApiResponse(
+      apiClient.updateInfant(id, normalizeInfantPayloadForAdmin(data)),
+      "Update infant",
+    );
   },
 
   /**

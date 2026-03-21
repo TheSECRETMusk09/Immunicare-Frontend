@@ -14,6 +14,12 @@ import apiClient, {
   persistStoredUser,
 } from "../utils/api";
 import { normalizeAuthUser } from "../utils/authRedirect";
+import {
+  buildPermissionCapabilities,
+  hasAnyPermission as checkAnyPermission,
+  hasPermission as checkPermission,
+  normalizePermissions,
+} from "../utils/authPermissions";
 
 // Create the AuthContext
 const AuthContext = createContext(null);
@@ -189,11 +195,26 @@ export function AuthProvider({ children }) {
   const isRoleAdmin = normalizedLegacyRole === "admin";
   const isAdminOrSuperAdmin = isSuperAdmin || isRoleAdmin;
   const guardianId = user?.guardian_id || user?.id;
+  const permissions = useMemo(() => normalizePermissions(user?.permissions), [user]);
+  const permissionCapabilities = useMemo(
+    () => buildPermissionCapabilities(permissions),
+    [permissions],
+  );
+  const hasPermission = useCallback(
+    (permission) => checkPermission(permissions, permission),
+    [permissions],
+  );
+  const hasAnyPermission = useCallback(
+    (requiredPermissions) => checkAnyPermission(permissions, requiredPermissions),
+    [permissions],
+  );
 
   // Context value
   const value = useMemo(
     () => ({
       user,
+      permissions,
+      permissionCapabilities,
       loading,
       isAuthenticated,
       isAdmin,
@@ -207,9 +228,13 @@ export function AuthProvider({ children }) {
       updateUser,
       updateUserPasswordStatus,
       hasRole,
+      hasPermission,
+      hasAnyPermission,
     }),
     [
       user,
+      permissions,
+      permissionCapabilities,
       loading,
       isAuthenticated,
       isAdmin,
@@ -223,6 +248,8 @@ export function AuthProvider({ children }) {
       updateUser,
       updateUserPasswordStatus,
       hasRole,
+      hasPermission,
+      hasAnyPermission,
     ],
   );
 

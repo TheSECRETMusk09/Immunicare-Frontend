@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import apiClient from "../utils/api";
 
 /**
  * ChildPhotoUpload Component
@@ -52,18 +53,14 @@ export default function ChildPhotoUpload({
     try {
       setUploading(true);
       const formData = new FormData();
-      formData.append("photo", file);
+      formData.append("file", file); // Must match the backend multer 'file' field
       formData.append("infantId", infantId);
 
-      // For now, simulate upload since backend endpoint may not exist
-      // In production, this would call: apiClient.uploadInfantPhoto(formData)
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const response = await apiClient.uploadInfantPhoto(formData);
+      const photoUrl = response?.data?.downloadUrl || response?.downloadUrl;
 
-      // Simulate successful upload with a mock URL
-      const mockPhotoUrl = `/uploads/infants/infant-${infantId}-${Date.now()}.jpg`;
-
-      if (onPhotoUpdate) {
-        onPhotoUpdate(mockPhotoUrl);
+      if (onPhotoUpdate && photoUrl) {
+        onPhotoUpdate(photoUrl);
       }
     } catch (error) {
       console.error("Error uploading photo:", error);

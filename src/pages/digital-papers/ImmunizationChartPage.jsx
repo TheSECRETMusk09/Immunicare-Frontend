@@ -11,7 +11,7 @@ import {
 import ImmunizationChart from "../../components/ImmunizationChart";
 import InfantPersonalRecord from "../../components/InfantPersonalRecord";
 import apiClient from "../../utils/api";
-import { BarChart3, FileText, Printer, Baby, User } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 
 export default function ImmunizationChartPage() {
   const { infantId } = useParams();
@@ -41,327 +41,6 @@ export default function ImmunizationChartPage() {
     fetchInfant();
   }, [fetchInfant]);
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleDownload = () => {
-    // Create a printable version of the immunization chart
-    const chartContent = document.querySelector(".space-y-6");
-    if (!chartContent) {
-      alert("No content available to download");
-      return;
-    }
-
-    // Create a new window for printing
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      alert("Please allow popups to download the PDF");
-      return;
-    }
-
-    const infantName = infant
-      ? `${infant.first_name} ${infant.last_name}`
-      : "Immunization Chart";
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>${infantName} - Immunization Chart</title>
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding: 20px;
-            color: #1a1a1a;
-            line-height: 1.5;
-          }
-          .header {
-            text-align: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #4f46e5;
-          }
-          .header h1 {
-            color: #4f46e5;
-            font-size: 24px;
-            margin-bottom: 5px;
-          }
-          .header p {
-            color: #666;
-            font-size: 14px;
-          }
-          .infant-info {
-            background: #f3f4f6;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-          }
-          .infant-info-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-            font-size: 13px;
-          }
-          .infant-info-grid div {
-            padding: 5px 0;
-          }
-          .infant-info-grid strong {
-            color: #374151;
-          }
-          .visit-section {
-            margin-bottom: 25px;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            overflow: hidden;
-          }
-          .visit-header {
-            background: #4f46e5;
-            color: white;
-            padding: 12px 15px;
-            font-weight: 600;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-          }
-          .visit-header .date {
-            font-size: 13px;
-            opacity: 0.9;
-          }
-          .visit-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            padding: 15px;
-          }
-          .vital-signs, .vaccines {
-            font-size: 13px;
-          }
-          .vital-signs h5, .vaccines h5 {
-            color: #374151;
-            margin-bottom: 10px;
-            font-size: 14px;
-            border-bottom: 1px solid #e5e7eb;
-            padding-bottom: 5px;
-          }
-          .vital-signs div, .vaccines div {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 0;
-            border-bottom: 1px solid #f3f4f6;
-          }
-          .vital-signs span:last-child, .vaccines span:last-child {
-            font-weight: 500;
-          }
-          .completed { color: #16a34a; }
-          .pending { color: #9ca3af; }
-          .footer {
-            margin-top: 30px;
-            text-align: center;
-            font-size: 12px;
-            color: #666;
-            border-top: 1px solid #e5e7eb;
-            padding-top: 15px;
-          }
-          @media print {
-            body { padding: 0; }
-            .visit-section { break-inside: avoid; }
-          }
-          @media screen {
-            body { background: #f9fafb; }
-            .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>💉 Immunization Chart</h1>
-            <p>San Nicolas Health Center - Child Vaccination Record</p>
-          </div>
-
-          ${
-            infant
-              ? `
-          <div class="infant-info">
-            <div class="infant-info-grid">
-              <div><strong>Name:</strong> ${infant.last_name}, ${infant.first_name}</div>}</div>
-              <div><strong>Date of Birth:</strong> ${new Date(infant.dob).toLocaleDateString()}</div>
-              <div><strong>Sex:</strong> ${infant.sex === "M" ? "Male" : "Female"}</div>
-              <div><strong>Birth Weight:</strong> ${infant.birth_weight || "N/A"} kg</div>
-              <div><strong>Place of Birth:</strong> ${infant.place_of_birth || "N/A"}</div>
-              <div><strong>Mother:</strong> ${infant.mother_name || "N/A"}</div>
-              <div><strong>BCG:</strong> ${infant.bcg === 1 ? "✓ Given" : "○ Not Given"}</div>
-              <div><strong>Hepatitis B:</strong> ${infant.hepb === 1 ? "✓ Given" : "○ Not Given"}</div>
-            </div>
-          </div>
-          `
-              : ""
-          }
-
-          <div class="visit-schedule">
-            <div class="visit-section">
-              <div class="visit-header">
-                <span>6 Weeks Visit</span>
-                <span class="date">PENTA 1, OPV 1, PCV 1</span>
-              </div>
-              <div class="visit-content">
-                <div class="vital-signs">
-                  <h5>VITAL SIGNS</h5>
-                  <div><span>HR (Heart Rate):</span><span>___ bpm</span></div>
-                  <div><span>RR (Respiratory Rate):</span><span>___ rpm</span></div>
-                  <div><span>Temperature:</span><span>___ °C</span></div>
-                  <div><span>Height:</span><span>___ cm</span></div>
-                  <div><span>Weight:</span><span>___ kg</span></div>
-                  <div><span>Breastfeeding:</span><span>Y / N</span></div>
-                </div>
-                <div class="vaccines">
-                  <h5>VACCINES</h5>
-                  <div><span>PENTA 1 / HEXA 1:</span><span class="pending">○</span></div>
-                  <div><span>OPV 1:</span><span class="pending">○</span></div>
-                  <div><span>PCV 1:</span><span class="pending">○</span></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="visit-section">
-              <div class="visit-header">
-                <span>10 Weeks Visit</span>
-                <span class="date">PENTA 2, OPV 2, PCV 2</span>
-              </div>
-              <div class="visit-content">
-                <div class="vital-signs">
-                  <h5>VITAL SIGNS</h5>
-                  <div><span>HR (Heart Rate):</span><span>___ bpm</span></div>
-                  <div><span>RR (Respiratory Rate):</span><span>___ rpm</span></div>
-                  <div><span>Temperature:</span><span>___ °C</span></div>
-                  <div><span>Height:</span><span>___ cm</span></div>
-                  <div><span>Weight:</span><span>___ kg</span></div>
-                  <div><span>Breastfeeding:</span><span>Y / N</span></div>
-                </div>
-                <div class="vaccines">
-                  <h5>VACCINES</h5>
-                  <div><span>PENTA 2 / HEXA 2:</span><span class="pending">○</span></div>
-                  <div><span>OPV 2:</span><span class="pending">○</span></div>
-                  <div><span>PCV 2:</span><span class="pending">○</span></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="visit-section">
-              <div class="visit-header">
-                <span>14 Weeks Visit</span>
-                <span class="date">PENTA 3, OPV 3, PCV 3, IPV 1</span>
-              </div>
-              <div class="visit-content">
-                <div class="vital-signs">
-                  <h5>VITAL SIGNS</h5>
-                  <div><span>HR (Heart Rate):</span><span>___ bpm</span></div>
-                  <div><span>RR (Respiratory Rate):</span><span>___ rpm</span></div>
-                  <div><span>Temperature:</span><span>___ °C</span></div>
-                  <div><span>Height:</span><span>___ cm</span></div>
-                  <div><span>Weight:</span><span>___ kg</span></div>
-                  <div><span>Breastfeeding:</span><span>Y / N</span></div>
-                </div>
-                <div class="vaccines">
-                  <h5>VACCINES</h5>
-                  <div><span>PENTA 3 / HEXA 3:</span><span class="pending">○</span></div>
-                  <div><span>OPV 3:</span><span class="pending">○</span></div>
-                  <div><span>PCV 3:</span><span class="pending">○</span></div>
-                  <div><span>IPV 1:</span><span class="pending">○</span></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="visit-section">
-              <div class="visit-header">
-                <span>6 Months Visit</span>
-                <span class="date">VITAMIN A</span>
-              </div>
-              <div class="visit-content">
-                <div class="vital-signs">
-                  <h5>VITAL SIGNS</h5>
-                  <div><span>HR (Heart Rate):</span><span>___ bpm</span></div>
-                  <div><span>RR (Respiratory Rate):</span><span>___ rpm</span></div>
-                  <div><span>Temperature:</span><span>___ °C</span></div>
-                  <div><span>Height:</span><span>___ cm</span></div>
-                  <div><span>Weight:</span><span>___ kg</span></div>
-                  <div><span>Breastfeeding:</span><span>Y / N</span></div>
-                </div>
-                <div class="vaccines">
-                  <h5>VACCINES</h5>
-                  <div><span>VITAMIN A:</span><span class="pending">○</span></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="visit-section">
-              <div class="visit-header">
-                <span>9 Months Visit</span>
-                <span class="date">MCV 1, IPV 2</span>
-              </div>
-              <div class="visit-content">
-                <div class="vital-signs">
-                  <h5>VITAL SIGNS</h5>
-                  <div><span>HR (Heart Rate):</span><span>___ bpm</span></div>
-                  <div><span>RR (Respiratory Rate):</span><span>___ rpm</span></div>
-                  <div><span>Temperature:</span><span>___ °C</span></div>
-                  <div><span>Height:</span><span>___ cm</span></div>
-                  <div><span>Weight:</span><span>___ kg</span></div>
-                  <div><span>Breastfeeding:</span><span>Y / N</span></div>
-                </div>
-                <div class="vaccines">
-                  <h5>VACCINES</h5>
-                  <div><span>MCV 1 (Measles):</span><span class="pending">○</span></div>
-                  <div><span>IPV 2:</span><span class="pending">○</span></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="visit-section">
-              <div class="visit-header">
-                <span>12 Months Visit</span>
-                <span class="date">MCV 2</span>
-              </div>
-              <div class="visit-content">
-                <div class="vital-signs">
-                  <h5>VITAL SIGNS</h5>
-                  <div><span>HR (Heart Rate):</span><span>___ bpm</span></div>
-                  <div><span>RR (Respiratory Rate):</span><span>___ rpm</span></div>
-                  <div><span>Temperature:</span><span>___ °C</span></div>
-                  <div><span>Height:</span><span>___ cm</span></div>
-                  <div><span>Weight:</span><span>___ kg</span></div>
-                  <div><span>Breastfeeding:</span><span>Y / N</span></div>
-                </div>
-                <div class="vaccines">
-                  <h5>VACCINES</h5>
-                  <div><span>MCV 2 (Measles):</span><span class="pending">○</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="footer">
-            <p>Generated from Immunicare System - San Nicolas Health Center</p>
-            <p>Date: ${new Date().toLocaleDateString()}</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `);
-
-    printWindow.document.close();
-    printWindow.focus();
-
-    // Wait for content to load then trigger print
-    setTimeout(() => {
-      printWindow.print();
-      // Optionally close after printing (uncomment if desired)
-      // printWindow.close();
-    }, 500);
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -384,29 +63,23 @@ export default function ImmunizationChartPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="immunization-chart-page space-y-6 p-6">
       {/* Header */}
-      <PageHeader
-        title="Immunization Chart"
-        subtitle={
-          infant
-            ? `Visit records for ${infant.first_name} ${infant.last_name}`
-            : "Detailed visit records with vital signs and vaccines"
-        }
-        icon={<BarChart3 className="w-6 h-6" />}
-        actions={
-          <div className="flex gap-2">
-            <Button onClick={handleDownload} variant="secondary">
-              <FileText className="w-4 h-4 mr-2" /> Download PDF
-            </Button>
-            <Button onClick={handlePrint}><Printer className="w-4 h-4 mr-2" /> Print</Button>
-          </div>
-        }
-      />
+      <div className="no-print immunization-chart-page__screen-only">
+        <PageHeader
+          title="Immunization Chart"
+          subtitle={
+            infant
+              ? `Visit records for ${infant.first_name} ${infant.last_name}`
+              : "Detailed visit records with vital signs and vaccines"
+          }
+          icon={<BarChart3 className="w-6 h-6" />}
+        />
+      </div>
 
       {/* Infant Summary Card */}
       {infant && (
-        <Card className="p-4 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800">
+        <Card className="no-print immunization-chart-page__screen-only p-4 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center text-2xl">
@@ -446,7 +119,7 @@ export default function ImmunizationChartPage() {
 
       {/* Section Navigation for Infant */}
       {infantId && (
-        <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
+        <div className="no-print immunization-chart-page__screen-only flex gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
           <Button
             variant={activeSection === "chart" ? "primary" : "ghost"}
             onClick={() => setActiveSection("chart")}
@@ -468,7 +141,9 @@ export default function ImmunizationChartPage() {
       {infantId ? (
         <>
           {activeSection === "chart" && (
-            <ImmunizationChart infantId={infantId} />
+            <div className="immunization-chart-page__chart-panel">
+              <ImmunizationChart infantId={infantId} />
+            </div>
           )}
           {activeSection === "personal" && (
             <InfantPersonalRecord
@@ -489,7 +164,7 @@ export default function ImmunizationChartPage() {
       )}
 
       {/* Visit Schedule Reference */}
-      <Card className="p-6 bg-gray-50 dark:bg-gray-800">
+      <Card className="no-print immunization-chart-page__screen-only p-6 bg-gray-50 dark:bg-gray-800">
         <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">
           📅 Standard Visit Schedule
         </h4>
@@ -544,6 +219,24 @@ export default function ImmunizationChartPage() {
           </div>
         </div>
       </Card>
+
+      <style>{`
+        @media print {
+          .immunization-chart-page {
+            padding: 0 !important;
+            background: #ffffff !important;
+          }
+
+          .immunization-chart-page__screen-only {
+            display: none !important;
+          }
+
+          .immunization-chart-page__chart-panel {
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

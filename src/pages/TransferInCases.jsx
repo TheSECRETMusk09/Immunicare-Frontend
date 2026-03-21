@@ -17,20 +17,20 @@ import {
   Select,
   Checkbox,
 } from "../components/UI";
-import { Search, CheckCircle, XCircle, Eye, Clock, FileText, Download, Trash2 } from "lucide-react";
+import { Search, CheckCircle, XCircle, Eye, Clock, FileText, Download } from "lucide-react";
 
 const TRANSFER_STATUS = {
-  PENDING: "pending",
-  VALIDATED: "validated",
+  FOR_VALIDATION: "for_validation",
+  APPROVED: "approved",
+  NEEDS_CLARIFICATION: "needs_clarification",
   REJECTED: "rejected",
-  IN_PROGRESS: "in_progress",
 };
 
 const STATUS_LABELS = {
-  [TRANSFER_STATUS.PENDING]: { label: "Pending", variant: "warning" },
-  [TRANSFER_STATUS.VALIDATED]: { label: "Validated", variant: "success" },
+  [TRANSFER_STATUS.FOR_VALIDATION]: { label: "For Validation", variant: "warning" },
+  [TRANSFER_STATUS.APPROVED]: { label: "Approved", variant: "success" },
+  [TRANSFER_STATUS.NEEDS_CLARIFICATION]: { label: "Needs Clarification", variant: "info" },
   [TRANSFER_STATUS.REJECTED]: { label: "Rejected", variant: "danger" },
-  [TRANSFER_STATUS.IN_PROGRESS]: { label: "In Progress", variant: "info" },
 };
 
 const VALIDATION_PRIORITY = {
@@ -61,7 +61,7 @@ const TRIAGE_LABELS = {
   overdue_priority_followup: { label: "Overdue Priority Follow-up", variant: "danger" },
 };
 
-export default function TransferInCases() {
+const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateChange }, ref) => {
   const { isAdmin } = useAuth();
   const { success, error, warning } = useNotification();
 
@@ -149,6 +149,22 @@ export default function TransferInCases() {
 
     setFilteredCases(result);
   }, [cases, searchQuery, statusFilter, priorityFilter, triageFilter]);
+
+  useEffect(() => {
+    onRefreshStateChange?.(refreshing);
+  }, [refreshing, onRefreshStateChange]);
+
+  useEffect(() => {
+    return () => {
+      onRefreshStateChange?.(false);
+    };
+  }, [onRefreshStateChange]);
+
+  React.useImperativeHandle(ref, () => ({
+    fetchCases: (isRefresh) => {
+      fetchCases(isRefresh);
+    },
+  }));
 
   const handleViewDetails = (caseItem) => {
     setSelectedCase(caseItem);
@@ -311,8 +327,11 @@ export default function TransferInCases() {
             {val === TRANSFER_STATUS.REJECTED && (
               <XCircle className="w-4 h-4 text-red-500" />
             )}
-            {val === TRANSFER_STATUS.PENDING && (
+            {val === TRANSFER_STATUS.FOR_VALIDATION && (
               <Clock className="w-4 h-4 text-yellow-500" />
+            )}
+            {val === TRANSFER_STATUS.APPROVED && (
+              <CheckCircle className="w-4 h-4 text-green-500" />
             )}
             <Badge variant={status.variant}>{status.label}</Badge>
           </div>
@@ -345,7 +364,8 @@ export default function TransferInCases() {
       >
         <Eye className="w-4 h-4" /> View
       </Button>
-      {row.validation_status === TRANSFER_STATUS.PENDING && (
+      {(row.validation_status === TRANSFER_STATUS.FOR_VALIDATION ||
+        row.validation_status === TRANSFER_STATUS.NEEDS_CLARIFICATION) && (
         <>
           <Button
             variant="primary"
@@ -356,6 +376,10 @@ export default function TransferInCases() {
           >
             <CheckCircle className="w-4 h-4" /> Validate
           </Button>
+        </>
+      )}
+      {row.validation_status === TRANSFER_STATUS.APPROVED && !row.vaccines_imported && (
+        <>
           <Button
             variant="success"
             size="sm"
@@ -408,30 +432,31 @@ export default function TransferInCases() {
 
   return (
     <div className="space-y-8 px-6">
-      {/* Sticky Header Section - Stays fixed at top while scrolling */}
-      <div className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6 -mx-6 -mt-6">
-        <PageHeader
-          title="Transfer-In Cases Validation"
-          subtitle="Review and validate transfer-in cases from other health centers"
-          icon={<FileText className="w-6 h-6" />}
-          actions={
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                onClick={() => fetchCases(true)}
-                disabled={refreshing}
-                className="flex items-center gap-2"
-              >
-                <span className="mr-1">🔄</span>{" "}
-                {refreshing ? "Refreshing..." : "Refresh"}
-              </Button>
-            </div>
-          }
-        />
-      </div>
+      {showHeader && (
+        <div className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6 -mx-6 -mt-6">
+          <PageHeader
+            title="Transfer-In Cases Validation"
+            subtitle="Review and validate transfer-in cases from other health centers"
+            icon={<FileText className="w-6 h-6" />}
+            actions={
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => fetchCases(true)}
+                  disabled={refreshing}
+                  className="flex items-center gap-2"
+                >
+                  <span className="mr-1">🔄</span>
+                  {refreshing ? "Refreshing..." : "Refresh"}
+                </Button>
+              </div>
+            }
+          />
+        </div>
+      )}
 
       {/* Filters - Sticky below header */}
-      <div className="sticky top-[88px] z-20 bg-white dark:bg-gray-900 -mx-6 px-6">
+      <div className={`sticky ${showHeader ? "top-[88px]" : "top-0"} z-20 bg-white dark:bg-gray-900 -mx-6 px-6`}>
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
           <div className="flex flex-col md:flex-row gap-4">
           <div className="relative flex-1 max-w-md">
@@ -450,10 +475,16 @@ export default function TransferInCases() {
             onChange={(e) => setStatusFilter(e.target.value)}
             options={[
               { value: "", label: "All Statuses" },
-              { value: TRANSFER_STATUS.PENDING, label: "Pending" },
-              { value: TRANSFER_STATUS.VALIDATED, label: "Validated" },
+              {
+                value: TRANSFER_STATUS.FOR_VALIDATION,
+                label: "For Validation",
+              },
+              { value: TRANSFER_STATUS.APPROVED, label: "Approved" },
+              {
+                value: TRANSFER_STATUS.NEEDS_CLARIFICATION,
+                label: "Needs Clarification",
+              },
               { value: TRANSFER_STATUS.REJECTED, label: "Rejected" },
-              { value: TRANSFER_STATUS.IN_PROGRESS, label: "In Progress" },
             ]}
             className="w-48"
           />
@@ -510,7 +541,8 @@ export default function TransferInCases() {
             <Button variant="cancel" onClick={() => setShowDetailsModal(false)}>
               Close
             </Button>
-            {selectedCase?.validation_status === TRANSFER_STATUS.PENDING && (
+            {(selectedCase?.validation_status === TRANSFER_STATUS.FOR_VALIDATION ||
+              selectedCase?.validation_status === TRANSFER_STATUS.NEEDS_CLARIFICATION) && (
               <Button
                 variant="primary"
                 onClick={() => handleStartValidation(selectedCase)}
@@ -617,9 +649,9 @@ export default function TransferInCases() {
                           (Dose {vaccine.dose_number})
                         </span>
                       )}
-                      {vaccine.administration_date && (
+                      {vaccine.date_administered && (
                         <span className="text-sm text-gray-500 dark:text-gray-400">
-                          - {new Date(vaccine.administration_date).toLocaleDateString()}
+                          - {new Date(vaccine.date_administered).toLocaleDateString()}
                         </span>
                       )}
                     </li>
@@ -707,7 +739,9 @@ export default function TransferInCases() {
           <div className="space-y-6">
             <Alert variant="warning" title="Validation Warning">
               This action will validate the transfer-in case and update the
-              infant's vaccination record. Please review the information
+              infant's vaccination record. Approved cases now import the
+              validated transfer doses into the official child record automatically.
+              Please review the information
               carefully before proceeding.
             </Alert>
 
@@ -753,7 +787,11 @@ export default function TransferInCases() {
                 onChange={(e) => setValidationStatus(e.target.value)}
                 required
                 options={[
-                  { value: TRANSFER_STATUS.VALIDATED, label: "Validate" },
+                  { value: TRANSFER_STATUS.APPROVED, label: "Approve" },
+                  {
+                    value: TRANSFER_STATUS.NEEDS_CLARIFICATION,
+                    label: "Request Clarification",
+                  },
                   { value: TRANSFER_STATUS.REJECTED, label: "Reject" },
                 ]}
               />
@@ -903,4 +941,6 @@ export default function TransferInCases() {
       </Modal>
     </div>
   );
-}
+});
+
+export default TransferInCases;

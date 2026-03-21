@@ -24,6 +24,7 @@ import AdminLayout from "./components/AdminLayout";
 import GuardianIntroduction from "./components/GuardianIntroduction";
 import QueryProvider from "./providers/QueryProvider"; // Guardian introduction page
 import { getDefaultAuthenticatedRouteFromFlags } from "./utils/authRedirect";
+import { legacyRouteRedirects } from "./utils/routePaths";
 
 // Lazy load components for better performance
 // Core components loaded immediately
@@ -88,6 +89,12 @@ const GuardianImmunizationChartPage = lazy(() =>
   })),
 );
 
+const GuardianDocumentsPage = lazy(() =>
+  import("./pages/GuardianDocumentsPage").then((module) => ({
+    default: module.default,
+  })),
+);
+
 const GuardianNotificationsPage = lazy(() =>
   import("./pages/GuardianNotificationsPage").then((module) => ({
     default: module.default,
@@ -135,10 +142,6 @@ const ImmunizationRecordPage = lazy(
 
 const VaccineSchedulePage = lazy(
   () => import("./pages/digital-papers/VaccineSchedulePage"),
-);
-
-const DownloadCenter = lazy(
-  () => import("./pages/digital-papers/DownloadCenter"),
 );
 
 // Prefetch function for route preloading
@@ -453,13 +456,7 @@ function AppContent() {
           />
           <Route
             path="/digital-papers/downloads"
-            element={
-              <ProtectedRoute requireSystemAdmin>
-                <AdminLayout>
-                  <DownloadCenter />
-                </AdminLayout>
-              </ProtectedRoute>
-            }
+            element={<Navigate to={legacyRouteRedirects.guardianDigitalPaperDownloadsTab} replace />}
           />
           {/* Digital Papers - Immunization Chart */}
           <Route
@@ -655,6 +652,7 @@ function AppContent() {
               path="vaccination-records/:childId"
               element={<UserVaccinationRecords />}
             />
+            <Route path="documents" element={<GuardianDocumentsPage />} />
             <Route
               path="immunization-chart"
               element={<GuardianImmunizationChartPage />}

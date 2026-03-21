@@ -4,7 +4,7 @@ import { Button, Input, Card, Modal } from "./UI";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function InventoryMonitoringDashboard() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [inventory, setInventory] = useState([]);
   const [vaccines, setVaccines] = useState([]);
   const [alerts, setAlerts] = useState([]);
@@ -26,18 +26,40 @@ export default function InventoryMonitoringDashboard() {
       setLoading(true);
       setError(null);
 
-      const [inventoryData, vaccinesData, alertsData, suppliersData] =
+      const clinicId = user?.clinic_id || user?.facility_id || 1;
+      const [inventoryRes, vaccinesRes, alertsRes, suppliersRes] =
         await Promise.all([
-          apiClient.getVaccineInventory(),
-          apiClient.getVaccines(),
-          apiClient.getVaccineStockAlerts({ status: "ACTIVE" }),
-          apiClient.getSuppliers(),
+          apiClient.getVaccineInventory().catch(() => ({ data: [] })),
+          apiClient.getVaccines().catch(() => ({ data: [] })),
+          apiClient.getVaccineStockAlerts({ clinic_id: clinicId, status: "ACTIVE" }).catch(() => ({ data: [] })),
+          apiClient.getSuppliers().catch(() => ({ data: [] })),
         ]);
 
-      setInventory(inventoryData);
-      setVaccines(vaccinesData);
-      setAlerts(alertsData);
-      setSuppliers(suppliersData);
+      const inventoryList = inventoryRes?.data || inventoryRes?.inventory || inventoryRes || [];
+      const vaccinesList = vaccinesRes?.data || vaccinesRes || [];
+      const alertsList = alertsRes?.data || alertsRes || [];
+      const suppliersList = suppliersRes?.data || suppliersRes || [];
+
+      setInventory(inventoryList);
+      setVaccines(vaccinesList);
+
+      // Synchronize alerts with actual current inventory data
+      const synchronizedAlerts = alertsList.filter((alert) => {
+        const invItem = inventoryList.find((i) => i.id === alert.vaccine_inventory_id);
+        if (!invItem) return true;
+
+        const currentStock = Number(invItem.stock_on_hand || 0);
+        if (alert.alert_type === "OUT_OF_STOCK" || alert.alert_type === "CRITICAL_STOCK") {
+          return currentStock === 0;
+        }
+        if (alert.alert_type === "LOW_STOCK") {
+          return currentStock > 0 && currentStock <= (invItem.low_stock_threshold || 10);
+        }
+        return true;
+      });
+
+      setAlerts(synchronizedAlerts);
+      setSuppliers(suppliersList);
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
       setError(err.message || "Failed to load dashboard data");
@@ -49,11 +71,11 @@ export default function InventoryMonitoringDashboard() {
   const getVaccineStats = () => {
     const totalVaccines = inventory.length;
     const criticalStock = alerts.filter(
-      (a) => a.alert_type === "CRITICAL_STOCK",
+      (a) => a.alert_type === "CRITICAL_STOCK" || a.alert_type === "OUT_OF_STOCK",
     ).length;
     const lowStock = alerts.filter((a) => a.alert_type === "LOW_STOCK").length;
     const totalStock = inventory.reduce(
-      (sum, item) => sum + item.stock_on_hand,
+      (sum, item) => sum + (Number(item.stock_on_hand) || 0),
       0,
     );
 
@@ -77,13 +99,6 @@ export default function InventoryMonitoringDashboard() {
       const expiryDate = new Date(item.expiry_date);
       return expiryDate >= today && expiryDate <= thirtyDaysLater;
     });
-  };
-
-  const getTopLowStockVaccines = () => {
-    return inventory
-      .filter((item) => item.stock_on_hand <= (item.low_stock_threshold || 10))
-      .sort((a, b) => a.stock_on_hand - b.stock_on_hand)
-      .slice(0, 5);
   };
 
   if (!isAdmin) {
@@ -121,8 +136,9 @@ export default function InventoryMonitoringDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
+      <div className="flex flex-col items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
+        <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Loading monitoring data...</p>
       </div>
     );
   }
@@ -140,22 +156,20 @@ export default function InventoryMonitoringDashboard() {
 
   const stats = getVaccineStats();
   const expiringSoon = getExpiringSoon();
-  const topLowStock = getTopLowStockVaccines();
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100">
-          Inventory Monitoring Dashboard
-        </h2>
-        <div className="flex space-x-3">
-          <Button onClick={() => setShowBatchModal(true)}>
+    <div className="space-y-4">
+      {/* Action Controls */}
+      <div className="flex justify-end items-center mb-2">
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => setShowBatchModal(true)} className="transition-none">
             Manage Batches
           </Button>
           <Button
+            size="sm"
             variant="secondary"
             onClick={() => setShowSupplierModal(true)}
+            className="transition-none"
           >
             Supplier Management
           </Button>
@@ -278,9 +292,9 @@ export default function InventoryMonitoringDashboard() {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {/* Alerts Section */}
-        <Card className="lg:col-span-2 p-6">
+        <Card className="p-6">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
             Stock Alerts
           </h3>
@@ -317,6 +331,7 @@ export default function InventoryMonitoringDashboard() {
                             .then(fetchDashboardData)
                         }
                         disabled={alert.status === "RESOLVED"}
+                        className="transition-none"
                       >
                         Acknowledge
                       </Button>
@@ -328,6 +343,7 @@ export default function InventoryMonitoringDashboard() {
                             .then(fetchDashboardData)
                         }
                         disabled={alert.status === "RESOLVED"}
+                        className="transition-none"
                       >
                         Resolve
                       </Button>
@@ -343,52 +359,6 @@ export default function InventoryMonitoringDashboard() {
           )}
         </Card>
 
-        {/* Quick Actions */}
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
-            Quick Actions
-          </h3>
-          <div className="space-y-3">
-            <Button variant="outline" className="w-full justify-start">
-              Add New Vaccine
-            </Button>
-            <Button variant="outline" className="w-full justify-start">
-              Generate Report
-            </Button>
-            <Button variant="outline" className="w-full justify-start">
-              Export to Excel
-            </Button>
-            <Button variant="outline" className="w-full justify-start">
-              View Expiry Calendar
-            </Button>
-          </div>
-
-          {/* Low Stock Summary */}
-          {topLowStock.length > 0 && (
-            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Top Low Stock Items
-              </h4>
-              <div className="space-y-2">
-                {topLowStock.map((item) => {
-                  const vaccine = vaccines.find(
-                    (v) => v.id === item.vaccine_id,
-                  );
-                  return (
-                    <div key={item.id} className="flex justify-between text-sm">
-                      <span className="text-gray-600 dark:text-gray-400">
-                        {vaccine?.name || "Unknown"}
-                      </span>
-                      <span className="font-medium text-red-600">
-                        {item.stock_on_hand} units
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </Card>
       </div>
 
       {/* Expiring Soon Section */}
@@ -457,7 +427,7 @@ export default function InventoryMonitoringDashboard() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="outline" className="transition-none">
                           Review
                         </Button>
                       </td>
@@ -492,6 +462,7 @@ export default function InventoryMonitoringDashboard() {
               variant="cancel"
               actionRole="cancel"
               onClick={() => setShowBatchModal(false)}
+              className="transition-none"
             >
               Close
             </Button>
@@ -520,6 +491,7 @@ export default function InventoryMonitoringDashboard() {
               variant="cancel"
               actionRole="cancel"
               onClick={() => setShowSupplierModal(false)}
+              className="transition-none"
             >
               Close
             </Button>

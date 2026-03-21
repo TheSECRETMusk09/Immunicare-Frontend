@@ -34,7 +34,7 @@ const REPORT_TYPES = Object.freeze([
   "consolidated",
 ]);
 
-const REPORT_FORMATS = Object.freeze(["pdf", "excel", "csv"]);
+const REPORT_FORMATS = Object.freeze(["pdf", "excel"]);
 
 const normalizeReportFormatInput = (value) => {
   const normalized = sanitizeText(value).toLowerCase();
@@ -369,6 +369,7 @@ const Reports = () => {
           {
             method: "GET",
             responseType: "blob",
+            timeout: 60000, // 60 seconds timeout for downloads
           },
         );
 
@@ -600,7 +601,7 @@ const Reports = () => {
       {/* Admin Dashboard Summary */}
       {adminSummary && (
         <Card title="📈 Dashboard Overview" className="flex-shrink-0">
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
             {/* Vaccination Summary */}
             <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
               <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
@@ -640,6 +641,18 @@ const Reports = () => {
               </div>
             </div>
 
+            <div className="bg-fuchsia-50 dark:bg-fuchsia-900/20 p-4 rounded-lg">
+              <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                No Shows
+              </div>
+              <div className="text-2xl font-bold text-fuchsia-600 dark:text-fuchsia-400">
+                {adminSummary.appointments?.no_show || 0}
+              </div>
+              <div className="text-xs text-gray-500">
+                Missed appointment load
+              </div>
+            </div>
+
             {/* Guardians Summary */}
             <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
               <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
@@ -650,6 +663,18 @@ const Reports = () => {
               </div>
               <div className="text-xs text-gray-500">
                 Active: {adminSummary.guardians?.active || 0}
+              </div>
+            </div>
+
+            <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
+              <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                Expired Lots
+              </div>
+              <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                {adminSummary.inventory?.expired_items || 0}
+              </div>
+              <div className="text-xs text-gray-500">
+                Inventory expiry risk
               </div>
             </div>
 
@@ -676,6 +701,18 @@ const Reports = () => {
               </div>
               <div className="text-xs text-gray-500">
                 Downloads: {adminSummary.reports?.total_downloads || 0}
+              </div>
+            </div>
+
+            <div className="bg-teal-50 dark:bg-teal-900/20 p-4 rounded-lg">
+              <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                Transfer Turnaround
+              </div>
+              <div className="text-2xl font-bold text-teal-600 dark:text-teal-400">
+                {adminSummary.transfers?.avg_turnaround_days || 0}
+              </div>
+              <div className="text-xs text-gray-500">
+                Days • Open: {adminSummary.transfers?.open_cases || 0}
               </div>
             </div>
           </div>
@@ -820,7 +857,6 @@ const Reports = () => {
               >
                 <option value="pdf">PDF Document</option>
                 <option value="excel">Excel Spreadsheet</option>
-                <option value="csv">CSV File</option>
               </Select>
             </div>
           </div>

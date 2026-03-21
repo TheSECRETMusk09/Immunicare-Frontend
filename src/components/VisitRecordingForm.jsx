@@ -1,10 +1,32 @@
 import React, { useState, useEffect } from "react";
 import { Button, Input } from "./UI";
 
+const VISIT_TIME_MIN = "07:00";
+const VISIT_TIME_MAX = "16:00";
+const HEALTHCARE_WORKER_OPTIONS = ["Midwife", "Nurse"];
+
+const normalizeVisitTime = (value) => {
+  const normalizedValue = String(value || "").slice(0, 5);
+
+  if (!normalizedValue) {
+    return VISIT_TIME_MIN;
+  }
+
+  if (normalizedValue < VISIT_TIME_MIN) {
+    return VISIT_TIME_MIN;
+  }
+
+  if (normalizedValue > VISIT_TIME_MAX) {
+    return VISIT_TIME_MAX;
+  }
+
+  return normalizedValue;
+};
+
 export default function VisitRecordingForm({ infant, visit, onClose, onSave }) {
   const [formData, setFormData] = useState({
     visit_date: new Date().toISOString().split("T")[0],
-    visit_time: new Date().toTimeString().split(" ")[0].substring(0, 5),
+    visit_time: normalizeVisitTime(new Date().toTimeString().split(" ")[0].substring(0, 5)),
     growth: {
       weight: "",
       height: "",
@@ -60,7 +82,16 @@ export default function VisitRecordingForm({ infant, visit, onClose, onSave }) {
     try {
       // Validate required fields
       if (!formData.visit_date || !formData.healthcare_worker) {
-        alert("Please fill in visit date and healthcare worker name");
+        alert("Please fill in visit date and select a healthcare worker.");
+        setLoading(false);
+        return;
+      }
+
+      if (
+        formData.visit_time &&
+        (formData.visit_time < VISIT_TIME_MIN || formData.visit_time > VISIT_TIME_MAX)
+      ) {
+        alert("Visit time must be between 7:00 AM and 4:00 PM only.");
         setLoading(false);
         return;
       }
@@ -112,17 +143,24 @@ export default function VisitRecordingForm({ infant, visit, onClose, onSave }) {
           <Input
             type="time"
             value={formData.visit_time}
+            min={VISIT_TIME_MIN}
+            max={VISIT_TIME_MAX}
             onChange={(e) =>
-              setFormData((prev) => ({ ...prev, visit_time: e.target.value }))
+              setFormData((prev) => ({
+                ...prev,
+                visit_time: normalizeVisitTime(e.target.value),
+              }))
             }
           />
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Allowed time: 7:00 AM to 4:00 PM only
+          </p>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Healthcare Worker *
           </label>
-          <Input
-            type="text"
+          <select
             value={formData.healthcare_worker}
             onChange={(e) =>
               setFormData((prev) => ({
@@ -130,9 +168,16 @@ export default function VisitRecordingForm({ infant, visit, onClose, onSave }) {
                 healthcare_worker: e.target.value,
               }))
             }
-            placeholder="Enter healthcare worker name"
             required
-          />
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:border-gray-500 dark:text-gray-100"
+          >
+            <option value="">Select healthcare worker</option>
+            {HEALTHCARE_WORKER_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -296,7 +341,7 @@ export default function VisitRecordingForm({ infant, visit, onClose, onSave }) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                      Lot Number
+                      Lot/Batch Number
                     </label>
                     <Input
                       type="text"
@@ -304,7 +349,7 @@ export default function VisitRecordingForm({ infant, visit, onClose, onSave }) {
                       onChange={(e) =>
                         handleVaccineChange(index, "lot_number", e.target.value)
                       }
-                      placeholder="Lot #"
+                      placeholder="Lot/Batch #"
                       size="sm"
                     />
                   </div>

@@ -26,6 +26,7 @@ import {
   validateNumberRange,
 } from "../utils/adminFormValidation";
 import { APPROVED_VACCINE_NAMES } from "../constants/approvedVaccines";
+import InventoryMonitoringDashboard from "./InventoryMonitoringDashboard";
 
 // SheetJS for Excel export - loaded dynamically
 let XLSX = null;
@@ -46,7 +47,8 @@ try {
 
 const INVENTORY_TAB_CONFIG = [
   { key: "inventory_sheet", label: "Inventory Sheet" },
-  { key: "stock_alerts", label: "Stock Management" }
+  { key: "stock_alerts", label: "Stock Management" },
+  { key: "vaccine_monitoring", label: "Vaccine Monitoring" }
 ];
 
 const INVENTORY_DEFAULT_TAB_KEY = INVENTORY_TAB_CONFIG[0].key;
@@ -60,6 +62,9 @@ const INVENTORY_TAB_ALIASES = {
   stock_alerts: "stock_alerts",
   "stock-alerts": "stock_alerts",
   alerts: "stock_alerts",
+  vaccine_monitoring: "vaccine_monitoring",
+  "vaccine-monitoring": "vaccine_monitoring",
+  monitoring: "vaccine_monitoring",
 };
 
 const normalizeInventoryTabKey = (value) => {
@@ -394,11 +399,13 @@ export default function InventoryManagement() {
   // Vaccine items based on paper configuration
   const vaccineItems = useMemo(
     () =>
-      APPROVED_VACCINE_NAMES.map((name) => ({
-        id: name.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
-        name,
-        unit: "vials",
-      })),
+      APPROVED_VACCINE_NAMES
+        .filter((name) => !name.toLowerCase().includes("diluent 5ml"))
+        .map((name) => ({
+          id: name.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+          name,
+          unit: "vials",
+        })),
     [],
   );
 
@@ -797,16 +804,24 @@ export default function InventoryManagement() {
         return;
       }
 
-        const payload = {
-          vaccine_inventory_id: dbInventoryId,
-          vaccine_id: matchedInventory._vaccineId,
-          transaction_type: mapModalTypeToApiType(modalType),
-          quantity: qty,
-          lot_number: lotNumber || undefined,
-          transaction_date: formData.date,
-          notes: normalizedNotes || undefined,
-          clinic_id: matchedInventory._facilityId,
-        };
+      const payload = {
+        vaccine_inventory_id: Number(dbInventoryId),
+        vaccine_id: Number(matchedInventory._vaccineId),
+        transaction_type: mapModalTypeToApiType(modalType),
+        quantity: Number(qty),
+        transaction_date: formData.date,
+      };
+
+      if (lotNumber) {
+        payload.lot_number = lotNumber;
+        payload.lot_batch_number = lotNumber;
+      }
+      if (normalizedNotes) {
+        payload.notes = normalizedNotes;
+      }
+      if (matchedInventory._facilityId) {
+        payload.clinic_id = Number(matchedInventory._facilityId);
+      }
 
       await apiClient.createVaccineInventoryTransaction(payload);
 
@@ -1158,7 +1173,7 @@ export default function InventoryManagement() {
     inventory.forEach((item) => {
       if (item.stock_on_hand === 0) {
         alerts.critical.push(item);
-      } else if (item.stock_on_hand < 10) {
+      } else if (item.stock_on_hand <= 10) {
         alerts.low.push(item);
       }
 
@@ -1251,7 +1266,7 @@ export default function InventoryManagement() {
           <div className="flex space-x-2 overflow-x-auto">
             <button
               onClick={() => handleTabChange("inventory_sheet")}
-              className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
+              className={`px-4 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 whitespace-nowrap ${
                 activeTab === "inventory_sheet"
                   ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
                   : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
@@ -1261,7 +1276,7 @@ export default function InventoryManagement() {
             </button>
             <button
               onClick={() => handleTabChange("stock_alerts")}
-              className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap relative ${
+              className={`px-4 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 whitespace-nowrap relative ${
                 activeTab === "stock_alerts"
                   ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
                   : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
@@ -1273,6 +1288,16 @@ export default function InventoryManagement() {
                   {stockAlerts.critical.length}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => handleTabChange("vaccine_monitoring")}
+              className={`px-4 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 whitespace-nowrap ${
+                activeTab === "vaccine_monitoring"
+                  ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
+                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+              }`}
+            >
+              Vaccine Monitoring
             </button>
           </div>
         </Card>
@@ -1751,106 +1776,6 @@ export default function InventoryManagement() {
       {/* Stock Alerts Tab - NOT printed */}
       {activeTab === "stock_alerts" && (
         <div className="space-y-4">
-          {/* Action Cards - Inline horizontally in a single row */}
-          <div className="grid grid-cols-4 gap-3">
-            {/* Excel Export */}
-            <Card
-              className="p-3 text-center cursor-pointer hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700"
-              onClick={downloadExcel}
-            >
-              <div className="p-2 bg-purple-100 dark:bg-purple-900/50 rounded-full w-10 h-10 mx-auto flex items-center justify-center mb-2">
-                <svg
-                  className="w-5 h-5 text-purple-600 dark:text-purple-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1">
-                Export to Excel
-              </h3>
-            </Card>
-
-            {/* CSV Export */}
-            <Card
-              className="p-3 text-center cursor-pointer hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700"
-              onClick={downloadCSV}
-            >
-              <div className="p-2 bg-green-100 dark:bg-green-900/50 rounded-full w-10 h-10 mx-auto flex items-center justify-center mb-2">
-                <svg
-                  className="w-5 h-5 text-green-600 dark:text-green-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1">
-                Export to CSV
-              </h3>
-            </Card>
-
-            {/* Print / PDF */}
-            <Card
-              className="p-3 text-center cursor-pointer hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700"
-              onClick={printReport}
-            >
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-full w-10 h-10 mx-auto flex items-center justify-center mb-2">
-                <svg
-                  className="w-5 h-5 text-blue-600 dark:text-blue-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1">
-                Print / PDF
-              </h3>
-            </Card>
-
-            {/* Summary */}
-            <Card className="p-3 text-center dark:bg-gray-800 dark:border-gray-700">
-              <div className="p-2 bg-orange-100 dark:bg-orange-900/50 rounded-full w-10 h-10 mx-auto flex items-center justify-center mb-2">
-                <svg
-                  className="w-5 h-5 text-orange-600 dark:text-orange-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1">
-                Summary
-              </h3>
-            </Card>
-          </div>
-
           {/* Inventory Summary */}
           <Card className="p-4 dark:bg-gray-800 dark:border-gray-700">
             <h3 className="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-200">
@@ -2229,6 +2154,13 @@ export default function InventoryManagement() {
                 </div>
               </Card>
             )}
+        </div>
+      )}
+
+      {/* Vaccine Monitoring Tab - NOT printed */}
+      {activeTab === "vaccine_monitoring" && (
+        <div className="space-y-4 print:hidden">
+          <InventoryMonitoringDashboard />
         </div>
       )}
 

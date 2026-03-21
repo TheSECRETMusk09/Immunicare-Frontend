@@ -11,6 +11,11 @@ import {
   normalizeVaccineInventoryResponse,
 } from "../utils/adminDataAdapters";
 import { getApprovedBrandsForVaccine } from "../constants/approvedVaccines";
+import {
+  buildHealthWorkerOptions,
+  buildInventorySourceOptionLabel,
+  resolveLotBatchValue,
+} from "../utils/vaccinationFormOptions";
 
 const injectionSiteOptions = [
   { value: "", label: "Select Site" },
@@ -78,12 +83,11 @@ const INITIAL_FORM = {
   date_administered: new Date().toISOString().split("T")[0],
   time_administered: "",
   dose_number: 1,
-  lot_number: "",
+  lot_batch_number: "",
   expiration_date: "",
   site_of_injection: "",
   route_of_injection: "IM",
   administered_by: "",
-  batch_number: "",
   manufacturer: "",
   reaction: "",
   reaction_other: "",
@@ -105,6 +109,7 @@ export default function InjectVaccineModal({
   const [vaccines, setVaccines] = useState([]);
   const [infants, setInfants] = useState([]);
   const [inventoryRecords, setInventoryRecords] = useState([]);
+  const [healthWorkerUsers, setHealthWorkerUsers] = useState([]);
   const [selectedInfantId, setSelectedInfantId] = useState(infantId || "");
   const [eligibleVaccines, setEligibleVaccines] = useState(null);
   const [eligibleLoading, setEligibleLoading] = useState(false);
@@ -120,27 +125,34 @@ export default function InjectVaccineModal({
 
   const fetchData = useCallback(async () => {
     try {
-      const [vaccinesResponse, infantsResponse, inventoryResponse] =
+      const [vaccinesResponse, infantsResponse, inventoryResponse, systemUsersResponse] =
         await Promise.all([
           apiClient.getVaccines(),
           apiClient.getInfants(),
           apiClient.getVaccineInventory({
             ...(scopedClinicId ? { clinic_id: scopedClinicId } : {}),
           }),
+          apiClient.getSystemUsers({ limit: 100, roles: "nurse,midwife" }).catch(() => ({ data: [] })),
         ]);
 
       const normalizedVaccines = normalizeVaccinesResponse(vaccinesResponse);
       const normalizedInfants = normalizeInfantsResponse(infantsResponse);
       const normalizedInventory = normalizeVaccineInventoryResponse(inventoryResponse);
+      const normalizedHealthWorkers = buildHealthWorkerOptions(
+        systemUsersResponse,
+        scopedClinicId,
+      );
 
       setVaccines(normalizedVaccines);
       setInfants(normalizedInfants);
       setInventoryRecords(normalizedInventory);
+      setHealthWorkerUsers(normalizedHealthWorkers);
     } catch (err) {
       console.error("Error fetching data:", err);
       setVaccines([]);
       setInfants([]);
       setInventoryRecords([]);
+      setHealthWorkerUsers([]);
     }
   }, [scopedClinicId]);
 
@@ -209,7 +221,7 @@ export default function InjectVaccineModal({
   // Get eligible vaccines for dropdown - filter vaccines that are ready or upcoming
   const eligibleVaccineOptions = useMemo(() => {
     if (!eligibleVaccines) return [];
-    const { eligibleVaccines: ready, upcomingVaccines, completedVaccines } = eligibleVaccines;
+    const { eligibleVaccines: ready, upcomingVaccines } = eligibleVaccines;
 
     // Combine ready and upcoming vaccines for selection
     const selectableVaccines = [
@@ -217,7 +229,11 @@ export default function InjectVaccineModal({
       ...(upcomingVaccines || [])
     ];
 
-    return selectableVaccines.map(v => ({
+    const uniqueSelectableVaccines = Array.from(
+      new Map(selectableVaccines.map((vaccine) => [vaccine.vaccineId, vaccine])).values(),
+    );
+
+    return uniqueSelectableVaccines.map(v => ({
       ...v,
       displayLabel: `${v.vaccineName} - Dose ${v.nextDoseNumber}/${v.totalDoses}`
     }));
@@ -275,6 +291,42 @@ export default function InjectVaccineModal({
     return getApprovedBrandsForVaccine(selectedVaccine.name);
   }, [selectedVaccine]);
 
+  const defaultAdministeredBy = useMemo(() => {
+    const currentUserId = Number(user?.id || 0) || null;
+    if (!currentUserId) return "";
+
+    return healthWorkerUsers.some((entry) => Number(entry.id) === currentUserId)
+      ? String(currentUserId)
+      : "";
+  }, [healthWorkerUsers, user?.id]);
+
+  const healthWorkerSelectOptions = useMemo(
+    () => [
+      {
+        value: "",
+        label: healthWorkerUsers.length
+          ? "Select Nurse or Midwife"
+          : "No Nurse or Midwife users available",
+      },
+      ...healthWorkerUsers.map((entry) => ({
+        value: String(entry.id),
+        label: entry.optionLabel,
+      })),
+    ],
+    [healthWorkerUsers],
+  );
+
+  useEffect(() => {
+    if (!isOpen || formData.administered_by || !defaultAdministeredBy) {
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      administered_by: defaultAdministeredBy,
+    }));
+  }, [defaultAdministeredBy, formData.administered_by, isOpen]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -305,15 +357,31 @@ export default function InjectVaccineModal({
       return;
     }
 
+    const administeredByValue = Number(formData.administered_by);
+    const administeredBy =
+      Number.isFinite(administeredByValue) && administeredByValue > 0
+        ? administeredByValue
+        : null;
+
+    if (!administeredBy) {
+      setError("Please select a Nurse or Midwife in the Administered By dropdown.");
+      setLoading(false);
+      return;
+    }
+
+    const lotBatchValue =
+      resolveLotBatchValue(formData.lot_batch_number, selectedInventoryRecord?.lot_batch_number) ||
+      "";
+
+    if (!lotBatchValue) {
+      setError("The selected inventory record does not have a Lot / Batch number.");
+      setLoading(false);
+      return;
+    }
+
     let createdVaccinationRecordId = null;
 
     try {
-      const administeredByValue = Number(formData.administered_by);
-      const administeredBy =
-        Number.isFinite(administeredByValue) && administeredByValue > 0
-          ? administeredByValue
-          : user?.id || null;
-
       const recordPayload = {
         patient_id: Number(selectedInfantId),
         vaccine_id: Number(formData.vaccine_id),
@@ -328,8 +396,9 @@ export default function InjectVaccineModal({
             : formData.reaction || null,
         next_due_date: formData.next_appointment_date || null,
         notes: formData.notes || null,
-        lot_number: formData.lot_number || null,
-        batch_number: formData.batch_number || null,
+        lot_batch_number: lotBatchValue || null,
+        lot_number: lotBatchValue || null,
+        batch_number: lotBatchValue || null,
         manufacturer: formData.manufacturer || null,
         expiration_date: formData.expiration_date || null,
         status: "completed",
@@ -348,8 +417,7 @@ export default function InjectVaccineModal({
          clinic_id: selectedInventoryRecord?.clinic_id ? Number(selectedInventoryRecord.clinic_id) : undefined,
          transaction_type: 'ISSUE',
          quantity: 1,
-         lot_number: formData.lot_number || null,
-         batch_number: formData.batch_number || null,
+         lot_batch_number: lotBatchValue || null,
          reference_number: createdVaccinationRecordId
            ? `VAC-${createdVaccinationRecordId}`
            : null,
@@ -363,8 +431,7 @@ export default function InjectVaccineModal({
          clinic_id: selectedInventoryRecord?.clinic_id ? Number(selectedInventoryRecord.clinic_id) : undefined,
          transaction_type: "ISSUE",
          quantity: 1,
-         lot_number: formData.lot_number || null,
-         batch_number: formData.batch_number || null,
+         lot_batch_number: lotBatchValue || null,
          reference_number: createdVaccinationRecordId
            ? `VAC-${createdVaccinationRecordId}`
            : null,
@@ -416,8 +483,7 @@ export default function InjectVaccineModal({
           ...prev,
           [name]: value,
           vaccine_inventory_id: "",
-          lot_number: "",
-          batch_number: "",
+          lot_batch_number: "",
           manufacturer: "",
           dose_number: selectedVaccine.nextDoseNumber || 1
         }));
@@ -431,8 +497,7 @@ export default function InjectVaccineModal({
       ...(name === "vaccine_id"
         ? {
             vaccine_inventory_id: "",
-            lot_number: "",
-            batch_number: "",
+            lot_batch_number: "",
             manufacturer: "",
           }
         : {}),
@@ -454,7 +519,7 @@ export default function InjectVaccineModal({
             type="submit"
             variant="primary"
             form="injectVaccineForm"
-            disabled={loading || !isAdmin}
+            disabled={loading || !isAdmin || healthWorkerUsers.length === 0}
           >
             {loading ? "Recording..." : "Record Vaccination"}
           </Button>
@@ -514,9 +579,13 @@ export default function InjectVaccineModal({
             value={formData.vaccine_id}
             onChange={handleChange}
             options={[
-              { value: "", label: "Select Vaccine" },
-              ...(eligibleLoading ? [{ value: "", label: "Loading eligibility...", disabled: true }] :
-                eligibleVaccineOptions.length > 0
+              {
+                value: "",
+                label: eligibleLoading ? "Loading eligibility..." : "Select Vaccine",
+                disabled: eligibleLoading,
+              },
+              ...(!eligibleLoading
+                ? eligibleVaccineOptions.length > 0
                   ? [
                       ...eligibleVaccineOptions.filter(v => v.status === 'ready').map((vaccine) => ({
                         value: vaccine.vaccineId,
@@ -531,7 +600,7 @@ export default function InjectVaccineModal({
                       value: vaccine.id,
                       label: `${vaccine.name} (${vaccine.code || "N/A"})`,
                     }))
-              ),
+                : []),
             ]}
             required
             disabled={eligibleLoading}
@@ -577,10 +646,11 @@ export default function InjectVaccineModal({
               const inventoryRecord = inventoryRecords.find(
                 (record) => record.id === Number(selectedId),
               );
+              const lotBatchValue = resolveLotBatchValue(inventoryRecord?.lot_batch_number);
               setFormData((prev) => ({
                 ...prev,
                 vaccine_inventory_id: selectedId,
-                lot_number: inventoryRecord?.lot_batch_number || prev.lot_number,
+                lot_batch_number: lotBatchValue,
               }));
             }}
             options={[
@@ -592,9 +662,7 @@ export default function InjectVaccineModal({
               },
               ...vaccineInventoryOptions.map((record) => ({
                 value: record.id,
-                label: `${record.facility_name || "Barangay San Nicolas Health Center"} • Stock ${
-                  record.stock_on_hand
-                } • Lot ${record.lot_batch_number || "N/A"}`,
+                label: buildInventorySourceOptionLabel(record),
               })),
             ]}
             required
@@ -620,7 +688,9 @@ export default function InjectVaccineModal({
             {selectedInventoryRecord && (
               <div className="flex flex-wrap items-center gap-4 mt-1 text-xs text-gray-500 dark:text-gray-400">
                 <span>Facility: {selectedInventoryRecord.facility_name || "N/A"}</span>
-                <span>Lot: {selectedInventoryRecord.lot_batch_number || "N/A"}</span>
+                <span>
+                  Lot/Batch: {resolveLotBatchValue(selectedInventoryRecord.lot_batch_number) || "N/A"}
+                </span>
                 <span className="text-emerald-600 dark:text-emerald-400">
                   {selectedInventoryRecord.stock_on_hand || 0} in stock
                 </span>
@@ -660,21 +730,11 @@ export default function InjectVaccineModal({
 
         <div className="admin-form-row-2">
           <Input
-            label="Lot Number"
-            name="lot_number"
-            value={formData.lot_number}
-            onChange={handleChange}
-            placeholder={formData.vaccine_inventory_id ? "Auto-filled from inventory" : "Enter lot number"}
-            disabled={!!formData.vaccine_inventory_id}
-            required={!formData.vaccine_inventory_id}
-          />
-          <Input
-            label="Batch Number"
-            name="batch_number"
-            value={formData.batch_number}
-            onChange={handleChange}
-            placeholder={formData.vaccine_inventory_id ? "Auto-filled from inventory" : "Enter batch number"}
-            disabled={!!formData.vaccine_inventory_id}
+            label="Lot / Batch Number"
+            name="lot_batch_number"
+            value={formData.lot_batch_number}
+            placeholder="Auto-filled from selected inventory record"
+            disabled
           />
         </div>
 
@@ -733,13 +793,19 @@ export default function InjectVaccineModal({
         </div>
 
         <div className="admin-field-group">
-          <Input
-            label="Administered By (Health Worker)"
+          <Select
+            label="Administered By"
             name="administered_by"
             value={formData.administered_by}
             onChange={handleChange}
-            placeholder="Health worker user ID (optional)"
+            options={healthWorkerSelectOptions}
+            required
           />
+          {!healthWorkerUsers.length && (
+            <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+              No active Nurse or Midwife users were found for this facility.
+            </p>
+          )}
         </div>
 
         <div className="admin-form-row-2">

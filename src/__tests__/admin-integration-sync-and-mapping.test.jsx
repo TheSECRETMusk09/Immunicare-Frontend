@@ -31,6 +31,9 @@ jest.mock("../utils/api", () => ({
     updateVaccinationRecord: jest.fn(),
     deleteVaccinationRecord: jest.fn(),
     getVaccineInventory: jest.fn(),
+    getVaccineInventoryStatus: jest.fn(),
+    createVaccineInventoryTransaction: jest.fn(),
+    getSystemUsers: jest.fn(),
   },
 }));
 
@@ -100,6 +103,39 @@ const vaccineRows = [
   { id: 2, name: "Penta Valent", code: "PENTA", doses_required: 3 },
 ];
 
+const inventoryRecordRows = [
+  {
+    id: 11,
+    vaccine_id: 1,
+    vaccine_name: "BCG",
+    clinic_id: 7,
+    lot_batch_number: "BCG-LOT-001",
+    stock_on_hand: 10,
+    low_stock_threshold: 5,
+    is_low_stock: false,
+  },
+  {
+    id: 21,
+    vaccine_id: 2,
+    vaccine_name: "Penta Valent",
+    clinic_id: 7,
+    lot_batch_number: "PENTA-FEFO-001",
+    stock_on_hand: 9,
+    low_stock_threshold: 5,
+    is_low_stock: false,
+  },
+  {
+    id: 22,
+    vaccine_id: 2,
+    vaccine_name: "Penta Valent",
+    clinic_id: 7,
+    lot_batch_number: "PENTA-LATER-002",
+    stock_on_hand: 6,
+    low_stock_threshold: 5,
+    is_low_stock: false,
+  },
+];
+
 const vaccinationRecordRows = [
   {
     id: 501,
@@ -135,6 +171,19 @@ describe("Admin integration sync and mapping checks", () => {
       isAdmin: true,
       user: { id: 100, role_type: "SYSTEM_ADMIN", clinic_id: 7, facility_id: 7 },
     });
+    apiClient.getVaccineInventory.mockResolvedValue([]);
+    apiClient.getVaccineInventoryStatus.mockResolvedValue({ clinicId: 7, batches: [] });
+    apiClient.createVaccineInventoryTransaction.mockResolvedValue({ id: 901 });
+    apiClient.getSystemUsers.mockResolvedValue([
+      {
+        id: 100,
+        role_name: "nurse",
+        username: "nurse.one",
+        clinic_id: 7,
+        facility_id: 7,
+        is_active: true,
+      },
+    ]);
   });
 
   test("normalized adapters handle wrapped payloads for records and transactions", () => {
@@ -245,16 +294,36 @@ describe("Admin integration sync and mapping checks", () => {
     apiClient.getVaccinationSchedules.mockResolvedValue(scheduleRows);
     apiClient.getInfants.mockResolvedValue(infantRows);
     apiClient.getVaccines.mockResolvedValue(vaccineRows);
+    apiClient.getVaccineInventory.mockResolvedValue(inventoryRecordRows);
     apiClient.createVaccinationRecord.mockResolvedValueOnce({
       id: 999,
-      patient_id: 1,
-      vaccine_id: 1,
+      patient_id: 2,
+      vaccine_id: 2,
       dose_no: 1,
       admin_date: "2026-03-01",
       status: "completed",
       patient_first_name: "Baby",
-      patient_last_name: "One",
-      vaccine_name: "BCG",
+      patient_last_name: "Two",
+      vaccine_name: "Penta Valent",
+    });
+    apiClient.getVaccineInventoryStatus.mockResolvedValue({
+      clinicId: 7,
+      batches: [
+        {
+          id: 302,
+          vaccine_id: 2,
+          lot_no: "PENTA-LATER-002",
+          qty_current: 6,
+          expiry_date: "2026-06-01",
+        },
+        {
+          id: 301,
+          vaccine_id: 2,
+          lot_no: "PENTA-FEFO-001",
+          qty_current: 9,
+          expiry_date: "2026-04-01",
+        },
+      ],
     });
 
     renderVaccinationsDashboard();
@@ -275,11 +344,24 @@ describe("Admin integration sync and mapping checks", () => {
 
     const childSelect = screen.getByDisplayValue("Select Child");
     const vaccineSelect = screen.getByDisplayValue("Select Vaccine");
+    const batchSourceSelect = await screen.findByLabelText(/batch source/i);
     const doseInput = screen.getByLabelText(/dose number/i);
     const adminDateInput = screen.getByLabelText(/date administered/i);
 
-    fireEvent.change(childSelect, { target: { value: "1" } });
-    fireEvent.change(vaccineSelect, { target: { value: "1" } });
+    fireEvent.change(childSelect, { target: { value: "2" } });
+    fireEvent.change(vaccineSelect, { target: { value: "2" } });
+
+    await waitFor(() => {
+      expect(apiClient.getVaccineInventoryStatus).toHaveBeenCalledWith(2);
+    });
+
+    await waitFor(() => {
+      expect(batchSourceSelect).toHaveValue("301");
+    });
+
+    expect(
+      screen.getByText(/FEFO recommended batch selected automatically/i),
+    ).toBeInTheDocument();
     fireEvent.change(doseInput, { target: { value: "1" } });
     fireEvent.change(adminDateInput, { target: { value: "2026-03-01" } });
 
@@ -289,8 +371,87 @@ describe("Admin integration sync and mapping checks", () => {
       expect(apiClient.createVaccinationRecord).toHaveBeenCalledTimes(1);
     });
 
+    expect(apiClient.createVaccinationRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        patient_id: 2,
+        vaccine_id: 2,
+        batch_id: 301,
+        lot_batch_number: "PENTA-FEFO-001",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(apiClient.createVaccineInventoryTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          vaccine_inventory_id: 21,
+          vaccine_id: 2,
+          transaction_type: "ISSUE",
+          lot_batch_number: "PENTA-FEFO-001",
+        }),
+      );
+    });
+
     await waitFor(() => {
       expect(apiClient.getVaccinationRecords.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  test("vaccination add flow auto-selects the earliest FEFO-linked batch", async () => {
+    apiClient.getVaccinationRecords.mockResolvedValue(vaccinationRecordRows);
+    apiClient.getVaccinationSchedules.mockResolvedValue(scheduleRows);
+    apiClient.getInfants.mockResolvedValue(infantRows);
+    apiClient.getVaccines.mockResolvedValue(vaccineRows);
+    apiClient.getVaccineInventory.mockResolvedValue(inventoryRecordRows);
+    apiClient.getVaccineInventoryStatus.mockResolvedValue({
+      clinicId: 7,
+      batches: [
+        {
+          id: 302,
+          vaccine_id: 2,
+          lot_no: "PENTA-LATER-002",
+          qty_current: 6,
+          expiry_date: "2026-06-01",
+        },
+        {
+          id: 301,
+          vaccine_id: 2,
+          lot_no: "PENTA-FEFO-001",
+          qty_current: 9,
+          expiry_date: "2026-04-01",
+        },
+      ],
+    });
+
+    renderVaccinationsDashboard();
+
+    expect(
+      await screen.findByRole("button", { name: /vaccination schedule/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^➕\s*add$/i }));
+
+    expect(
+      await screen.findByRole("heading", { name: /add new vaccination record/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByDisplayValue("Select Child"), {
+      target: { value: "2" },
+    });
+    fireEvent.change(screen.getByDisplayValue("Select Vaccine"), {
+      target: { value: "2" },
+    });
+
+    const batchSourceSelect = await screen.findByLabelText(/batch source/i);
+    const lotBatchInput = screen.getByLabelText(/lot \/ batch number/i);
+
+    await waitFor(() => {
+      expect(apiClient.getVaccineInventoryStatus).toHaveBeenCalledWith(2);
+    });
+    await waitFor(() => {
+      expect(batchSourceSelect).toHaveValue("301");
+    });
+    await waitFor(() => {
+      expect(lotBatchInput).toHaveValue("PENTA-FEFO-001");
     });
   });
 
@@ -379,6 +540,7 @@ describe("Admin integration sync and mapping checks", () => {
         vaccine_id: 1,
         vaccine_name: "BCG",
         vaccine_code: "BCG",
+        clinic_id: 7,
         stock_on_hand: 2,
         low_stock_threshold: 5,
         is_low_stock: true,
@@ -389,6 +551,7 @@ describe("Admin integration sync and mapping checks", () => {
         vaccine_id: 99,
         vaccine_name: "Pentavalent",
         vaccine_code: "LEGACY",
+        clinic_id: 7,
         stock_on_hand: 5,
         low_stock_threshold: 5,
         is_low_stock: true,

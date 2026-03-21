@@ -374,6 +374,11 @@ export default function GuardianAppointmentsPage() {
       return;
     }
 
+    if (isWeekendDate(info.date)) {
+      setCalendarGuardFeedback("Appointments can only be booked on weekdays (Monday-Friday).");
+      return;
+    }
+
     const availability = isDateAvailableForBooking(info.date);
     if (!availability.isAvailable) {
       setCalendarGuardFeedback(availability.reason);

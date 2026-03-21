@@ -109,6 +109,23 @@ const validateDateSelection = (dateStr) => {
   return { valid: true, message: "Date is available" };
 };
 
+const resolveRecommendedVaccine = (readinessData) =>
+  readinessData?.overdueVaccines?.[0] || readinessData?.dueVaccines?.[0] || null;
+
+const normalizeAppointmentSuggestions = (response) => {
+  const payload = response?.data || response;
+
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (Array.isArray(payload?.suggestions)) {
+    return payload.suggestions;
+  }
+
+  return [];
+};
+
 export default function GuardianAppointmentBooking() {
   const { guardianId } = useAuth();
   const navigate = useNavigate();
@@ -130,9 +147,11 @@ export default function GuardianAppointmentBooking() {
   const [childReadiness, setChildReadiness] = useState(null);
   const [readinessLoading, setReadinessLoading] = useState(false);
   const [suggestedAppointments, setSuggestedAppointments] = useState([]);
+  const [recommendedVaccine, setRecommendedVaccine] = useState(null);
 
   const [formData, setFormData] = useState({
     infant_id: childId || "",
+    vaccine_id: "",
     scheduled_date: "",
     scheduled_time: "",
     type: "Vaccination",
@@ -191,7 +210,7 @@ export default function GuardianAppointmentBooking() {
   }, [fetchChildren]);
 
   const fetchTimeSlots = useCallback(async () => {
-    if (!guardianId || !formData.scheduled_date) {
+    if (!guardianId || !formData.scheduled_date || !formData.vaccine_id) {
       setTimeSlots([]);
       setTimeSlotsFeedback(null);
       return;
@@ -203,6 +222,8 @@ export default function GuardianAppointmentBooking() {
     try {
       const result = await apiClient.getAppointmentTimeSlots({
         scheduled_date: formData.scheduled_date,
+        vaccine_id: formData.vaccine_id,
+        clinic_id: selectedChild?.clinic_id || selectedChild?.facility_id || undefined,
       });
 
       const slots = Array.isArray(result?.slots) ? result.slots : [];
@@ -224,7 +245,13 @@ export default function GuardianAppointmentBooking() {
     } finally {
       setTimeSlotsLoading(false);
     }
-  }, [guardianId, formData.scheduled_date]);
+  }, [
+    guardianId,
+    formData.scheduled_date,
+    formData.vaccine_id,
+    selectedChild?.clinic_id,
+    selectedChild?.facility_id,
+  ]);
 
   useEffect(() => {
     fetchTimeSlots();
@@ -238,41 +265,66 @@ export default function GuardianAppointmentBooking() {
     try {
       const result = await apiClient.getVaccinationReadiness(infantId);
       if (result?.success && result?.data) {
-        setChildReadiness(result.data);
+        const readinessData = result.data;
+        const nextRecommendedVaccine = resolveRecommendedVaccine(readinessData);
+
+        setChildReadiness(readinessData);
+        setRecommendedVaccine(nextRecommendedVaccine);
+        setFormData((prev) => ({
+          ...prev,
+          vaccine_id: nextRecommendedVaccine?.vaccineId
+            ? String(nextRecommendedVaccine.vaccineId)
+            : "",
+          scheduled_date:
+            prev.scheduled_date ||
+            readinessData?.nextAppointmentPrediction?.date ||
+            nextRecommendedVaccine?.earliestDate ||
+            "",
+          scheduled_time: "",
+          type: "Vaccination",
+        }));
       } else {
         setChildReadiness(null);
+        setRecommendedVaccine(null);
       }
     } catch (err) {
       console.error("Error fetching readiness:", err);
       setChildReadiness(null);
+      setRecommendedVaccine(null);
     } finally {
       setReadinessLoading(false);
     }
   }, []);
 
   // Fetch suggested appointments based on readiness
-  const fetchSuggestedAppointments = useCallback(async (infantId) => {
+  const fetchSuggestedAppointments = useCallback(async (infantId, clinicId = null) => {
     if (!infantId) return;
 
     try {
-      // Use the appointment suggestion endpoint
-      const result = await apiClient.getAppointmentSuggestions(infantId);
-      if (result?.success && Array.isArray(result?.data)) {
-        setSuggestedAppointments(result.data);
-      } else {
-        setSuggestedAppointments([]);
-      }
+      const result = await apiClient.getAppointmentSuggestions({
+        infantId,
+        guardianId,
+        clinicId,
+      });
+      setSuggestedAppointments(normalizeAppointmentSuggestions(result));
     } catch (err) {
       console.error("Error fetching suggestions:", err);
       setSuggestedAppointments([]);
     }
-  }, []);
+  }, [guardianId]);
 
   // Handle child selection
   const handleChildSelect = (infantId) => {
     const child = children.find((c) => c.id === parseInt(infantId));
     setSelectedChild(child);
-    setFormData((prev) => ({ ...prev, infant_id: infantId }));
+    setFormData((prev) => ({
+      ...prev,
+      infant_id: infantId,
+      vaccine_id: "",
+      scheduled_date: "",
+      scheduled_time: "",
+      type: "Vaccination",
+    }));
     // Clear error when user selects a child
     if (errors.infant_id) {
       setErrors((prev) => ({ ...prev, infant_id: null }));
@@ -280,9 +332,10 @@ export default function GuardianAppointmentBooking() {
     // Clear previous readiness and suggestions
     setChildReadiness(null);
     setSuggestedAppointments([]);
+    setRecommendedVaccine(null);
     // Fetch readiness and suggestions for the selected child
     fetchChildReadiness(infantId);
-    fetchSuggestedAppointments(infantId);
+    fetchSuggestedAppointments(infantId, child?.clinic_id || child?.facility_id || null);
   };
 
   // Handle form field blur for real-time validation
@@ -346,6 +399,11 @@ export default function GuardianAppointmentBooking() {
       return;
     }
 
+    if (!formData.vaccine_id) {
+      setError("No due vaccine is currently selected for this child.");
+      return;
+    }
+
     setError(null);
     setErrors({});
     setSubmitting(true);
@@ -355,6 +413,7 @@ export default function GuardianAppointmentBooking() {
 
       const appointmentData = {
         infant_id: parseInt(formData.infant_id),
+        vaccine_id: parseInt(formData.vaccine_id, 10),
         scheduled_date: scheduledDateTime,
         type: formData.type,
         notes: formData.notes,
@@ -729,6 +788,22 @@ export default function GuardianAppointmentBooking() {
                             )}
                           </div>
                         )}
+
+                        {recommendedVaccine && (
+                          <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-3">
+                            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300 mb-1">
+                              Recommended Vaccine:
+                            </p>
+                            <p className="text-sm text-emerald-700 dark:text-emerald-400">
+                              {recommendedVaccine.label}
+                            </p>
+                            {recommendedVaccine.earliestDate && (
+                              <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-1">
+                                Earliest eligible date: {new Date(recommendedVaccine.earliestDate).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
@@ -788,17 +863,20 @@ export default function GuardianAppointmentBooking() {
                         error={touched.scheduled_time ? errors.scheduled_time : undefined}
                         disabled={
                           !formData.scheduled_date ||
+                          !formData.vaccine_id ||
                           timeSlotsLoading ||
                           (timeSlotsFeedback && !timeSlotsFeedback.available)
                         }
                         className="w-full guardian-input"
                       >
                         <option value="">
-                          {!formData.scheduled_date
-                            ? "Select date first"
-                            : timeSlotsLoading
-                              ? "Loading time slots..."
-                              : "Select time"}
+                          {!formData.vaccine_id
+                            ? "Due vaccine required first"
+                            : !formData.scheduled_date
+                              ? "Select date first"
+                              : timeSlotsLoading
+                                ? "Loading time slots..."
+                                : "Select time"}
                         </option>
                         {timeSlots.map((slot) => (
                           <option key={slot} value={slot}>
@@ -807,7 +885,7 @@ export default function GuardianAppointmentBooking() {
                         ))}
                       </Select>
                       <p className="text-xs text-gray-500 mt-1">
-                        Available from 8:00 AM to 4:00 PM (12:00 PM - 1:00 PM lunch break).
+                        Available from 8:00 AM to 4:00 PM (12:00 PM - 1:00 PM lunch break), filtered by due vaccine stock and clinic availability.
                       </p>
                       {!timeSlotsLoading && timeSlotsFeedback && !timeSlotsFeedback.available && (
                         <Alert variant="warning" className="mt-2">
@@ -1019,6 +1097,7 @@ export default function GuardianAppointmentBooking() {
                         const date = new Date(slot.date || slot.suggestedDate);
                         setFormData(prev => ({
                           ...prev,
+                          vaccine_id: slot.vaccineId ? String(slot.vaccineId) : prev.vaccine_id,
                           scheduled_date: date.toISOString().split('T')[0],
                           scheduled_time: slot.time || slot.suggestedTime || ''
                         }));
@@ -1027,6 +1106,9 @@ export default function GuardianAppointmentBooking() {
                     >
                       <div className="flex justify-between items-center">
                         <div>
+                          <p className="font-medium text-emerald-700 dark:text-emerald-400">
+                            {slot.vaccine || "Suggested vaccine"}
+                          </p>
                           <p className="font-medium text-gray-900 dark:text-white">
                             {slot.date
                               ? new Date(slot.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
@@ -1056,6 +1138,7 @@ export default function GuardianAppointmentBooking() {
               loading={submitting}
               disabled={
                 !selectedChild ||
+                !formData.vaccine_id ||
                 !formData.scheduled_date ||
                 !formData.scheduled_time ||
                 (childReadiness && childReadiness.readinessStatus === 'PENDING_CONFIRMATION')

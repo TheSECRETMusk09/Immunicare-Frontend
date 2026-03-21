@@ -39,6 +39,12 @@ import {
   getPurokStreetColorOptions,
   isValidPurokStreetColorSelection,
 } from "../constants/purokOptions";
+import { guardianRoutePaths } from "../utils/routePaths";
+import {
+  buildTransferCaseVaccinesPayload,
+  createTransferVaccineEntry,
+  validateTransferHistoryEntries,
+} from "../utils/transferCasePayloads";
 
 const getErrorFieldMap = (error) => {
   if (!error || !error.response || !error.response.data) {
@@ -219,7 +225,7 @@ export default function MyChildren() {
   const [registrationType, setRegistrationType] = useState("new"); // "new" or "transfer"
   const [transferFormData, setTransferFormData] = useState({
     source_facility: "",
-    prior_vaccines: [],
+    prior_vaccines: [createTransferVaccineEntry(1)],
     vaccination_card: null,
     vaccination_card_preview: "",
     notes: "",
@@ -227,7 +233,6 @@ export default function MyChildren() {
   const [vaccineOptions] = useState(
     APPROVED_VACCINE_NAMES.map((name) => ({ value: name, label: name })),
   );
-  const [selectedVaccines, setSelectedVaccines] = useState([]);
 
 
 
@@ -505,17 +510,56 @@ export default function MyChildren() {
     setTransferFormData((prev) => ({
       ...prev,
       [name]: value,
+      prior_vaccines:
+        name === "source_facility"
+          ? prev.prior_vaccines.map((entry) =>
+              entry.facilityName
+                ? entry
+                : {
+                    ...entry,
+                    facilityName: value,
+                  },
+            )
+          : prev.prior_vaccines,
     }));
   };
 
-  // Handle vaccine selection for transfer-in
-  const handleVaccineToggle = (vaccineValue) => {
-    setSelectedVaccines((prev) => {
-      if (prev.includes(vaccineValue)) {
-        return prev.filter((v) => v !== vaccineValue);
-      }
-      return [...prev, vaccineValue];
+  const addTransferVaccineEntry = () => {
+    setTransferFormData((prev) => {
+      const nextId = Math.max(...prev.prior_vaccines.map((entry) => entry.id), 0) + 1;
+
+      return {
+        ...prev,
+        prior_vaccines: [
+          ...prev.prior_vaccines,
+          createTransferVaccineEntry(nextId, prev.source_facility),
+        ],
+      };
     });
+  };
+
+  const updateTransferVaccineEntry = (entryId, field, value) => {
+    setTransferFormData((prev) => ({
+      ...prev,
+      prior_vaccines: prev.prior_vaccines.map((entry) =>
+        entry.id === entryId
+          ? {
+              ...entry,
+              [field]: field === "doseNumber" ? Number.parseInt(value, 10) || "" : value,
+            }
+          : entry,
+      ),
+    }));
+  };
+
+  const removeTransferVaccineEntry = (entryId) => {
+    setTransferFormData((prev) => ({
+      ...prev,
+      prior_vaccines:
+        prev.prior_vaccines.length === 1
+          ? prev.prior_vaccines
+          : prev.prior_vaccines.filter((entry) => entry.id !== entryId),
+    }));
   };
 
   // Handle vaccination card file upload
@@ -534,12 +578,11 @@ export default function MyChildren() {
   const resetTransferForm = () => {
     setTransferFormData({
       source_facility: "",
-      prior_vaccines: [],
+      prior_vaccines: [createTransferVaccineEntry(1)],
       vaccination_card: null,
       vaccination_card_preview: "",
       notes: "",
     });
-    setSelectedVaccines([]);
     setRegistrationType("new");
   };
 
@@ -564,6 +607,20 @@ export default function MyChildren() {
     setRegisterFieldErrors({});
 
     try {
+      if (!String(transferFormData.source_facility || "").trim()) {
+        setRegisterError("Previous health center name is required for transfer-in cases.");
+        return;
+      }
+
+      const transferEntryValidation = validateTransferHistoryEntries(
+        transferFormData.prior_vaccines,
+      );
+
+      if (!transferEntryValidation.isValid) {
+        setRegisterError(transferEntryValidation.errors[0]);
+        return;
+      }
+
       // First create the infant record
       const infantData = {
         first_name: formData.first_name,
@@ -585,24 +642,33 @@ export default function MyChildren() {
       const infantResponse = await apiClient.createGuardianInfant(infantData);
 
       // Get the created infant ID
-      const infantId = infantResponse?.id || infantResponse?.infant?.id;
+      const infantId =
+        infantResponse?.data?.id ||
+        infantResponse?.id ||
+        infantResponse?.infant?.id;
 
        if (infantId) {
-          const submittedVaccines = selectedVaccines.map((vaccineName) => ({
-            vaccine_name: vaccineName,
-            dose_number: 1,
-            date_administered: null,
-            batch_number: null,
-            facility_name: transferFormData.source_facility || null,
-          }));
+          const submittedVaccines = buildTransferCaseVaccinesPayload(
+            transferFormData.prior_vaccines,
+            transferFormData.source_facility,
+          );
+
+          const transferRemarks = [
+            transferFormData.notes || null,
+            transferFormData.vaccination_card
+              ? `Guardian selected local proof file: ${transferFormData.vaccination_card.name}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join("\n");
 
           // Create transfer-in case with vaccine history
           const transferCaseData = {
             infant_id: infantId,
             source_facility: transferFormData.source_facility,
             submitted_vaccines: submittedVaccines,
-            vaccination_card_url: transferFormData.vaccination_card ? "pending_upload" : null,
-            remarks: transferFormData.notes || null,
+            vaccination_card_url: null,
+            remarks: transferRemarks || null,
           };
 
            // Submit transfer-in case
@@ -617,18 +683,18 @@ export default function MyChildren() {
             // Trigger transfer-in submitted notification via notification context
             transferInSubmitted({
               childName: `${formData.first_name} ${formData.last_name}`,
-              vaccines: selectedVaccines.map(v =>
-                vaccineOptions.find(opt => opt.value === v)?.label || v
-              ).join(', ')
+              vaccines: submittedVaccines
+                .map((entry) => `${entry.vaccine_name} dose ${entry.dose_number}`)
+                .join(', ')
             });
 
             // Send persistent transfer-in submitted notification via notification service
             try {
               await notificationService.sendTransferInSubmittedNotification({
                 childName: `${formData.first_name} ${formData.last_name}`,
-                vaccines: selectedVaccines.map(v =>
-                  vaccineOptions.find(opt => opt.value === v)?.label || v
-                ).join(', '),
+                vaccines: submittedVaccines
+                  .map((entry) => `${entry.vaccine_name} dose ${entry.dose_number}`)
+                  .join(', '),
                 guardianId: guardianId,
                 infantId: infantId
               });
@@ -925,7 +991,7 @@ export default function MyChildren() {
                     size="sm"
                     className="flex-1 justify-center guardian-card-action guardian-card-action--neutral"
                     onClick={() =>
-                      navigate(`/guardian/vaccination-records/${child.id}`)
+                      navigate(guardianRoutePaths.vaccinationRecordsByChild(child.id))
                     }
                   >
                     <FileText className="w-4 h-4 mr-2" />
@@ -936,7 +1002,7 @@ export default function MyChildren() {
                     size="sm"
                     className="flex-1 justify-center guardian-card-action guardian-card-action--neutral"
                     onClick={() =>
-                      navigate(`/guardian/appointments/new?childId=${child.id}`)
+                      navigate(guardianRoutePaths.appointmentBooking(child.id))
                     }
                   >
                     <Calendar className="w-4 h-4 mr-2" />
@@ -978,7 +1044,7 @@ export default function MyChildren() {
               <Button
                 variant="secondary"
                 className="p-6 h-auto flex-col items-center text-center guardian-quick-action-card guardian-quick-action-card--blue"
-                onClick={() => navigate("/guardian/vaccination-records")}
+                onClick={() => navigate(guardianRoutePaths.vaccinationRecords)}
               >
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400/30 to-purple-500/30 backdrop-blur-sm flex items-center justify-center mb-3">
                   <FileText className="w-6 h-6 guardian-card-icon-accent guardian-card-icon-accent--blue" />
@@ -994,7 +1060,7 @@ export default function MyChildren() {
               <Button
                 variant="secondary"
                 className="p-6 h-auto flex-col items-center text-center guardian-quick-action-card guardian-quick-action-card--emerald"
-                onClick={() => navigate("/guardian/appointments/new")}
+                onClick={() => navigate(guardianRoutePaths.appointmentBooking())}
               >
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400/30 to-teal-500/30 backdrop-blur-sm flex items-center justify-center mb-3">
                   <Calendar className="w-6 h-6 guardian-card-icon-accent guardian-card-icon-accent--emerald" />
@@ -1010,16 +1076,16 @@ export default function MyChildren() {
               <Button
                 variant="secondary"
                 className="p-6 h-auto flex-col items-center text-center guardian-quick-action-card guardian-quick-action-card--purple"
-                onClick={() => navigate("/guardian/vaccination-records")}
+                onClick={() => navigate(guardianRoutePaths.documents)}
               >
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400/30 to-pink-500/30 backdrop-blur-sm flex items-center justify-center mb-3">
                   <FileText className="w-6 h-6 guardian-card-icon-accent guardian-card-icon-accent--purple" />
                 </div>
                 <span className="font-bold guardian-quick-action-title">
-                  Download Documents
+                  Documents Hub
                 </span>
                 <span className="text-xs guardian-quick-action-description mt-1">
-                  Get PDF certificates and records
+                  Open current charts, records, and document-ready views
                 </span>
               </Button>
             </div>
@@ -1387,42 +1453,119 @@ export default function MyChildren() {
                       />
                     </div>
 
-                    <div className="mt-4">
-                      <label className="block text-sm font-medium text-theme-secondary mb-2">
-                        Vaccines Previously Administered
-                      </label>
-                      <div className="space-y-2">
-                        <p className="text-xs text-theme-secondary mb-1">
-                          Select all vaccines your child has previously received:
+                      <div className="mt-4 space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <label className="block text-sm font-medium text-theme-secondary">
+                            Previously Administered Doses
+                          </label>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={addTransferVaccineEntry}
+                          >
+                            <Plus className="w-4 h-4 mr-1" />
+                            Add Dose
+                          </Button>
+                        </div>
+                        <p className="text-xs text-theme-secondary">
+                          Enter each vaccine dose separately and include the exact administered date.
+                          This information will be submitted to the admin transfer review workflow.
                         </p>
-                        <div className="grid grid-cols-2 gap-2">
-                          {vaccineOptions.map((option) => (
-                            <label key={option.value} className="flex items-center p-2 border rounded hover:bg-theme-bg-primary/50 transition-colors">
-                              <input
-                                type="checkbox"
-                                value={option.value}
-                                checked={selectedVaccines.includes(option.value)}
-                                onChange={() => handleVaccineToggle(option.value)}
-                                className="h-4 w-4 text-theme-primary focus:ring-theme-primary"
-                              />
-                              <span className="ml-2 text-sm">{option.label}</span>
-                            </label>
+
+                        <div className="space-y-3">
+                          {transferFormData.prior_vaccines.map((entry, index) => (
+                            <div
+                              key={entry.id}
+                              className="rounded-lg border border-theme-border-primary p-4 space-y-3"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-sm font-semibold text-theme-primary">
+                                  Dose Entry #{index + 1}
+                                </p>
+                                {transferFormData.prior_vaccines.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeTransferVaccineEntry(entry.id)}
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-1" />
+                                    Remove
+                                  </Button>
+                                )}
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <Select
+                                  label="Vaccine"
+                                  value={entry.vaccineName}
+                                  onChange={(event) =>
+                                    updateTransferVaccineEntry(
+                                      entry.id,
+                                      "vaccineName",
+                                      event.target.value,
+                                    )
+                                  }
+                                  options={[{ value: "", label: "Select vaccine" }, ...vaccineOptions]}
+                                  required
+                                />
+                                <Input
+                                  label="Dose Number"
+                                  type="number"
+                                  min="1"
+                                  value={entry.doseNumber}
+                                  onChange={(event) =>
+                                    updateTransferVaccineEntry(
+                                      entry.id,
+                                      "doseNumber",
+                                      event.target.value,
+                                    )
+                                  }
+                                  required
+                                />
+                                <Input
+                                  label="Date Administered"
+                                  type="date"
+                                  value={entry.dateAdministered}
+                                  onChange={(event) =>
+                                    updateTransferVaccineEntry(
+                                      entry.id,
+                                      "dateAdministered",
+                                      event.target.value,
+                                    )
+                                  }
+                                  required
+                                />
+                                <Input
+                                  label="Facility Name (Optional)"
+                                  value={entry.facilityName}
+                                  onChange={(event) =>
+                                    updateTransferVaccineEntry(
+                                      entry.id,
+                                      "facilityName",
+                                      event.target.value,
+                                    )
+                                  }
+                                  placeholder="Facility for this dose"
+                                />
+                                <Input
+                                  label="Batch/Lot Number (Optional)"
+                                  value={entry.batchNumber}
+                                  onChange={(event) =>
+                                    updateTransferVaccineEntry(
+                                      entry.id,
+                                      "batchNumber",
+                                      event.target.value,
+                                    )
+                                  }
+                                  placeholder="Recorded on vaccine card"
+                                />
+                              </div>
+                            </div>
                           ))}
                         </div>
-                        {selectedVaccines.length > 0 && (
-                          <div className="mt-2 p-3 bg-theme-bg-primary/50 rounded">
-                            <p className="font-medium text-theme-primary">Selected Vaccines:</p>
-                            <ul className="list-disc list-inside text-sm text-theme-secondary mt-1">
-                              {selectedVaccines.map((vaccine) => (
-                                <li key={vaccine}>
-                                  {vaccineOptions.find((opt) => opt.value === vaccine)?.label || vaccine}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
                       </div>
-                    </div>
 
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-theme-secondary mb-2">

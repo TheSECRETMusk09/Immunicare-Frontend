@@ -11,6 +11,45 @@ import ImmunizationRecordBooklet from "../../components/ImmunizationRecordBookle
 import apiClient from "../../utils/api";
 import { FileCheck, FileText, Printer } from "lucide-react";
 
+const sanitizeFileSegment = (value) =>
+  String(value || "document")
+    .trim()
+    .replace(/[^a-z0-9]+/gi, "_")
+    .replace(/^_+|_+$/g, "") || "document";
+
+const collectInlineStyles = (needle) =>
+  Array.from(document.querySelectorAll("style"))
+    .map((styleNode) => styleNode.textContent || "")
+    .filter((text) => text.includes(needle))
+    .join("\n");
+
+const downloadHtmlDocument = ({ title, filename, markup, styles = "" }) => {
+  const htmlDocument = `<!DOCTYPE html>
+  <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>${title}</title>
+      <style>
+        body { margin: 0; padding: 24px; background: #ffffff; color: #111827; font-family: Arial, sans-serif; }
+        ${styles}
+      </style>
+    </head>
+    <body>
+      ${markup}
+    </body>
+  </html>`;
+
+  const blob = new Blob([htmlDocument], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 export default function ImmunizationRecordPage() {
   const { infantId } = useParams();
   const [infant, setInfant] = useState(null);
@@ -42,7 +81,18 @@ export default function ImmunizationRecordPage() {
   };
 
   const handleDownload = () => {
-    alert("PDF download functionality - integrate with PDF generation library");
+    const printableNode = document.querySelector(".record-booklet-print");
+    if (!printableNode) {
+      setError("Printable immunization record content is not available yet.");
+      return;
+    }
+
+    downloadHtmlDocument({
+      title: `Child Immunization Record - ${infant?.first_name || "Child"} ${infant?.last_name || "Record"}`,
+      filename: `Immunization_Record_${sanitizeFileSegment(infant?.last_name)}_${sanitizeFileSegment(infant?.first_name)}.html`,
+      markup: printableNode.outerHTML,
+      styles: collectInlineStyles("record-booklet-print"),
+    });
   };
 
   if (loading) {

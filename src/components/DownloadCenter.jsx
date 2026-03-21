@@ -1,16 +1,38 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Button,
   Input,
   Modal,
   Card,
-  LoadingSpinner,
   EmptyState,
   SkeletonTable,
 } from "./UI";
 import apiClient from "../utils/api";
 
+const DIGITAL_PAPER_SHORTCUTS = [
+  {
+    key: "chart",
+    title: "Immunization Chart",
+    description: "View the official chart with visit milestones and printable tracking details.",
+    buildPath: (infantId) => `/digital-papers/immunization-chart/${infantId}`,
+  },
+  {
+    key: "record",
+    title: "Immunization Record",
+    description: "Open the child immunization record booklet sourced from the live vaccination timeline.",
+    buildPath: (infantId) => `/digital-papers/immunization-records/${infantId}`,
+  },
+  {
+    key: "schedule",
+    title: "Vaccine Schedule",
+    description: "Review the dynamic schedule booklet with due, completed, and overdue doses.",
+    buildPath: (infantId) => `/digital-papers/vaccine-schedule/${infantId}`,
+  },
+];
+
 export default function DownloadCenter({ onRefresh }) {
+  const navigate = useNavigate();
   const [downloads, setDownloads] = useState([]);
   const [infants, setInfants] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -108,6 +130,24 @@ export default function DownloadCenter({ onRefresh }) {
         .includes(searchQuery.toLowerCase()),
   );
 
+  const filteredInfants = infants.filter((infant) => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    if (!normalizedQuery) return true;
+
+    return [
+      infant.first_name,
+      infant.last_name,
+      infant.middle_name,
+      infant.control_number,
+    ]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(normalizedQuery));
+  });
+
+  const handleOpenOperationalDocument = (path) => {
+    navigate(path);
+  };
+
   if (loading && downloads.length === 0) {
     return (
       <div className="space-y-6">
@@ -116,6 +156,15 @@ export default function DownloadCenter({ onRefresh }) {
           <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse" />
         </div>
         <SkeletonTable rows={5} columns={7} />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        <div className="text-red-600 mb-4">Error: {error}</div>
+        <Button onClick={fetchData}>Retry</Button>
       </div>
     );
   }
@@ -148,6 +197,70 @@ export default function DownloadCenter({ onRefresh }) {
       </div>
 
       {/* Downloads List */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden p-6 space-y-4">
+        <div>
+          <h4 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+            Operational document shortcuts
+          </h4>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Open the live digital papers that now read directly from the same vaccination source of truth used by the admin and guardian modules.
+          </p>
+        </div>
+
+        {filteredInfants.length === 0 ? (
+          <EmptyState
+            title="No infants available for operational documents"
+            description="Register a child first to open their immunization chart, record booklet, or vaccine schedule."
+            icon="👶"
+            className="border-none shadow-none"
+          />
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {filteredInfants.slice(0, 8).map((infant) => (
+              <Card key={`digital-paper-shortcuts-${infant.id}`} className="p-4 space-y-4 border border-gray-200 dark:border-gray-700">
+                <div>
+                  <h5 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    {infant.first_name} {infant.last_name}
+                  </h5>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {infant.control_number || "No control number yet"}
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {DIGITAL_PAPER_SHORTCUTS.map((shortcut) => (
+                    <div
+                      key={`${infant.id}-${shortcut.key}`}
+                      className="rounded-lg border border-gray-200 dark:border-gray-700 p-3"
+                    >
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {shortcut.title}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {shortcut.description}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() =>
+                            handleOpenOperationalDocument(shortcut.buildPath(infant.id))
+                          }
+                        >
+                          Open document
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">

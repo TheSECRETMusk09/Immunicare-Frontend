@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, X, Clock, AlertCircle, Lock, Unlock } from 'lucide-react';
+import { Check, Clock, AlertCircle, Lock, Unlock } from 'lucide-react';
 import apiClient from '../utils/api';
 
 /**
@@ -119,7 +119,13 @@ const ImmunizationCard = ({ vaccine, status, dueDate, index, onViewDetails }) =>
           Dose {vaccine.dose?.number || 1} of {vaccine.dose?.total || 1}
         </span>
         <span className={`text-sm font-medium ${config.textClass}`}>
-          {dueDate}
+          {status === 'completed' && vaccine.adminDate
+            ? new Date(vaccine.adminDate).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })
+            : dueDate}
         </span>
       </div>
 
@@ -132,6 +138,16 @@ const ImmunizationCard = ({ vaccine, status, dueDate, index, onViewDetails }) =>
       <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
         {getStatusLabel()}
       </div>
+      {status === 'completed' && vaccine.adminDate && (
+        <div className="mt-2 text-xs font-medium text-green-700 dark:text-green-400">
+          Administered: {new Date(vaccine.adminDate).toLocaleDateString('en-US')}
+        </div>
+      )}
+      {status === 'completed' && (
+        <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+          Tap to edit the administered date.
+        </div>
+      )}
     </div>
   );
 };
@@ -296,7 +312,11 @@ const EnhancedGuardianImmunizationChart = ({
   };
 
   const handleViewDetails = (vaccine, status) => {
-    // Could open a modal or navigate to details
+    if (status === 'completed' && childId) {
+      navigate(`/guardian/vaccination-records/${childId}`);
+      return;
+    }
+
     console.log('View details for:', vaccine, status);
   };
 
@@ -329,14 +349,15 @@ const EnhancedGuardianImmunizationChart = ({
     }
 
     return scheduleData.schedule.map((item) => ({
-      vaccine: {
-        id: item.vaccine.id,
-        name: item.vaccine.name,
-        description: item.schedule?.description,
-        dose: {
-          number: item.dose.number,
-          total: item.dose.total,
-          completed: item.dose.completed
+        vaccine: {
+          id: item.vaccine.id,
+          name: item.vaccine.name,
+          description: item.schedule?.description,
+          adminDate: item.lastAdministered || null,
+          dose: {
+            number: item.dose.number,
+            total: item.dose.total,
+            completed: item.dose.completed
         }
       },
       status: item.status,

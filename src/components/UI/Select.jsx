@@ -68,8 +68,12 @@ const Select = ({
         {...props}
       >
         {options
-          ? options.map((option) => (
-              <option key={option.value} value={option.value}>
+          ? options.map((option, index) => (
+              <option
+                key={`${String(option.value ?? 'option')}-${index}`}
+                value={option.value}
+                disabled={option.disabled}
+              >
                 {option.label}
               </option>
             ))

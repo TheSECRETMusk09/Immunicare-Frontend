@@ -1,8 +1,14 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Card, Button, Alert, DataTable } from "../UI";
 import apiClient from "../../utils/api";
+import { useAuth } from "../../contexts/AuthContext";
+import {
+  extractAuditLogsPayload,
+  formatAuditLogRow,
+} from "../../utils/auditLogAdapters";
 
 export const AuditLogViewer = () => {
+  const { hasPermission } = useAuth();
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -15,33 +21,31 @@ export const AuditLogViewer = () => {
   const [exporting, setExporting] = useState(false);
 
   const fetchAuditLogs = useCallback(async () => {
+    if (!hasPermission("system:audit")) {
+      setLoading(false);
+      setAuditLogs([]);
+      return;
+    }
+
     try {
       setLoading(true);
       const params = {
         user: filters.user,
-        actionType: filters.actionType,
+        action_type: filters.actionType,
         dateRange: filters.dateRange,
         severity: filters.severity,
       };
       const response = await apiClient.getAuditLogs(params);
-      // Transform data to match frontend expected format
-      const formattedLogs = (response.logs || []).map((log) => ({
-        id: log.id,
-        timestamp: new Date(log.timestamp).toLocaleString(),
-        user: log.user_id,
-        action: log.action_type,
-        severity: log.severity,
-        ipAddress: log.ip_address,
-        details: log.details,
-        userAgent: log.user_agent,
-      }));
+      const formattedLogs = extractAuditLogsPayload(response).logs.map(
+        formatAuditLogRow,
+      );
       setAuditLogs(formattedLogs);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [filters.user, filters.actionType, filters.dateRange, filters.severity]);
+  }, [filters.user, filters.actionType, filters.dateRange, filters.severity, hasPermission]);
 
   useEffect(() => {
     fetchAuditLogs();
@@ -55,10 +59,25 @@ export const AuditLogViewer = () => {
   const handleExport = async () => {
     try {
       setExporting(true);
-      await apiClient.exportAuditLogs(filters);
-      // In a real implementation, this would trigger a file download
+      const exportPayload = await apiClient.exportAuditLogs({
+        user: filters.user,
+        action_type: filters.actionType,
+        dateRange: filters.dateRange,
+        severity: filters.severity,
+      });
+      const blob =
+        exportPayload instanceof Blob
+          ? exportPayload
+          : new Blob([exportPayload], { type: "text/csv;charset=utf-8" });
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(objectUrl);
       setExporting(false);
-      alert("Audit logs exported successfully!");
     } catch (err) {
       setError(err.message);
       setExporting(false);
@@ -108,8 +127,16 @@ export const AuditLogViewer = () => {
     { Header: "Details", accessor: "details" },
   ];
 
+  if (!hasPermission("system:audit")) {
+    return (
+      <Alert variant="warning">
+        Audit log access requires the system audit permission.
+      </Alert>
+    );
+  }
+
   if (loading) return <div>Loading audit logs...</div>;
-  if (error) return <Alert type="error">{error}</Alert>;
+  if (error) return <Alert variant="error">{error}</Alert>;
 
   return (
     <div className="audit-log-viewer">

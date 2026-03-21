@@ -26,6 +26,17 @@ describe("notification routing", () => {
     expect(resolveNotificationActionUrl(notification)).toBe("/inventory");
   });
 
+  test("maps expiry warnings to the inventory module", () => {
+    const notification = {
+      notification_type: "expiry_warning",
+      title: "Vaccine expiring soon",
+      message: "BCG batch expires within 30 days.",
+    };
+
+    expect(resolveNotificationCategory(notification)).toBe("inventory_low_stock");
+    expect(resolveNotificationActionUrl(notification)).toBe("/inventory");
+  });
+
   test("maps guardian registration notifications to the guardians tab in user management", () => {
     const notification = {
       title: "New Registration",
@@ -81,6 +92,24 @@ describe("notification routing", () => {
     expect(
       resolveNotificationActionUrl(notification, { isGuardian: true }),
     ).toBe("/guardian/immunization-chart/7");
+  });
+
+  test("maps guardian appointment suggestions to the appointments module", () => {
+    const notification = {
+      notification_type: "appointment_suggested",
+      title: "Suggested appointment available",
+      message: "A suggested appointment is available.",
+      metadata: {
+        infant_id: 7,
+      },
+    };
+
+    expect(resolveNotificationCategory(notification, { isGuardian: true })).toBe(
+      "appointment",
+    );
+    expect(
+      resolveNotificationActionUrl(notification, { isGuardian: true }),
+    ).toBe("/guardian/appointments?childId=7");
   });
 
   test("maps guardian messages directly to the messages module", () => {

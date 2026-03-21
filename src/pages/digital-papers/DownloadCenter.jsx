@@ -4,9 +4,10 @@ import { Card, Button } from "../../components/UI";
 import { useAuth } from "../../contexts/AuthContext";
 
 const DownloadCenter = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isAdminOrSuperAdmin, user } = useAuth();
+  const hasAccess = isAdmin || isAdminOrSuperAdmin || user?.role_type === "SYSTEM_ADMIN" || user?.role === "admin" || user?.role === "super_admin";
 
-  if (!isAdmin) {
+  if (!hasAccess) {
     return (
       <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 m-6">
         <div className="flex">

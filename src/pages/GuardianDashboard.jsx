@@ -460,11 +460,11 @@ const GuardianDashboard = () => {
       const today = new Date();
 
       const vaccinatedCount = childrenData.reduce((acc, child) => {
-        return acc + (child.vaccinations?.filter(v => v.status === 'completed')?.length || 0);
+        return acc + Number(child.completed_vaccinations || 0);
       }, 0);
 
       const pendingCount = childrenData.reduce((acc, child) => {
-        return acc + (child.vaccinations?.filter(v => v.status === 'pending' || v.status === 'scheduled')?.length || 0);
+        return acc + Number(child.pending_vaccinations || 0);
       }, 0);
 
       // Calculate due/overdue vaccinations
@@ -935,6 +935,9 @@ const GuardianDashboard = () => {
                               ID: {child.controlNumber}
                             </p>
                           )}
+                          <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-medium">
+                            {Number(child.completed_vaccinations || 0)} completed • {Number(child.pending_vaccinations || 0)} pending
+                          </p>
                         </div>
                         <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
                       </div>

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import moment from "moment";
 import {
   AdminModalActions,
@@ -6,7 +6,6 @@ import {
   Modal,
   PageHeader,
   PageContainer,
-  DataTable,
   Badge,
   Alert,
   EmptyState,
@@ -129,25 +128,15 @@ const validateDateSelection = (dateStr) => {
   return { valid: true, message: "Date is available" };
 };
 
-// Generate time options from 8:00 AM to 4:00 PM (30-minute intervals)
-const generateTimeOptions = () => {
-  const options = [{ value: "", label: "Select Time" }];
-  const startMinutes = 8 * 60;
-  const endMinutes = 16 * 60;
-
-  for (let currentMinutes = startMinutes; currentMinutes <= endMinutes; currentMinutes += 30) {
-    const hour = Math.floor(currentMinutes / 60);
-    const minute = currentMinutes % 60;
-    const time = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
-    const displayTime = new Date(`2000-01-01T${time}`).toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-    options.push({ value: time, label: displayTime });
-  }
-
-  return options;
+const formatTimeSlotLabel = (value) => {
+  if (!value) return "";
+  const parsed = new Date(`2000-01-01T${value}`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
 };
 
 export default function Appointments() {
@@ -183,7 +172,21 @@ export default function Appointments() {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rowAction, setRowAction] = useState({ id: null, action: null });
   const [statusFilter, setStatusFilter] = useState('all');
+  const lastAppliedAppointmentsSignatureRef = useRef("");
+
+  const initialAppointmentsSignature = useMemo(
+    () =>
+      JSON.stringify(
+        (initialAppointments || []).map((appointment) => ({
+          id: appointment?.id ?? null,
+          scheduled_date: appointment?.scheduled_date ?? null,
+          status: appointment?.status ?? null,
+        })),
+      ),
+    [initialAppointments],
+  );
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -265,7 +268,10 @@ export default function Appointments() {
   const [createFormError, setCreateFormError] = useState("");
   const [editFormErrors, setEditFormErrors] = useState({});
   const [cancelModalError, setCancelModalError] = useState("");
-  const timeOptions = generateTimeOptions();
+
+  const [timeSlotsLoading, setTimeSlotsLoading] = useState(false);
+  const [timeSlots, setTimeSlots] = useState([]);
+  const [timeSlotsFeedback, setTimeSlotsFeedback] = useState(null);
 
   // Form states
   const [createFormData, setCreateFormData] = useState({
@@ -288,6 +294,54 @@ export default function Appointments() {
     type: "",
     notes: "",
   });
+
+  const fetchTimeSlots = useCallback(async (date, excludeId = undefined) => {
+    if (!showBookingModal && !showEditModal) {
+      setTimeSlots([]);
+      setTimeSlotsFeedback(null);
+      return;
+    }
+
+    if (!date) {
+      setTimeSlots([]);
+      setTimeSlotsFeedback(null);
+      return;
+    }
+
+    setTimeSlotsLoading(true);
+    setTimeSlotsFeedback(null);
+
+    try {
+      const result = await apiClient.getAppointmentTimeSlots({
+        scheduled_date: date,
+        exclude_appointment_id: excludeId,
+      });
+
+      const slots = Array.isArray(result?.slots) ? result.slots : [];
+      setTimeSlots(slots);
+      setTimeSlotsFeedback(result || null);
+    } catch (slotError) {
+      setTimeSlots([]);
+      setTimeSlotsFeedback({
+        available: false,
+        message: slotError?.message || "Failed to load time slots.",
+      });
+    } finally {
+      setTimeSlotsLoading(false);
+    }
+  }, [showBookingModal, showEditModal]);
+
+  useEffect(() => {
+    if (showBookingModal && createFormData.scheduled_date) {
+      fetchTimeSlots(createFormData.scheduled_date);
+    }
+  }, [showBookingModal, createFormData.scheduled_date, fetchTimeSlots]);
+
+  useEffect(() => {
+    if (showEditModal && editFormData.scheduled_date) {
+      fetchTimeSlots(editFormData.scheduled_date, editFormData.id);
+    }
+  }, [showEditModal, editFormData.scheduled_date, editFormData.id, fetchTimeSlots]);
 
   const getSelectedInfantControlNumber = useCallback(
     (infantId) => {
@@ -414,10 +468,11 @@ export default function Appointments() {
 
   // Sync initial appointments when they load
   useEffect(() => {
-    if (!isRefreshing && initialAppointments && initialAppointments.length > 0) {
-      setAppointments(initialAppointments);
+    if (!isRefreshing && initialAppointmentsSignature !== lastAppliedAppointmentsSignatureRef.current) {
+      setAppointments(initialAppointments || []);
+      lastAppliedAppointmentsSignatureRef.current = initialAppointmentsSignature;
     }
-  }, [initialAppointments, isRefreshing]);
+  }, [initialAppointments, initialAppointmentsSignature, isRefreshing]);
 
   // Refresh appointments from API
   const refreshAppointments = useCallback(async () => {
@@ -494,6 +549,28 @@ export default function Appointments() {
       >
         View
       </Button>
+      {row.status === "pending" && (
+        <Button
+          variant="success"
+          size="sm"
+          onClick={() => void handleApproveAppointment(row)}
+          className="gap-1.5"
+          loading={rowAction.id === row.id && rowAction.action === "approve"}
+        >
+          Approve
+        </Button>
+      )}
+      {row.status === "scheduled" && (
+        <Button
+          variant="success"
+          size="sm"
+          onClick={() => void handleCompleteAppointment(row)}
+          className="gap-1.5"
+          loading={rowAction.id === row.id && rowAction.action === "complete"}
+        >
+          Complete
+        </Button>
+      )}
       {row.status !== "cancelled" && row.status !== "attended" && (
         <>
           <Button
@@ -523,6 +600,34 @@ export default function Appointments() {
     setCancelReason("");
     setCancelModalError("");
     setShowCancelModal(true);
+  };
+
+  const handleApproveAppointment = async (appointment) => {
+    try {
+      setRowAction({ id: appointment.id, action: "approve" });
+      setError(null);
+      await apiClient.updateAppointment(appointment.id, { status: "scheduled" });
+      await refreshAppointments();
+    } catch (err) {
+      setError(err.message || "Failed to approve appointment");
+      console.error("Error approving appointment:", err);
+    } finally {
+      setRowAction({ id: null, action: null });
+    }
+  };
+
+  const handleCompleteAppointment = async (appointment) => {
+    try {
+      setRowAction({ id: appointment.id, action: "complete" });
+      setError(null);
+      await apiClient.completeAppointment(appointment.id, "Completed by admin");
+      await refreshAppointments();
+    } catch (err) {
+      setError(err.message || "Failed to complete appointment");
+      console.error("Error completing appointment:", err);
+    } finally {
+      setRowAction({ id: null, action: null });
+    }
   };
 
   // Handle Confirm Cancel Appointment
@@ -671,6 +776,16 @@ export default function Appointments() {
       return;
     }
 
+    if (timeSlotsFeedback && !timeSlotsFeedback.available) {
+      setCreateFormError(timeSlotsFeedback.message || "No available time slots for the selected date.");
+      return;
+    }
+
+    if (timeSlots.length > 0 && !timeSlots.includes(createFormData.scheduled_time)) {
+      setCreateFormError("Selected time is no longer available. Please choose another slot.");
+      return;
+    }
+
     const selectedDateDetails = bookingDateDetails;
     if (
       selectedDateDetails &&
@@ -700,6 +815,16 @@ export default function Appointments() {
       return;
     }
 
+    if (timeSlotsFeedback && !timeSlotsFeedback.available) {
+      setError(timeSlotsFeedback.message || "No available time slots for the selected date.");
+      return;
+    }
+
+    if (timeSlots.length > 0 && !timeSlots.includes(createFormData.scheduled_time)) {
+      setError("Selected time is no longer available. Please choose another slot.");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setError(null);
@@ -718,6 +843,7 @@ export default function Appointments() {
       await apiClient.createAppointment(appointmentData);
       // Refresh from API to ensure data consistency
       await refreshAppointments();
+      setSelectedDate(createFormData.scheduled_date);
       setShowBookingModal(false);
       setCreateFormData({
         infant_id: "",
@@ -728,6 +854,12 @@ export default function Appointments() {
       });
       setFormErrors({});
     } catch (err) {
+      if (err?.status === 409 || err?.code === "DUPLICATE_APPOINTMENT") {
+        setCreateFormError(
+          err.message ||
+            "This child already has an active appointment on the selected date.",
+        );
+      }
       const backendFields = err?.response?.data?.fields || {};
       if (Object.keys(backendFields).length > 0) {
         setFormErrors((prev) => ({
@@ -809,9 +941,18 @@ export default function Appointments() {
       );
       // Refresh from API to ensure data consistency
       await refreshAppointments();
+      setSelectedDate(editFormData.scheduled_date);
       setShowEditModal(false);
       setSelectedAppointment(null);
     } catch (err) {
+      if (err?.status === 409 || err?.code === "DUPLICATE_APPOINTMENT") {
+        setEditFormErrors((prev) => ({
+          ...prev,
+          scheduled_date:
+            err.message ||
+            "This child already has an active appointment on the selected date.",
+        }));
+      }
       const backendFields = err?.response?.data?.fields || {};
       if (Object.keys(backendFields).length > 0) {
         setEditFormErrors((prev) => ({
@@ -861,7 +1002,7 @@ export default function Appointments() {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex h-full min-h-0 min-w-0 flex-col" data-testid="admin-appointments-page">
       {/* Page Header - Fixed/Sticky at top */}
       <div className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6">
         <PageHeader
@@ -917,7 +1058,12 @@ export default function Appointments() {
       </div>
 
       {view === "calendar" ? (
-        <PageContainer title="Calendar View">
+        <div
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 pt-3 sm:px-6 sm:pb-6"
+          data-testid="admin-appointments-calendar-scroll-region"
+        >
+        <PageContainer title="Calendar View" className="overflow-visible">
+          <div className="space-y-4 pb-4">
           {/* Calendar Header with Navigation */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             {/* Month Navigation */}
@@ -997,7 +1143,6 @@ export default function Appointments() {
                 {/* Calendar Cells */}
                 <div className="grid grid-cols-7 gap-1 sm:gap-2 p-2 sm:p-4 min-h-[360px] sm:min-h-[420px]">
                   {calendarCells.map((cell) => {
-                    const info = availabilityByDate[cell.dateKey];
                     const isBlocked = blockedDates[cell.dateKey]?.is_blocked;
                     const isCurrentMonth = cell.isCurrentMonth;
                     const dayAppointments = getAppointmentsForDate(cell.dateKey);
@@ -1189,9 +1334,11 @@ export default function Appointments() {
               })()}
             </div>
           )}
+          </div>
         </PageContainer>
+        </div>
       ) : (
-        <div className="flex-1 flex flex-col p-4 sm:px-6 sm:pb-6 pt-3 overflow-hidden">
+        <div className="flex-1 flex min-h-0 min-w-0 flex-col overflow-hidden p-4 pt-3 sm:px-6 sm:pb-6">
           {/* Filter Controls */}
           <div className="flex-shrink-0 z-20 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4 mb-3">
             <div className="flex flex-wrap items-center gap-3">
@@ -1707,15 +1854,21 @@ export default function Appointments() {
                   }));
                 }}
                 error={formErrors.scheduled_time}
-                disabled={isSubmitting}
+                disabled={isSubmitting || timeSlotsLoading || (timeSlotsFeedback && !timeSlotsFeedback.available)}
                 aria-required="true"
               >
-                {timeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
+                <option value="">
+                  {timeSlotsLoading ? "Loading time slots..." : "Select time"}
+                </option>
+                {timeSlots.map((slot) => (
+                  <option key={slot} value={slot}>
+                    {formatTimeSlotLabel(slot)}
                   </option>
                 ))}
               </Select>
+              {timeSlotsFeedback && !timeSlotsFeedback.available && !timeSlotsLoading && (
+                <p className="text-xs text-red-500 mt-1">{timeSlotsFeedback.message}</p>
+              )}
             </div>
           </div>
 
@@ -1990,16 +2143,22 @@ export default function Appointments() {
                     scheduled_time: undefined,
                   }));
                 }}
-                disabled={isSubmitting}
+                disabled={isSubmitting || timeSlotsLoading || (timeSlotsFeedback && !timeSlotsFeedback.available)}
                 error={editFormErrors.scheduled_time}
                 aria-required="true"
               >
-                {timeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
+                <option value="">
+                  {timeSlotsLoading ? "Loading time slots..." : "Select time"}
+                </option>
+                {timeSlots.map((slot) => (
+                  <option key={slot} value={slot}>
+                    {formatTimeSlotLabel(slot)}
                   </option>
                 ))}
               </Select>
+              {timeSlotsFeedback && !timeSlotsFeedback.available && !timeSlotsLoading && (
+                <p className="text-xs text-red-500 mt-1">{timeSlotsFeedback.message}</p>
+              )}
             </div>
           </div>
 

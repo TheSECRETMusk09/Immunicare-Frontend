@@ -177,11 +177,12 @@ describe("Reports page backend contract alignment", () => {
           success: true,
           data: {
             vaccination: { total: 0, completed: 0 },
-            inventory: { total_items: 0, low_stock_items: 0 },
-            appointments: { total: 0, completed: 0 },
+            inventory: { total_items: 0, low_stock_items: 0, expired_items: 0 },
+            appointments: { total: 0, completed: 0, no_show: 0 },
             guardians: { total: 0, active: 0 },
             infants: { total: 0, up_to_date: 0 },
             reports: { total_reports: 0, total_downloads: 0 },
+            transfers: { total: 0, open_cases: 0, avg_turnaround_days: 0 },
           },
         });
       }
@@ -360,5 +361,41 @@ describe("Reports page backend contract alignment", () => {
     expect(URL.createObjectURL).toHaveBeenCalled();
 
     linkClickSpy.mockRestore();
+  });
+
+  test("dashboard overview surfaces no-show, expired-lot, and transfer-turnaround metrics", async () => {
+    apiClient.request.mockImplementation((endpoint, options = {}) => {
+      if (endpoint === "/reports" && !options.method) {
+        return Promise.resolve({ success: true, data: [] });
+      }
+
+      if (endpoint === "/reports/templates") {
+        return Promise.resolve({ success: true, data: [] });
+      }
+
+      if (endpoint === "/reports/admin/summary") {
+        return Promise.resolve({
+          success: true,
+          data: {
+            vaccination: { total: 12, completed: 9 },
+            inventory: { total_items: 6, low_stock_items: 2, expired_items: 1 },
+            appointments: { total: 8, completed: 5, no_show: 2 },
+            guardians: { total: 4, active: 4 },
+            infants: { total: 7, up_to_date: 5 },
+            reports: { total_reports: 3, total_downloads: 11 },
+            transfers: { total: 5, open_cases: 2, avg_turnaround_days: 3.5 },
+          },
+        });
+      }
+
+      return Promise.resolve({ success: true, data: [] });
+    });
+
+    render(<Reports />);
+
+    expect(await screen.findByText(/no shows/i)).toBeInTheDocument();
+    expect(screen.getByText(/expired lots/i)).toBeInTheDocument();
+    expect(screen.getByText(/transfer turnaround/i)).toBeInTheDocument();
+    expect(screen.getByText(/days • open: 2/i)).toBeInTheDocument();
   });
 });

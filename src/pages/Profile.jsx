@@ -17,7 +17,6 @@ import {
   AccountStatsCard,
   QuickActionsCard,
   PasswordChangeModal,
-  DownloadDataModal,
   LogoutConfirmationModal,
 } from "../components/Profile";
 
@@ -57,7 +56,6 @@ export default function Profile() {
 
   // Modal states
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // Stats
@@ -245,47 +243,6 @@ export default function Profile() {
     }
   };
 
-  // Handle data download
-  const handleDownloadData = async ({ format, options }) => {
-    try {
-      setSaving(true);
-      setError(null);
-
-      const profileGuardianId = guardianId || user?.guardian_id || user?.id;
-
-      // Prepare export data
-      const exportData = {
-        exportDate: new Date().toISOString(),
-        format,
-        includeProfile: options.include_profile_data,
-        includeVaccinations: options.include_vaccination_records,
-        includeAppointments: options.include_appointment_history,
-      };
-
-      // For now, create a JSON download
-      // In production, this would call an API endpoint
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-        type: "application/json",
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `immunicare-data-${new Date().toISOString().split("T")[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      setSuccess("Data download started!");
-      setShowDownloadModal(false);
-      setTimeout(() => setSuccess(null), 5000);
-    } catch (err) {
-      setError(err.message || "Failed to download data.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   // Clear messages after 5 seconds
   useEffect(() => {
     if (error) {
@@ -418,7 +375,6 @@ export default function Profile() {
               {/* Quick Actions */}
               <QuickActionsCard
                 onChangePassword={() => setShowPasswordModal(true)}
-                onDownloadData={() => setShowDownloadModal(true)}
                 onOpenLogoutModal={() => setShowLogoutModal(true)}
               />
             </div>
@@ -430,13 +386,6 @@ export default function Profile() {
           isOpen={showPasswordModal}
           onClose={() => setShowPasswordModal(false)}
           onSubmit={handlePasswordChange}
-          loading={saving}
-        />
-
-        <DownloadDataModal
-          isOpen={showDownloadModal}
-          onClose={() => setShowDownloadModal(false)}
-          onDownload={handleDownloadData}
           loading={saving}
         />
 

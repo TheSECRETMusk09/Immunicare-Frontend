@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import apiClient from "../utils/api";
+import { guardianRoutePaths } from "../utils/routePaths";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
 import GuardianTopHeader from "../components/GuardianTopHeader";
 import { Button, Card, Input } from "../components/UI";
@@ -14,7 +15,6 @@ import {
   Calendar,
   FileText,
   ChevronDown,
-  AlertCircle,
   RefreshCw,
   Bell,
   User,
@@ -95,12 +95,18 @@ export default function UserVaccinationRecords() {
       const normalizedRecords = (Array.isArray(recordsData) ? recordsData : []).map(
         (record) => ({
           ...record,
+          due_date: record.due_date || record.next_due_date || null,
+          dose_no: record.dose_no || record.dose_number || 1,
           provider_name: resolveProviderName(record),
         }),
       );
 
       setVaccinationRecords(normalizedRecords);
-      setVaccinationSchedules(schedulesResponse || []);
+      setVaccinationSchedules(
+        Array.isArray(schedulesResponse)
+          ? schedulesResponse
+          : schedulesResponse?.data || [],
+      );
     } catch (err) {
       console.error("Error fetching vaccination data:", err);
     }
@@ -208,7 +214,7 @@ export default function UserVaccinationRecords() {
   }, [vaccinationRecords]);
 
   const getVaccineStatus = (vaccine) => {
-    if (vaccine.admin_date) {
+    if (vaccine.admin_date || String(vaccine.status || "").toLowerCase() === "completed") {
       return { status: "Completed", color: "green", label: "Completed" };
     }
 
@@ -262,16 +268,24 @@ export default function UserVaccinationRecords() {
     } else if (viewMode === "schedule") {
       // Show all scheduled vaccines with their expected timing
       records = vaccinationSchedules.map((schedule) => {
+        const scheduleVaccineId = schedule.vaccine_id || schedule.vaccineId;
+        const scheduleDoseNumber = schedule.dose_number || schedule.doseNumber || 1;
         const existingRecord = vaccinationRecords.find(
-          (r) => r.vaccine_id === schedule.vaccine_id && r.dose_no === 1,
+          (r) =>
+            r.vaccine_id === scheduleVaccineId &&
+            Number(r.dose_no || r.dose_number || 1) === Number(scheduleDoseNumber),
         );
         return (
           existingRecord || {
             ...schedule,
-            vaccine_name: schedule.vaccine_name,
-            dose_no: 1,
-            due_date: schedule.target_date,
+            vaccine_id: scheduleVaccineId,
+            vaccine_name: schedule.vaccine_name || schedule.vaccineName,
+            dose_no: scheduleDoseNumber,
+            due_date: schedule.dueDate || schedule.due_date || null,
             admin_date: null,
+            status:
+              schedule.status ||
+              (schedule.isOverdue ? "overdue" : schedule.isNextDueDose ? "pending" : "upcoming"),
             isScheduleOnly: true,
           }
         );
@@ -615,7 +629,9 @@ export default function UserVaccinationRecords() {
                   childReadiness.readinessStatus === 'OVERDUE' ||
                   (childReadiness.nextAppointmentPrediction && childReadiness.nextAppointmentPrediction.date)) && (
                   <Button
-                    onClick={() => navigate(`/guardian/book-appointment?childId=${selectedChild.id}`)}
+                    onClick={() =>
+                      navigate(guardianRoutePaths.appointmentBooking(selectedChild.id))
+                    }
                     size="sm"
                     className="shrink-0"
                   >
@@ -713,6 +729,9 @@ export default function UserVaccinationRecords() {
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                             Status
                           </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Action
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -761,6 +780,15 @@ export default function UserVaccinationRecords() {
                                   }`}
                                 >
                                   {status.label}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap text-sm">
+                                <span className="text-xs text-gray-400 dark:text-gray-500">
+                                  {vaccine.isScheduleOnly
+                                    ? "Awaiting dose"
+                                    : vaccine.admin_date
+                                      ? "Recorded by health center"
+                                      : "—"}
                                 </span>
                               </td>
                             </tr>

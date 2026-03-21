@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../utils/api";
@@ -11,8 +11,71 @@ import {
 } from "../components/UI";
 import { BarChart2, Calendar, Download, Bell, Loader2 } from "lucide-react";
 
+const calculateAgeInMonths = (dob) => {
+  if (!dob) return 0;
+  const birthDate = new Date(dob);
+  const today = new Date();
+  let months =
+    (today.getFullYear() - birthDate.getFullYear()) * 12 +
+    (today.getMonth() - birthDate.getMonth());
+
+  if (today.getDate() < birthDate.getDate()) {
+    months -= 1;
+  }
+
+  return Math.max(months, 0);
+};
+
+const buildGuardianGuidance = (child, growthRecords = []) => {
+  const ageInMonths = calculateAgeInMonths(child?.dob);
+  const latestGrowth = growthRecords[growthRecords.length - 1] || null;
+
+  const guidance = [
+    {
+      title: "Age-based care guidance",
+      description:
+        ageInMonths <= 1
+          ? "Focus on newborn feeding, temperature monitoring, and at-birth vaccine follow-up."
+          : ageInMonths <= 6
+            ? "Support exclusive breastfeeding, monitor growth, and attend routine early-infant vaccination visits."
+            : "Track feeding transitions, developmental milestones, and follow the next vaccine schedule on time.",
+    },
+    {
+      title: "Growth reminder",
+      description: latestGrowth
+        ? `Latest recorded growth is ${latestGrowth.weight || "N/A"} kg and ${latestGrowth.height || "N/A"} cm. Continue monitoring weight and height trends every visit.`
+        : "No recent growth entry is recorded yet. Book the next checkup to capture updated measurements.",
+    },
+    {
+      title: "Vaccination support",
+      description:
+        "Use the immunization chart and appointment modules together so upcoming doses, completed visits, and reminders stay synchronized.",
+    },
+  ];
+
+  return guidance;
+};
+
+const ADMIN_GUIDANCE_CARDS = [
+  {
+    title: "Education campaigns",
+    description:
+      "Use child records and due-vaccine patterns to target barangay outreach, missed-dose recovery, and seasonal education efforts.",
+  },
+  {
+    title: "Operational references",
+    description:
+      "Review growth trends, child health context, and vaccination progress before scheduling, follow-up, or escalation decisions.",
+  },
+  {
+    title: "Care coordination",
+    description:
+      "Coordinate appointments, vaccination records, and digital papers so caregiver guidance matches the latest verified child status.",
+  },
+];
+
 export default function HealthInformation() {
-  const { guardianId } = useAuth();
+  const { guardianId, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [children, setChildren] = useState([]);
   const [selectedChild, setSelectedChild] = useState(null);
@@ -23,23 +86,29 @@ export default function HealthInformation() {
 
   // Define all useCallback hooks BEFORE useEffect hooks that reference them
   const fetchChildren = useCallback(async () => {
-    if (!guardianId) {
+    if (!guardianId && !isAdmin) {
       setLoading(false);
       return;
     }
     try {
       setLoading(true);
-      const response = await apiClient.getInfantsByGuardian(guardianId);
-      setChildren(response.data || []);
-      if (response.data && response.data.length > 0) {
-        setSelectedChild(response.data[0]);
+      const response = isAdmin
+        ? await apiClient.getInfants()
+        : await apiClient.getInfantsByGuardian(guardianId);
+      const childRows = Array.isArray(response)
+        ? response
+        : response?.data || [];
+
+      setChildren(childRows);
+      if (childRows.length > 0) {
+        setSelectedChild(childRows[0]);
       }
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [guardianId]);
+  }, [guardianId, isAdmin]);
 
   const fetchHealthRecords = useCallback(async (childId) => {
     try {
@@ -61,10 +130,10 @@ export default function HealthInformation() {
 
   // Add useEffect hooks AFTER useCallback definitions
   useEffect(() => {
-    if (guardianId) {
+    if (guardianId || isAdmin) {
       fetchChildren();
     }
-  }, [guardianId, fetchChildren]);
+  }, [guardianId, isAdmin, fetchChildren]);
 
   useEffect(() => {
     if (selectedChild) {
@@ -95,6 +164,13 @@ export default function HealthInformation() {
     }
     return age;
   };
+
+  const guidanceCards = useMemo(() => {
+    if (!selectedChild) return [];
+    return isAdmin
+      ? ADMIN_GUIDANCE_CARDS
+      : buildGuardianGuidance(selectedChild, growthData);
+  }, [growthData, isAdmin, selectedChild]);
 
   if (loading) {
     return (
@@ -127,13 +203,30 @@ export default function HealthInformation() {
       {/* PageHeader - Standardized violet gradient design matching My Children module */}
       <PageHeader
         title="Health Information"
-        subtitle="Track your children's health metrics and growth records"
+        subtitle={
+          isAdmin
+            ? "Review child health context, growth trends, and education references for clinic operations"
+            : "Track your children's health metrics, growth records, and care guidance"
+        }
         icon={<BarChart2 className="w-8 h-8 text-white" />}
         actions={
-          <Button onClick={() => {}}>
-            <BarChart2 className="w-4 h-4 mr-2" />
-            View Growth Charts
-          </Button>
+          isAdmin ? (
+            <Button onClick={() => navigate("/reports")}>
+              <Download className="w-4 h-4 mr-2" />
+              Open Reports
+            </Button>
+          ) : (
+            <Button
+              onClick={() =>
+                selectedChild
+                  ? navigate(`/guardian/health-charts/${selectedChild.id}`)
+                  : navigate("/guardian/children")
+              }
+            >
+              <BarChart2 className="w-4 h-4 mr-2" />
+              View Growth Charts
+            </Button>
+          )
         }
       />
 
@@ -144,14 +237,18 @@ export default function HealthInformation() {
               <BarChart2 className="w-12 h-12 text-primary-600 dark:text-primary-400" />
             </div>
             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-              No Children Registered
+              {isAdmin ? "No Child Records Available" : "No Children Registered"}
             </h3>
             <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto mb-8">
-              You need to register your children first to view their health
-              information.
+              {isAdmin
+                ? "Health information becomes available once child records and growth entries exist in the system."
+                : "You need to register your children first to view their health information."}
             </p>
-            <Button size="lg" onClick={() => navigate("/guardian/children")}>
-              Register Child
+            <Button
+              size="lg"
+              onClick={() => navigate(isAdmin ? "/infants" : "/guardian/children")}
+            >
+              {isAdmin ? "Open Child Management" : "Register Child"}
             </Button>
           </div>
         </PageContainer>
@@ -284,6 +381,23 @@ export default function HealthInformation() {
                 </div>
               </Card>
 
+              <PageContainer title={isAdmin ? "Campaign & Care Guidance" : "Health Guidance"}>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {guidanceCards.map((card) => (
+                    <Card key={card.title} className="p-5 h-full" noPadding>
+                      <div className="p-5 h-full">
+                        <h4 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider">
+                          {card.title}
+                        </h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-3 leading-relaxed">
+                          {card.description}
+                        </p>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </PageContainer>
+
               {/* Health Records Table */}
               <PageContainer title="Health Checkup Records">
                 <div className="overflow-x-auto">
@@ -376,45 +490,54 @@ export default function HealthInformation() {
                   <Button
                     variant="secondary"
                     className="p-6 h-auto flex-col items-center text-center hover:bg-primary-50 dark:hover:bg-primary-900/10 transition-colors border-dashed border-2"
+                    onClick={() => navigate(isAdmin ? "/appointments" : "/guardian/appointments")}
                   >
                     <div className="w-12 h-12 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center mb-3">
                       <Calendar className="w-6 h-6 text-primary-600 dark:text-primary-400" />
                     </div>
                     <span className="font-bold text-gray-900 dark:text-white">
-                      Schedule Checkup
+                      {isAdmin ? "Open Appointments" : "Schedule Checkup"}
                     </span>
                     <span className="text-xs text-gray-500 mt-1">
-                      Book a visit with a pediatrician
+                      {isAdmin
+                        ? "Review upcoming clinic visits and child demand"
+                        : "Book a visit with a pediatrician"}
                     </span>
                   </Button>
 
                   <Button
                     variant="secondary"
                     className="p-6 h-auto flex-col items-center text-center hover:bg-success-50 dark:hover:bg-success-900/10 transition-colors border-dashed border-2"
+                    onClick={() => navigate(isAdmin ? "/reports" : "/guardian/immunization-chart")}
                   >
                     <div className="w-12 h-12 rounded-full bg-success-100 dark:bg-success-900/30 flex items-center justify-center mb-3">
                       <Download className="w-6 h-6 text-success-600 dark:text-success-400" />
                     </div>
                     <span className="font-bold text-gray-900 dark:text-white">
-                      Download Report
+                      {isAdmin ? "Open Reports" : "Download Report"}
                     </span>
                     <span className="text-xs text-gray-500 mt-1">
-                      Get a PDF of all health records
+                      {isAdmin
+                        ? "Export operational summaries and compliance-ready health outputs"
+                        : "Get a PDF of all health records"}
                     </span>
                   </Button>
 
                   <Button
                     variant="secondary"
                     className="p-6 h-auto flex-col items-center text-center hover:bg-info-50 dark:hover:bg-info-900/10 transition-colors border-dashed border-2"
+                    onClick={() => navigate(isAdmin ? "/vaccination-management" : "/guardian/notifications")}
                   >
                     <div className="w-12 h-12 rounded-full bg-info-100 dark:bg-info-900/30 flex items-center justify-center mb-3">
                       <Bell className="w-6 h-6 text-info-600 dark:text-info-400" />
                     </div>
                     <span className="font-bold text-gray-900 dark:text-white">
-                      Set Reminders
+                      {isAdmin ? "Open Vaccinations" : "Set Reminders"}
                     </span>
                     <span className="text-xs text-gray-500 mt-1">
-                      Get notified for next checkups
+                      {isAdmin
+                        ? "Cross-check health context with vaccine progress"
+                        : "Get notified for next checkups"}
                     </span>
                   </Button>
                 </div>

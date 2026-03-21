@@ -285,19 +285,6 @@ export default function DocumentTemplates({ onRefresh }) {
               </div>
             </div>
 
-            {/* Validation Rules */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Validation Rules
-              </label>
-              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                <pre className="text-sm font-mono text-gray-800 dark:text-gray-200">
-                  {JSON.stringify(selectedTemplate.validation_rules, null, 2) ||
-                    "{}"}
-                </pre>
-              </div>
-            </div>
-
             <div className="flex justify-center gap-3 pt-4">
               <Button
                 variant="cancel"

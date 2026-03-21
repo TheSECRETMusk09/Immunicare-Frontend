@@ -9,7 +9,45 @@ import {
 } from "../../components/UI";
 import VaccineScheduleBooklet from "../../components/VaccineScheduleBooklet";
 import apiClient from "../../utils/api";
-import { Syringe, FileText, Printer, Baby } from "lucide-react";
+import { Syringe, FileText, Printer } from "lucide-react";
+
+const sanitizeFileSegment = (value) =>
+  String(value || "document")
+    .trim()
+    .replace(/[^a-z0-9]+/gi, "_")
+    .replace(/^_+|_+$/g, "") || "document";
+
+const downloadHtmlDocument = ({ title, filename, markup }) => {
+  const htmlDocument = `<!DOCTYPE html>
+  <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>${title}</title>
+      <style>
+        body { margin: 0; padding: 24px; background: #ffffff; color: #111827; font-family: Arial, sans-serif; }
+        .bg-white { background: #ffffff; }
+        .rounded-xl { border-radius: 16px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; vertical-align: top; }
+        th { background: #f3f4f6; }
+        .border, .border-b, .border-t { border-color: #d1d5db; }
+      </style>
+    </head>
+    <body>
+      ${markup}
+    </body>
+  </html>`;
+
+  const blob = new Blob([htmlDocument], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
 
 export default function VaccineSchedulePage() {
   const { infantId } = useParams();
@@ -42,7 +80,17 @@ export default function VaccineSchedulePage() {
   };
 
   const handleDownload = () => {
-    alert("PDF download functionality - integrate with PDF generation library");
+    const printableNode = document.getElementById("vaccine-schedule-print");
+    if (!printableNode) {
+      setError("Printable vaccine schedule content is not available yet.");
+      return;
+    }
+
+    downloadHtmlDocument({
+      title: `Vaccine Schedule - ${infant?.first_name || "Child"} ${infant?.last_name || "Schedule"}`,
+      filename: `Vaccine_Schedule_${sanitizeFileSegment(infant?.last_name)}_${sanitizeFileSegment(infant?.first_name)}.html`,
+      markup: printableNode.outerHTML,
+    });
   };
 
   if (loading) {

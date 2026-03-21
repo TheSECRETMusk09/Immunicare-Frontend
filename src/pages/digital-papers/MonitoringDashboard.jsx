@@ -4,9 +4,10 @@ import { Card, Badge } from "../../components/UI";
 import { useAuth } from "../../contexts/AuthContext";
 
 const MonitoringDashboard = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isAdminOrSuperAdmin, hasPermission, user } = useAuth();
+  const canAccessMonitoring = isAdmin || isAdminOrSuperAdmin || user?.role === "admin" || user?.role === "super_admin" || hasPermission("dashboard:analytics");
 
-  if (!isAdmin) {
+  if (!canAccessMonitoring) {
     return (
       <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 m-6">
         <div className="flex">
@@ -30,7 +31,7 @@ const MonitoringDashboard = () => {
             <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
               <p>
                 You do not have permission to access the monitoring dashboard.
-                Please contact an administrator if you believe this is an error.
+                Analytics permission is required for this page.
               </p>
             </div>
           </div>

@@ -109,6 +109,9 @@ const CATEGORY_ALIASES = Object.freeze({
   inventory_low_stock: [
     "low_stock",
     "inventory_low_stock",
+    "low_stock_alert",
+    "expiry_warning",
+    "expiry_critical",
     "stock_warning",
     "stock_alert",
   ],
@@ -118,6 +121,7 @@ const CATEGORY_ALIASES = Object.freeze({
     "stock_unavailable",
     "vaccine_non_availability",
     "critical_stock_alert",
+    "out_of_stock_alert",
   ],
   guardian_registration: [
     "guardian_registration",
@@ -405,9 +409,13 @@ const getInfantId = (raw = {}) => {
     payload?.childId,
     payload?.child_id,
     templateData?.infantId,
+    templateData?.infant_id,
     templateData?.childId,
+    templateData?.child_id,
     metadata?.infantId,
+    metadata?.infant_id,
     metadata?.childId,
+    metadata?.child_id,
     getRelatedEntityType(raw) === "infant" ? getRelatedEntityId(raw) : null,
     getRelatedEntityType(raw) === "child" ? getRelatedEntityId(raw) : null,
     getRelatedEntityType(raw) === "patient" ? getRelatedEntityId(raw) : null,
@@ -498,7 +506,7 @@ export const resolveNotificationActionUrl = (raw, options = {}) => {
   }
 };
 
-export default {
+const notificationRouting = {
   CATEGORY_META,
   CATEGORY_FILTER_OPTIONS,
   inferNotificationCategoryFromText,
@@ -508,3 +516,5 @@ export default {
   resolveNotificationActionUrl,
   resolveNotificationCategory,
 };
+
+export default notificationRouting;

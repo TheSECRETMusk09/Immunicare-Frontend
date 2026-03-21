@@ -125,7 +125,7 @@ export default function ManagementDashboard() {
             <div className="flex flex-wrap gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
               <button
                 onClick={() => setActiveInfantView("personal")}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                className={`px-4 py-2 rounded-lg text-sm font-bold ${
                   activeInfantView === "personal"
                     ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -136,7 +136,7 @@ export default function ManagementDashboard() {
               </button>
               <button
                 onClick={() => setActiveInfantView("details")}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                className={`px-4 py-2 rounded-lg text-sm font-bold ${
                   activeInfantView === "details"
                     ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -147,7 +147,7 @@ export default function ManagementDashboard() {
               </button>
               <button
                 onClick={() => setActiveInfantView("records")}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                className={`px-4 py-2 rounded-lg text-sm font-bold ${
                   activeInfantView === "records"
                     ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -158,7 +158,7 @@ export default function ManagementDashboard() {
               </button>
               <button
                 onClick={() => setActiveInfantView("chart")}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                className={`px-4 py-2 rounded-lg text-sm font-bold ${
                   activeInfantView === "chart"
                     ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -171,35 +171,36 @@ export default function ManagementDashboard() {
           </div>
 
           {/* Content based on active infant view */}
-          <PageContainer
-            title={
-              activeInfantView === "personal"
-                ? "Personal Information Record"
-                : activeInfantView === "details"
-                  ? "Vaccine Schedule Booklet"
-                  : activeInfantView === "records"
-                    ? "Immunization Record Booklet"
-                    : "Immunization Chart"
-            }
-          >
+          {activeInfantView === "chart" ? (
             <div className="animate-fade-in">
-              {activeInfantView === "details" && (
-                <VaccineScheduleBooklet infantId={selectedInfant.id} />
-              )}
-              {activeInfantView === "records" && (
-                <ImmunizationRecordBooklet infantId={selectedInfant.id} />
-              )}
-              {activeInfantView === "personal" && (
-                <InfantPersonalRecord
-                  infantId={selectedInfant.id}
-                  onUpdate={handlePersonalUpdate}
-                />
-              )}
-              {activeInfantView === "chart" && (
-                <ImmunizationChart infantId={selectedInfant.id} />
-              )}
+              <ImmunizationChart infantId={selectedInfant.id} />
             </div>
-          </PageContainer>
+          ) : (
+            <PageContainer
+              title={
+                activeInfantView === "personal"
+                  ? "Personal Information Record"
+                  : activeInfantView === "details"
+                    ? "Vaccine Schedule Booklet"
+                    : "Immunization Record Booklet"
+              }
+            >
+              <div className="animate-fade-in">
+                {activeInfantView === "details" && (
+                  <VaccineScheduleBooklet infantId={selectedInfant.id} />
+                )}
+                {activeInfantView === "records" && (
+                  <ImmunizationRecordBooklet infantId={selectedInfant.id} />
+                )}
+                {activeInfantView === "personal" && (
+                  <InfantPersonalRecord
+                    infantId={selectedInfant.id}
+                    onUpdate={handlePersonalUpdate}
+                  />
+                )}
+              </div>
+            </PageContainer>
+          )}
         </div>
       );
     }

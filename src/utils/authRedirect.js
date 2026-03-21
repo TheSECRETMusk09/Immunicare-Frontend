@@ -1,7 +1,10 @@
 const SYSTEM_ADMIN_ALIASES = [
   "system_admin",
   "super_admin",
+  "superadmin",
+  "superadministrator",
   "admin",
+  "administrator",
   "clinic_manager",
   "public_health_nurse",
   "inventory_manager",

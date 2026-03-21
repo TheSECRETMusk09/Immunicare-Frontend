@@ -7,7 +7,8 @@
 
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Home, Users, Calendar, Syringe, Bell, Settings } from "lucide-react";
+import { Home, Users, Calendar, Syringe, Bell, User } from "lucide-react";
+import { guardianRoutePaths } from "../../utils/routePaths";
 
 const MobileBottomNav = ({ onNotificationClick }) => {
   const location = useLocation();
@@ -18,43 +19,43 @@ const MobileBottomNav = ({ onNotificationClick }) => {
       id: "dashboard",
       icon: Home,
       label: "Home",
-      path: "/guardian/dashboard",
+      path: guardianRoutePaths.dashboard,
     },
     {
       id: "children",
       icon: Users,
       label: "Children",
-      path: "/guardian/children",
+      path: guardianRoutePaths.children,
     },
     {
       id: "appointments",
       icon: Calendar,
       label: "Schedule",
-      path: "/guardian/appointments",
+      path: guardianRoutePaths.appointments,
     },
     {
       id: "vaccinations",
       icon: Syringe,
       label: "Vaccines",
-      path: "/guardian/vaccination-records",
+      path: guardianRoutePaths.vaccinationRecords,
     },
     {
       id: "notifications",
       icon: Bell,
       label: "Alerts",
-      path: "/guardian/notifications",
+      path: guardianRoutePaths.notifications,
       onClick: onNotificationClick,
     },
     {
-      id: "settings",
-      icon: Settings,
-      label: "Settings",
-      path: "/guardian/settings",
+      id: "profile",
+      icon: User,
+      label: "Profile",
+      path: guardianRoutePaths.profile,
     },
   ];
 
   const isActive = (item) => {
-    if (item.path === "/guardian/dashboard") {
+    if (item.path === guardianRoutePaths.dashboard) {
       return (
         location.pathname === item.path || location.pathname === "/guardian"
       );

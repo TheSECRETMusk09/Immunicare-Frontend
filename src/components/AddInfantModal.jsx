@@ -1,6 +1,43 @@
 import React, { useState, useEffect } from "react";
 import apiClient from "../utils/api";
+import infantService from "../services/infantService";
 import { Button, Input, Modal, Select, Alert, AdminModalActions } from "./UI";
+
+const createInitialFormData = () => ({
+  first_name: "",
+  last_name: "",
+  dob: "",
+  sex: "male",
+  birth_weight: "",
+  birth_length: "",
+  birth_head_circumference: "",
+  blood_type: "",
+  birthplace: "",
+  guardian_id: "",
+  notes: "",
+});
+
+const mapEditingInfantToFormData = (editingInfant = null) => {
+  if (!editingInfant) {
+    return createInitialFormData();
+  }
+
+  return {
+    first_name: editingInfant.first_name || "",
+    last_name: editingInfant.last_name || "",
+    dob: editingInfant.dob ? editingInfant.dob.split("T")[0] : "",
+    sex: editingInfant.sex || "male",
+    birth_weight: editingInfant.birth_weight || "",
+    birth_length:
+      editingInfant.birth_height || editingInfant.birth_length || "",
+    birth_head_circumference: editingInfant.birth_head_circumference || "",
+    blood_type: editingInfant.blood_type || "",
+    birthplace:
+      editingInfant.place_of_birth || editingInfant.birthplace || "",
+    guardian_id: editingInfant.guardian_id || "",
+    notes: editingInfant.notes || "",
+  };
+};
 
 export default function AddInfantModal({
   isOpen,
@@ -8,19 +45,7 @@ export default function AddInfantModal({
   onSuccess,
   editingInfant = null,
 }) {
-  const [formData, setFormData] = useState({
-    first_name: "",
-    last_name: "",
-    dob: "",
-    sex: "male",
-    birth_weight: "",
-    birth_length: "",
-    birth_head_circumference: "",
-    blood_type: "",
-    birthplace: "",
-    guardian_id: "",
-    notes: "",
-  });
+  const [formData, setFormData] = useState(createInitialFormData);
   const [guardians, setGuardians] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -32,20 +57,7 @@ export default function AddInfantModal({
     if (isOpen) {
       fetchGuardians();
       if (editingInfant) {
-        setFormData({
-          first_name: editingInfant.first_name || "",
-          last_name: editingInfant.last_name || "",
-          dob: editingInfant.dob ? editingInfant.dob.split("T")[0] : "",
-          sex: editingInfant.sex || "male",
-          birth_weight: editingInfant.birth_weight || "",
-          birth_length: editingInfant.birth_length || "",
-          birth_head_circumference:
-            editingInfant.birth_head_circumference || "",
-          blood_type: editingInfant.blood_type || "",
-          birthplace: editingInfant.birthplace || "",
-          guardian_id: editingInfant.guardian_id || "",
-          notes: editingInfant.notes || "",
-        });
+        setFormData(mapEditingInfantToFormData(editingInfant));
       } else {
         resetForm();
       }
@@ -53,19 +65,9 @@ export default function AddInfantModal({
   }, [isOpen, editingInfant]);
 
   const resetForm = () => {
-    setFormData({
-      first_name: "",
-      last_name: "",
-      dob: "",
-      sex: "male",
-      birth_weight: "",
-      birth_length: "",
-      birth_head_circumference: "",
-      blood_type: "",
-      birthplace: "",
-      guardian_id: "",
-      notes: "",
-    });
+    setFormData(createInitialFormData());
+    setErrors({});
+    setTouched({});
   };
 
   const fetchGuardians = async () => {
@@ -105,15 +107,32 @@ export default function AddInfantModal({
     setError(null);
     setSuccess(null);
 
+    const submitErrors = {};
+    ["first_name", "last_name", "dob", "guardian_id"].forEach((field) => {
+      const fieldError = validateField(field, formData[field]);
+      if (fieldError) {
+        submitErrors[field] = fieldError;
+      }
+    });
+
+    if (Object.keys(submitErrors).length > 0) {
+      setErrors(submitErrors);
+      setTouched({
+        first_name: true,
+        last_name: true,
+        dob: true,
+        guardian_id: true,
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       if (editingInfant) {
-        await apiClient.request(`/infants/${editingInfant.id}`, {
-          method: "PUT",
-          data: formData
-        });
+        await infantService.update(editingInfant.id, formData);
         setSuccess("Infant record updated successfully!");
       } else {
-        await apiClient.createInfant(formData);
+        await infantService.create(formData);
         setSuccess("Infant registered successfully!");
       }
 

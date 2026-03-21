@@ -2,14 +2,10 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   Button,
-  Input,
-  Modal,
   Card,
   PageHeader,
   Alert,
   LoadingSpinner,
-  SkeletonCard,
-  EmptyState,
 } from "../components/UI";
 import apiClient from "../utils/api";
 import { useAuth } from "../contexts/AuthContext";
@@ -23,7 +19,7 @@ export default function DigitalPapersDashboard() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const urlTab = searchParams.get("tab");
-  const { user, isAdmin, isHealthcareWorker } = useAuth();
+  const { user, isAdmin, isAdminOrSuperAdmin, isHealthcareWorker } = useAuth();
   const [activeTab, setActiveTab] = useState(urlTab || "paper_configuration");
   const [stats, setStats] = useState({
     totalTemplates: 0,
@@ -37,24 +33,15 @@ export default function DigitalPapersDashboard() {
   // Check if user has access (admin, doctor, nurse, or healthcare worker)
   const hasAccess =
     isAdmin ||
+    isAdminOrSuperAdmin ||
+    user?.role_type === "SYSTEM_ADMIN" ||
+    user?.role === "admin" ||
+    user?.role === "super_admin" ||
     isHealthcareWorker ||
     user?.role === "doctor" ||
     user?.role === "nurse" ||
     user?.role === "physician" ||
     user?.role === "midwife";
-
-  // Define allowed roles for display
-  const allowedRoles = [
-    "super_admin",
-    "admin",
-    "clinic_manager",
-    "healthcare_worker",
-    "physician",
-    "doctor",
-    "nurse",
-    "midwife",
-    "staff",
-  ];
 
   const userRoleDisplay =
     user?.role?.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()) ||

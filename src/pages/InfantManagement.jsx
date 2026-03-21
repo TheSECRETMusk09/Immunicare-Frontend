@@ -4,6 +4,7 @@ import VaccineScheduleBooklet from "../components/VaccineScheduleBooklet";
 import ImmunizationRecordBooklet from "../components/ImmunizationRecordBooklet";
 import InfantPersonalRecord from "../components/InfantPersonalRecord";
 import ImmunizationChart from "../components/ImmunizationChart";
+import TransferInCases from "./TransferInCases";
 import AddInfantModal from "../components/AddInfantModal";
 import InjectVaccineModal from "../components/InjectVaccineModal";
 import useInfantManagementSocket from "../hooks/useInfantManagementSocket";
@@ -13,7 +14,6 @@ import {
   PageHeader,
   PageContainer,
   Alert,
-  DataTable,
   Badge,
   LoadingSpinner,
   Input,
@@ -27,9 +27,24 @@ import {
   Plus,
   Search,
   Syringe,
-  Download,
   Baby,
+  RefreshCw,
 } from "lucide-react";
+
+const WORKFLOW_STATUS_META = {
+  needs_review: { label: "Needs Review", variant: "warning" },
+  pending_doses: { label: "Pending Doses", variant: "info" },
+  in_progress: { label: "In Progress", variant: "success" },
+  up_to_date: { label: "Up to Date", variant: "secondary" },
+};
+
+const TRANSFER_STATUS_META = {
+  approved: { label: "Transfer Approved", variant: "success" },
+  for_validation: { label: "Transfer Review", variant: "warning" },
+  needs_clarification: { label: "Needs Clarification", variant: "info" },
+  pending_validation: { label: "Pending Validation", variant: "warning" },
+  rejected: { label: "Transfer Rejected", variant: "danger" },
+};
 
 const formatControlNumberDisplay = (controlNumber, dateValue) => {
   const base = String(controlNumber || "").trim();
@@ -54,9 +69,11 @@ export default function InfantManagement() {
   const [showInjectModal, setShowInjectModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState("");
+  const [transferCasesRefreshing, setTransferCasesRefreshing] = useState(false);
 
   const isMountedRef = useRef(true);
   const fetchRequestIdRef = useRef(0);
+  const transferInCasesRef = useRef(null);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -174,47 +191,26 @@ export default function InfantManagement() {
     }
   );
 
-  // Export infant data to CSV
-  const handleExportInfants = () => {
-    const headers = [
-      "Name",
-      "Date of Birth",
-      "Gender",
-      "Mother Name",
-      "Father Name",
-      "Guardian Name",
-      "Contact",
-    ];
-    const rows = filteredInfants.map((infant) => [
-      `${infant.first_name} ${infant.last_name}`,
-      infant.dob ? new Date(infant.dob).toLocaleDateString() : "",
-      infant.sex === "M" || infant.sex === "male"
-        ? "Male"
-        : infant.sex === "F" || infant.sex === "female"
-          ? "Female"
-          : "",
-      infant.mother_name || "",
-      infant.father_name || "",
-      infant.guardian_name || "",
-      infant.cellphone_number || infant.guardian_phone || "",
-    ]);
-    const csv = [
-      headers.join(","),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-    ].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "infants_export.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+  const infantSummary = {
+    total: filteredInfants.length,
+    needsReview: filteredInfants.filter(
+      (infant) => infant.workflow_status === "needs_review",
+    ).length,
+    withImportedHistory: filteredInfants.filter(
+      (infant) => Number(infant.imported_vaccinations || 0) > 0,
+    ).length,
+    pendingVaccinations: filteredInfants.reduce(
+      (total, infant) => total + Number(infant.pending_vaccinations || 0),
+      0,
+    ),
   };
 
   const columns = [
     {
       key: "name",
       label: "Name",
+      headerClassName: "w-auto whitespace-nowrap",
+      cellClassName: "whitespace-normal min-w-[10rem]",
       render: (val, row) => (
         <div className="font-medium text-gray-900 dark:text-gray-100">
           {row.first_name} {row.last_name}
@@ -224,6 +220,8 @@ export default function InfantManagement() {
     {
       key: "control_number",
       label: "Infant Control Number",
+      headerClassName: "w-px whitespace-nowrap",
+      cellClassName: "w-px whitespace-nowrap",
       render: (val, row) => (
         <span className="font-mono text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-gray-600 dark:text-gray-300">
           {formatControlNumberDisplay(val, row.dob)}
@@ -233,11 +231,15 @@ export default function InfantManagement() {
     {
       key: "dob",
       label: "Date of Birth",
+      headerClassName: "w-px whitespace-nowrap",
+      cellClassName: "w-px whitespace-nowrap",
       type: "date",
     },
     {
       key: "sex",
       label: "Gender",
+      headerClassName: "w-px whitespace-nowrap",
+      cellClassName: "w-px whitespace-nowrap",
       render: (val) => {
         // Handle both 'M'/'F' and 'male'/'female' formats
         const isMale =
@@ -254,6 +256,8 @@ export default function InfantManagement() {
     {
       key: "parents",
       label: "Parents/Guardian",
+      headerClassName: "w-auto whitespace-nowrap",
+      cellClassName: "whitespace-normal min-w-[14rem]",
       render: (val, row) => {
         const parents = [];
         if (row.mother_name) parents.push(`Mother: ${row.mother_name}`);
@@ -280,9 +284,64 @@ export default function InfantManagement() {
     {
       key: "contact",
       label: "Contact",
+      headerClassName: "w-px whitespace-nowrap",
+      cellClassName: "w-px whitespace-nowrap",
       render: (val, row) => (
         <div className="text-sm text-gray-700 dark:text-gray-300">
           {row.cellphone_number || row.guardian_phone || "Not specified"}
+        </div>
+      ),
+    },
+    {
+      key: "workflow_status",
+      label: "Workflow",
+      headerClassName: "w-px whitespace-nowrap",
+      cellClassName: "w-px whitespace-nowrap",
+      render: (val, row) => {
+        const workflowMeta =
+          WORKFLOW_STATUS_META[row.workflow_status] || WORKFLOW_STATUS_META.up_to_date;
+
+        return (
+          <div className="space-y-1">
+            <Badge variant={workflowMeta.variant}>{workflowMeta.label}</Badge>
+            {row.latest_transfer_case_status && (
+              <div>
+                <Badge
+                  variant={
+                    TRANSFER_STATUS_META[row.latest_transfer_case_status]?.variant ||
+                    "secondary"
+                  }
+                >
+                  {TRANSFER_STATUS_META[row.latest_transfer_case_status]?.label ||
+                    row.latest_transfer_case_status}
+                </Badge>
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "vaccination_progress",
+      label: "Vaccination Progress",
+      headerClassName: "w-px whitespace-nowrap",
+      cellClassName: "w-px whitespace-nowrap",
+      render: (val, row) => (
+        <div className="text-sm text-gray-700 dark:text-gray-300 space-y-1">
+          <div>Completed: {Number(row.completed_vaccinations || 0)}</div>
+          <div>Pending: {Number(row.pending_vaccinations || 0)}</div>
+          <div>Imported: {Number(row.imported_vaccinations || 0)}</div>
+        </div>
+      ),
+    },
+    {
+      key: "latest_transfer_source_facility",
+      label: "Transfer Source",
+      headerClassName: "w-auto whitespace-nowrap",
+      cellClassName: "whitespace-normal min-w-[12rem]",
+      render: (val) => (
+        <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-normal break-words">
+          {val || "—"}
         </div>
       ),
     },
@@ -355,7 +414,7 @@ export default function InfantManagement() {
     );
   }
 
-  if (activeView !== "list" && selectedInfant) {
+if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
     return (
       <div className="space-y-8 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
@@ -375,13 +434,35 @@ export default function InfantManagement() {
               <p className="text-xs mt-1 font-mono text-gray-600 dark:text-gray-300">
                 Infant Control Number: {formatControlNumberDisplay(selectedInfant.control_number, selectedInfant.dob)}
               </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Badge
+                  variant={
+                    WORKFLOW_STATUS_META[selectedInfant.workflow_status]?.variant ||
+                    "secondary"
+                  }
+                >
+                  {WORKFLOW_STATUS_META[selectedInfant.workflow_status]?.label ||
+                    "Workflow Active"}
+                </Badge>
+                {selectedInfant.latest_transfer_case_status && (
+                  <Badge
+                    variant={
+                      TRANSFER_STATUS_META[selectedInfant.latest_transfer_case_status]
+                        ?.variant || "secondary"
+                    }
+                  >
+                    {TRANSFER_STATUS_META[selectedInfant.latest_transfer_case_status]
+                      ?.label || selectedInfant.latest_transfer_case_status}
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
             <button
               onClick={() => setActiveView("personal")}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+              className={`px-4 py-2 rounded-lg text-sm font-bold ${
                 activeView === "personal"
                   ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
                   : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -391,7 +472,7 @@ export default function InfantManagement() {
             </button>
             <button
               onClick={() => setActiveView("schedule")}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+              className={`px-4 py-2 rounded-lg text-sm font-bold ${
                 activeView === "schedule"
                   ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
                   : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -401,7 +482,7 @@ export default function InfantManagement() {
             </button>
             <button
               onClick={() => setActiveView("records")}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+              className={`px-4 py-2 rounded-lg text-sm font-bold ${
                 activeView === "records"
                   ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
                   : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -411,7 +492,7 @@ export default function InfantManagement() {
             </button>
             <button
               onClick={() => setActiveView("chart")}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+              className={`px-4 py-2 rounded-lg text-sm font-bold ${
                 activeView === "chart"
                   ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
                   : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -422,35 +503,62 @@ export default function InfantManagement() {
           </div>
         </div>
 
-        <PageContainer
-          title={
-            activeView === "personal"
-              ? "Personal Information Record"
-              : activeView === "schedule"
-                ? "Vaccine Schedule Booklet"
-                : activeView === "records"
-                  ? "Immunization Record Booklet"
-                  : "Immunization Chart"
-          }
-        >
+        {activeView === "chart" ? (
           <div className="animate-fade-in">
-            {activeView === "schedule" && (
-              <VaccineScheduleBooklet infantId={selectedInfant.id} />
-            )}
-            {activeView === "records" && (
-              <ImmunizationRecordBooklet infantId={selectedInfant.id} />
-            )}
-            {activeView === "personal" && (
-              <InfantPersonalRecord
-                infantId={selectedInfant.id}
-                onUpdate={handlePersonalUpdate}
-              />
-            )}
-            {activeView === "chart" && (
-              <ImmunizationChart infantId={selectedInfant.id} />
-            )}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Completed</p>
+                <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {Number(selectedInfant.completed_vaccinations || 0)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Pending</p>
+                <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {Number(selectedInfant.pending_vaccinations || 0)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Imported History</p>
+                <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {Number(selectedInfant.imported_vaccinations || 0)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Transfer Source</p>
+                <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-gray-100 line-clamp-2">
+                  {selectedInfant.latest_transfer_source_facility || "No transfer source"}
+                </p>
+              </div>
+            </div>
+            <ImmunizationChart infantId={selectedInfant.id} />
           </div>
-        </PageContainer>
+        ) : (
+          <PageContainer
+            title={
+              activeView === "personal"
+                ? "Personal Information Record"
+                : activeView === "schedule"
+                  ? "Vaccine Schedule Booklet"
+                  : "Immunization Record Booklet"
+            }
+          >
+            <div className="animate-fade-in">
+              {activeView === "schedule" && (
+                <VaccineScheduleBooklet infantId={selectedInfant.id} />
+              )}
+              {activeView === "records" && (
+                <ImmunizationRecordBooklet infantId={selectedInfant.id} />
+              )}
+              {activeView === "personal" && (
+                <InfantPersonalRecord
+                  infantId={selectedInfant.id}
+                  onUpdate={handlePersonalUpdate}
+                />
+              )}
+            </div>
+          </PageContainer>
+        )}
 
         {/* Inject Vaccine Button */}
         <div className="fixed bottom-6 right-6">
@@ -472,38 +580,96 @@ export default function InfantManagement() {
       {/* Sticky Header Section - Stays fixed at top while scrolling */}
       <div className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6">
         <PageHeader
-          title="Infant Management"
-          subtitle="Digital booklets and records for pediatric patients"
-          icon={<Baby className="w-6 h-6" />}
+          title={activeView === "transfer-in" ? "Transfer-In Cases" : "Infant Management"}
+          subtitle={activeView === "transfer-in" ? "Manage and validate infant vaccination records transferred from other facilities" : "Digital booklets and records for pediatric patients"}
+          icon={activeView === "transfer-in" ? <BookOpen className="w-6 h-6" /> : <Baby className="w-6 h-6" />}
           actions={
             <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={handleExportInfants}
-                variant="secondary"
-                className="flex items-center gap-2"
-              >
-                <Download className="w-4 h-4" /> Export Data
-              </Button>
-              <Button
-                onClick={() => setShowInjectModal(true)}
-                variant="success"
-                className="flex items-center gap-2"
-              >
-                <Syringe className="w-4 h-4" /> Record Vaccination
-              </Button>
-              <Button
-                onClick={() => setShowAddModal(true)}
-                variant="primary"
-                className="flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" /> Add New Infant
-              </Button>
+              {activeView === "transfer-in" ? (
+                <>
+                  <Button
+                    onClick={() => {
+                      setTransferCasesRefreshing(false);
+                      setActiveView("list");
+                    }}
+                    variant="secondary"
+                    className="flex items-center gap-2"
+                  >
+                    <ArrowLeft className="w-4 h-4" /> Back to Infants
+                  </Button>
+                  <Button
+                    onClick={() => transferInCasesRef.current?.fetchCases(true)}
+                    variant="secondary"
+                    disabled={transferCasesRefreshing}
+                    className="flex items-center gap-2"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${transferCasesRefreshing ? "animate-spin" : ""}`} />
+                    {transferCasesRefreshing ? "Refreshing..." : "Refresh"}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    onClick={() => {
+                      setSelectedInfant(null);
+                      setActiveView("transfer-in");
+                    }}
+                    variant="info"
+                    className="flex items-center gap-2"
+                  >
+                    <BookOpen className="w-4 h-4" /> Transfer-In Cases
+                  </Button>
+                  <Button
+                    onClick={() => setShowInjectModal(true)}
+                    variant="success"
+                    className="flex items-center gap-2"
+                  >
+                    <Syringe className="w-4 h-4" /> Record Vaccination
+                  </Button>
+                  <Button
+                    onClick={() => setShowAddModal(true)}
+                    variant="primary"
+                    className="flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" /> Add New Infant
+                  </Button>
+                </>
+              )}
             </div>
           }
         />
       </div>
 
       <div className="flex-1 flex flex-col p-4 sm:px-6 sm:pb-6 pt-3 overflow-hidden">
+        {activeView === "transfer-in" ? (
+          <div className="flex-1 overflow-auto animate-fade-in -mx-4 sm:-mx-6 -mb-6 px-4 sm:px-6 pb-6">
+            <TransferInCases
+              ref={transferInCasesRef}
+              showHeader={false}
+              onRefreshStateChange={setTransferCasesRefreshing}
+            />
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Visible Infants</p>
+            <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">{infantSummary.total}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Needs Review</p>
+            <p className="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">{infantSummary.needsReview}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Imported History</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-400">{infantSummary.withImportedHistory}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Pending Doses</p>
+            <p className="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">{infantSummary.pendingVaccinations}</p>
+          </div>
+        </div>
+
         {/* Search Bar */}
         <div className="flex-shrink-0 z-20 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4 mb-3">
           <div className="flex flex-col sm:flex-row gap-4">
@@ -551,21 +717,21 @@ export default function InfantManagement() {
             </h3>
           </div>
           <div className="flex-1 overflow-auto auto-hide-scrollbar">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 relative">
+            <table className="min-w-full w-full table-auto divide-y divide-gray-200 dark:divide-gray-700 relative">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                 <tr>
                   {columns.map((col) => (
                     <th
                       key={col.key}
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700"
+                      className={`px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 ${col.headerClassName || ""}`}
                     >
                       {col.label}
                     </th>
                   ))}
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 w-px whitespace-nowrap"
                   >
                     Actions
                   </th>
@@ -585,7 +751,10 @@ export default function InfantManagement() {
                   filteredInfants.map((row) => (
                     <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                       {columns.map((col, colIndex) => (
-                        <td key={col.key || colIndex} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                        <td
+                          key={col.key || colIndex}
+                          className={`px-4 py-4 align-top text-sm text-gray-900 dark:text-gray-100 ${col.cellClassName || "whitespace-nowrap"}`}
+                        >
                           {col.render
                             ? col.render(row[col.key], row)
                             : col.type === "date" && row[col.key]
@@ -593,7 +762,7 @@ export default function InfantManagement() {
                               : row[col.key]}
                         </td>
                       ))}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <td className="px-4 py-4 align-top whitespace-nowrap text-sm font-medium w-px">
                         {tableActions(row)}
                       </td>
                     </tr>
@@ -603,6 +772,8 @@ export default function InfantManagement() {
             </table>
           </div>
         </div>
+          </>
+        )}
       </div>
 
       {/* Add Infant Modal */}

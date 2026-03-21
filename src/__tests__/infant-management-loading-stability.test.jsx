@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
 import InfantPersonalRecord from "../components/InfantPersonalRecord";
@@ -20,6 +20,7 @@ jest.mock("../utils/api", () => ({
     getVaccinationRecordsByInfant: jest.fn(),
     getAppointmentsByInfant: jest.fn(),
     getGrowthRecordsByInfant: jest.fn(),
+    recordVaccinationWithInventory: jest.fn(),
     getVaccines: jest.fn(),
     getVaccineBatches: jest.fn(),
     createGrowthRecord: jest.fn(),
@@ -96,6 +97,14 @@ const baseDynamicSchedule = {
 };
 
 const renderStrict = (ui) => render(<React.StrictMode>{ui}</React.StrictMode>);
+
+const readBlobAsText = (blob) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = reject;
+    reader.readAsText(blob);
+  });
 
 describe("Infant module loading stability under StrictMode lifecycle", () => {
   beforeEach(() => {
@@ -183,5 +192,127 @@ describe("Infant module loading stability under StrictMode lifecycle", () => {
     expect(screen.queryByText(/loading immunization chart/i)).not.toBeInTheDocument();
     expect(apiClient.getAppointmentsByInfant).toHaveBeenCalled();
     expect(apiClient.getGrowthRecordsByInfant).toHaveBeenCalled();
+  });
+
+  test("ImmunizationChart renders PDF action with the redesigned visit layout", async () => {
+    apiClient.getInfant.mockResolvedValue({
+      ...baseInfant,
+      birth_weight: 3.1,
+      birth_height: 49,
+      place_of_birth: "Pasig City",
+      mother_name: "Mother One",
+      cellphone_number: "09123456789",
+      time_of_delivery: "08:30",
+      type_of_delivery: "NSD",
+      doctor_midwife_nurse: "Nurse",
+      nbs_done: true,
+      nbs_date: "2025-01-02",
+    });
+    apiClient.getVaccinationRecordsByInfant.mockResolvedValue([
+      {
+        id: 1,
+        vaccine_name: "BCG",
+        dose_no: 1,
+        admin_date: "2025-01-01",
+        status: "completed",
+      },
+      {
+        id: 2,
+        vaccine_name: "Hepa B",
+        dose_no: 1,
+        admin_date: "2025-01-01",
+        status: "completed",
+      },
+    ]);
+
+    renderStrict(<ImmunizationChart infantId={1} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/detailed visit records for/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("button", { name: /print \/ pdf/i })).toBeInTheDocument();
+    expect(screen.getByText(/^6 weeks$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^10 weeks$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^14 weeks$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^6 months$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^9 months$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^12 months$/i)).toBeInTheDocument();
+    expect(screen.getByText(/mother one/i)).toBeInTheDocument();
+  });
+
+  test("ImmunizationChart prints through a prepared iframe document instead of a blank popup", async () => {
+    const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const openSpy = jest.spyOn(window, "open").mockImplementation(() => null);
+    const originalCreateElement = document.createElement.bind(document);
+    const frameEvents = new Map();
+    const writtenHtml = [];
+    const frameFocus = jest.fn();
+    const framePrint = jest.fn(() => {
+      const afterPrintHandler = frameEvents.get("afterprint");
+      if (typeof afterPrintHandler === "function") {
+        afterPrintHandler();
+      }
+    });
+
+    Object.defineProperty(window.HTMLImageElement.prototype, "complete", {
+      configurable: true,
+      get: () => true,
+    });
+
+    global.fetch = jest.fn().mockRejectedValue(new Error("asset load unavailable in test"));
+
+    const createElementSpy = jest
+      .spyOn(document, "createElement")
+      .mockImplementation((tagName, options) => {
+        if (String(tagName).toLowerCase() === "iframe") {
+          const iframe = originalCreateElement("iframe", options);
+          const iframeDocument = document.implementation.createHTMLDocument("print-frame");
+          const originalWrite = iframeDocument.write.bind(iframeDocument);
+
+          iframeDocument.write = jest.fn((html) => {
+            writtenHtml.push(html);
+            originalWrite(html);
+          });
+
+          Object.defineProperty(iframe, "contentWindow", {
+            configurable: true,
+            value: {
+              document: iframeDocument,
+              focus: frameFocus,
+              print: framePrint,
+              addEventListener: jest.fn((eventName, handler) => {
+                frameEvents.set(eventName, handler);
+              }),
+            },
+          });
+
+          return iframe;
+        }
+
+        return originalCreateElement(tagName, options);
+      });
+
+    renderStrict(<ImmunizationChart infantId={1} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/detailed visit records for/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /print \/ pdf/i }));
+
+    await waitFor(() => {
+      expect(framePrint).toHaveBeenCalledTimes(1);
+    });
+
+    expect(frameFocus).toHaveBeenCalledTimes(1);
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(writtenHtml[0]).toContain("IMMUNIZATION CHART");
+    expect(writtenHtml[0]).toContain("6 WEEKS");
+    expect(writtenHtml[0]).toContain("CATCH UP:");
+
+    createElementSpy.mockRestore();
+    openSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
   });
 });

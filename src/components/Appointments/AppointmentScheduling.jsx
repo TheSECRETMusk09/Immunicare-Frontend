@@ -59,8 +59,15 @@ export const AppointmentScheduling = () => {
       setSuggestionError(null);
 
       try {
-        const response = await apiClient.getAppointmentSuggestions(mockInfantId);
-        setSuggestedAppointments(response.data || []);
+        const response = await apiClient.getAppointmentSuggestions({ infantId: mockInfantId });
+        const payload = response?.data || response;
+        setSuggestedAppointments(
+          Array.isArray(payload?.suggestions)
+            ? payload.suggestions
+            : Array.isArray(payload)
+              ? payload
+              : [],
+        );
       } catch (err) {
         setSuggestionError(err.message || 'Failed to load suggested appointments');
         setSuggestedAppointments([]);
