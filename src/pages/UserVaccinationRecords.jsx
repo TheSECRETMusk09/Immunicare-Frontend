@@ -61,25 +61,18 @@ export default function UserVaccinationRecords() {
         : response?.data || response || [];
       setChildren(childrenData);
 
-      // Set selected child from URL or first child
-      if (childId) {
-        const targetChild = childrenData.find(
-          (c) => c.id === parseInt(childId),
-        );
-        if (targetChild) {
-          setSelectedChild(targetChild);
-        } else if (childrenData.length > 0) {
-          setSelectedChild(childrenData[0]);
-        }
-      } else if (childrenData.length > 0) {
-        setSelectedChild(childrenData[0]);
+      if (childrenData.length === 0) {
+        setSelectedChild(null);
+        setVaccinationRecords([]);
+        setVaccinationSchedules([]);
+        setChildReadiness(null);
       }
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [guardianId, childId]);
+  }, [guardianId]);
 
   const fetchVaccinationData = useCallback(async (childId) => {
     try {
@@ -137,25 +130,41 @@ export default function UserVaccinationRecords() {
   }, [guardianId, fetchChildren]);
 
   useEffect(() => {
-    if (selectedChild) {
-      fetchVaccinationData(selectedChild.id);
-      fetchReadiness(selectedChild.id);
-      // Update URL with child ID
-      navigate(`/guardian/vaccination-records/${selectedChild.id}`, {
+    if (children.length === 0) {
+      return;
+    }
+
+    const parsedChildId = childId ? Number.parseInt(childId, 10) : null;
+    const targetChild = Number.isInteger(parsedChildId)
+      ? children.find((child) => Number(child.id) === parsedChildId)
+      : null;
+
+    const nextSelectedChild = targetChild || children[0];
+
+    setSelectedChild((currentSelectedChild) => {
+      if (
+        currentSelectedChild &&
+        Number(currentSelectedChild.id) === Number(nextSelectedChild.id)
+      ) {
+        return currentSelectedChild;
+      }
+
+      return nextSelectedChild;
+    });
+
+    if (String(childId || "") !== String(nextSelectedChild.id)) {
+      navigate(`/guardian/vaccination-records/${nextSelectedChild.id}`, {
         replace: true,
       });
     }
-  }, [selectedChild, fetchVaccinationData, fetchReadiness, navigate]);
+  }, [childId, children, navigate]);
 
   useEffect(() => {
-    // Handle direct child ID access
-    if (childId && children.length > 0) {
-      const child = children.find((c) => c.id === parseInt(childId));
-      if (child && (!selectedChild || selectedChild.id !== child.id)) {
-        setSelectedChild(child);
-      }
+    if (selectedChild) {
+      fetchVaccinationData(selectedChild.id);
+      fetchReadiness(selectedChild.id);
     }
-  }, [childId, children, selectedChild]);
+  }, [selectedChild, fetchVaccinationData, fetchReadiness]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -296,9 +305,12 @@ export default function UserVaccinationRecords() {
   }, [vaccinationRecords, vaccinationSchedules, searchQuery, viewMode]);
 
   const handleChildSelect = (child) => {
-    setSelectedChild(child);
     setShowChildDropdown(false);
     setSearchQuery("");
+
+    if (Number(selectedChild?.id) !== Number(child.id)) {
+      navigate(`/guardian/vaccination-records/${child.id}`);
+    }
   };
 
   if (loading) {

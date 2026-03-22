@@ -1664,8 +1664,10 @@ class ApiClient {
     return this.request(`/growth/infant/${infantId}/latest`);
   }
 
-  async getGrowthStats() {
-    return this.request("/growth/stats/overview");
+  async getGrowthStats(params = {}) {
+    const queryParams = new URLSearchParams(params || {});
+    const suffix = queryParams.toString() ? `?${queryParams.toString()}` : "";
+    return this.request(`/growth/stats/overview${suffix}`);
   }
 
   async getAbnormalGrowthAlerts() {

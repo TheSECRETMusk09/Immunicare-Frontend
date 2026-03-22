@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Bell, CalendarClock, ShieldAlert, Syringe } from "lucide-react";
 import { Card, Button, PageHeader, Alert } from "../UI";
@@ -102,7 +102,7 @@ export default function DashboardOverview() {
   const navigate = useNavigate();
   const { alerts: socketAlerts, notifications: socketNotifications, isConnected } = useSocket();
 
-  const [localRefreshTick, setLocalRefreshTick] = useState(0);
+  const previousSocketCountsRef = useRef({ alerts: 0, notifications: 0 });
 
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useDashboardStats();
   const { data: appointments, isLoading: appointmentsLoading, refetch: refetchAppointments } = useDashboardAppointments(10);
@@ -118,7 +118,6 @@ export default function DashboardOverview() {
 
   // Combined refetch function for all dashboard data
   const refreshAllDashboardData = useCallback(async () => {
-    setLocalRefreshTick((prev) => prev + 1);
     await Promise.all([
       refetchStats(),
       refetchAppointments(),
@@ -130,11 +129,24 @@ export default function DashboardOverview() {
 
   // Refresh on socket events - comprehensive handling for all data types
   useEffect(() => {
-    if (!isConnected) return;
+    if (!isConnected) {
+      previousSocketCountsRef.current = { alerts: 0, notifications: 0 };
+      return;
+    }
 
-    // Determine if we should refresh based on socket activity
-    const shouldRefresh = socketAlerts.length > 0 || socketNotifications.length > 0;
-    if (!shouldRefresh) return;
+    const currentCounts = {
+      alerts: socketAlerts.length,
+      notifications: socketNotifications.length,
+    };
+
+    const previousCounts = previousSocketCountsRef.current;
+    const hasNewSocketActivity =
+      currentCounts.alerts > previousCounts.alerts ||
+      currentCounts.notifications > previousCounts.notifications;
+
+    previousSocketCountsRef.current = currentCounts;
+
+    if (!hasNewSocketActivity) return;
 
     // Debounce refresh to avoid excessive calls
     const timeoutId = setTimeout(() => {
@@ -353,7 +365,6 @@ export default function DashboardOverview() {
         </Card>
       </div>
 
-      <p className="text-xs text-gray-500">Live refresh ticks: {localRefreshTick}</p>
     </div>
   );
 }
