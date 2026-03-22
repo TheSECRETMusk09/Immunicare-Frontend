@@ -171,7 +171,7 @@ export default function DocumentTemplates({ onRefresh }) {
                 <Button size="sm" onClick={() => handleViewDetails(template)}>
                   View Details
                 </Button>
-                <Button size="sm" variant="secondary">
+              <Button size="sm" variant="secondary" disabled title="Feature coming soon">
                   Edit Template
                 </Button>
               </div>
@@ -298,7 +298,7 @@ export default function DocumentTemplates({ onRefresh }) {
               >
                 Close
               </Button>
-              <Button>Edit Template</Button>
+          <Button disabled title="Feature coming soon">Edit Template</Button>
             </div>
           </div>
         )}

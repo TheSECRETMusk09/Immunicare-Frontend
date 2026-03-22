@@ -87,14 +87,6 @@ export default function InventoryReports() {
     } catch (err) {
       console.error("Error fetching inventory data:", err);
       setError(err.message || "Failed to load inventory data");
-
-      // Set mock data for demo
-      setInventory(getMockInventory());
-      setCategories(getMockCategories());
-      setWarehouses(getMockWarehouses());
-      setSuppliers(getMockSuppliers());
-      setAlerts(getMockAlerts());
-      setTransactions(getMockTransactions());
     } finally {
       setLoading(false);
     }
@@ -161,12 +153,6 @@ export default function InventoryReports() {
       totalQuantity,
     };
   }, [filteredInventory]);
-
-  const exportToPDF = () => {
-    alert(
-      "PDF export would use jsPDF library with the new inventory schema structure",
-    );
-  };
 
   // Stock status badge helper
   const getStockStatusBadge = (status) => {
@@ -339,22 +325,6 @@ export default function InventoryReports() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => setShowExportModal(true)}>
-            <svg
-              className="w-4 h-4 mr-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-              />
-            </svg>
-            Export Report
-          </Button>
           <Button variant="outline" onClick={fetchData}>
             <svg
               className="w-4 h-4 mr-2"
@@ -851,7 +821,7 @@ export default function InventoryReports() {
             </div>
           </Card>
         </Tab>
-
+        {/* Suppressing Suppliers tab as backend integration is not complete
         <Tab id="suppliers" label="Suppliers" icon="🏢">
           {/* Suppliers Table */}
           <Card className="overflow-hidden">
@@ -938,6 +908,7 @@ export default function InventoryReports() {
             </div>
           </Card>
         </Tab>
+        */}
       </Tabs>
 
       {/* Export Modal */}
@@ -952,7 +923,6 @@ export default function InventoryReports() {
               variant="outline"
               className="w-full justify-start"
               onClick={() => {
-                exportToPDF();
                 setShowExportModal(false);
               }}
             >
@@ -1156,224 +1126,4 @@ export default function InventoryReports() {
       </Modal>
     </div>
   );
-}
-
-// Mock data functions for demo purposes
-function getMockInventory() {
-  return [
-    {
-      item_id: "1",
-      sku: "VAC-001",
-      product_name: "Pfizer-BioNTech COVID-19 Vaccine",
-      description: "COVID-19 mRNA vaccine, 30mcg dose",
-      category_name: "Vaccines",
-      current_stock_level: 500,
-      unit_of_measure: "doses",
-      reorder_point: 100,
-      unit_cost: 15.5,
-      total_value: 7750,
-      warehouse_name: "Main Warehouse",
-      bin_location: "A-12-3",
-      stock_status: "adequate",
-      updated_at: new Date().toISOString(),
-    },
-    {
-      item_id: "2",
-      sku: "VAC-002",
-      product_name: "Influenza Vaccine (Quadrivalent)",
-      description: "Seasonal flu vaccine, 2024-2025 strain",
-      category_name: "Vaccines",
-      current_stock_level: 45,
-      unit_of_measure: "doses",
-      reorder_point: 50,
-      unit_cost: 12.0,
-      total_value: 540,
-      warehouse_name: "Cold Storage",
-      bin_location: "C-01-1",
-      stock_status: "low",
-      updated_at: new Date().toISOString(),
-    },
-    {
-      item_id: "3",
-      sku: "MED-001",
-      product_name: "Paracetamol 500mg",
-      description: "Analgesic and antipyretic tablets",
-      category_name: "Medicines",
-      current_stock_level: 5000,
-      unit_of_measure: "tablets",
-      reorder_point: 1000,
-      unit_cost: 0.25,
-      total_value: 1250,
-      warehouse_name: "Main Warehouse",
-      bin_location: "B-05-2",
-      stock_status: "adequate",
-      updated_at: new Date().toISOString(),
-    },
-    {
-      item_id: "4",
-      sku: "SUP-001",
-      product_name: "Surgical Face Masks",
-      description: "3-ply disposable surgical masks",
-      category_name: "Supplies",
-      current_stock_level: 3,
-      unit_of_measure: "boxes",
-      reorder_point: 50,
-      unit_cost: 15.0,
-      total_value: 45,
-      warehouse_name: "Main Warehouse",
-      bin_location: "D-01-1",
-      stock_status: "critical",
-      updated_at: new Date().toISOString(),
-    },
-    {
-      item_id: "5",
-      sku: "LAB-001",
-      product_name: "COVID-19 Rapid Test Kit",
-      description: "Antigen rapid test for COVID-19",
-      category_name: "Laboratory",
-      current_stock_level: 2000,
-      unit_of_measure: "kits",
-      reorder_point: 200,
-      unit_cost: 5.0,
-      total_value: 10000,
-      warehouse_name: "Main Warehouse",
-      bin_location: "E-03-1",
-      stock_status: "adequate",
-      updated_at: new Date().toISOString(),
-    },
-  ];
-}
-
-function getMockCategories() {
-  return [
-    { category_id: "1", category_code: "VACC", category_name: "Vaccines" },
-    { category_id: "2", category_code: "MEDS", category_name: "Medicines" },
-    { category_id: "3", category_code: "SUPPL", category_name: "Supplies" },
-    { category_id: "4", category_code: "LAB", category_name: "Laboratory" },
-    { category_id: "5", category_code: "EQUIP", category_name: "Equipment" },
-  ];
-}
-
-function getMockWarehouses() {
-  return [
-    {
-      warehouse_id: "1",
-      warehouse_code: "WH-MAIN",
-      warehouse_name: "Main Warehouse",
-    },
-    {
-      warehouse_id: "2",
-      warehouse_code: "WH-COLD",
-      warehouse_name: "Cold Storage Facility",
-    },
-    {
-      warehouse_id: "3",
-      warehouse_code: "WH-SUB",
-      warehouse_name: "Satellite Warehouse",
-    },
-  ];
-}
-
-function getMockSuppliers() {
-  return [
-    {
-      supplier_id: "1",
-      supplier_code: "SUP-001",
-      supplier_name: "PharmaCare Distributors Inc.",
-      email: "sales@pharmacare.com",
-      phone: "+632-8123-4567",
-      contact_person: "John Smith",
-      is_active: true,
-      avg_overall_score: 92.5,
-    },
-    {
-      supplier_id: "2",
-      supplier_code: "SUP-002",
-      supplier_name: "Medical Supplies Co.",
-      email: "orders@medsupplies.com",
-      phone: "+632-8234-5678",
-      contact_person: "Jane Doe",
-      is_active: true,
-      avg_overall_score: 88.0,
-    },
-  ];
-}
-
-function getMockAlerts() {
-  return [
-    {
-      alert_id: "1",
-      alert_type: "low_stock",
-      severity_level: "critical",
-      alert_title: "Critical Stock Level: Surgical Face Masks",
-      current_value: 3,
-      alert_status: "active",
-      sku: "SUP-001",
-      created_at: new Date(Date.now() - 86400000).toISOString(),
-    },
-    {
-      alert_id: "2",
-      alert_type: "low_stock",
-      severity_level: "high",
-      alert_title: "Low Stock Warning: Influenza Vaccine",
-      current_value: 45,
-      alert_status: "active",
-      sku: "VAC-002",
-      created_at: new Date(Date.now() - 172800000).toISOString(),
-    },
-    {
-      alert_id: "3",
-      alert_type: "expiring",
-      severity_level: "medium",
-      alert_title: "Expiring Soon: COVID-19 Vaccine Batch",
-      current_value: "2024-03-15",
-      alert_status: "acknowledged",
-      sku: "VAC-001",
-      created_at: new Date(Date.now() - 259200000).toISOString(),
-    },
-  ];
-}
-
-function getMockTransactions() {
-  return [
-    {
-      transaction_id: "1",
-      transaction_number: "2024-01-REC-000001",
-      transaction_type: "receipt",
-      product_name: "Pfizer-BioNTech COVID-19 Vaccine",
-      sku: "VAC-001",
-      quantity: 100,
-      unit_of_measure: "doses",
-      source_warehouse: "Supplier",
-      destination_warehouse: "Main Warehouse",
-      transaction_date: new Date(Date.now() - 86400000).toISOString(),
-      transaction_status: "completed",
-    },
-    {
-      transaction_id: "2",
-      transaction_number: "2024-01-ISS-000001",
-      transaction_type: "issue",
-      product_name: "Paracetamol 500mg",
-      sku: "MED-001",
-      quantity: -50,
-      unit_of_measure: "tablets",
-      source_warehouse: "Main Warehouse",
-      destination_warehouse: "Clinic A",
-      transaction_date: new Date(Date.now() - 172800000).toISOString(),
-      transaction_status: "completed",
-    },
-    {
-      transaction_id: "3",
-      transaction_number: "2024-01-TRF-000001",
-      transaction_type: "transfer",
-      product_name: "Influenza Vaccine",
-      sku: "VAC-002",
-      quantity: 25,
-      unit_of_measure: "doses",
-      source_warehouse: "Cold Storage",
-      destination_warehouse: "Satellite Warehouse",
-      transaction_date: new Date(Date.now() - 259200000).toISOString(),
-      transaction_status: "completed",
-    },
-  ];
 }

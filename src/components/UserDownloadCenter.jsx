@@ -31,7 +31,7 @@ export default function UserDownloadCenter() {
       ]);
 
       setDownloads(downloadsData.data || []);
-      setInfants(infantsData || []);
+      setInfants(Array.isArray(infantsData) ? infantsData : (infantsData?.data || []));
       setTemplates(templatesData.data || []);
     } catch (err) {
       setError(err.message);
@@ -63,7 +63,14 @@ export default function UserDownloadCenter() {
     try {
       const response = await apiClient.customRequest(`/documents/${downloadId}/download`, { responseType: 'blob' });
       // Handle file download
-      if (response && !(response.data && response.data.file_path)) {
+      if (response && response.data && typeof response.data === 'object' && response.data.file_path) {
+        const link = document.createElement("a");
+        link.href = response.data.file_path;
+        link.download = response.data.file_name || "document";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } else if (response) {
         const blob = response.data instanceof Blob ? response.data : new Blob([response.data || response]);
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -73,13 +80,6 @@ export default function UserDownloadCenter() {
         link.click();
         link.remove();
         window.URL.revokeObjectURL(url);
-      } else if (response.data && response.data.file_path) {
-        const link = document.createElement("a");
-        link.href = response.data.file_path;
-        link.download = response.data.file_name || "document";
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
       }
     } catch (err) {
       setError(err.message);
@@ -186,9 +186,6 @@ export default function UserDownloadCenter() {
                   disabled={!template.is_active}
                 >
                   Generate
-                </Button>
-                <Button size="sm" variant="secondary">
-                  View Sample
                 </Button>
               </div>
             </Card>

@@ -8,6 +8,7 @@ import PageTransitionLoader from "../components/PageTransitionLoader";
 import QuickActionFAB from "../components/QuickActionFAB";
 import { AlertCircle } from "lucide-react";
 import { Button } from "../components/UI";
+import ErrorBoundary from "./ErrorBoundary";
 import "../css/design-tokens.css";
 import "../css/guardian-master-responsive.css";
 
@@ -162,120 +163,122 @@ const GuardianLayout = memo(function GuardianLayout({ children }) {
   };
 
   return (
-    <div className="guardian-layout-wrapper">
-      <div
-        className={`guardian-dashboard ${sidebarVisible ? 'sidebar-open' : 'sidebar-collapsed'} ${
-          isDesktop ? 'desktop-mode' : 'mobile-mode'
-        }`}
-      >
-        {/* Page Transition Loader */}
-        {isNavigating && <PageTransitionLoader message="Loading page..." />}
+    <ErrorBoundary>
+      <div className="guardian-layout-wrapper">
+        <div
+          className={`guardian-dashboard ${sidebarVisible ? 'sidebar-open' : 'sidebar-collapsed'} ${
+            isDesktop ? 'desktop-mode' : 'mobile-mode'
+          }`}
+        >
+          {/* Page Transition Loader */}
+          {isNavigating && <PageTransitionLoader message="Loading page..." />}
 
-        {/* Floating ImmuniCare logo toggle - visible whenever sidebar is collapsed */}
-        {!sidebarVisible && (
-          <button
-            type="button"
-            onClick={handleSidebarToggle}
-            className="guardian-menu-btn guardian-logo-menu-btn"
-            aria-label="Open sidebar navigation"
-            aria-expanded={sidebarVisible}
-            aria-controls="guardian-sidebar"
-          >
-            <img
-              src="/immunicare_LOGO.avif"
-              alt="Open ImmuniCare navigation"
-              className="w-full h-full object-cover"
-            />
-          </button>
-        )}
-
-        {/* Sidebar - Fixed on left side */}
-        <GuardianSidebar
-          isOpen={sidebarVisible}
-          onClose={handleSidebarClose}
-          onToggle={handleSidebarToggle}
-          isDesktop={isDesktop}
-        />
-
-        {/* Main Content */}
-        <div className="guardian-main-content">
-          {/* Main Content Area - Single optimized content layer */}
-          <div className="flex-1 w-full min-w-0 h-full overflow-x-hidden">
-            <div className="guardian-content-area">
-              {children ? children : <Outlet />}
-            </div>
-
-            {/* Mobile Bottom Navigation - Only for guardian users */}
-            {isGuardian && <MobileBottomNav />}
-          </div>
-
-          {/* Quick Action FAB */}
-          {isGuardian && (
-            <QuickActionFAB
-              isGuardian={isGuardian}
-              emergencyContact={user?.emergencyContact || null}
-            />
+          {/* Floating ImmuniCare logo toggle - visible whenever sidebar is collapsed */}
+          {!sidebarVisible && (
+            <button
+              type="button"
+              onClick={handleSidebarToggle}
+              className="guardian-menu-btn guardian-logo-menu-btn"
+              aria-label="Open sidebar navigation"
+              aria-expanded={sidebarVisible}
+              aria-controls="guardian-sidebar"
+            >
+              <img
+                src="/immunicare_LOGO.avif"
+                alt="Open ImmuniCare navigation"
+                className="w-full h-full object-cover"
+              />
+            </button>
           )}
 
-          {/* Password Change Overlay for first login */}
-          {needsPasswordChange && (
-            <div
-              className="fixed inset-0 bg-black/50 flex items-center justify-center z-[400] p-4 backdrop-blur-sm"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="password-change-title"
-            >
-              <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-gray-200 max-h-[90vh] overflow-y-auto">
-                <div className="flex flex-col items-center text-center mb-6">
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-amber-100 flex items-center justify-center mb-4">
-                    <AlertCircle className="w-7 h-7 sm:w-8 sm:h-8 text-amber-600" />
+          {/* Sidebar - Fixed on left side */}
+          <GuardianSidebar
+            isOpen={sidebarVisible}
+            onClose={handleSidebarClose}
+            onToggle={handleSidebarToggle}
+            isDesktop={isDesktop}
+          />
+
+          {/* Main Content */}
+          <div className="guardian-main-content">
+            {/* Main Content Area - Single optimized content layer */}
+            <div className="flex-1 w-full min-w-0 h-full overflow-x-hidden">
+              <div className="guardian-content-area">
+                {children ? children : <Outlet />}
+              </div>
+
+              {/* Mobile Bottom Navigation - Only for guardian users */}
+              {isGuardian && <MobileBottomNav />}
+            </div>
+
+            {/* Quick Action FAB */}
+            {isGuardian && (
+              <QuickActionFAB
+                isGuardian={isGuardian}
+                emergencyContact={user?.emergencyContact || null}
+              />
+            )}
+
+            {/* Password Change Overlay for first login */}
+            {needsPasswordChange && (
+              <div
+                className="fixed inset-0 bg-black/50 flex items-center justify-center z-[400] p-4 backdrop-blur-sm"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="password-change-title"
+              >
+                <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+                  <div className="flex flex-col items-center text-center mb-6">
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-amber-100 flex items-center justify-center mb-4">
+                      <AlertCircle className="w-7 h-7 sm:w-8 sm:h-8 text-amber-600" />
+                    </div>
+                    <h3
+                      id="password-change-title"
+                      className="text-lg sm:text-xl font-bold text-gray-900"
+                    >
+                      Password Change Required
+                    </h3>
+                    <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                      Security notice for new accounts
+                    </p>
                   </div>
-                  <h3
-                    id="password-change-title"
-                    className="text-lg sm:text-xl font-bold text-gray-900"
-                  >
-                    Password Change Required
-                  </h3>
-                  <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                    Security notice for new accounts
+                  <p className="text-sm text-gray-600 mb-6 sm:mb-8 text-center">
+                    For security reasons, you must change your password from the
+                    default on first login.
                   </p>
-                </div>
-                <p className="text-sm text-gray-600 mb-6 sm:mb-8 text-center">
-                  For security reasons, you must change your password from the
-                  default on first login.
-                </p>
-                <div className="flex flex-col gap-3">
-                  <Button
-                    onClick={() => setShowPasswordModal(true)}
-                    size="lg"
-                    className="w-full min-h-[48px] font-bold"
-                  >
-                    Change Password Now
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setNeedsPasswordChange(false);
-                      logout();
-                    }}
-                    variant="ghost"
-                    className="w-full text-gray-500 min-h-[44px] font-semibold"
-                  >
-                    Logout
-                  </Button>
+                  <div className="flex flex-col gap-3">
+                    <Button
+                      onClick={() => setShowPasswordModal(true)}
+                      size="lg"
+                      className="w-full min-h-[48px] font-bold"
+                    >
+                      Change Password Now
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setNeedsPasswordChange(false);
+                        logout();
+                      }}
+                      variant="ghost"
+                      className="w-full text-gray-500 min-h-[44px] font-semibold"
+                    >
+                      Logout
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Password Change Modal */}
-          <PasswordChangeModal
-            isOpen={showPasswordModal}
-            onClose={() => setShowPasswordModal(false)}
-            onSuccess={handlePasswordChangeSuccess}
-          />
+            {/* Password Change Modal */}
+            <PasswordChangeModal
+              isOpen={showPasswordModal}
+              onClose={() => setShowPasswordModal(false)}
+              onSuccess={handlePasswordChangeSuccess}
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 });
 

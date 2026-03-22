@@ -60,7 +60,7 @@ export default function DownloadCenter({ onRefresh }) {
       ]);
 
       setDownloads(downloadsData.data || []);
-      setInfants(infantsData || []);
+      setInfants(Array.isArray(infantsData) ? infantsData : (infantsData?.data || []));
       setTemplates(templatesData.data || []);
     } catch (err) {
       setError(err.message);
@@ -95,7 +95,14 @@ export default function DownloadCenter({ onRefresh }) {
     try {
       const response = await apiClient.customRequest(`/documents/${downloadId}/download`, { responseType: 'blob' });
       // Handle file download
-      if (response && !(response.data && response.data.file_path)) {
+      if (response && response.data && typeof response.data === 'object' && response.data.file_path) {
+        const link = document.createElement("a");
+        link.href = response.data.file_path;
+        link.download = response.data.file_name || "document";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } else if (response) {
         // Create download link
         const blob = response.data instanceof Blob ? response.data : new Blob([response.data || response]);
         const url = window.URL.createObjectURL(blob);
@@ -106,13 +113,6 @@ export default function DownloadCenter({ onRefresh }) {
         link.click();
         link.remove();
         window.URL.revokeObjectURL(url);
-      } else if (response.data && response.data.file_path) {
-        const link = document.createElement("a");
-        link.href = response.data.file_path;
-        link.download = response.data.file_name || "document";
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
       }
     } catch (err) {
       setError(err.message);

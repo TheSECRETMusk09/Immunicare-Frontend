@@ -162,6 +162,7 @@ export default function InventoryMonitoringDashboard() {
       {/* Action Controls */}
       <div className="flex justify-end items-center mb-2">
         <div className="flex gap-2">
+          {/* Suppressed unimplemented placeholder modals
           <Button size="sm" onClick={() => setShowBatchModal(true)} className="transition-none">
             Manage Batches
           </Button>
@@ -173,6 +174,7 @@ export default function InventoryMonitoringDashboard() {
           >
             Supplier Management
           </Button>
+          */}
         </div>
       </div>
 
@@ -441,6 +443,7 @@ export default function InventoryMonitoringDashboard() {
       )}
 
       {/* Modals */}
+      {/*
       <Modal
         isOpen={showBatchModal}
         onClose={() => setShowBatchModal(false)}
@@ -498,6 +501,7 @@ export default function InventoryMonitoringDashboard() {
           </div>
         </div>
       </Modal>
+      */}
     </div>
   );
 }

@@ -9,8 +9,10 @@ import {
 import { Button, Input, Select } from "./UI";
 import apiClient from "../utils/api";
 import VaccineEligibilityIndicator, { VaccineEligibilityList } from "./VaccineEligibilityIndicator";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
+  const { user, guardianId } = useAuth();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState("");
   const [appointmentType, setAppointmentType] = useState("routine_checkup");
@@ -79,7 +81,11 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
       setSuggestionError(null);
 
       try {
-        const response = await apiClient.getAppointmentSuggestions({ infantId });
+        const response = await apiClient.getAppointmentSuggestions({
+          infantId,
+          guardianId: guardianId || user?.id,
+          clinicId: user?.clinic_id || user?.facility_id
+        });
         const payload = response?.data || response;
         setSuggestedSlots(
           Array.isArray(payload?.suggestions)

@@ -278,10 +278,10 @@ export default function MonitoringDashboard({ onRefresh }) {
                         )}
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="secondary">
+                        <Button size="sm" variant="secondary" disabled title="Feature coming soon">
                           View Details
                         </Button>
-                        <Button size="sm">Mark Complete</Button>
+                        <Button size="sm" disabled title="Feature coming soon">Mark Complete</Button>
                       </div>
                     </div>
                   </Card>

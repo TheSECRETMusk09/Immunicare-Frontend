@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import documentService from "../services/documentService";
+import { Modal, Button, Input } from "./UI";
 
 /**
  * InfantDocuments Component
@@ -23,6 +24,11 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
+
+  // Modal state for uploading
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [pendingFile, setPendingFile] = useState(null);
+  const [uploadForm, setUploadForm] = useState({ documentType: "vaccination_card", description: "" });
 
   // Load documents on mount and when filter changes
   useEffect(() => {
@@ -59,7 +65,7 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    await uploadFile(file);
+    initiateUploadForm(file);
     // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -83,11 +89,11 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
 
     const files = e.dataTransfer?.files;
     if (files && files.length > 0) {
-      await uploadFile(files[0]);
+      initiateUploadForm(files[0]);
     }
   };
 
-  const uploadFile = async (file) => {
+  const initiateUploadForm = (file) => {
     // Validate file
     const validTypes = [
       "application/pdf",
@@ -108,31 +114,19 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
       return;
     }
 
-    // Ask for document type
-    const documentType = prompt(
-      "Select document type:\n1. vaccination_card\n2. birth_certificate\n3. medical_record\n4. image\n5. other\n\nEnter number (1-5):"
-    );
+    setPendingFile(file);
+    setUploadForm({ documentType: "vaccination_card", description: "" });
+    setShowUploadModal(true);
+  };
 
-    const typeMap = {
-      "1": "vaccination_card",
-      "2": "birth_certificate",
-      "3": "medical_record",
-      "4": "image",
-      "5": "other"
-    };
-
-    const selectedType = typeMap[documentType];
-    if (!selectedType) {
-      setError("Invalid document type selection");
-      return;
-    }
-
-    const description = prompt("Enter description (optional):") || null;
+  const confirmUpload = async () => {
+    if (!pendingFile) return;
 
     try {
       setUploading(true);
       setError(null);
       setUploadProgress(0);
+      setShowUploadModal(false);
 
       // Simulate progress
       const progressInterval = setInterval(() => {
@@ -141,9 +135,9 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
 
       const response = await documentService.uploadInfantDocument(
         infantId,
-        file,
-        selectedType,
-        description
+        pendingFile,
+        uploadForm.documentType,
+        uploadForm.description || null
       );
 
       clearInterval(progressInterval);
@@ -166,6 +160,7 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
     } finally {
       setUploading(false);
       setUploadProgress(0);
+      setPendingFile(null);
     }
   };
 
@@ -485,6 +480,62 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
           </div>
         </div>
       )}
+
+      {/* Upload Details Modal */}
+      <Modal
+        isOpen={showUploadModal}
+        onClose={() => {
+          setShowUploadModal(false);
+          setPendingFile(null);
+        }}
+        title="Upload Document"
+        size="md"
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button variant="cancel" onClick={() => {
+              setShowUploadModal(false);
+              setPendingFile(null);
+            }}>Cancel</Button>
+            <Button onClick={confirmUpload} disabled={uploading}>Upload</Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Selected file: <span className="font-semibold text-gray-900 dark:text-gray-100">{pendingFile?.name}</span>
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Document Type *
+            </label>
+            <select
+              value={uploadForm.documentType}
+              onChange={(e) => setUploadForm({ ...uploadForm, documentType: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+              required
+            >
+              <option value="vaccination_card">Vaccination Card</option>
+              <option value="birth_certificate">Birth Certificate</option>
+              <option value="medical_record">Medical Record</option>
+              <option value="image">Image</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Description (Optional)
+            </label>
+            <Input
+              value={uploadForm.description}
+              onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
+              placeholder="Enter a brief description..."
+              className="w-full"
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

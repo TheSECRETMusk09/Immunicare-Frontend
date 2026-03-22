@@ -1292,114 +1292,42 @@ export default function InventoryManagement() {
                         {item.name}
                       </td>
                       <td className="px-1 py-0.5 border border-black dark:border-gray-500">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.beginning_balance}
-                          onChange={(e) =>
-                            updateItem(
-                              item.id,
-                              "beginning_balance",
-                              parseInt(e.target.value) || 0,
-                            )
-                          }
-                          className="w-full text-center text-sm border-none focus:outline-none focus:ring-0 bg-blue-50 dark:bg-blue-900/30 text-gray-900 dark:text-gray-100"
-                        />
-                      </td>
-                      <td className="px-1 py-0.5 border border-black dark:border-gray-500">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.received}
-                          onChange={(e) =>
-                            updateItem(
-                              item.id,
-                              "received",
-                              parseInt(e.target.value) || 0,
-                            )
-                          }
-                          className="w-full text-center text-sm border-none focus:outline-none focus:ring-0 bg-green-50 dark:bg-green-900/30 text-gray-900 dark:text-gray-100"
-                        />
-                      </td>
-                      <td className="px-1 py-0.5 border border-black dark:border-gray-500 bg-gray-50 dark:bg-gray-700/30">
-                        <input
-                          type="text"
-                          value={item.lot_batch_number}
-                          onChange={(e) =>
-                            updateItem(
-                              item.id,
-                              "lot_batch_number",
-                              e.target.value,
-                            )
-                          }
-                          className="w-full text-center text-sm border-none focus:outline-none focus:ring-0 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                          placeholder="---"
-                        />
-                      </td>
-                      <td className="px-1 py-0.5 border border-black dark:border-gray-500 bg-gray-50 dark:bg-gray-700/30">
-                        <div className="flex gap-0.5">
-                          <input
-                            type="number"
-                            min="0"
-                            value={item.transferred_in}
-                            onChange={(e) =>
-                              updateItem(
-                                item.id,
-                                "transferred_in",
-                                parseInt(e.target.value) || 0,
-                              )
-                            }
-                            className="w-1/2 text-center text-sm border-none focus:outline-none focus:ring-0 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                            placeholder="In"
-                          />
-                          <input
-                            type="number"
-                            min="0"
-                            value={item.transferred_out}
-                            onChange={(e) =>
-                              updateItem(
-                                item.id,
-                                "transferred_out",
-                                parseInt(e.target.value) || 0,
-                              )
-                            }
-                            className="w-1/2 text-center text-sm border-none focus:outline-none focus:ring-0 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                            placeholder="Out"
-                          />
+                        <div className="w-full text-center text-sm bg-blue-50 dark:bg-blue-900/30 text-gray-900 dark:text-gray-100 py-1">
+                          {item.beginning_balance}
                         </div>
                       </td>
                       <td className="px-1 py-0.5 border border-black dark:border-gray-500">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.expired_wasted}
-                          onChange={(e) =>
-                            updateItem(
-                              item.id,
-                              "expired_wasted",
-                              parseInt(e.target.value) || 0,
-                            )
-                          }
-                          className="w-full text-center text-sm border-none focus:outline-none focus:ring-0 bg-red-50 dark:bg-red-900/30 text-gray-900 dark:text-gray-100"
-                        />
+                        <div className="w-full text-center text-sm bg-green-50 dark:bg-green-900/30 text-gray-900 dark:text-gray-100 py-1">
+                          {item.received}
+                        </div>
+                      </td>
+                      <td className="px-1 py-0.5 border border-black dark:border-gray-500 bg-gray-50 dark:bg-gray-700/30">
+                        <div className="w-full text-center text-sm text-gray-900 dark:text-gray-100 py-1">
+                          {item.lot_batch_number || "---"}
+                        </div>
+                      </td>
+                      <td className="px-1 py-0.5 border border-black dark:border-gray-500 bg-gray-50 dark:bg-gray-700/30">
+                        <div className="flex gap-0.5">
+                          <div className="w-1/2 text-center text-sm text-gray-900 dark:text-gray-100 py-1" title="Transferred In">
+                            {item.transferred_in}
+                          </div>
+                          <div className="w-1/2 text-center text-sm text-gray-900 dark:text-gray-100 py-1" title="Transferred Out">
+                            {item.transferred_out}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-1 py-0.5 border border-black dark:border-gray-500">
+                        <div className="w-full text-center text-sm bg-red-50 dark:bg-red-900/30 text-gray-900 dark:text-gray-100 py-1">
+                          {item.expired_wasted}
+                        </div>
                       </td>
                       <td className="px-2 py-1 text-center font-bold text-blue-800 dark:text-blue-300 border border-black dark:border-gray-500 bg-blue-100 dark:bg-blue-900/50">
                         {item.total_available}
                       </td>
                       <td className="px-1 py-0.5 border border-black dark:border-gray-500">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.issuance}
-                          onChange={(e) =>
-                            updateItem(
-                              item.id,
-                              "issuance",
-                              parseInt(e.target.value) || 0,
-                            )
-                          }
-                          className="w-full text-center text-sm border-none focus:outline-none focus:ring-0 bg-yellow-50 dark:bg-yellow-900/30 text-gray-900 dark:text-gray-100"
-                        />
+                        <div className="w-full text-center text-sm bg-yellow-50 dark:bg-yellow-900/30 text-gray-900 dark:text-gray-100 py-1">
+                          {item.issuance}
+                        </div>
                       </td>
                       <td className="px-2 py-1 text-center font-bold text-green-800 dark:text-green-300 border border-black dark:border-gray-500 bg-green-100 dark:bg-green-900/50">
                         {item.stock_on_hand}

@@ -100,47 +100,6 @@ export default function AnalyticsDashboard() {
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(true);
 
-  // Deterministic mock data fallbacks (no random values)
-  const mockVaccinationData = useCallback(() => {
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-    return months.map((month, index) => ({
-      month,
-      administered: 35 + index * 5,
-      scheduled: 25 + index * 3,
-      pending: 10 + index * 2,
-    }));
-  }, []);
-
-  const mockAppointmentData = useCallback(() => {
-    return [
-      { status: "Scheduled", value: 45 },
-      { status: "Completed", value: 35 },
-      { status: "Cancelled", value: 15 },
-      { status: "No Show", value: 5 },
-    ];
-  }, []);
-
-  const mockInventoryData = useCallback(() => {
-    return [
-      { name: "BCG", value: 150, status: "good" },
-      { name: "Hepatitis B", value: 89, status: "warning" },
-      { name: "Penta", value: 45, status: "danger" },
-      { name: "OPV", value: 120, status: "good" },
-      { name: "PCV", value: 67, status: "warning" },
-      { name: "MR", value: 23, status: "danger" },
-    ];
-  }, []);
-
-  const mockGrowthData = useCallback(() => {
-    const weeks = [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44];
-    return weeks.map((week) => ({
-      week,
-      weight: 2.5 + week * 0.2,
-      height: 50 + week * 1.5,
-      headCircumference: 34 + week * 0.5,
-    }));
-  }, []);
-
   // Transform gender data from API to chart format
   const transformGenderData = useCallback((demographicsData) => {
     if (!demographicsData?.genderBreakdown || !Array.isArray(demographicsData.genderBreakdown)) {
@@ -181,14 +140,14 @@ export default function AnalyticsDashboard() {
       // Transform data for charts
       const vaccinations = vaccinationData.status === 'fulfilled'
         ? (vaccinationData.value?.trends || [])
-        : mockVaccinationData();
+        : [];
 
       const appointments = appointmentData.status === 'fulfilled'
         ? (appointmentData.value?.statusBreakdown || []).map(item => ({
             status: item.status,
             value: item.count,
           }))
-        : mockAppointmentData();
+        : [];
 
       const inventory = inventoryData.status === 'fulfilled'
         ? (inventoryData.value?.byVaccine || []).map(item => ({
@@ -196,11 +155,11 @@ export default function AnalyticsDashboard() {
             value: item.availableDoses || 0,
             status: item.criticalStock ? 'danger' : item.lowStock ? 'warning' : 'good',
           }))
-        : mockInventoryData();
+        : [];
 
       const growth = growthData.status === 'fulfilled'
         ? (growthData.value?.data || [])
-        : mockGrowthData();
+        : [];
 
       // Get stats from dashboard or use individual responses
       const stats = dashboardStats.status === 'fulfilled'
@@ -248,7 +207,6 @@ export default function AnalyticsDashboard() {
       });
     } catch (error) {
       console.error("Error fetching analytics:", error);
-      // Use empty arrays instead of mock data - let the UI show empty states
       setData({
         vaccinations: [],
         appointments: [],
@@ -263,10 +221,6 @@ export default function AnalyticsDashboard() {
       setLoading(false);
     }
   }, [
-    mockVaccinationData,
-    mockAppointmentData,
-    mockInventoryData,
-    mockGrowthData,
     transformGenderData,
     timeRange,
   ]);
@@ -300,7 +254,7 @@ export default function AnalyticsDashboard() {
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-gray-50 dark:bg-gray-900" aria-label="Analytics Dashboard">
       {/* Sticky Header */}
-      <div className="flex-shrink-0 sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6">
+      <div className="flex-shrink-0 sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6 transition-none transform-none animate-none [&_*]:transition-none [&_*]:transform-none [&_*]:animate-none">
         <PageHeader
           title="Analytics Dashboard"
           subtitle="Operational analytics for one Barangay Health Center in Pasig City"

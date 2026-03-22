@@ -66,6 +66,7 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
     { name: "User Management", icon: Users },
     { name: "Infant Management", icon: Baby },
     { name: "Vaccinations", icon: Syringe },
+    { name: "Transfer-In Cases", icon: ArrowRightLeft },
     { name: "Inventory", icon: Package },
     { name: "Appointments", icon: Calendar },
     { name: "Digital Papers", icon: FileText },
@@ -207,8 +208,8 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
 
       {/* Sidebar - Sticky on desktop, fixed slide-out on mobile */}
       <aside
-        className={`admin-sidebar md:sticky md:top-0 md:h-screen z-30 w-64 bg-white dark:bg-gray-800 border-r dark:border-gray-700 flex flex-col transform transition-transform duration-300 ease-out h-screen
-        ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+        className={`admin-sidebar md:sticky md:top-0 md:h-screen z-30 w-64 bg-white dark:bg-gray-800 border-r dark:border-gray-700 flex flex-col h-screen
+        ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"} transition-none`}
         role="navigation"
         aria-label="Main navigation"
       >

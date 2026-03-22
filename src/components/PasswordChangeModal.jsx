@@ -39,8 +39,8 @@ export default function PasswordChangeModal({ isOpen, onClose, onSuccess }) {
       return;
     }
 
-    if (formData.newPassword.length < 6) {
-      setError("Password must be at least 6 characters long");
+    if (formData.newPassword.length < 8) {
+      setError("Password must be at least 8 characters long");
       return;
     }
 
@@ -103,7 +103,7 @@ export default function PasswordChangeModal({ isOpen, onClose, onSuccess }) {
           showPasswordAriaLabel="Show new password"
           hidePasswordAriaLabel="Hide new password"
           required
-          minLength={6}
+          minLength={8}
         />
 
         <PasswordInput
@@ -114,7 +114,7 @@ export default function PasswordChangeModal({ isOpen, onClose, onSuccess }) {
           showPasswordAriaLabel="Show confirm new password"
           hidePasswordAriaLabel="Hide confirm new password"
           required
-          minLength={6}
+          minLength={8}
         />
 
         <div className="form-actions-standardized">

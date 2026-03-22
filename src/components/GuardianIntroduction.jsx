@@ -17,6 +17,7 @@ import {
   Loader2,
   CheckCircle,
 } from "lucide-react";
+import apiClient from "../utils/api";
 
 const GuardianIntroduction = () => {
   console.log("GuardianIntroduction component loaded");
@@ -97,11 +98,17 @@ const GuardianIntroduction = () => {
         return;
       }
 
-      // No dedicated public guardian-count endpoint is available.
-      // Keep a stable fallback value and cache it to avoid noisy 404s in the console.
-      const fallbackCount = 10542;
-      setGuardianCount(fallbackCount);
-      sessionStorage.setItem('guardianCount', fallbackCount.toString());
+      let count = 10542;
+      try {
+        const response = await apiClient.customRequest('/public/stats');
+        if (response && response.data && response.data.guardiansCount) {
+          count = response.data.guardiansCount;
+        }
+      } catch (err) {
+        console.warn("Public stats API unavailable, using fallback value");
+      }
+      setGuardianCount(count);
+      sessionStorage.setItem('guardianCount', count.toString());
       sessionStorage.setItem('guardianCountTime', Date.now().toString());
     } catch (error) {
       setErrors(prev => ({ ...prev, guardianCount: error.message }));
@@ -122,14 +129,30 @@ const GuardianIntroduction = () => {
         return;
       }
 
-      // Calculate next vaccination date (next month, 15th)
-      const today = new Date();
-      const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 15);
-      const formattedDate = nextMonth.toLocaleDateString('en-US', {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric'
-      });
+      let formattedDate;
+      try {
+        const response = await apiClient.customRequest('/public/stats');
+        if (response && response.data && response.data.nextVaccinationDate) {
+          const apiDate = new Date(response.data.nextVaccinationDate);
+          formattedDate = apiDate.toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric'
+          });
+        }
+      } catch (err) {
+        console.warn("Public stats API unavailable, using fallback date");
+      }
+
+      if (!formattedDate) {
+        const today = new Date();
+        const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 15);
+        formattedDate = nextMonth.toLocaleDateString('en-US', {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric'
+        });
+      }
 
       setNextVaccinationDate(formattedDate);
       sessionStorage.setItem('nextVaccinationDate', formattedDate);
@@ -153,14 +176,25 @@ const GuardianIntroduction = () => {
         return;
       }
 
-      // Fetch from PSA API or use cached data
-      const data = {
-        population: 42765,
-        barangay: 'San Nicolas',
-        city: 'Pasig City',
-        source: 'Philippine Statistics Authority (PSA), 2020 Census',
-        lastUpdated: new Date().toISOString(),
+      let data = {
+         population: 42765,
+         barangay: 'San Nicolas',
+         city: 'Pasig City',
+         source: 'Philippine Statistics Authority (PSA), 2020 Census',
+         lastUpdated: new Date().toISOString(),
       };
+
+      try {
+        const response = await apiClient.customRequest('/public/stats');
+        if (response && response.data && response.data.communityData) {
+          data = {
+            ...data,
+            ...response.data.communityData
+          };
+        }
+      } catch (err) {
+        console.warn("Public stats API unavailable, using fallback community data");
+      }
 
       setCommunityData(data);
       sessionStorage.setItem('communityData', JSON.stringify(data));

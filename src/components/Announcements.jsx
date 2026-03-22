@@ -103,20 +103,14 @@ export default function Announcements() {
       console.error("Error fetching announcements:", err);
       setError(err.message || "Failed to load announcements");
 
-      // Set mock data for demo
-      const mockAnnouncements = getMockAnnouncements();
-      setAnnouncements(mockAnnouncements);
-      setMyAnnouncements(
-        mockAnnouncements.filter((a) => a.status === "published"),
-      );
-      setCategories(getMockCategories());
+      setAnnouncements([]);
+      setMyAnnouncements([]);
+      setCategories([]);
       setStats({
-        totalAnnouncements: mockAnnouncements.length,
-        unreadCount: 3,
-        pendingAcknowledgments: 2,
-        activeAnnouncements: mockAnnouncements.filter(
-          (a) => a.status === "published",
-        ).length,
+        totalAnnouncements: 0,
+        unreadCount: 0,
+        pendingAcknowledgments: 0,
+        activeAnnouncements: 0,
       });
     } finally {
       setLoading(false);
@@ -1303,89 +1297,4 @@ export default function Announcements() {
       </Modal>
     </div>
   );
-}
-
-// Mock data functions
-function getMockAnnouncements() {
-  return [
-    {
-      announcement_id: "1",
-      announcement_code: "ANN-001",
-      title: "System Maintenance Scheduled",
-      content:
-        "The inventory management system will undergo scheduled maintenance on February 15, 2024, from 10:00 PM to 2:00 AM. During this time, the system may be temporarily unavailable.\n\nPlease save your work before the maintenance window begins.",
-      content_type: "maintenance",
-      priority: "high",
-      category: "system",
-      status: "published",
-      target_audience_type: "all",
-      requires_acknowledgment: true,
-      acknowledgment_deadline: "2024-02-14",
-      publish_date: "2024-02-10",
-      expiration_date: "2024-02-16",
-      created_by_name: "System Admin",
-      has_acknowledged: false,
-      created_at: "2024-02-10T10:00:00Z",
-    },
-    {
-      announcement_id: "2",
-      announcement_code: "ANN-002",
-      title: "New Vaccine Inventory Guidelines",
-      content:
-        "We have updated the vaccine inventory management guidelines. Please review the new procedures for storing and handling temperature-sensitive vaccines.\n\nKey changes include:\n- Updated storage temperature requirements\n- New expiration tracking procedures\n- Enhanced quality control measures",
-      content_type: "policy",
-      priority: "normal",
-      category: "inventory",
-      status: "published",
-      target_audience_type: "role",
-      target_roles: ["nurse", "medical_technician"],
-      requires_acknowledgment: true,
-      acknowledgment_deadline: "2024-02-20",
-      publish_date: "2024-02-12",
-      expiration_date: "",
-      created_by_name: "Medical Director",
-      has_acknowledged: true,
-      created_at: "2024-02-12T09:00:00Z",
-    },
-    {
-      announcement_id: "3",
-      announcement_code: "ANN-003",
-      title: "Flu Vaccination Drive Next Week",
-      content:
-        "Our annual flu vaccination drive will be held next week. All staff are encouraged to participate.\n\nDate: February 19-23, 2024\nTime: 9:00 AM - 4:00 PM\nLocation: Main Clinic\n\nPlease register in advance through the patient portal.",
-      content_type: "update",
-      priority: "normal",
-      category: "vaccination",
-      status: "published",
-      target_audience_type: "all",
-      requires_acknowledgment: false,
-      publish_date: "2024-02-14",
-      expiration_date: "2024-02-24",
-      created_by_name: "Health Services",
-      has_acknowledged: false,
-      created_at: "2024-02-14T14:00:00Z",
-    },
-    {
-      announcement_id: "4",
-      announcement_code: "ANN-004",
-      title: "Draft: New Supplier Approval Process",
-      content:
-        "This is a draft announcement for the new supplier approval process. Please review and provide feedback.\n\nThe new process includes:\n- Enhanced vendor verification\n- Quality certification requirements\n- Performance metrics tracking",
-      content_type: "policy",
-      priority: "low",
-      category: "system",
-      status: "draft",
-      target_audience_type: "all",
-      requires_acknowledgment: false,
-      publish_date: "",
-      expiration_date: "",
-      created_by_name: "Admin",
-      has_acknowledged: false,
-      created_at: "2024-02-14T16:00:00Z",
-    },
-  ];
-}
-
-function getMockCategories() {
-  return ["system", "inventory", "vaccination", "policy", "event", "training"];
 }

@@ -255,11 +255,55 @@ axiosRetry(axiosClient, {
   },
 });
 
+// Check if the JWT token is within 2 minutes of expiration
+const isTokenExpiringSoon = (token) => {
+  if (!token) return false;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+
+    const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      (typeof window !== 'undefined' && window.atob ? window.atob(payloadBase64) : Buffer.from(payloadBase64, 'base64').toString('binary'))
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    const payload = JSON.parse(jsonPayload);
+    const expTime = payload.exp * 1000;
+
+    // Refresh if less than 2 minutes (120000 ms) remaining
+    return (expTime - Date.now()) > 0 && (expTime - Date.now()) < 120000;
+  } catch (e) {
+    return false;
+  }
+};
+
 // Request interceptor to add auth token
 axiosClient.interceptors.request.use(
-  (config) => {
+  async (config) => {
     // Check both localStorage and sessionStorage for token using safe storage
-    const token = getStoredAccessToken();
+    let token = getStoredAccessToken();
+
+    // Proactive token refresh before request if nearing expiration
+    if (token && isTokenExpiringSoon(token) && !String(config.url || '').includes('/auth/refresh')) {
+      try {
+        const refreshResponse = await getOrCreateRefreshRequest();
+        const newToken = refreshResponse.data.token || refreshResponse.data.accessToken;
+        if (newToken) {
+          const tokenStorage = getPreferredAuthStorage();
+          tokenStorage.setItem("token", newToken);
+          if (refreshResponse.data.user) {
+            persistStoredUser(refreshResponse.data.user);
+          }
+          token = newToken;
+        }
+      } catch (refreshError) {
+        // Ignore error here, let the request proceed.
+        // Response interceptor will catch actual 401s if it truly failed.
+      }
+    }
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -1459,7 +1503,7 @@ class ApiClient {
   }
 
   async getMyAnnouncements() {
-    return this.request("/announcements", {
+    return this.request("/announcements/my", {
       method: "GET",
     });
   }
@@ -1468,12 +1512,10 @@ class ApiClient {
     return ["system", "inventory", "vaccination", "policy", "event", "training"];
   }
 
-  async acknowledgeAnnouncement(_announcementId) {
-    // Backend does not currently expose announcement acknowledgment endpoint.
-    // Keep method for API-contract compatibility and fail fast with explicit intent.
-    const error = new Error("Announcement acknowledgment endpoint is not available");
-    error.code = "ANNOUNCEMENT_ACK_NOT_SUPPORTED";
-    throw error;
+  async acknowledgeAnnouncement(id) {
+    return this.request(`/announcements/${id}/acknowledge`, {
+      method: "POST",
+    });
   }
 
   async getActiveAnnouncements(audience) {
@@ -1768,6 +1810,13 @@ class ApiClient {
   }
 
   // Notifications endpoints
+  async createNotification(notificationData) {
+    return this.request("/notifications", {
+      method: "POST",
+      data: notificationData,
+    });
+  }
+
   async getNotifications(filters = {}) {
     const params = new URLSearchParams(filters);
     return this.request(`/notifications?${params}`);

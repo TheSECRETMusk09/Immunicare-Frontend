@@ -215,9 +215,6 @@ const GuardianSidebar = memo(
         ],
       },
 
-      // Documents menu entry using FileText icon
-      { name: "Documents", icon: FileText, path: "/guardian/documents" },
-
       { name: "Appointments", icon: Calendar, path: "/guardian/appointments" },
       { name: "Notifications", icon: Bell, path: "/guardian/notifications", badge: notificationCount },
       { name: "Profile", icon: User, path: "/guardian/profile" },

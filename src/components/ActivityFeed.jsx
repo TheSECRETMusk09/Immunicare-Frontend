@@ -54,38 +54,7 @@ export default function ActivityFeed({
         const response = await apiClient.getInfantActivities(infantId, maxItems);
         data = Array.isArray(response) ? response : response?.data || [];
       } catch (apiErr) {
-        console.warn("API not available, using fallback mock data for Activity Feed", apiErr);
-        // Fallback mock data if backend endpoint doesn't exist yet
-        data = [
-          {
-            id: 1,
-            type: "vaccination",
-            title: "MMR Vaccine Completed",
-            description: "Administered MMR vaccine to infant",
-            created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-          {
-            id: 2,
-            type: "appointment",
-            title: "Appointment Scheduled",
-            description: "Scheduled DPT vaccination appointment",
-            created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-          {
-            id: 3,
-            type: "growth",
-            title: "Growth Check Completed",
-            description: "Recorded growth: 8.5kg, 68cm",
-            created_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-          {
-            id: 4,
-            type: "certificate",
-            title: "Health Certificate Issued",
-            description: "Issued annual health certificate",
-            created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-        ];
+        throw apiErr;
       }
 
       setActivities(data.slice(0, maxItems));
