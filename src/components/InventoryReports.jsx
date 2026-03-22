@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import apiClient from "../utils/api";
-import { Button, Input, Card, Modal, Badge, Select, Tabs, Tab } from "./UI";
+import { Button, Input, Card, Modal, Select, Tabs, Tab, LoadingSpinner, Alert } from "./UI";
 import { useAuth } from "../contexts/AuthContext";
 
 /**
@@ -12,7 +12,7 @@ import { useAuth } from "../contexts/AuthContext";
  * - Supplier management integration
  */
 export default function InventoryReports() {
-  const { isAdmin, user } = useAuth();
+  const { isAdmin } = useAuth();
 
   // Active tab state
   const [activeTab, setActiveTab] = useState("inventory");
@@ -46,12 +46,7 @@ export default function InventoryReports() {
   // Modal states
   const [showExportModal, setShowExportModal] = useState(false);
   const [showItemModal, setShowItemModal] = useState(false);
-  const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [selectedTransaction, setSelectedTransaction] = useState(null);
-
-  // Report type state
-  const [reportType, setReportType] = useState("summary");
 
   // Fetch all data
   const fetchData = useCallback(async () => {
@@ -167,67 +162,10 @@ export default function InventoryReports() {
     };
   }, [filteredInventory]);
 
-  // Export functions
-  const exportToCSV = () => {
-    const headers = [
-      "SKU",
-      "Product Name",
-      "Category",
-      "Current Stock",
-      "Unit of Measure",
-      "Reorder Point",
-      "Unit Cost",
-      "Total Value",
-      "Warehouse",
-      "Supplier",
-      "Stock Status",
-      "Last Updated",
-    ];
-
-    const rows = filteredInventory.map((item) => [
-      item.sku || "",
-      item.product_name || "",
-      item.category_name || "",
-      item.current_stock_level || 0,
-      item.unit_of_measure || "",
-      item.reorder_point || 0,
-      item.unit_cost || 0,
-      item.total_value || 0,
-      item.warehouse_name || "",
-      item.supplier_name || "",
-      item.stock_status || "",
-      item.updated_at || "",
-    ]);
-
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((row) => row.join(",")),
-    ].join("\n");
-    downloadFile(csvContent, "inventory_report.csv", "text/csv");
-  };
-
   const exportToPDF = () => {
     alert(
       "PDF export would use jsPDF library with the new inventory schema structure",
     );
-  };
-
-  const exportToExcel = () => {
-    alert(
-      "Excel export would use SheetJS library with multiple sheets for inventory, alerts, and transactions",
-    );
-  };
-
-  const downloadFile = (content, filename, mimeType) => {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
   };
 
   // Stock status badge helper
@@ -363,6 +301,27 @@ export default function InventoryReports() {
           </div>
         </div>
       </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="error" title="Error loading inventory data">
+        {error}
+        <div className="mt-4">
+          <Button onClick={fetchData} size="sm">
+            Retry
+          </Button>
+        </div>
+      </Alert>
     );
   }
 
@@ -714,16 +673,6 @@ export default function InventoryReports() {
                           >
                             Details
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedItem(item);
-                              setShowTransactionModal(true);
-                            }}
-                          >
-                            Transact
-                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -999,56 +948,6 @@ export default function InventoryReports() {
       >
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => {
-                exportToCSV();
-                setShowExportModal(false);
-              }}
-            >
-              <div className="flex items-center justify-between w-full">
-                <span>Export to CSV</span>
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                  />
-                </svg>
-              </div>
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => {
-                exportToExcel();
-                setShowExportModal(false);
-              }}
-            >
-              <div className="flex items-center justify-between w-full">
-                <span>Export to Excel</span>
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                  />
-                </svg>
-              </div>
-            </Button>
             <Button
               variant="outline"
               className="w-full justify-start"

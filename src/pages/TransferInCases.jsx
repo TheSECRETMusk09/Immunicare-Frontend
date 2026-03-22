@@ -257,10 +257,14 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
     setIsValidating(true);
 
     try {
-      const response = await api.updateTransferInCase(selectedCase.id, {
-        validation_status: validationStatus,
-        validation_notes: validationNotes,
-        validated_at: new Date().toISOString(),
+      // Explicitly hit the validation endpoint rather than standard update
+      const response = await api.customRequest(`/transfer-in-cases/${selectedCase.id}/validate`, {
+        method: 'PUT',
+        data: {
+          validation_status: validationStatus,
+          validation_notes: validationNotes,
+          validated_at: new Date().toISOString(),
+        }
       });
 
       if (response.success) {

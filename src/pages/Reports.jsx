@@ -34,13 +34,10 @@ const REPORT_TYPES = Object.freeze([
   "consolidated",
 ]);
 
-const REPORT_FORMATS = Object.freeze(["pdf", "excel"]);
+const REPORT_FORMATS = Object.freeze(["pdf"]);
 
 const normalizeReportFormatInput = (value) => {
   const normalized = sanitizeText(value).toLowerCase();
-  if (normalized === "xlsx") {
-    return "excel";
-  }
   return normalized;
 };
 
@@ -379,7 +376,7 @@ const Reports = () => {
         const safeFormat = REPORT_FORMATS.includes(normalizedFormat)
           ? normalizedFormat
           : "pdf";
-        const extension = safeFormat === "excel" ? "xlsx" : safeFormat;
+        const extension = safeFormat;
         const filename =
           parsedFilename || `report-${normalizedReportId}-${Date.now()}.${extension}`;
 
@@ -856,7 +853,6 @@ const Reports = () => {
                 error={formErrors.format}
               >
                 <option value="pdf">PDF Document</option>
-                <option value="excel">Excel Spreadsheet</option>
               </Select>
             </div>
           </div>

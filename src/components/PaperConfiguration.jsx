@@ -4,9 +4,9 @@ import {
   Input,
   Modal,
   Card,
-  LoadingSpinner,
   EmptyState,
   SkeletonTable,
+  Alert,
 } from "./UI";
 import apiClient from "../utils/api";
 
@@ -153,6 +153,12 @@ export default function PaperConfiguration({ onRefresh }) {
         </div>
         <Button onClick={handleAddTemplate}>Add New Template</Button>
       </div>
+
+      {error && (
+        <Alert variant="error">
+          {error}
+        </Alert>
+      )}
 
       {/* Search */}
       <div className="flex justify-between items-center">

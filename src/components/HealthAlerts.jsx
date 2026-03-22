@@ -49,7 +49,7 @@ export default function HealthAlerts({
             childId: infant.id,
             childName: `${infant.first_name} ${infant.last_name}`,
             action: "Schedule Now",
-            actionUrl: `/appointments/new?childId=${infant.id}`,
+            actionUrl: `/guardian/appointments/new?childId=${infant.id}`,
             daysAgo: Math.abs(daysUntilDue),
             category: "vaccination",
           });
@@ -63,7 +63,7 @@ export default function HealthAlerts({
             childId: infant.id,
             childName: `${infant.first_name} ${infant.last_name}`,
             action: "Schedule Now",
-            actionUrl: `/appointments/new?childId=${infant.id}`,
+            actionUrl: `/guardian/appointments/new?childId=${infant.id}`,
             daysUntilDue,
             category: "vaccination",
           });
@@ -77,7 +77,7 @@ export default function HealthAlerts({
             childId: infant.id,
             childName: `${infant.first_name} ${infant.last_name}`,
             action: "View Details",
-            actionUrl: `/vaccination-records/${infant.id}`,
+            actionUrl: `/guardian/vaccination-records/${infant.id}`,
             daysUntilDue,
             category: "vaccination",
           });
@@ -95,7 +95,7 @@ export default function HealthAlerts({
           childId: infant.id,
           childName: `${infant.first_name} ${infant.last_name}`,
           action: "Update Now",
-          actionUrl: `/health-information?childId=${infant.id}`,
+          actionUrl: `/guardian/health-information?childId=${infant.id}`,
           category: "growth",
         });
       }
@@ -118,7 +118,7 @@ export default function HealthAlerts({
             childId: infant.id,
             childName: `${infant.first_name} ${infant.last_name}`,
             action: "Renew",
-            actionUrl: `/documents/health-certificates?childId=${infant.id}`,
+            actionUrl: `/guardian/documents?childId=${infant.id}`,
             daysUntilExpiry,
             category: "certificate",
           });
@@ -132,7 +132,7 @@ export default function HealthAlerts({
             childId: infant.id,
             childName: `${infant.first_name} ${infant.last_name}`,
             action: "Renew Immediately",
-            actionUrl: `/documents/health-certificates?childId=${infant.id}`,
+            actionUrl: `/guardian/documents?childId=${infant.id}`,
             daysAgo: Math.abs(daysUntilExpiry),
             category: "certificate",
           });
@@ -150,7 +150,7 @@ export default function HealthAlerts({
           childId: infant.id,
           childName: `${infant.first_name} ${infant.last_name}`,
           action: "View Appointments",
-          actionUrl: `/appointments?childId=${infant.id}`,
+          actionUrl: `/guardian/appointments?childId=${infant.id}`,
           count: infant.upcomingAppointments,
           category: "appointment",
         });

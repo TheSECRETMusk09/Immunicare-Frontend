@@ -4,9 +4,9 @@ import {
   Input,
   Modal,
   Card,
-  LoadingSpinner,
   EmptyState,
   SkeletonCard,
+  Alert,
 } from "./UI";
 import apiClient from "../utils/api";
 
@@ -83,6 +83,12 @@ export default function DocumentTemplates({ onRefresh }) {
           </p>
         </div>
       </div>
+
+      {error && (
+        <Alert variant="error">
+          {error}
+        </Alert>
+      )}
 
       {/* Search */}
       <div className="flex justify-between items-center">

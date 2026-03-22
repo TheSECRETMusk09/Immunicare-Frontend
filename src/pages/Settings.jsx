@@ -7,11 +7,11 @@ import React, {
 import {
   Card,
   Button,
-  Badge,
   LoadingSpinner,
   Alert,
+  Badge,
 } from "../components/UI";
-import { Settings2, Save } from "lucide-react";
+import { Save } from "lucide-react";
 import { useSettings } from "../hooks/useSettings";
 
 /**
@@ -427,7 +427,7 @@ const SettingsSearch = ({
 const Settings = () => {
   const { settings, loading, error, updateSettings, resetCategory } =
     useSettings();
-  const [activeTab, setActiveTab] = useState("general");
+  const [activeTab, setActiveTab] = useState("facility");
   const [searchMode, setSearchMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [saveStatus, setSaveStatus] = useState(null);
@@ -444,15 +444,71 @@ const Settings = () => {
   // Define all settings configuration
   const settingsConfig = useMemo(
     () => ({
-      general: {
-        label: "General",
-        icon: "⚙️",
-        description: "System-wide preferences and display options",
+      facility: {
+        label: "Facility",
+        icon: "🏥",
+        description: "Clinic information and operating details",
+        sections: [
+          {
+            id: "clinicInfo",
+            title: "Clinic Information",
+            icon: "📋",
+            fields: [
+              {
+                key: "clinicName",
+                label: "Clinic Name",
+                type: "text",
+                placeholder: "e.g., San Nicolas Health Center",
+                required: true,
+              },
+              {
+                key: "address",
+                label: "Address",
+                type: "text",
+                placeholder: "Complete facility address",
+              },
+              {
+                key: "contactEmail",
+                label: "Contact Email",
+                type: "email",
+                placeholder: "clinic@example.com",
+              },
+              {
+                key: "contactPhone",
+                label: "Contact Phone",
+                type: "text",
+                placeholder: "+63 XXX XXX XXXX",
+              },
+            ],
+          },
+          {
+            id: "operatingHours",
+            title: "Operating Hours",
+            icon: "⏰",
+            fields: [
+              {
+                key: "hoursStart",
+                label: "Opening Time",
+                type: "time",
+              },
+              {
+                key: "hoursEnd",
+                label: "Closing Time",
+                type: "time",
+              },
+            ],
+          },
+        ],
+      },
+      preferences: {
+        label: "Preferences",
+        icon: "🎨",
+        description: "Display and system preferences",
         sections: [
           {
             id: "appearance",
             title: "Appearance",
-            icon: "🎨",
+            icon: "🌗",
             fields: [
               {
                 key: "theme",
@@ -464,35 +520,11 @@ const Settings = () => {
                   { value: "system", label: "System Default" },
                 ],
                 tooltip: "Choose your preferred color theme for the interface",
-                helpText: "The theme affects all pages in the application",
-              },
-              {
-                key: "language",
-                label: "Language",
-                type: "select",
-                options: [
-                  { value: "en", label: "English" },
-                  { value: "fil", label: "Filipino" },
-                  { value: "ceb", label: "Cebuano" },
-                ],
-                tooltip: "Select your preferred language for the interface",
-              },
-              {
-                key: "timezone",
-                label: "Timezone",
-                type: "select",
-                options: [
-                  { value: "Asia/Singapore", label: "Singapore (UTC+8)" },
-                  { value: "Asia/Manila", label: "Manila (UTC+8)" },
-                  { value: "Asia/Tokyo", label: "Tokyo (UTC+9)" },
-                ],
-                tooltip:
-                  "Set your local timezone for accurate date/time display",
               },
             ],
           },
           {
-            id: "dateFormat",
+            id: "localization",
             title: "Date & Time Format",
             icon: "📅",
             fields: [
@@ -505,7 +537,6 @@ const Settings = () => {
                   { value: "DD/MM/YYYY", label: "DD/MM/YYYY" },
                   { value: "YYYY-MM-DD", label: "YYYY-MM-DD" },
                 ],
-                tooltip: "Choose how dates are displayed throughout the system",
               },
               {
                 key: "timeFormat",
@@ -515,67 +546,42 @@ const Settings = () => {
                   { value: "12h", label: "12-hour (AM/PM)" },
                   { value: "24h", label: "24-hour" },
                 ],
-                tooltip: "Choose how times are displayed",
               },
             ],
           },
         ],
       },
-      profile: {
-        label: "Profile",
-        icon: "👤",
-        description: "Personal information and account details",
+      alerts: {
+        label: "Alerts & Thresholds",
+        icon: "🔔",
+        description: "Configure system alerts and reminders",
         sections: [
           {
-            id: "personalInfo",
-            title: "Personal Information",
-            icon: "📝",
+            id: "inventoryAlerts",
+            title: "Inventory Alerts",
+            icon: "📦",
             fields: [
               {
-                key: "displayName",
-                label: "Display Name",
-                type: "text",
-                placeholder: "Enter your display name",
-                tooltip: "This name will be displayed in the interface",
-                validate: (value) => {
-                  if (value && value.length < 2)
-                    return "Name must be at least 2 characters";
-                  if (value && value.length > 50)
-                    return "Name must be less than 50 characters";
-                  return "";
-                },
-              },
-              {
-                key: "bio",
-                label: "Bio",
-                type: "textarea",
-                placeholder: "Tell us about yourself...",
-                tooltip: "A short biography that others can see",
-                validate: (value) => {
-                  if (value && value.length > 200)
-                    return "Bio must be less than 200 characters";
-                  return "";
-                },
+                key: "lowStockThreshold",
+                label: "Default Low Stock Threshold",
+                type: "number",
+                min: 1,
+                helpText: "Default stock level to trigger a low stock warning",
               },
             ],
           },
           {
-            id: "contactInfo",
-            title: "Contact Information",
-            icon: "📞",
+            id: "appointmentAlerts",
+            title: "Appointment Reminders",
+            icon: "📅",
             fields: [
               {
-                key: "phone",
-                label: "Phone Number",
-                type: "text",
-                placeholder: "+63 XXX XXX XXXX",
-                tooltip: "Your contact phone number",
-                validate: (value) => {
-                  if (value && !/^\+?[\d\s-]{10,}$/.test(value)) {
-                    return "Please enter a valid phone number";
-                  }
-                  return "";
-                },
+                key: "appointmentReminderLeadTime",
+                label: "Reminder Lead Time (Hours)",
+                type: "number",
+                min: 1,
+                max: 72,
+                helpText: "Hours before appointment to send reminder",
               },
             ],
           },
@@ -584,30 +590,8 @@ const Settings = () => {
       security: {
         label: "Security",
         icon: "🔒",
-        description: "Account security and authentication settings",
+        description: "Session and access controls",
         sections: [
-          {
-            id: "authentication",
-            title: "Authentication",
-            icon: "🔑",
-            fields: [
-              {
-                key: "twoFactorEnabled",
-                label: "Two-Factor Authentication",
-                type: "toggle",
-                description: "Add an extra layer of security to your account",
-                tooltip:
-                  "Requires a verification code in addition to your password",
-              },
-              {
-                key: "loginNotifications",
-                label: "Login Notifications",
-                type: "toggle",
-                description: "Get notified when someone logs into your account",
-                tooltip: "Receive email alerts for new login attempts",
-              },
-            ],
-          },
           {
             id: "session",
             title: "Session Settings",
@@ -615,111 +599,17 @@ const Settings = () => {
             fields: [
               {
                 key: "sessionTimeout",
-                label: "Session Timeout (minutes)",
+                label: "Session Timeout (Minutes)",
                 type: "number",
                 min: 5,
                 max: 120,
-                tooltip:
-                  "Automatically log out after this period of inactivity",
-                helpText: "Recommended: 30 minutes for security",
-                validate: (value) => {
-                  const num = parseInt(value);
-                  if (isNaN(num) || num < 5)
-                    return "Minimum timeout is 5 minutes";
-                  if (num > 120) return "Maximum timeout is 120 minutes";
-                  return "";
-                },
+                helpText: "Automatically log out after inactivity",
               },
-            ],
-          },
-        ],
-      },
-      notification: {
-        label: "Notifications",
-        icon: "🔔",
-        description: "Manage how you receive notifications",
-        sections: [
-          {
-            id: "channels",
-            title: "Notification Channels",
-            icon: "📡",
-            fields: [
               {
-                key: "emailEnabled",
-                label: "Email Notifications",
+                key: "requireReauth",
+                label: "Require Re-authentication",
                 type: "toggle",
-                description: "Receive notifications via email",
-                tooltip: "Get important updates delivered to your inbox",
-              },
-              {
-                key: "pushEnabled",
-                label: "Push Notifications",
-                type: "toggle",
-                description: "Receive browser push notifications",
-                tooltip: "Get instant alerts even when not on the page",
-              },
-              {
-                key: "smsEnabled",
-                label: "SMS Notifications",
-                type: "toggle",
-                description: "Receive notifications via SMS",
-                tooltip: "Get text messages for critical alerts",
-              },
-            ],
-          },
-          {
-            id: "frequency",
-            title: "Notification Frequency",
-            icon: "⏰",
-            fields: [
-              {
-                key: "digestFrequency",
-                label: "Email Digest",
-                type: "select",
-                options: [
-                  { value: "realtime", label: "Real-time" },
-                  { value: "daily", label: "Daily Digest" },
-                  { value: "weekly", label: "Weekly Digest" },
-                ],
-                tooltip: "How often to receive summary emails",
-              },
-            ],
-          },
-        ],
-      },
-      system: {
-        label: "System",
-        icon: "🖥️",
-        description: "System information and advanced options",
-        sections: [
-          {
-            id: "info",
-            title: "System Information",
-            icon: "ℹ️",
-            isInfoSection: true,
-          },
-          {
-            id: "dataManagement",
-            title: "Data Management",
-            icon: "💾",
-            fields: [
-              {
-                key: "autoBackup",
-                label: "Automatic Backups",
-                type: "toggle",
-                description: "Automatically backup your data",
-                tooltip: "Your data will be backed up daily",
-              },
-              {
-                key: "backupFrequency",
-                label: "Backup Frequency",
-                type: "select",
-                options: [
-                  { value: "daily", label: "Daily" },
-                  { value: "weekly", label: "Weekly" },
-                  { value: "monthly", label: "Monthly" },
-                ],
-                tooltip: "How often to create automatic backups",
+                description: "Require password for sensitive actions like exports",
               },
             ],
           },
@@ -881,42 +771,11 @@ const Settings = () => {
             icon={section.icon}
             defaultOpen={true}
           >
-            {section.isInfoSection ? (
-              <div className="space-y-3">
-                <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-800">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    Version
-                  </span>
-                  <Badge variant="info">1.0.0</Badge>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-800">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    Database Status
-                  </span>
-                  <Badge variant="success">Connected</Badge>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-800">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    Last Backup
-                  </span>
-                  <span className="text-sm text-gray-900 dark:text-gray-100">
-                    2 hours ago
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    Server Status
-                  </span>
-                  <Badge variant="success">Healthy</Badge>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {section.fields?.map((field) => (
-                  <div key={field.key}>{renderField(activeTab, field)}</div>
-                ))}
-              </div>
-            )}
+            <div className="space-y-2">
+              {section.fields?.map((field) => (
+                <div key={field.key}>{renderField(activeTab, field)}</div>
+              ))}
+            </div>
           </CollapsibleSection>
         ))}
 

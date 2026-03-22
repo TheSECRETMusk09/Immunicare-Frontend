@@ -621,6 +621,22 @@ export default function MyChildren() {
         return;
       }
 
+      let uploadedCardUrl = null;
+      if (transferFormData.vaccination_card) {
+        try {
+          const formData = new FormData();
+          formData.append("file", transferFormData.vaccination_card);
+          const uploadRes = await apiClient.customRequest("/upload", {
+            method: "POST",
+            data: formData,
+            headers: { "Content-Type": "multipart/form-data" }
+          });
+          uploadedCardUrl = uploadRes.data?.url || uploadRes.url || null;
+        } catch (uploadErr) {
+          console.warn("Vaccination card upload failed", uploadErr);
+        }
+      }
+
       // First create the infant record
       const infantData = {
         first_name: formData.first_name,
@@ -667,7 +683,7 @@ export default function MyChildren() {
             infant_id: infantId,
             source_facility: transferFormData.source_facility,
             submitted_vaccines: submittedVaccines,
-            vaccination_card_url: null,
+            vaccination_card_url: uploadedCardUrl,
             remarks: transferRemarks || null,
           };
 

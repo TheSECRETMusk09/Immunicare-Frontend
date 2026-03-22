@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Button, Input, Modal, Card } from "./UI";
+import { Button, Input, Modal, Card, Alert } from "./UI";
 import apiClient from "../utils/api";
-import { useAuth } from "../contexts/AuthContext";
 
 export default function UserDownloadCenter() {
-  const { user } = useAuth();
   const [downloads, setDownloads] = useState([]);
   const [infants, setInfants] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -63,16 +61,25 @@ export default function UserDownloadCenter() {
 
   const handleDownload = async (downloadId) => {
     try {
-      const response = await apiClient.downloadDocument(downloadId);
+      const response = await apiClient.customRequest(`/documents/${downloadId}/download`, { responseType: 'blob' });
       // Handle file download
-      if (response.data && response.data.file_path) {
-        // Create download link
+      if (response && !(response.data && response.data.file_path)) {
+        const blob = response.data instanceof Blob ? response.data : new Blob([response.data || response]);
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", `document-${downloadId}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      } else if (response.data && response.data.file_path) {
         const link = document.createElement("a");
         link.href = response.data.file_path;
         link.download = response.data.file_name || "document";
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
+        link.remove();
       }
     } catch (err) {
       setError(err.message);
@@ -116,6 +123,12 @@ export default function UserDownloadCenter() {
           Generate New Document
         </Button>
       </div>
+
+      {error && (
+        <Alert variant="error">
+          {error}
+        </Alert>
+      )}
 
       {/* Search */}
       <div className="flex justify-between items-center">
@@ -366,7 +379,6 @@ export default function UserDownloadCenter() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
             >
               <option value="PDF">PDF</option>
-              <option value="EXCEL">Excel</option>
               <option value="PRINT">Print</option>
             </select>
           </div>
