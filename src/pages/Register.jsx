@@ -447,8 +447,8 @@ const Register = () => {
 
     try {
       const response = await apiClient.resendGuardianRegistrationOtp({
-        phone: pendingVerification?.phone || registrationPayload.phone,
-        email: registrationPayload.email,
+        phone: normalizePhoneForVerification(pendingVerification?.phone || registrationPayload?.phone),
+        email: registrationPayload?.email,
       });
       const nextPendingVerification = createPendingVerificationState(
         response,
@@ -468,9 +468,11 @@ const Register = () => {
               1,
               Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : 60,
             )} second(s) before requesting another code.`
-          : error?.response?.data?.error ||
-            error?.message ||
-            "Failed to resend OTP. Please try again.";
+          : error?.response?.status >= 500
+            ? "The server encountered a timeout while attempting to send the verification code. Please check your signal and try again later."
+            : error?.response?.data?.error ||
+              error?.message ||
+              "Failed to resend OTP. Please try again.";
       setOtpError(message);
       throw error;
     } finally {
