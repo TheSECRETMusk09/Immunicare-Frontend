@@ -280,7 +280,7 @@ const NotificationItem = ({ notification, onDismiss }) => {
         <Icon className="w-4 h-4" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-theme-primary truncate">
+        <p className="text-sm font-medium text-theme-primary leading-snug break-words">
           {notification.title || notification.message?.substring(0, 50)}
         </p>
         <p className="text-xs text-theme-secondary mt-0.5 line-clamp-2">
@@ -534,6 +534,14 @@ const GuardianDashboard = () => {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
+  // Auto-refresh dashboard data every 60 seconds
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      fetchDashboardData();
+    }, 60000);
+    return () => window.clearInterval(intervalId);
+  }, [fetchDashboardData]);
+
   // Format date for appointment display
   const formatAppointmentDate = (dateString) => {
     const date = new Date(dateString);
@@ -569,7 +577,7 @@ const GuardianDashboard = () => {
 
   return (
     <div className="guardian-page-wrapper min-h-screen bg-theme-bg-primary transition-colors duration-200">
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 w-full bg-theme-bg-primary border-b border-theme-border-primary shadow-sm transition-colors duration-200">
+      <div className="min-[1025px]:hidden fixed top-0 left-0 right-0 z-40 w-full bg-theme-bg-primary border-b border-theme-border-primary shadow-sm transition-colors duration-200">
         <GuardianTopHeader
           title=""
           onRefresh={handleRetry}
@@ -577,13 +585,13 @@ const GuardianDashboard = () => {
         />
       </div>
 
-      <div className="pt-14 sm:pt-16 lg:pt-0">
+      <div className="pt-14 sm:pt-16 min-[1025px]:pt-0">
         <GuardianModuleHeader
           title="Guardian Dashboard"
           subtitle="Welcome back! "
           icon={<Calendar className="w-8 h-8 text-white" />}
           actions={(
-            <div className="hidden lg:flex guardian-desktop-pageheader-actions">
+            <div className="hidden min-[1025px]:flex guardian-desktop-pageheader-actions">
               <button
                 type="button"
                 onClick={handleRetry}
@@ -617,7 +625,7 @@ const GuardianDashboard = () => {
           )}
         />
 
-        <main className="guardian-page-content space-y-4 md:space-y-5 lg:space-y-6 p-4 md:p-6">
+        <main className="guardian-page-content space-y-4 md:space-y-5 lg:space-y-6">
 
         {/* Error State */}
         {error && (
@@ -637,7 +645,7 @@ const GuardianDashboard = () => {
               }`}
               role="alert"
             >
-              <div className="flex items-start gap-3">
+              <div className="flex flex-col gap-3 min-[768px]:flex-row min-[768px]:items-start">
                 {stats.overdueCount > 0 ? (
                   <AlertCircle className="w-6 h-6 text-red-500 flex-shrink-0" />
                 ) : (
@@ -671,7 +679,7 @@ const GuardianDashboard = () => {
                 </div>
                 <button
                   onClick={() => navigate('/guardian/appointments/new')}
-                  className={`flex-shrink-0 px-4 py-2 text-sm font-bold rounded-lg transition-colors shadow-sm ${
+                  className={`w-full min-[768px]:w-auto flex-shrink-0 px-4 py-2 text-sm font-bold rounded-lg transition-colors shadow-sm ${
                     stats.overdueCount > 0
                       ? 'bg-red-600 hover:bg-red-700 text-white'
                       : 'bg-amber-600 hover:bg-amber-700 text-white'
@@ -686,7 +694,7 @@ const GuardianDashboard = () => {
 
         {/* Stats Grid - 2x2 on mobile, 4 columns on desktop */}
         <div className="pt-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 min-[360px]:grid-cols-2 min-[1025px]:grid-cols-4 gap-4">
             {loading ? (
               <>
                 <StatCardSkeleton />
@@ -777,7 +785,7 @@ const GuardianDashboard = () => {
         {/* Due Vaccines Alert Cards */}
         {!loading && dueVaccines.length > 0 && (
           <div className="pt-4">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col gap-3 min-[640px]:flex-row min-[640px]:items-center min-[640px]:justify-between mb-4">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
                   <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
@@ -792,7 +800,7 @@ const GuardianDashboard = () => {
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 min-[768px]:grid-cols-2 min-[1025px]:grid-cols-3 gap-3">
               {dueVaccines.slice(0, 6).map((vaccine) => (
                 <DueVaccineCard
                   key={vaccine.id}
@@ -816,7 +824,7 @@ const GuardianDashboard = () => {
             </div>
             <h2 className="text-base sm:text-lg font-bold text-theme-primary">Quick Actions</h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 min-[768px]:grid-cols-3 min-[1025px]:grid-cols-5 gap-4">
             <button
               onClick={() => navigate('/guardian/appointments')}
               className="guardian-quick-action-btn guardian-dashboard-quick-action flex flex-col items-center justify-center p-4 sm:p-5 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 min-h-[100px] sm:min-h-[120px]"
@@ -867,10 +875,10 @@ const GuardianDashboard = () => {
         </div>
 
         {/* Three Column Layout - Children, Appointments, Notifications */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 pt-4 md:pt-6">
+        <div className="grid grid-cols-1 min-[768px]:grid-cols-2 min-[1025px]:grid-cols-3 gap-4 md:gap-6 pt-4 md:pt-6">
             {/* My Children Section */}
-            <div className="lg:col-span-1">
-              <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="flex flex-col gap-3 min-[640px]:flex-row min-[640px]:items-center min-[640px]:justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 bg-teal-100 dark:bg-teal-900/30 rounded-lg flex items-center justify-center">
                     <Baby className="w-4 h-4 text-teal-600 dark:text-teal-400" />
@@ -956,8 +964,8 @@ const GuardianDashboard = () => {
             </div>
 
             {/* Upcoming Appointments Section */}
-            <div className="lg:col-span-1">
-              <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="flex flex-col gap-3 min-[640px]:flex-row min-[640px]:items-center min-[640px]:justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
                     <Calendar className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -1023,8 +1031,8 @@ const GuardianDashboard = () => {
             </div>
 
             {/* Recent Notifications Section */}
-            <div className="lg:col-span-1">
-              <div className="flex items-center justify-between mb-4">
+            <div className="min-[768px]:col-span-2 min-[1025px]:col-span-1">
+              <div className="flex flex-col gap-3 min-[640px]:flex-row min-[640px]:items-center min-[640px]:justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
                     <Bell className="w-4 h-4 text-blue-600 dark:text-blue-400" />
@@ -1089,8 +1097,7 @@ const GuardianDashboard = () => {
           onSuccess={(result) => {
             setShowTransferModal(false);
             setSelectedInfant(null);
-            // Optionally show success message or refresh data
-            console.log('Vaccines imported:', result);
+            fetchDashboardData();
           }}
         />
       )}

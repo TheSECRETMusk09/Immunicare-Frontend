@@ -422,7 +422,7 @@ export default function GuardianAppointmentBooking() {
       };
 
       const newAppointment = await apiClient.createAppointment(appointmentData);
-      setCreatedAppointment(newAppointment);
+      setCreatedAppointment(newAppointment?.data || newAppointment);
       setSuccess(true);
 
       // Send SMS confirmation (backend should handle this)
@@ -477,7 +477,7 @@ export default function GuardianAppointmentBooking() {
                       Patient Information
                     </h3>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-4 text-sm">
                     <div>
                       <p className="text-gray-500 dark:text-gray-400">Name</p>
                       <p className="font-medium text-gray-900 dark:text-white">
@@ -620,7 +620,7 @@ export default function GuardianAppointmentBooking() {
 
         <form onSubmit={handleSubmit} className="guardian-form space-y-6">
           {/* Main Content Grid */}
-          <div className="guardian-cards-grid grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 lg:gap-6">
+          <div className="guardian-cards-grid grid grid-cols-1 min-[768px]:grid-cols-2 gap-4 sm:gap-5 lg:gap-6">
             {/* Left Column - Form */}
             <div className="space-y-6">
               {/* Child Selection Card */}
@@ -949,7 +949,7 @@ export default function GuardianAppointmentBooking() {
                     </h3>
                   </div>
                   <div className="p-5 space-y-3">
-                    <div className="flex justify-between gap-3">
+                    <div className="flex flex-col gap-1 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between">
                       <span className="text-gray-500 dark:text-gray-400">
                         Name
                       </span>
@@ -957,7 +957,7 @@ export default function GuardianAppointmentBooking() {
                         {selectedChild.first_name} {selectedChild.last_name}
                       </span>
                     </div>
-                    <div className="flex justify-between gap-3">
+                    <div className="flex flex-col gap-1 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between">
                       <span className="text-gray-500 dark:text-gray-400">
                         Date of Birth
                       </span>
@@ -965,7 +965,7 @@ export default function GuardianAppointmentBooking() {
                         {new Date(selectedChild.dob).toLocaleDateString()}
                       </span>
                     </div>
-                    <div className="flex justify-between gap-3">
+                    <div className="flex flex-col gap-1 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between">
                       <span className="text-gray-500 dark:text-gray-400">
                         Sex
                       </span>
@@ -977,7 +977,7 @@ export default function GuardianAppointmentBooking() {
                             : "N/A"}
                       </span>
                     </div>
-                    <div className="flex justify-between gap-3">
+                    <div className="flex flex-col gap-1 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between">
                       <span className="text-gray-500 dark:text-gray-400">
                         Infant Control Number
                       </span>
@@ -986,7 +986,7 @@ export default function GuardianAppointmentBooking() {
                       </span>
                     </div>
                     {selectedChild.health_center && (
-                      <div className="flex justify-between gap-3">
+                      <div className="flex flex-col gap-1 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between">
                         <span className="text-gray-500 dark:text-gray-400">
                           Health Center
                         </span>

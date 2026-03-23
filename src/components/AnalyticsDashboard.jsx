@@ -61,10 +61,9 @@ const CustomTooltip = ({ active, payload, label }) => {
         {payload.map((entry, index) => (
           <p
             key={index}
-            style={{ color: entry.color }}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 text-gray-700 dark:text-gray-200 font-medium"
           >
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></span>
+            <span className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: entry.color }}></span>
             {entry.name}: {entry.value}
           </p>
         ))}
@@ -85,7 +84,7 @@ const CustomLegend = ({ payload }) => {
               className="w-3 h-3 rounded-full"
               style={{ backgroundColor: entry.color }}
             ></span>
-            <span className="text-gray-700 dark:text-gray-300">{entry.value}</span>
+            <span className="text-gray-700 dark:text-gray-300 font-medium">{entry.value}</span>
           </div>
         ))}
       </div>
@@ -102,19 +101,40 @@ export default function AnalyticsDashboard() {
 
   // Transform gender data from API to chart format
   const transformGenderData = useCallback((demographicsData) => {
-    if (!demographicsData?.genderBreakdown || !Array.isArray(demographicsData.genderBreakdown)) {
+    const breakdown = Array.isArray(demographicsData) ? demographicsData : demographicsData?.genderBreakdown;
+    if (!breakdown || !Array.isArray(breakdown)) {
       return [
         { name: 'Male', value: 52, fill: '#3B82F6' },
         { name: 'Female', value: 48, fill: '#8B5CF6' },
       ];
     }
 
-    return demographicsData.genderBreakdown.map((item, index) => ({
-      name: item.label || 'Unknown',
-      value: parseInt(item.count, 10) || 0,
-      fill: index === 0 ? '#3B82F6' : '#8B5CF6',
-    }));
+      return breakdown.map((item) => {
+        const label = item.label || 'Unknown';
+        const labelLower = label.toLowerCase();
+        let fill = '#8B5CF6'; // Default Female/fallback
+        if (labelLower === 'male' || labelLower === 'm') {
+          fill = '#3B82F6';
+        } else if (labelLower === 'female' || labelLower === 'f') {
+          fill = '#8B5CF6';
+        } else {
+          fill = '#FFA500'; // Orange for Other / Not specified
+        }
+        return {
+          name: label,
+          value: parseInt(item.count, 10) || 0,
+          fill,
+        };
+      });
   }, []);
+
+  // Utility to safely unwrap varied API responses
+  const unwrapApiPayload = (res) => {
+    if (!res) return {};
+    if (res.data && res.data.data) return res.data.data;
+    if (res.data) return res.data;
+    return res;
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -128,6 +148,7 @@ export default function AnalyticsDashboard() {
         growthData,
         dashboardStats,
         demographicsData,
+        adminSummaryData,
       ] = await Promise.allSettled([
         apiClient.getVaccinationAnalytics(params),
         apiClient.getAppointmentAnalytics(params),
@@ -135,54 +156,47 @@ export default function AnalyticsDashboard() {
         apiClient.getGrowthStats(params),
         apiClient.getDashboardStats(params),
         apiClient.getDemographicsAnalytics(params),
+        apiClient.request("/reports/admin/summary"),
       ]);
 
       // Transform data for charts
-      const vaccinations = vaccinationData.status === 'fulfilled'
-        ? (vaccinationData.value?.trends || [])
-        : [];
+      const vacPayload = vaccinationData.status === 'fulfilled' ? unwrapApiPayload(vaccinationData.value) : {};
+      const vaccinations = vacPayload.trends || vacPayload.data || [];
 
-      const appointments = appointmentData.status === 'fulfilled'
-        ? (appointmentData.value?.statusBreakdown || []).map(item => ({
-            status: item.status,
-            value: item.count,
-          }))
-        : [];
+      const apptPayload = appointmentData.status === 'fulfilled' ? unwrapApiPayload(appointmentData.value) : {};
+      const appointments = (apptPayload.statusBreakdown || apptPayload.data || []).map(item => ({
+          status: item.status || item.name || 'Unknown',
+          value: parseInt(item.count || item.value || 0, 10),
+      }));
 
-      const inventory = inventoryData.status === 'fulfilled'
-        ? (inventoryData.value?.byVaccine || []).map(item => ({
-            name: item.vaccineName || item.vaccine_key,
-            value: item.availableDoses || 0,
-            status: item.criticalStock ? 'danger' : item.lowStock ? 'warning' : 'good',
-          }))
-        : [];
+      const invPayload = inventoryData.status === 'fulfilled' ? unwrapApiPayload(inventoryData.value) : {};
+      const inventory = (invPayload.byVaccine || invPayload.data || []).map(item => ({
+          name: item.vaccineName || item.vaccine_key || item.name || 'Unknown',
+          value: parseInt(item.availableDoses || item.stock_on_hand || item.value || 0, 10),
+          status: item.criticalStock ? 'danger' : item.lowStock ? 'warning' : 'good',
+      }));
 
-      const growth = growthData.status === 'fulfilled'
-        ? (growthData.value?.data || [])
-        : [];
+      const growthPayload = growthData.status === 'fulfilled' ? unwrapApiPayload(growthData.value) : {};
+      const growth = growthPayload.data || growthPayload.trends || [];
 
       // Get stats from dashboard or use individual responses
-      const stats = dashboardStats.status === 'fulfilled'
-        ? dashboardStats.value
-        : {};
+      const stats = dashboardStats.status === 'fulfilled' ? unwrapApiPayload(dashboardStats.value) : {};
+      const adminSummary = adminSummaryData.status === 'fulfilled' ? unwrapApiPayload(adminSummaryData.value) : {};
 
       // Transform demographics for gender chart
-      const gender = demographicsData.status === 'fulfilled'
-        ? transformGenderData(demographicsData.value)
+      const demoPayload = demographicsData.status === 'fulfilled' ? unwrapApiPayload(demographicsData.value) : null;
+      const gender = demoPayload
+        ? transformGenderData(demoPayload)
         : [
             { name: 'Male', value: 52, fill: '#3B82F6' },
             { name: 'Female', value: 48, fill: '#8B5CF6' },
           ];
 
       // Extract summary metrics
-      const summary = vaccinationData.status === 'fulfilled'
-        ? vaccinationData.value?.summary || {}
-        : {};
+      const summary = vacPayload.summary || vacPayload || {};
 
       // Get critical stock alerts from inventory
-      const criticalAlerts = inventoryData.status === 'fulfilled'
-        ? inventoryData.value?.criticalAlerts || []
-        : [];
+      const criticalAlerts = invPayload.criticalAlerts || invPayload.alerts || [];
 
       setData({
         vaccinations,
@@ -193,13 +207,13 @@ export default function AnalyticsDashboard() {
         stats: {
           vaccinations: summary.administeredInPeriod || summary.completedToday || stats.vaccinations || 0,
           appointments: stats.appointments || 0,
-          infants: stats.infants || summary.uniqueInfantsServed || 0,
-          guardians: stats.guardians || 0,
+          infants: adminSummary.infants?.total || stats.total_infants || stats.infants || summary.uniqueInfantsServed || 0,
+          guardians: adminSummary.guardians?.total || stats.total_guardians || stats.guardians || 0,
           lowStock: summary.lowStock || inventoryData.value?.lowStockCount || 0,
           pendingVaccinations: summary.dueInPeriod || 0,
           overdueVaccinations: summary.overdue || 0,
-          completedVaccinations: summary.completedToday || 0,
-          childrenTracked: summary.uniqueInfantsServed || stats.infants || 0,
+          completedVaccinations: summary.administeredInPeriod || stats.vaccinations || summary.completedToday || 0,
+          childrenTracked: adminSummary.infants?.total || summary.uniqueInfantsServed || stats.infants || 0,
           vaccinationCoverage: summary.coverageRate || 0,
         },
         criticalAlerts,
@@ -207,16 +221,8 @@ export default function AnalyticsDashboard() {
       });
     } catch (error) {
       console.error("Error fetching analytics:", error);
-      setData({
-        vaccinations: [],
-        appointments: [],
-        inventory: [],
-        growth: [],
-        gender: [],
-        stats: {},
-        criticalAlerts: [],
-        isUsingFallback: true,
-      });
+      setData({ isUsingFallback: false });
+      // In a production healthcare system, we must not show hardcoded fake metrics.
     } finally {
       setLoading(false);
     }
@@ -233,11 +239,24 @@ export default function AnalyticsDashboard() {
 
   // Check if we're using fallback data
   const isUsingFallback = data.isUsingFallback === true;
-  const isDarkMode =
-    typeof document !== "undefined" &&
-    document.documentElement.classList.contains("dark");
-  const chartGridStroke = isDarkMode ? "#374151" : "#E5E7EB";
-  const chartAxisStroke = isDarkMode ? "#D1D5DB" : "#6B7280";
+
+  const [isDarkMode, setIsDarkMode] = useState(
+    typeof document !== "undefined" && document.documentElement.classList.contains("dark")
+  );
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const checkDarkMode = () => setIsDarkMode(document.documentElement.classList.contains("dark"));
+    checkDarkMode(); // initial check
+
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+
+  const chartGridStroke = isDarkMode ? "#374151" : "#E5E7EB"; // gray-700 : gray-200
+  const chartAxisStroke = isDarkMode ? "#9CA3AF" : "#6B7280"; // gray-400 : gray-500
 
   const handleExport = () => {
     window.print();
@@ -287,9 +306,9 @@ export default function AnalyticsDashboard() {
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto p-4 sm:px-6 sm:pb-6 pt-3">
         <div className="max-w-7xl mx-auto">
-          {isUsingFallback && (
-            <Alert variant="warning" className="mb-6">
-              ⚠️ Showing demo data - API connection unavailable
+          {!data.stats && !loading && (
+            <Alert variant="error" className="mb-6">
+              Unable to load analytics data. Please check your connection or contact the system administrator.
             </Alert>
           )}
 
@@ -320,7 +339,7 @@ export default function AnalyticsDashboard() {
           {activeTab === "overview" && (
             <div>
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-6 xl:mb-8">
           <Card className="hover:shadow-md transition-shadow bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
@@ -342,13 +361,13 @@ export default function AnalyticsDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Pending Vaccinations
+                  Due Soon (7 Days)
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
                   {data.stats?.pendingVaccinations || "0"}
                 </p>
                 <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
-                  Awaiting schedule
+                  Upcoming doses
                 </p>
               </div>
               <Calendar className="h-12 w-12 text-yellow-500" />
@@ -379,7 +398,7 @@ export default function AnalyticsDashboard() {
                   Critical Stock Alerts
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {data.stats?.lowStock || "0"}
+                  {data.criticalAlerts?.length || "0"}
                 </p>
                 <p className="text-xs text-red-600 dark:text-red-400 mt-1">
                   Needs attention
@@ -391,7 +410,7 @@ export default function AnalyticsDashboard() {
         </div>
 
         {/* Infant Management Module Widgets */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-6 xl:mb-8">
           <Card className="hover:shadow-md transition-shadow bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
@@ -505,7 +524,7 @@ export default function AnalyticsDashboard() {
           )}
 
           {activeTab === "vaccinations" && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 xl:gap-8 mb-6 xl:mb-8">
         {/* Charts Grid */}
           {/* Vaccination Trends */}
           <ModernChartCard
@@ -521,11 +540,11 @@ export default function AnalyticsDashboard() {
                 <XAxis
                   dataKey="month"
                   stroke={chartAxisStroke}
-                  tick={{ fontSize: 12 }}
+                  tick={{ fontSize: 12, fill: chartAxisStroke }}
                 />
                 <YAxis
                   stroke={chartAxisStroke}
-                  tick={{ fontSize: 12 }}
+                  tick={{ fontSize: 12, fill: chartAxisStroke }}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend content={<CustomLegend />} />
@@ -563,28 +582,28 @@ export default function AnalyticsDashboard() {
               >
                 <defs>
                   <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={isDarkMode ? 0.6 : 0.8}/>
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={isDarkMode ? 0.1 : 0}/>
                   </linearGradient>
                   <linearGradient id="colorHeight" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#10B981" stopOpacity={isDarkMode ? 0.6 : 0.8}/>
+                    <stop offset="95%" stopColor="#10B981" stopOpacity={isDarkMode ? 0.1 : 0}/>
                   </linearGradient>
                   <linearGradient id="colorHead" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#F59E0B" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#F59E0B" stopOpacity={isDarkMode ? 0.6 : 0.8}/>
+                    <stop offset="95%" stopColor="#F59E0B" stopOpacity={isDarkMode ? 0.1 : 0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
                 <XAxis
                   dataKey="week"
                   stroke={chartAxisStroke}
-                  tick={{ fontSize: 12 }}
-                  label={{ value: 'Week', position: 'insideBottom', offset: -5 }}
+                  tick={{ fontSize: 12, fill: chartAxisStroke }}
+                  label={{ value: 'Week', position: 'insideBottom', offset: -5, fill: chartAxisStroke, fontSize: 12, fontWeight: 500 }}
                 />
                 <YAxis
                   stroke={chartAxisStroke}
-                  tick={{ fontSize: 12 }}
+                  tick={{ fontSize: 12, fill: chartAxisStroke }}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend content={<CustomLegend />} />
@@ -622,7 +641,7 @@ export default function AnalyticsDashboard() {
           )}
 
           {activeTab === "appointments" && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 xl:gap-8 mb-6 xl:mb-8">
               {/* Appointment Status */}
               <ModernChartCard
                 title="Appointment Status Distribution"
@@ -635,9 +654,19 @@ export default function AnalyticsDashboard() {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }) =>
-                        `${name} ${(percent * 100).toFixed(0)}%`
-                      }
+                      label={({ name, percent, x, y, cx }) => (
+                        <text
+                          x={x}
+                          y={y}
+                          fill={chartAxisStroke}
+                          textAnchor={x > cx ? 'start' : 'end'}
+                          dominantBaseline="central"
+                          fontSize={12}
+                          fontWeight={500}
+                        >
+                          {`${name} ${(percent * 100).toFixed(0)}%`}
+                        </text>
+                      )}
                       outerRadius={100}
                       innerRadius={60}
                       fill="#8884d8"
@@ -659,7 +688,8 @@ export default function AnalyticsDashboard() {
                       y="50%"
                       textAnchor="middle"
                       dominantBaseline="middle"
-                      className="text-gray-600 dark:text-gray-400 text-sm"
+                      className="text-gray-600 dark:text-gray-400 text-sm font-medium"
+                      fill="currentColor"
                     >
                       Appointments
                     </text>
@@ -669,6 +699,7 @@ export default function AnalyticsDashboard() {
                       textAnchor="middle"
                       dominantBaseline="middle"
                       className="text-xl font-bold text-gray-900 dark:text-white"
+                      fill="currentColor"
                     >
                       100%
                     </text>
@@ -688,9 +719,19 @@ export default function AnalyticsDashboard() {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }) =>
-                        `${name} ${(percent * 100).toFixed(0)}%`
-                      }
+                      label={({ name, percent, x, y, cx }) => (
+                        <text
+                          x={x}
+                          y={y}
+                          fill={chartAxisStroke}
+                          textAnchor={x > cx ? 'start' : 'end'}
+                          dominantBaseline="central"
+                          fontSize={12}
+                          fontWeight={500}
+                        >
+                          {`${name} ${(percent * 100).toFixed(0)}%`}
+                        </text>
+                      )}
                       outerRadius={100}
                       innerRadius={60}
                       fill="#8884d8"
@@ -712,7 +753,8 @@ export default function AnalyticsDashboard() {
                       y="50%"
                       textAnchor="middle"
                       dominantBaseline="middle"
-                      className="text-gray-600 dark:text-gray-400 text-sm"
+                      className="text-gray-600 dark:text-gray-400 text-sm font-medium"
+                      fill="currentColor"
                     >
                       Total
                     </text>
@@ -722,6 +764,7 @@ export default function AnalyticsDashboard() {
                       textAnchor="middle"
                       dominantBaseline="middle"
                       className="text-xl font-bold text-gray-900 dark:text-white"
+                      fill="currentColor"
                     >
                       100%
                     </text>
@@ -732,7 +775,7 @@ export default function AnalyticsDashboard() {
           )}
 
           {activeTab === "inventory" && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 xl:gap-8 mb-6 xl:mb-8">
               {/* Inventory Status */}
               <ModernChartCard
                 title="Inventory Status"
@@ -747,11 +790,11 @@ export default function AnalyticsDashboard() {
                     <XAxis
                       dataKey="name"
                       stroke={chartAxisStroke}
-                      tick={{ fontSize: 12 }}
+                      tick={{ fontSize: 12, fill: chartAxisStroke }}
                     />
                     <YAxis
                       stroke={chartAxisStroke}
-                      tick={{ fontSize: 12 }}
+                      tick={{ fontSize: 12, fill: chartAxisStroke }}
                     />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend content={<CustomLegend />} />

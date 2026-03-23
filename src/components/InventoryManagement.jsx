@@ -652,32 +652,6 @@ export default function InventoryManagement() {
     );
   }, [inventory, filteredInventory, isFiltering]);
 
-  // Update inventory item
-  const updateItem = (id, field, value) => {
-    setInventory((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          const updatedItem = { ...item, [field]: value };
-
-          // Auto-calculate derived fields
-          updatedItem.total_available =
-            parseInt(updatedItem.beginning_balance || 0) +
-            parseInt(updatedItem.received || 0);
-
-          updatedItem.stock_on_hand =
-            updatedItem.total_available +
-            parseInt(updatedItem.transferred_in || 0) -
-            parseInt(updatedItem.transferred_out || 0) -
-            parseInt(updatedItem.issuance || 0) -
-            parseInt(updatedItem.expired_wasted || 0);
-
-          return updatedItem;
-        }
-        return item;
-      }),
-    );
-  };
-
   // Open modal for transaction
   const openTransactionModal = (type, item = null) => {
     setModalType(type);
@@ -1034,45 +1008,46 @@ export default function InventoryManagement() {
         />
 
         {/* Tab Navigation */}
-        <Card className="mt-4 dark:bg-gray-800 dark:border-gray-700 p-3">
-          <div className="flex space-x-2 overflow-x-auto">
-            <button
-              onClick={() => handleTabChange("inventory_sheet")}
-              className={`px-4 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 whitespace-nowrap ${
-                activeTab === "inventory_sheet"
-                  ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-              }`}
-            >
-              Inventory Sheet
-            </button>
-            <button
-              onClick={() => handleTabChange("stock_alerts")}
-              className={`px-4 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 whitespace-nowrap relative ${
-                activeTab === "stock_alerts"
-                  ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-              }`}
-            >
-              Stock Alerts
-              {stockAlerts.critical.length > 0 && (
-                <span className="ml-2 px-2 py-0.5 text-xs bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 rounded-full">
-                  {stockAlerts.critical.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => handleTabChange("vaccine_monitoring")}
-              className={`px-4 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 whitespace-nowrap ${
-                activeTab === "vaccine_monitoring"
-                  ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-              }`}
-            >
-              Vaccine Monitoring
-            </button>
-          </div>
-        </Card>
+        <div className="mt-4 flex space-x-2 overflow-x-auto bg-gray-100 dark:bg-gray-800 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700">
+          <button
+            onClick={() => handleTabChange("inventory_sheet")}
+            className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
+              activeTab === "inventory_sheet"
+                ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+            }`}
+          >
+            <span>📋</span>
+            <span>Inventory Sheet</span>
+          </button>
+          <button
+            onClick={() => handleTabChange("stock_alerts")}
+            className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap relative ${
+              activeTab === "stock_alerts"
+                ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+            }`}
+          >
+            <span>⚠️</span>
+            <span>Stock Alerts</span>
+            {stockAlerts.critical.length > 0 && (
+              <span className="ml-2 px-2 py-0.5 text-xs bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 rounded-full">
+                {stockAlerts.critical.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => handleTabChange("vaccine_monitoring")}
+            className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
+              activeTab === "vaccine_monitoring"
+                ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+            }`}
+          >
+            <span>📈</span>
+            <span>Vaccine Monitoring</span>
+          </button>
+        </div>
       </div>
 
       {isPrintLayoutActive && (

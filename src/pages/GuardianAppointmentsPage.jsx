@@ -7,7 +7,7 @@ import GuardianModuleHeader from "../components/GuardianModuleHeader";
 import GuardianTopHeader from "../components/GuardianTopHeader";
 import { PackageX, Calendar, Plus, RefreshCw, Bell, User } from "lucide-react";
 import moment from "moment";
-import { useTheme, useMediaQuery } from "@mui/material";
+import { useMediaQuery } from "@mui/material";
 
 // FullCalendar imports (same as Admin Dashboard)
 import FullCalendar from "@fullcalendar/react";
@@ -110,8 +110,7 @@ export default function GuardianAppointmentsPage() {
   const navigate = useNavigate();
   const { guardianId } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const [searchParams] = useSearchParams();
   const childIdFromQuery = searchParams.get("childId");
 
@@ -780,7 +779,7 @@ export default function GuardianAppointmentsPage() {
 
   return (
     <div className="guardian-page-wrapper min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 guardian-module-mobile-header-spacing">
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 w-full bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-200">
+      <div className="min-[1025px]:hidden fixed top-0 left-0 right-0 z-40 w-full bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-200">
         <GuardianTopHeader
           title=""
           onRefresh={refreshAppointments}
@@ -788,7 +787,7 @@ export default function GuardianAppointmentsPage() {
         />
       </div>
 
-      <div className="pt-14 sm:pt-16 lg:pt-0">
+      <div className="pt-14 sm:pt-16 min-[1025px]:pt-0">
         <GuardianModuleHeader
           title="Appointments"
           subtitle="Book, edit, cancel, and monitor your baby's vaccination appointments"
@@ -796,8 +795,8 @@ export default function GuardianAppointmentsPage() {
           className="guardian-appointments-mobile-ui"
           actionsClassName="guardian-appointments-header-actions"
           actions={
-            <div className="flex items-center gap-2">
-              <div className="hidden lg:flex guardian-desktop-pageheader-actions mr-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="hidden min-[1025px]:flex guardian-desktop-pageheader-actions mr-2">
                 <button
                   type="button"
                   onClick={refreshAppointments}
@@ -825,7 +824,7 @@ export default function GuardianAppointmentsPage() {
                   <User className="w-4 h-4" />
                 </button>
               </div>
-              <div className="guardian-appointments-header-actions-inner flex items-center gap-2 sm:gap-3">
+              <div className="guardian-appointments-header-actions-inner flex flex-wrap items-center justify-end gap-2 sm:gap-3">
                 <Button variant="secondary" size="sm" onClick={handleToday}>
                   Today
                 </Button>
@@ -890,15 +889,15 @@ export default function GuardianAppointmentsPage() {
           </Alert>
         )}
 
-        <div className="guardian-appointments-layout grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5 lg:gap-6">
+        <div className="guardian-appointments-layout grid grid-cols-1 min-[768px]:grid-cols-2 min-[1025px]:grid-cols-3 gap-4 md:gap-5 lg:gap-6">
           {/* Left Column - FullCalendar (Admin-style) */}
           <section
-            className={`guardian-calendar-wrapper-expanded lg:col-span-2 ${
+            className={`guardian-calendar-wrapper-expanded min-[768px]:col-span-2 min-[1025px]:col-span-2 ${
               isMobile && mobileViewMode !== "calendar" ? "hidden" : ""
             }`}
           >
             {/* Calendar Navigation Controls (Admin-style) */}
-            <div className="guardian-appointments-calendar-toolbar mb-4 px-3 sm:px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <div className="guardian-appointments-calendar-toolbar mb-4 rounded-2xl border border-gray-200 bg-white px-3 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:px-4">
               <div className="guardian-appointments-calendar-nav flex flex-wrap gap-2">
                 <Button variant="secondary" size="sm" onClick={handlePrev}>
                   ← Prev
@@ -1048,13 +1047,13 @@ export default function GuardianAppointmentsPage() {
 
           {/* Right Column - Selected Date & Upcoming Appointments & History (KEEP EXISTING CARDS) */}
           <aside
-            className={`guardian-appointments-sidebar space-y-4 md:space-y-5 ${
+            className={`guardian-appointments-sidebar grid grid-cols-1 gap-4 md:gap-5 min-[768px]:col-span-2 min-[768px]:grid-cols-2 min-[1025px]:col-span-1 min-[1025px]:grid-cols-1 ${
               isMobile && mobileViewMode === "calendar" ? "guardian-appointments-sidebar--mobile-secondary" : ""
             }`}
           >
             {/* Selected Date Card */}
             <section
-              className={`guardian-selected-date-card ${
+              className={`guardian-selected-date-card rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 min-[768px]:col-span-2 min-[1025px]:col-span-1 ${
                 isMobile && mobileViewMode !== "calendar" ? "hidden" : ""
               }`}
             >
@@ -1104,7 +1103,7 @@ export default function GuardianAppointmentsPage() {
 
             {/* Upcoming Appointments Card */}
             <section
-              className={`guardian-upcoming-appointments-card ${
+              className={`guardian-upcoming-appointments-card rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 ${
                 isMobile && mobileViewMode !== "upcoming" ? "hidden" : ""
               }`}
             >
@@ -1118,7 +1117,7 @@ export default function GuardianAppointmentsPage() {
               ) : (
                 <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                   {upcomingAppointments.map((appointment) => (
-                    <div key={appointment.id} className="guardian-appointment-card">
+                    <div key={appointment.id} className="guardian-appointment-card rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40 flex flex-col gap-3 min-[640px]:flex-row min-[640px]:items-start min-[640px]:justify-between">
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-gray-900 dark:text-gray-100 truncate">
                           {(appointment.first_name || "Infant") + " " + (appointment.last_name || "")}
@@ -1172,7 +1171,7 @@ export default function GuardianAppointmentsPage() {
 
             {/* Appointment History Card */}
             <section
-              className={`guardian-appointment-history-card ${
+              className={`guardian-appointment-history-card rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 ${
                 isMobile && mobileViewMode !== "history" ? "hidden" : ""
               }`}
             >
@@ -1186,7 +1185,7 @@ export default function GuardianAppointmentsPage() {
               ) : (
                 <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 mobile-scrollbar">
                   {appointmentHistory.map((appointment) => (
-                    <div key={appointment.id} className="guardian-appointment-card">
+                    <div key={appointment.id} className="guardian-appointment-card rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40 flex flex-col gap-3 min-[640px]:flex-row min-[640px]:items-start min-[640px]:justify-between">
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-gray-900 dark:text-gray-100 truncate">
                           {(appointment.first_name || "Infant") + " " + (appointment.last_name || "")}
@@ -1288,7 +1287,7 @@ export default function GuardianAppointmentsPage() {
                   </option>
                 ))}
               </Select>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 sm:col-span-2">
                 Available from 8:00 AM to 4:00 PM (12:00 PM - 1:00 PM lunch break).
               </p>
             </div>

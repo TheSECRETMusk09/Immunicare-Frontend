@@ -10,7 +10,6 @@ import "../css/guardian-profile.css";
 
 // Profile Components
 import {
-  ProfileHeader,
   PersonalInfoCard,
   EmergencyContactCard,
   ChildrenSummaryCard,
@@ -255,7 +254,7 @@ export default function Profile() {
 
   return (
     <div className="guardian-page-wrapper profile-page min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 guardian-profile-mobile-ui">
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 w-full bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm transition-colors duration-200">
+      <div className="min-[1025px]:hidden fixed top-0 left-0 right-0 z-40 w-full bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm transition-colors duration-200">
         <GuardianTopHeader
           title=""
           onRefresh={fetchProfileData}
@@ -263,14 +262,14 @@ export default function Profile() {
         />
       </div>
 
-      <div className="pt-14 sm:pt-16 lg:pt-0">
+      <div className="pt-14 sm:pt-16 min-[1025px]:pt-0">
         <GuardianModuleHeader
           title="My Profile"
           subtitle="Manage your account information, emergency contacts, and security settings"
           icon={<User className="w-8 h-8 text-white" />}
           className="guardian-profile-header-shell"
           actions={(
-            <div className="hidden lg:flex guardian-desktop-pageheader-actions">
+            <div className="hidden min-[1025px]:flex guardian-desktop-pageheader-actions">
               <button
                 type="button"
                 onClick={fetchProfileData}
@@ -321,17 +320,45 @@ export default function Profile() {
           )}
 
           {/* Profile Header */}
-          <ProfileHeader
-            user={user}
-            isEditing={isEditing}
-            onEditToggle={handleEditToggle}
-            loading={loading}
-          />
+          {loading ? (
+            <div className="h-40 sm:h-48 bg-gray-200 dark:bg-gray-700 rounded-2xl animate-pulse mb-6" />
+          ) : (
+            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl p-6 sm:p-8 shadow-lg relative overflow-hidden mb-6">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl pointer-events-none"></div>
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-xl pointer-events-none"></div>
+              <div className="guardian-profile-hero-layout relative z-10 flex flex-row items-center gap-4 sm:gap-6 lg:gap-8">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm border-4 border-white/30 shadow-xl flex-shrink-0">
+                  <span className="text-3xl sm:text-4xl font-bold text-white">
+                    {(user?.name || user?.username || "G").charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div className="text-left min-w-0 flex-1">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-white truncate drop-shadow-md">
+                    {user?.name || user?.username || "Guardian Profile"}
+                  </h2>
+                  <p className="text-emerald-100 text-sm sm:text-base mt-1 truncate">
+                    {user?.email || "Manage your account"}
+                  </p>
+                  <div className="mt-3 flex flex-row flex-wrap items-center justify-start gap-3 sm:gap-4">
+                    <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-semibold text-white backdrop-blur-sm border border-white/20 uppercase tracking-wider">
+                      {user?.role || "Guardian"}
+                    </span>
+                    <button
+                      onClick={handleEditToggle}
+                      className="bg-white/20 hover:bg-white/30 text-white border border-white/40 backdrop-blur-sm transition-all shadow-lg min-h-[36px] sm:min-h-[44px] px-4 sm:px-6 py-1.5 sm:py-2.5 rounded-lg font-semibold text-xs sm:text-sm"
+                    >
+                      {isEditing ? "Cancel Editing" : "Edit Profile"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6 lg:px-0">
+          <div className="grid grid-cols-1 min-[768px]:grid-cols-2 min-[1025px]:grid-cols-3 gap-4 sm:gap-5 lg:gap-6 lg:px-0">
             {/* Left Column - Main Content */}
-            <div className="lg:col-span-2 space-y-4 sm:space-y-5 lg:space-y-6">
+            <div className="min-[768px]:col-span-2 min-[1025px]:col-span-2 space-y-4 sm:space-y-5 lg:space-y-6">
               {/* Personal Information */}
               <PersonalInfoCard
                 formData={formData}

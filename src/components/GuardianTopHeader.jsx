@@ -19,7 +19,7 @@ export default function GuardianTopHeader({
   return (
     <header className={`guardian-top-header ${className}`}>
       <div className="guardian-top-header__inner">
-        <div className="guardian-top-header__left-spacer lg:hidden" aria-hidden="true" />
+        <div className="guardian-top-header__left-spacer min-[1025px]:hidden" aria-hidden="true" />
 
         <h1 className="guardian-top-header__title">{title}</h1>
 
@@ -28,7 +28,7 @@ export default function GuardianTopHeader({
             type="button"
             onClick={() => onRefresh?.()}
             className="guardian-top-header__action-btn"
-            aria-label={`Refresh ${title}`}
+            aria-label={title ? `Refresh ${title}` : "Refresh page"}
           >
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </button>

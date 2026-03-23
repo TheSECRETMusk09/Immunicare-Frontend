@@ -580,11 +580,6 @@ const Reports = () => {
           title="Reports Management"
           subtitle="Generate and manage comprehensive reports for your facility"
           icon={<BarChart3 className="w-8 h-8 text-white" />}
-          actions={
-            <Button variant="primary" onClick={() => setShowGenerateModal(true)}>
-              + Generate New Report
-            </Button>
-          }
         />
       </div>
 
@@ -598,7 +593,7 @@ const Reports = () => {
       {/* Admin Dashboard Summary */}
       {adminSummary && (
         <Card title="📈 Dashboard Overview" className="flex-shrink-0">
-          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-3 sm:gap-4">
             {/* Vaccination Summary */}
             <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
               <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
@@ -718,7 +713,7 @@ const Reports = () => {
 
       {/* Quick Report Generation Cards */}
       <Card title="🚀 Quick Report Generation" className="flex-shrink-0">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
           {reportTemplates.slice(0, 5).map((template) => (
             <Button
               key={template.type}

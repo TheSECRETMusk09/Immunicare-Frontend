@@ -26,15 +26,15 @@ export default function GuardianModuleHeader({
   const resolvedActions = actions ?? children ?? null;
 
   const visibilityClassName = [
-    showOnDesktop ? "" : "lg:hidden",
-    showOnMobile ? "" : "max-lg:hidden",
+    showOnDesktop ? "" : "min-[1025px]:hidden",
+    showOnMobile ? "" : "max-[1024px]:hidden",
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
     <div
-      className={`guardian-module-mobile-header guardian-module-header-shell pt-2 md:px-3 lg:px-4 ${visibilityClassName} ${className}`}
+      className={`guardian-module-mobile-header guardian-module-header-shell ${visibilityClassName} ${className}`}
     >
       <PageHeader
         title={title}

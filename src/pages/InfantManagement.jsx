@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import infantService from "../services/infantService";
 import VaccineScheduleBooklet from "../components/VaccineScheduleBooklet";
 import ImmunizationRecordBooklet from "../components/ImmunizationRecordBooklet";
@@ -58,7 +59,24 @@ const formatControlNumberDisplay = (controlNumber, dateValue) => {
   return `${base}-${parsedDate.getMonth() + 1}/${parsedDate.getDate()}/${parsedDate.getFullYear()}`;
 };
 
+const normalizeVaccinationPrefillFromRoute = (prefill = {}) => {
+  const normalizedInfantId = Number(prefill.infant_id ?? prefill.infantId ?? 0) || null;
+  const normalizedVaccineId = Number(prefill.vaccine_id ?? prefill.vaccineId ?? 0) || null;
+  const normalizedDoseNumber = Number(prefill.dose_number ?? prefill.doseNo ?? 1) || 1;
+
+  return {
+    infant_id: normalizedInfantId,
+    vaccine_id: normalizedVaccineId,
+    dose_number: normalizedDoseNumber,
+    date_administered: prefill.date_administered || prefill.admin_date || "",
+    next_due_date: prefill.next_due_date || prefill.nextDueDate || "",
+    status: prefill.status || "completed",
+  };
+};
+
 export default function InfantManagement() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [infants, setInfants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -67,7 +85,11 @@ export default function InfantManagement() {
   const [activeView, setActiveView] = useState("list"); // 'list', 'schedule', 'records', 'personal', 'chart'
   const [showAddModal, setShowAddModal] = useState(false);
   const [showInjectModal, setShowInjectModal] = useState(false);
+  const [recordVaccinationPrefill, setRecordVaccinationPrefill] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   const [dateFilter, setDateFilter] = useState("");
   const [transferCasesRefreshing, setTransferCasesRefreshing] = useState(false);
 
@@ -76,11 +98,56 @@ export default function InfantManagement() {
   const transferInCasesRef = useRef(null);
 
   useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchQuery, dateFilter]);
+
+  useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    const navigationState = location.state;
+    if (!navigationState || navigationState.openRecordVaccination !== true) {
+      return;
+    }
+
+    const normalizedPrefill = normalizeVaccinationPrefillFromRoute(
+      navigationState.prefill || {},
+    );
+
+    setRecordVaccinationPrefill(normalizedPrefill);
+
+    if (normalizedPrefill.infant_id) {
+      const matchedInfant = infants.find((entry) => entry.id === normalizedPrefill.infant_id);
+      if (matchedInfant) {
+        setSelectedInfant(matchedInfant);
+      }
+    }
+
+    setActiveView("list");
+    setShowInjectModal(true);
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+  }, [location.pathname, location.search, location.state, navigate, infants]);
+
+  useEffect(() => {
+    const prefillInfantId = Number(recordVaccinationPrefill?.infant_id || 0) || null;
+    if (!prefillInfantId || !infants.length) {
+      return;
+    }
+
+    const matchedInfant = infants.find((entry) => entry.id === prefillInfantId);
+    if (matchedInfant) {
+      setSelectedInfant(matchedInfant);
+    }
+  }, [infants, recordVaccinationPrefill]);
 
   const fetchInfants = useCallback(async (isRefresh = false) => {
     const requestId = ++fetchRequestIdRef.current;
@@ -92,6 +159,8 @@ export default function InfantManagement() {
         setLoading(true);
       }
       setError(null);
+
+      // Fetch all infants to allow reliable client-side sorting, filtering, and pagination
       const result = await infantService.getAll();
       const infantsData = normalizeInfantsResponse(result?.data ?? result);
 
@@ -169,27 +238,36 @@ export default function InfantManagement() {
     void fetchInfants();
   };
 
-  const filteredInfants = infants.filter(
-    (infant) => {
-      const matchesSearch = infant.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        infant.last_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        infant.guardian_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        infant.mother_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            infant.father_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            infant.control_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            infant.cellphone_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            infant.guardian_phone?.toLowerCase().includes(searchQuery.toLowerCase());
+  // Centralized filter + memory-safe chunking
+  const filteredInfants = useMemo(() => {
+    let result = [...infants];
 
-      if (!matchesSearch) return false;
-
-      if (dateFilter && infant.dob) {
-        const infantDate = new Date(infant.dob).toISOString().split('T')[0];
-        if (infantDate !== dateFilter) return false;
-      }
-
-      return true;
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase();
+      result = result.filter(infant =>
+        infant.first_name?.toLowerCase().includes(query) ||
+        infant.last_name?.toLowerCase().includes(query) ||
+        infant.guardian_name?.toLowerCase().includes(query) ||
+        infant.mother_name?.toLowerCase().includes(query) ||
+        infant.father_name?.toLowerCase().includes(query) ||
+        infant.control_number?.toLowerCase().includes(query) ||
+        infant.cellphone_number?.toLowerCase().includes(query) ||
+        infant.guardian_phone?.toLowerCase().includes(query)
+      );
     }
-  );
+
+    if (dateFilter) {
+      result = result.filter(infant => infant.dob && new Date(infant.dob).toISOString().split('T')[0] === dateFilter);
+    }
+
+    return result;
+  }, [infants, debouncedSearchQuery, dateFilter]);
+
+  const paginatedInfants = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredInfants.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredInfants, currentPage]);
+  const totalPages = Math.ceil(filteredInfants.length / itemsPerPage);
 
   const infantSummary = {
     total: filteredInfants.length,
@@ -563,12 +641,15 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
         {/* Inject Vaccine Button */}
         <div className="fixed bottom-6 right-6">
           <Button
-            onClick={() => setShowInjectModal(true)}
+            onClick={() => {
+              setRecordVaccinationPrefill(null);
+              setShowInjectModal(true);
+            }}
             variant="primary"
             className="flex items-center gap-2 shadow-lg"
             size="lg"
           >
-            <Syringe className="w-5 h-5" /> Record Vaccination
+            <Syringe className="w-5 h-5" /> Record Vaccinations
           </Button>
         </div>
       </div>
@@ -620,11 +701,14 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                     <BookOpen className="w-4 h-4" /> Transfer-In Cases
                   </Button>
                   <Button
-                    onClick={() => setShowInjectModal(true)}
+                    onClick={() => {
+                      setRecordVaccinationPrefill(null);
+                      setShowInjectModal(true);
+                    }}
                     variant="success"
                     className="flex items-center gap-2"
                   >
-                    <Syringe className="w-4 h-4" /> Record Vaccination
+                    <Syringe className="w-4 h-4" /> Record Vaccinations
                   </Button>
                   <Button
                     onClick={() => setShowAddModal(true)}
@@ -651,7 +735,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-4">
               <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
             <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Visible Infants</p>
             <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">{infantSummary.total}</p>
@@ -672,8 +756,8 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
 
         {/* Search Bar */}
         <div className="flex-shrink-0 z-20 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4 mb-3">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1 max-w-md">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3 sm:gap-4">
+            <div className="relative flex-1 w-full lg:max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <Input
                   placeholder="Search by name, control no, or contact..."
@@ -682,7 +766,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                 className="pl-10"
               />
             </div>
-            <div className="flex-1 max-w-[200px]">
+            <div className="w-full sm:w-auto sm:max-w-[200px]">
               <Input
                 type="date"
                 value={dateFilter}
@@ -690,7 +774,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                 title="Filter by Date of Birth"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between sm:justify-start gap-3 w-full lg:w-auto">
               {refreshing && (
                 <span className="text-xs text-gray-500 dark:text-gray-400">Refreshing...</span>
               )}
@@ -704,7 +788,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                 <span className="mr-1">🔄</span> {refreshing ? 'Refreshing...' : 'Refresh'}
               </Button>
               <div className="text-sm text-gray-600 dark:text-gray-400 self-center">
-                Showing {filteredInfants.length} of {infants.length} infants
+                Showing {Math.min(currentPage * itemsPerPage, filteredInfants.length)} of {filteredInfants.length} infants
               </div>
             </div>
           </div>
@@ -748,7 +832,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                     </td>
                   </tr>
                 ) : (
-                  filteredInfants.map((row) => (
+                  paginatedInfants.map((row) => (
                     <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                       {columns.map((col, colIndex) => (
                         <td
@@ -771,6 +855,37 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
               </tbody>
             </table>
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
+              <div className="text-sm text-gray-500">
+                Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+                {Math.min(currentPage * itemsPerPage, filteredInfants.length)}{" "}
+                of {filteredInfants.length} infants
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <span className="flex items-center px-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
           </>
         )}
@@ -786,15 +901,20 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
       {/* Inject Vaccine Modal */}
       <InjectVaccineModal
         isOpen={showInjectModal}
-        onClose={() => setShowInjectModal(false)}
+        onClose={() => {
+          setShowInjectModal(false);
+          setRecordVaccinationPrefill(null);
+        }}
         infantId={selectedInfant?.id}
         infantName={
           selectedInfant
             ? `${selectedInfant.first_name} ${selectedInfant.last_name}`
             : ""
         }
+        prefillContext={recordVaccinationPrefill}
         onSuccess={() => {
           setShowInjectModal(false);
+          setRecordVaccinationPrefill(null);
           if (selectedInfant) {
             fetchInfants();
           }

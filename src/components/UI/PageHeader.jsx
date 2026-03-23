@@ -63,22 +63,22 @@ const PageHeader = ({ title, subtitle, actions, icon, className = "", glassmorph
       role="banner"
       aria-label={`${title} page header`}
     >
-      <div className="page-header__container px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
-        <div className="page-header__content flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-          <div className="page-header__main flex items-center gap-3 min-w-0">
+      <div className="page-header__container px-4 py-4 min-[768px]:px-6 min-[768px]:py-5 min-[1025px]:px-8 min-[1025px]:py-6">
+        <div className="page-header__content flex flex-col gap-3 min-[768px]:flex-row min-[768px]:items-start min-[768px]:justify-between min-[768px]:gap-4">
+          <div className="page-header__main flex items-start gap-3 min-w-0">
             {renderIcon()}
             <div className="page-header__text min-w-0">
-              <h2 className="page-header__title text-lg sm:text-xl lg:text-2xl font-bold truncate">
+              <h2 className="page-header__title text-lg min-[768px]:text-xl min-[1025px]:text-2xl font-bold break-words leading-tight">
                 {title}
               </h2>
               {subtitle && (
-                <p className="page-header__subtitle text-sm sm:text-base text-white/80 truncate">{subtitle}</p>
+                <p className="page-header__subtitle text-sm min-[768px]:text-base text-white/80 break-words leading-relaxed">{subtitle}</p>
               )}
             </div>
           </div>
           {actions && (
             <div
-              className="page-header__actions flex items-center gap-2 sm:gap-3 flex-shrink-0 bg-white/15 dark:bg-gray-900/30 px-2 py-1 rounded-lg shadow-lg ring-1 ring-white/30 backdrop-blur-sm text-white"
+              className="page-header__actions flex w-full flex-wrap items-center gap-2 rounded-xl bg-white/15 px-2.5 py-2 shadow-lg ring-1 ring-white/30 backdrop-blur-sm text-white min-[768px]:w-auto min-[768px]:justify-end min-[768px]:gap-3 dark:bg-gray-900/30"
             >
               {actions}
             </div>

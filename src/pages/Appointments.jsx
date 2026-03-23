@@ -155,7 +155,6 @@ export default function Appointments() {
   const [view, setView] = useState("list");
   // Custom calendar state (matching GuardianAppointmentsPage)
   const [monthCursor, setMonthCursor] = useState(new Date());
-  const [availabilityByDate, setAvailabilityByDate] = useState({});
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [blockedDates, setBlockedDates] = useState({});
   const [selectedDate, setSelectedDate] = useState(toDateKey(new Date()));
@@ -190,6 +189,9 @@ export default function Appointments() {
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   // Date filtering state
   const [dateFilterStart, setDateFilterStart] = useState("");
@@ -199,13 +201,22 @@ export default function Appointments() {
   const [sortField, setSortField] = useState("scheduled_date");
   const [sortDirection, setSortDirection] = useState("desc");
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchQuery, statusFilter, dateFilterStart, dateFilterEnd, sortField, sortDirection]);
+
   // Enhanced filtered appointments with search, date filtering, and sorting
   const filteredAppointments = useMemo(() => {
     let result = [...appointments];
 
     // Search query filtering - search by infant details, guardian info, control number, contact
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase();
       result = result.filter(apt =>
         apt.first_name?.toLowerCase().includes(query) ||
         apt.last_name?.toLowerCase().includes(query) ||
@@ -263,7 +274,13 @@ export default function Appointments() {
     });
 
     return result;
-  }, [appointments, searchQuery, statusFilter, dateFilterStart, dateFilterEnd, sortField, sortDirection]);
+  }, [appointments, debouncedSearchQuery, statusFilter, dateFilterStart, dateFilterEnd, sortField, sortDirection]);
+
+  const paginatedAppointments = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredAppointments.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredAppointments, currentPage]);
+  const totalPages = Math.ceil(filteredAppointments.length / itemsPerPage);
   const [dateDetailsLoading, setDateDetailsLoading] = useState(false);
   const [createFormError, setCreateFormError] = useState("");
   const [editFormErrors, setEditFormErrors] = useState({});
@@ -364,10 +381,8 @@ export default function Appointments() {
         accumulator[current.date] = current;
         return accumulator;
       }, {});
-
-      setAvailabilityByDate(mapped);
     } catch (err) {
-      setAvailabilityByDate({});
+      // Handled silently
     } finally {
       setCalendarLoading(false);
     }
@@ -478,6 +493,7 @@ export default function Appointments() {
   const refreshAppointments = useCallback(async () => {
     setIsRefreshing(true);
     try {
+      // Fetch all appointments for reliable client-side filtering, sorting, and pagination
       const response = await apiClient.getAppointments();
       const data = Array.isArray(response) ? response : response?.data || [];
       setAppointments(Array.isArray(data) ? data : []);
@@ -1453,7 +1469,7 @@ export default function Appointments() {
               {/* Results Count - Spacer */}
               <div className="flex-1 min-w-[100px]">
                 <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {filteredAppointments.length} of {appointments.length}
+                  {Math.min(currentPage * itemsPerPage, filteredAppointments.length)} of {filteredAppointments.length}
                 </span>
               </div>
             </div>
@@ -1492,7 +1508,7 @@ export default function Appointments() {
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {filteredAppointments.map((row) => (
+                    {paginatedAppointments.map((row) => (
                       <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                         {columns.map((col, colIndex) => (
                           <td key={col.key || colIndex} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
@@ -1511,6 +1527,37 @@ export default function Appointments() {
                   </tbody>
                 </table>
               </div>
+
+              {totalPages > 1 && (
+                <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
+                  <div className="text-sm text-gray-500">
+                    Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+                    {Math.min(currentPage * itemsPerPage, filteredAppointments.length)}{" "}
+                    of {filteredAppointments.length} appointments
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span className="flex items-center px-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

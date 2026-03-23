@@ -161,9 +161,13 @@ const ForgotPassword = () => {
           ? { email: normalizeEmail(email), otp, method }
           : { phone: normalizePhoneNumber(phoneNumber), otp, method }
       );
-      if (response.resetToken) {
-        setResetToken(response.resetToken);
+
+      const token = response?.resetToken || response?.data?.resetToken;
+      if (token) {
+        setResetToken(token);
         setOtpVerified(true);
+      } else {
+        throw new Error("Reset token missing from verification response");
       }
     } catch (err) {
       console.error("Verify OTP error:", err);

@@ -8,6 +8,7 @@ import {
   normalizeVaccinationRecordsResponse,
   toArrayPayload,
 } from "../utils/adminDataAdapters";
+import { useAuth } from "../contexts/AuthContext";
 
 const toFiniteNumber = (value, fallback = null) => {
   const parsed = Number(value);
@@ -1961,6 +1962,7 @@ const VisitSection = ({ summary, onRecordVisit }) => {
 };
 
 export default function ImmunizationChart({ infantId }) {
+  const { user } = useAuth();
   const [infant, setInfant] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [growthRecords, setGrowthRecords] = useState([]);
@@ -2445,7 +2447,7 @@ export default function ImmunizationChart({ infantId }) {
             vaccine_id: vaccine.id,
             dose_no: vaccineEntry.dose_no || 1,
             admin_date: visitData.visit_date,
-            administered_by: 1,
+            administered_by: user?.id || 1,
             health_care_provider: visitData.healthcare_worker || null,
             site_of_injection: vaccineEntry.site || "Left arm",
             reactions: vaccineEntry.reactions || null,

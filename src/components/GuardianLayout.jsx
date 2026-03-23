@@ -32,13 +32,18 @@ const GuardianLayout = memo(function GuardianLayout({ children }) {
   const { logout, forcePasswordChange, updateUserPasswordStatus, user } = useAuth();
   const location = useLocation();
   const initialDesktopState =
-    typeof window !== "undefined" ? window.innerWidth >= 1024 : false;
+    typeof window !== "undefined" ? window.innerWidth >= 1025 : false;
+  const initialTabletState =
+    typeof window !== "undefined"
+      ? window.innerWidth >= 768 && window.innerWidth <= 1024
+      : false;
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(initialDesktopState);
   const [isNavigating, setIsNavigating] = useState(false);
   const [isDesktop, setIsDesktop] = useState(initialDesktopState);
+  const [isTablet, setIsTablet] = useState(initialTabletState);
   const previousPathRef = useRef(location.pathname);
   const navigateTimeoutRef = useRef(null);
   const isInitialMountRef = useRef(true);
@@ -57,28 +62,37 @@ const GuardianLayout = memo(function GuardianLayout({ children }) {
 
   // Detect screen size
   useEffect(() => {
+    let resizeTimeout;
     const handleResize = () => {
-      const desktop = window.innerWidth >= 1024;
-      setIsDesktop(desktop);
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        const desktop = window.innerWidth >= 1025;
+        const tablet = window.innerWidth >= 768 && window.innerWidth <= 1024;
+        setIsDesktop(desktop);
+        setIsTablet(tablet);
 
-      if (desktop !== previousDesktopRef.current) {
-        // Mobile should always start with a closed drawer.
-        if (!desktop) {
-          setSidebarOpen(false);
+        if (desktop !== previousDesktopRef.current) {
+          // Mobile should always start with a closed drawer.
+          if (!desktop) {
+            setSidebarOpen(false);
+          }
+
+          // Desktop should default to open unless user explicitly toggled.
+          if (desktop && !hasUserToggledSidebarRef.current) {
+            setSidebarOpen(true);
+          }
+
+          previousDesktopRef.current = desktop;
         }
-
-        // Desktop should default to open unless user explicitly toggled.
-        if (desktop && !hasUserToggledSidebarRef.current) {
-          setSidebarOpen(true);
-        }
-
-        previousDesktopRef.current = desktop;
-      }
+      }, 150);
     };
 
     handleResize(); // Initial check
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+    };
   }, []);
 
   // Ensure desktop starts with visible sidebar on first mount.
@@ -168,7 +182,7 @@ const GuardianLayout = memo(function GuardianLayout({ children }) {
         <div
           className={`guardian-dashboard ${sidebarVisible ? 'sidebar-open' : 'sidebar-collapsed'} ${
             isDesktop ? 'desktop-mode' : 'mobile-mode'
-          }`}
+          } ${isTablet ? 'tablet-mode' : ''}`}
         >
           {/* Page Transition Loader */}
           {isNavigating && <PageTransitionLoader message="Loading page..." />}
@@ -208,7 +222,7 @@ const GuardianLayout = memo(function GuardianLayout({ children }) {
               </div>
 
               {/* Mobile Bottom Navigation - Only for guardian users */}
-              {isGuardian && <MobileBottomNav />}
+              {isGuardian && !isTablet && !isDesktop && <MobileBottomNav />}
             </div>
 
             {/* Quick Action FAB */}

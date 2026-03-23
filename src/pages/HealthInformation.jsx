@@ -400,78 +400,123 @@ export default function HealthInformation() {
 
               {/* Health Records Table */}
               <PageContainer title="Health Checkup Records">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 dark:bg-gray-700">
-                      <tr>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Date
-                        </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Weight
-                        </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Height
-                        </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          BMI
-                        </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Doctor Notes
-                        </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
-                      {healthRecords.map((record) => {
-                        const bmi =
-                          record.weight && record.height
-                            ? (
-                                record.weight / Math.pow(record.height / 100, 2)
-                              ).toFixed(1)
-                            : "N/A";
-                        return (
-                          <tr
-                            key={record.id}
-                            className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                          >
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-bold text-gray-900 dark:text-white">
-                                {formatDate(record.checkup_date)}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-600 dark:text-gray-300">
-                                {record.weight ? `${record.weight} kg` : "N/A"}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-600 dark:text-gray-300">
-                                {record.height ? `${record.height} cm` : "N/A"}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-primary-600 dark:text-primary-400">
-                                {bmi}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">
-                                {record.notes || "No notes"}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              <Button variant="ghost" size="sm">
-                                View Details
-                              </Button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                {/* Mobile Card View */}
+                <div className="guardian-table-card-list min-[768px]:hidden">
+                  {healthRecords.map((record) => {
+                    const bmi =
+                      record.weight && record.height
+                        ? (
+                            record.weight / Math.pow(record.height / 100, 2)
+                          ).toFixed(1)
+                        : "N/A";
+                    return (
+                      <article key={record.id} className="guardian-table-card">
+                        <div className="guardian-table-card__header">
+                          <h4 className="guardian-table-card__title text-base">{formatDate(record.checkup_date)}</h4>
+                        </div>
+                        <div className="guardian-table-card__rows">
+                          <div className="guardian-table-card__row">
+                            <span className="guardian-table-card__label">Weight</span>
+                            <span className="guardian-table-card__value">{record.weight ? `${record.weight} kg` : "N/A"}</span>
+                          </div>
+                          <div className="guardian-table-card__row">
+                            <span className="guardian-table-card__label">Height</span>
+                            <span className="guardian-table-card__value">{record.height ? `${record.height} cm` : "N/A"}</span>
+                          </div>
+                          <div className="guardian-table-card__row">
+                            <span className="guardian-table-card__label">BMI</span>
+                            <span className="guardian-table-card__value font-medium text-primary-600 dark:text-primary-400">{bmi}</span>
+                          </div>
+                          <div className="guardian-table-card__row">
+                            <span className="guardian-table-card__label">Notes</span>
+                            <span className="guardian-table-card__value truncate max-w-[200px]">{record.notes || "No notes"}</span>
+                          </div>
+                          <div className="guardian-table-card__row mt-2">
+                            <Button variant="ghost" size="sm" className="w-full justify-center border border-gray-200 dark:border-gray-700">
+                              View Details
+                            </Button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="guardian-table-scroll-shell hidden min-[768px]:block">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Date
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Weight
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Height
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            BMI
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Doctor Notes
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
+                        {healthRecords.map((record) => {
+                          const bmi =
+                            record.weight && record.height
+                              ? (
+                                  record.weight / Math.pow(record.height / 100, 2)
+                                ).toFixed(1)
+                              : "N/A";
+                          return (
+                            <tr
+                              key={record.id}
+                              className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                            >
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-bold text-gray-900 dark:text-white">
+                                  {formatDate(record.checkup_date)}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-600 dark:text-gray-300">
+                                  {record.weight ? `${record.weight} kg` : "N/A"}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-600 dark:text-gray-300">
+                                  {record.height ? `${record.height} cm` : "N/A"}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-primary-600 dark:text-primary-400">
+                                  {bmi}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">
+                                  {record.notes || "No notes"}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <Button variant="ghost" size="sm">
+                                  View Details
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
 
                 {healthRecords.length === 0 && (

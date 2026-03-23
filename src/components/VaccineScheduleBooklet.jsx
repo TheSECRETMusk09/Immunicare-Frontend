@@ -2,34 +2,6 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import apiClient from "../utils/api";
 import { Button, Alert, LoadingSpinner } from "./UI";
 
-// Extended age columns based on vaccination schedules
-const getVisitColumns = (schedules) => {
-  // Extract unique age months from schedules
-  const uniqueAges = [...new Set(schedules.map(s => s.ageMonths))].sort((a, b) => a - b);
-
-  // Map ages to column labels
-  const ageLabels = {
-    0: { key: "birth", label: "At Birth", shortLabel: "Birth" },
-    1.5: { key: "visit1", label: "1½ months", shortLabel: "1.5mo" },
-    2.5: { key: "visit2", label: "2½ months", shortLabel: "2.5mo" },
-    3.5: { key: "visit3", label: "3½ months", shortLabel: "3.5mo" },
-    6: { key: "visit6", label: "6 months", shortLabel: "6mo" },
-    9: { key: "visit9", label: "9 months", shortLabel: "9mo" },
-    12: { key: "visit12", label: "12 months", shortLabel: "1yr" },
-    18: { key: "visit18", label: "18 months", shortLabel: "1.5yr" },
-    48: { key: "visit48", label: "4-6 years", shortLabel: "4-6yr" },
-    60: { key: "visit60", label: "5 years", shortLabel: "5yr" },
-    72: { key: "visit72", label: "6 years", shortLabel: "6yr" }
-  };
-
-  return uniqueAges.map(age => ({
-    key: ageLabels[age]?.key || `age_${age}`,
-    label: ageLabels[age]?.label || `${age} months`,
-    shortLabel: ageLabels[age]?.shortLabel || `${age}mo`,
-    age
-  }));
-};
-
 const getStatusColor = (status) => {
   switch (status) {
     case "completed":
@@ -214,15 +186,6 @@ export default function VaccineScheduleBooklet({ infantId }) {
     doses: row.doses.sort((a, b) => a.ageMonths - b.ageMonths),
   })) : [];
 
-  // Get dynamic columns based on actual schedule data
-  const visitColumns = scheduleData?.schedules
-    ? getVisitColumns(scheduleData.schedules)
-    : [];
-
-  const getDoseForColumn = (row, columnAge) => {
-    return row.doses.find(doseEntry => doseEntry.ageMonths === columnAge) || null;
-  };
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-10">
@@ -272,46 +235,18 @@ export default function VaccineScheduleBooklet({ infantId }) {
   );
 
   const renderScheduleTable = () => (
-    <table className="w-full">
-      <thead className="bg-gray-50 dark:bg-gray-700">
-        <tr>
-          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-            Bakuna (Vaccine)
-          </th>
-          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-            Dose
-          </th>
-          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-            Status
-          </th>
-          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-            Due Date
-          </th>
-          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-            Admin Date
-          </th>
-          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-            Days
-          </th>
-        </tr>
-      </thead>
-      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+    <>
+      {/* Mobile Card View */}
+      <div className="guardian-table-card-list min-[768px]:hidden mt-2">
         {scheduleData.schedules.map((schedule, index) => (
-          <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-            <td className="px-4 py-3">
-              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                {schedule.vaccineName}
+          <article key={index} className="guardian-table-card">
+            <div className="guardian-table-card__header">
+              <div className="min-w-0">
+                <h4 className="guardian-table-card__title text-base">{schedule.vaccineName}</h4>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {schedule.ageDescription} • Dose {schedule.doseNumber}/{schedule.totalDoses}
+                </p>
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                {schedule.ageDescription}
-              </div>
-            </td>
-            <td className="px-4 py-3 text-center">
-              <span className="text-sm text-gray-600 dark:text-gray-300">
-                {schedule.doseNumber}/{schedule.totalDoses}
-              </span>
-            </td>
-            <td className="px-4 py-3 text-center">
               <span
                 className={`inline-flex items-center justify-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
                   schedule.status
@@ -319,29 +254,104 @@ export default function VaccineScheduleBooklet({ infantId }) {
               >
                 {getStatusIcon(schedule.status)} {getStatusLabel(schedule.status)}
               </span>
-            </td>
-            <td className="px-4 py-3 text-center">
-              <span className="text-sm text-gray-600 dark:text-gray-300">
-                {formatDate(schedule.dueDate)}
-              </span>
-            </td>
-            <td className="px-4 py-3 text-center">
-              <span className="text-sm text-gray-600 dark:text-gray-300">
-                {formatDate(schedule.adminDate)}
-              </span>
-            </td>
-            <td className="px-4 py-3 text-center">
-              <span className={`text-xs ${
-                schedule.isOverdue ? 'text-red-600 font-medium' :
-                schedule.isUpcoming ? 'text-yellow-600' : 'text-gray-500'
-              }`}>
-                {formatDays(schedule.daysOverdue)}
-              </span>
-            </td>
-          </tr>
+            </div>
+            <div className="guardian-table-card__rows">
+              <div className="guardian-table-card__row">
+                <span className="guardian-table-card__label">Due Date</span>
+                <span className="guardian-table-card__value">{formatDate(schedule.dueDate)}</span>
+              </div>
+              <div className="guardian-table-card__row">
+                <span className="guardian-table-card__label">Admin Date</span>
+                <span className="guardian-table-card__value">{formatDate(schedule.adminDate)}</span>
+              </div>
+              <div className="guardian-table-card__row">
+                <span className="guardian-table-card__label">Days</span>
+                <span className={`guardian-table-card__value text-xs ${
+                  schedule.isOverdue ? 'text-red-600 font-medium' :
+                  schedule.isUpcoming ? 'text-yellow-600 font-medium' : 'text-gray-500'
+                }`}>
+                  {formatDays(schedule.daysOverdue) || "—"}
+                </span>
+              </div>
+            </div>
+          </article>
         ))}
-      </tbody>
-    </table>
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="guardian-table-scroll-shell hidden min-[768px]:block">
+        <table className="w-full">
+          <thead className="bg-gray-50 dark:bg-gray-700">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Bakuna (Vaccine)
+              </th>
+              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Dose
+              </th>
+              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Status
+              </th>
+              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Due Date
+              </th>
+              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Admin Date
+              </th>
+              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Days
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            {scheduleData.schedules.map((schedule, index) => (
+              <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                <td className="px-4 py-3">
+                  <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {schedule.vaccineName}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {schedule.ageDescription}
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <span className="text-sm text-gray-600 dark:text-gray-300">
+                    {schedule.doseNumber}/{schedule.totalDoses}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <span
+                    className={`inline-flex items-center justify-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                      schedule.status
+                    )}`}
+                  >
+                    {getStatusIcon(schedule.status)} {getStatusLabel(schedule.status)}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <span className="text-sm text-gray-600 dark:text-gray-300">
+                    {formatDate(schedule.dueDate)}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <span className="text-sm text-gray-600 dark:text-gray-300">
+                    {formatDate(schedule.adminDate)}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <span className={`text-xs ${
+                    schedule.isOverdue ? 'text-red-600 font-medium' :
+                    schedule.isUpcoming ? 'text-yellow-600' : 'text-gray-500'
+                  }`}>
+                    {formatDays(schedule.daysOverdue)}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 
   return (

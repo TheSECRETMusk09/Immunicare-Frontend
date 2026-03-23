@@ -18,7 +18,6 @@ import {
   PageHeader,
   PageContainer,
   Alert,
-  DataTable,
   Badge,
   LoadingSpinner,
   EmptyState,
@@ -132,9 +131,12 @@ export default function UserManagement() {
   const { isAdmin, isSuperAdmin, user, hasPermission, permissionCapabilities } = useAuth();
   const { success, error: notifyError, warning } = useNotification();
 
-  const canCreateUsers = hasPermission("user:create");
-  const canUpdateUsers = hasPermission("user:update");
-  const canDeleteUsers = hasPermission("user:delete");
+  const isSystemAdmin = String(user?.role || "").toUpperCase() === "SYSTEM_ADMIN" || String(user?.role_type || "").toUpperCase() === "SYSTEM_ADMIN";
+  const canManageAdmins = isSuperAdmin || isSystemAdmin;
+
+  const canCreateUsers = hasPermission("user:create") || isSystemAdmin;
+  const canUpdateUsers = hasPermission("user:update") || isSystemAdmin;
+  const canDeleteUsers = hasPermission("user:delete") || isSystemAdmin;
   const canUseAdminOverrides =
     hasPermission("admin:override") || permissionCapabilities?.canUseAdminOverrides;
 
@@ -199,6 +201,8 @@ export default function UserManagement() {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
+  const [systemCurrentPage, setSystemCurrentPage] = useState(1);
+  const [guardianCurrentPage, setGuardianCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
   // Toggle user active state
@@ -209,6 +213,13 @@ export default function UserManagement() {
   const [localGuardians, setLocalGuardians] = useState([]);
   const [localSystemUsers, setLocalSystemUsers] = useState([]);
   const [isHydrated, setIsHydrated] = useState(false);
+
+  // Debounce search query to prevent lag on massive datasets
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     if (!guardiansLoading && Array.isArray(guardians)) {
@@ -462,8 +473,8 @@ export default function UserManagement() {
 
   const filteredSystemUsers = useMemo(() => {
     let result = [...normalizedSystemUsers];
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase();
       result = result.filter(
         (user) =>
           user.username?.toLowerCase().includes(query) ||
@@ -504,15 +515,20 @@ export default function UserManagement() {
       result = result.filter(u => u.created_at && new Date(u.created_at) <= end);
     }
     return result;
-  }, [normalizedSystemUsers, searchQuery, roleFilter, statusFilter, startDate, endDate]);
+  }, [normalizedSystemUsers, debouncedSearchQuery, roleFilter, statusFilter, startDate, endDate]);
+
+  const paginatedSystemUsers = useMemo(() => {
+    const startIndex = (systemCurrentPage - 1) * itemsPerPage;
+    return filteredSystemUsers.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredSystemUsers, systemCurrentPage]);
 
   // Filter, sort, and paginate admins
   const filteredAdmins = useMemo(() => {
     let result = [...admins];
 
     // Apply search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase();
       result = result.filter(
         (user) =>
           user.username?.toLowerCase().includes(query) ||
@@ -579,12 +595,12 @@ export default function UserManagement() {
     });
 
     return result;
-  }, [admins, searchQuery, roleFilter, statusFilter, startDate, endDate, sortField, sortDirection]);
+  }, [admins, debouncedSearchQuery, roleFilter, statusFilter, startDate, endDate, sortField, sortDirection]);
 
   const filteredGuardians = useMemo(() => {
     let result = [...normalizedGuardians];
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase();
       result = result.filter(
         (g) =>
           g.username?.toLowerCase().includes(query) ||
@@ -605,7 +621,13 @@ export default function UserManagement() {
       result = result.filter(u => u.created_at && new Date(u.created_at) <= end);
     }
     return result;
-  }, [normalizedGuardians, searchQuery, startDate, endDate]);
+  }, [normalizedGuardians, debouncedSearchQuery, startDate, endDate]);
+
+  const paginatedGuardians = useMemo(() => {
+    const startIndex = (guardianCurrentPage - 1) * itemsPerPage;
+    return filteredGuardians.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredGuardians, guardianCurrentPage]);
+  const totalGuardianPages = Math.ceil(filteredGuardians.length / itemsPerPage);
 
   // Paginate filtered admins
   const paginatedAdmins = useMemo(() => {
@@ -1309,7 +1331,7 @@ export default function UserManagement() {
       >
         <Edit className="w-3.5 h-3.5" />
       </Button>
-      {isSuperAdmin && (
+      {canManageAdmins && (
         <LoadingButton
           variant="danger"
           size="xs"
@@ -1523,7 +1545,7 @@ export default function UserManagement() {
         icon="👥"
         actions={
           <div className="flex gap-2">
-            {activeTab === "admins" && isSuperAdmin && canCreateUsers && (
+            {activeTab === "admins" && canManageAdmins && canCreateUsers && (
               <Button
                 onClick={handleAddAdmin}
                 variant="primary"
@@ -1578,47 +1600,46 @@ export default function UserManagement() {
       {/* Tab Navigation & Global Filters - Sticky at top */}
       <div className="flex-shrink-0 bg-white dark:bg-gray-900 z-20">
         <div className="border-b border-gray-200 dark:border-gray-700 flex flex-col xl:flex-row xl:items-center justify-between px-4 py-3 gap-4">
-          <nav className="flex space-x-2 overflow-x-auto">
+          <nav className="flex space-x-2 overflow-x-auto bg-gray-100 dark:bg-gray-800 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700">
             <button
             onClick={() => handleTabChange("system")}
-            className={`px-4 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 whitespace-nowrap ${
+            className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
               activeTab === "system"
-                ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
-                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
             }`}
           >
             <span className="text-lg">🛡️</span>
-            System Users (
-            {normalizedSystemUsers ? normalizedSystemUsers.length : 0})
+            <span>System Users ({normalizedSystemUsers ? normalizedSystemUsers.length : 0})</span>
           </button>
             <button
             onClick={() => handleTabChange("admins")}
-            className={`px-4 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 whitespace-nowrap ${
+            className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
               activeTab === "admins"
-                ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
-                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
             }`}
           >
             <ShieldAlert className="w-4 h-4" />
-            Admins ({admins.length})
+            <span>Admins ({admins.length})</span>
           </button>
 
           <button
             onClick={() => handleTabChange("guardians")}
-            className={`px-4 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 whitespace-nowrap ${
+            className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
               activeTab === "guardians"
-                ? "bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
-                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
             }`}
           >
             <span className="text-lg">👥</span>
-            Guardians ({normalizedGuardians.length})
+            <span>Guardians ({normalizedGuardians.length})</span>
           </button>
           </nav>
 
           {/* Global Search and Filters */}
-          <div className="flex flex-wrap items-center gap-3 pb-3 xl:pb-0">
-            <div className="relative w-full sm:w-56 flex-shrink-0">
+          <div className="flex flex-col md:flex-row md:flex-wrap items-stretch md:items-center gap-3 pb-3 xl:pb-0 mt-3 xl:mt-0 w-full xl:w-auto">
+            <div className="relative w-full md:w-56 flex-shrink-0">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
@@ -1627,38 +1648,40 @@ export default function UserManagement() {
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
+                  setSystemCurrentPage(1);
+                  setGuardianCurrentPage(1);
                 }}
                 className="w-full pl-9 pr-4 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-32"
+                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-32"
                 title="Start Date"
               />
-              <span className="text-gray-500">-</span>
+              <span className="hidden sm:inline text-gray-500">-</span>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-32"
+                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-32"
                 title="End Date"
               />
             </div>
 
             {activeTab !== "guardians" && (
-              <>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <select
                   value={roleFilter}
                   onChange={(e) => {
                     setRoleFilter(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-32"
+                  className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-32"
                 >
                   <option value="">All Roles</option>
                   <option value="1">Super Admin</option>
@@ -1675,13 +1698,13 @@ export default function UserManagement() {
                     setStatusFilter(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-32"
+                  className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-32"
                 >
                   <option value="">All Status</option>
                   <option value="active">Active</option>
                   <option value="disabled">Disabled</option>
                 </select>
-              </>
+              </div>
             )}
           </div>
         </div>
@@ -1696,8 +1719,8 @@ export default function UserManagement() {
                 title="No admin accounts found"
                 description="There are no administrator accounts configured. Super admins can create new admin accounts."
                 icon="🛡️"
-                actionLabel={isSuperAdmin ? "Add New Admin" : null}
-                onAction={isSuperAdmin ? handleAddAdmin : null}
+                actionLabel={canManageAdmins ? "Add New Admin" : null}
+                onAction={canManageAdmins ? handleAddAdmin : null}
                 className="py-20"
               />
             ) : (
@@ -1864,7 +1887,7 @@ export default function UserManagement() {
                       </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                      {filteredSystemUsers.map((row) => (
+                      {paginatedSystemUsers.map((row) => (
                         <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                             {row.username}
@@ -2009,7 +2032,7 @@ export default function UserManagement() {
                       </td>
                     </tr>
                   ) : (
-                  filteredGuardians.map((row) => (
+                  paginatedGuardians.map((row) => (
                       <tr key={`guardian:${String(row?.id)}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                         {guardianColumns.map((col, colIndex) => (
                           <td key={col.key || colIndex} className={`px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 ${col.cellClassName || ''}`}>
@@ -2027,6 +2050,37 @@ export default function UserManagement() {
                 </tbody>
               </table>
             </div>
+
+            {totalGuardianPages > 1 && (
+              <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-900">
+                <div className="text-sm text-gray-500">
+                  Showing {(guardianCurrentPage - 1) * itemsPerPage + 1} to{" "}
+                  {Math.min(guardianCurrentPage * itemsPerPage, filteredGuardians.length)}{" "}
+                  of {filteredGuardians.length} guardians
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setGuardianCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={guardianCurrentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="flex items-center px-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Page {guardianCurrentPage} of {totalGuardianPages}
+                  </span>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setGuardianCurrentPage((p) => Math.min(totalGuardianPages, p + 1))}
+                    disabled={guardianCurrentPage === totalGuardianPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

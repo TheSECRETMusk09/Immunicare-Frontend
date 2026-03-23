@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
+import GuardianTopHeader from "../components/GuardianTopHeader";
 import { Alert, Button } from "../components/UI";
 import { guardianRoutePaths } from "../utils/routePaths";
 import {
@@ -41,6 +42,11 @@ const documentModules = [
 export default function GuardianDocumentsPage() {
   return (
     <div className="guardian-page-wrapper min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 guardian-module-mobile-header-spacing">
+      <div className="min-[1025px]:hidden fixed top-0 left-0 right-0 z-40 w-full bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm transition-colors duration-200">
+        <GuardianTopHeader title="" onRefresh={() => window.location.reload()} />
+      </div>
+
+      <div className="pt-14 sm:pt-16 min-[1025px]:pt-0">
       <GuardianModuleHeader
         title="Documents"
         subtitle="Current document and record access for your children"
@@ -69,7 +75,7 @@ export default function GuardianDocumentsPage() {
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <section className="grid gap-4 min-[768px]:grid-cols-2 min-[1025px]:grid-cols-3">
           {documentModules.map((module) => {
             const Icon = module.icon;
 
@@ -102,6 +108,7 @@ export default function GuardianDocumentsPage() {
           })}
         </section>
       </main>
+      </div>
     </div>
   );
 }

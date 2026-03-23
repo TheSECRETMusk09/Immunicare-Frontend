@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNotification } from "../contexts/NotificationContext";
-import api from "../utils/api";
+import apiClient from "../utils/api";
 import {
   Button,
   PageHeader,
@@ -98,7 +98,7 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
       }
       setErrorState(null);
 
-      const response = await api.getTransferInCases();
+      const response = await apiClient.getTransferInCases();
 
       if (response.success) {
         setCases(response.data || []);
@@ -228,7 +228,7 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
     setIsImporting(true);
 
     try {
-      const response = await api.approveTransferCaseVaccines(selectedCase.id, {
+      const response = await apiClient.approveTransferCaseVaccines(selectedCase.id, {
         approvedVaccines: vaccinesToImport,
         importToRecords: true,
       });
@@ -258,7 +258,7 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
 
     try {
       // Explicitly hit the validation endpoint rather than standard update
-      const response = await api.customRequest(`/transfer-in-cases/${selectedCase.id}/validate`, {
+      const response = await apiClient.customRequest(`/transfer-in-cases/${selectedCase.id}/validate`, {
         method: 'PUT',
         data: {
           validation_status: validationStatus,

@@ -86,7 +86,7 @@ const ImmunizationCard = ({ vaccine, status, dueDate, index, onViewDetails }) =>
 
   return (
     <div
-      className={`immunization-card flex-shrink-0 w-72 sm:w-80 p-4 rounded-xl border-2 ${config.borderClass} ${config.bgClass} cursor-pointer transition-all hover:shadow-md`}
+      className={`immunization-card flex-shrink-0 w-[17rem] min-[480px]:w-[18.5rem] min-[768px]:w-[20rem] min-[1025px]:w-[18.5rem] p-4 rounded-xl border-2 ${config.borderClass} ${config.bgClass} cursor-pointer transition-all hover:shadow-md`}
       role="article"
       aria-label={`${vaccine.name} - ${config.label}`}
       onClick={() => onViewDetails && onViewDetails(vaccine, status)}
@@ -106,11 +106,11 @@ const ImmunizationCard = ({ vaccine, status, dueDate, index, onViewDetails }) =>
         </span>
       </div>
 
-      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">
+      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1 break-words leading-snug">
         {vaccine.name}
       </h3>
 
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 break-words leading-relaxed">
         {vaccine.description || `${vaccine.dose?.number || 1} of ${vaccine.dose?.total || 1} doses`}
       </p>
 
@@ -164,7 +164,7 @@ const EnhancedGuardianImmunizationChart = ({
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
       return false;
     }
-    return window.matchMedia('(min-width: 1024:px)').matches;
+    return window.matchMedia('(min-width: 1025px)').matches;
   });
   const [isDragging, setIsDragging] = useState(false);
   const [scheduleData, setScheduleData] = useState(null);
@@ -203,7 +203,7 @@ const EnhancedGuardianImmunizationChart = ({
       return undefined;
     }
 
-    const mediaQuery = window.matchMedia('(min-width: 1024px)');
+    const mediaQuery = window.matchMedia('(min-width: 1025px)');
     const handleViewportChange = (event) => {
       setIsDesktopViewport(event.matches);
       if (!event.matches) {
@@ -316,8 +316,6 @@ const EnhancedGuardianImmunizationChart = ({
       navigate(`/guardian/vaccination-records/${childId}`);
       return;
     }
-
-    console.log('View details for:', vaccine, status);
   };
 
   // Format date for display

@@ -92,11 +92,11 @@ const Modal = ({
 
   const currentType = typeStyles[type];
   const sizeClasses = {
-    sm: "max-w-md",
-    md: "max-w-2xl",
-    lg: "max-w-4xl",
-    xl: "max-w-6xl",
-    full: "max-w-[95vw]",
+    sm: "sm:max-w-md",
+    md: "sm:max-w-2xl",
+    lg: "sm:max-w-4xl",
+    xl: "sm:max-w-6xl",
+    full: "sm:max-w-[95vw]",
   };
   const resolvedSizeClass = sizeClasses[size] || sizeClasses.md;
 
@@ -108,12 +108,13 @@ const Modal = ({
         aria-hidden="true"
       />
 
-      <div className="relative flex min-h-full items-center justify-center p-4 sm:p-6">
+      <div className="relative flex min-h-full items-end justify-center p-0 sm:items-center sm:p-6">
         <div
           className={`
-            admin-modal-layout relative flex w-full max-h-[90vh] flex-col overflow-hidden rounded-xl
+            admin-modal-layout relative flex w-full max-h-[92dvh] flex-col overflow-hidden rounded-t-2xl
             border border-[var(--color-border-light)] bg-[var(--color-bg-primary)]
             shadow-2xl ring-1 ring-black/5 dark:ring-white/10
+            sm:max-h-[90vh] sm:rounded-2xl
             ${resolvedSizeClass}
           `}
           role="dialog"
@@ -122,12 +123,12 @@ const Modal = ({
         >
           {(title || showClose) && (
             <div
-              className={`
-                admin-modal-header flex items-center justify-between gap-3 border-b
-                border-[var(--color-border-light)] px-6 py-5
-                ${currentType.header}
-                flex-shrink-0
-              `}
+                className={`
+                 admin-modal-header flex items-center justify-between gap-3 border-b
+                border-[var(--color-border-light)] px-4 py-4 sm:px-6 sm:py-5
+                 ${currentType.header}
+                 flex-shrink-0
+               `}
             >
               <div className="flex min-w-0 flex-1 items-center gap-2">
                   {currentType.icon && (
@@ -147,7 +148,7 @@ const Modal = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex min-h-[40px] min-w-[40px] flex-shrink-0 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-primary)]"
+                  className="flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-primary)]"
                   aria-label="Close modal"
                 >
                   <X className="h-5 w-5" />
@@ -156,16 +157,17 @@ const Modal = ({
             </div>
           )}
 
-          <div className="admin-modal-body flex-1 min-h-0 overflow-y-auto px-6 py-6">
+          <div className="admin-modal-body flex-1 min-h-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
             {children}
           </div>
 
           {(footer || onConfirm) && (
             <div
               className="
-                admin-modal-footer mt-auto px-6 py-5 bg-[var(--color-bg-primary)]
+                admin-modal-footer mt-auto px-4 py-4 bg-[var(--color-bg-primary)]
                 border-t border-[var(--color-border-default)]
                 flex-shrink-0
+                sm:px-6 sm:py-5
               "
             >
               {footer ? (

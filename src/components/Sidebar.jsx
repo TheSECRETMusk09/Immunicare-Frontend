@@ -15,7 +15,6 @@ import {
   ClipboardList,
   Megaphone,
   Bell,
-  Settings,
   FileText,
   ChevronDown,
   ChevronRight,
@@ -71,7 +70,6 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
     { name: "Reports", icon: ClipboardList },
     { name: "Announcements", icon: Megaphone },
     { name: "Notifications", icon: Bell },
-    { name: "Settings", icon: Settings },
   ];
 
   const datePart = currentDateTime.toLocaleDateString("en-US", {
@@ -111,7 +109,6 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
       Reports: adminRoutePaths.reports,
       Announcements: adminRoutePaths.announcements,
       Notifications: adminRoutePaths.notifications,
-      Settings: adminRoutePaths.settings,
     };
 
     if (subItemName) {
@@ -141,7 +138,6 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
     if (path.includes("/reports")) return "Reports";
     if (path.includes("/announcements")) return "Announcements";
     if (path.includes("/notifications")) return "Notifications";
-    if (path.includes("/settings")) return "Settings";
     if (path.includes("/dashboard")) return "Dashboard";
 
     return "Dashboard";
@@ -206,8 +202,8 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
 
       {/* Sidebar - Sticky on desktop, fixed slide-out on mobile */}
       <aside
-        className={`admin-sidebar md:sticky md:top-0 md:h-screen z-30 w-64 bg-white dark:bg-gray-800 border-r dark:border-gray-700 flex flex-col h-screen
-        ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"} transition-none`}
+        className={`admin-sidebar fixed inset-y-0 left-0 md:relative md:sticky md:top-0 md:h-screen z-40 w-64 md:w-56 lg:w-64 bg-white dark:bg-gray-800 border-r dark:border-gray-700 flex flex-col h-screen flex-shrink-0
+        ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"} transition-transform duration-300 md:transition-none`}
         role="navigation"
         aria-label="Main navigation"
       >

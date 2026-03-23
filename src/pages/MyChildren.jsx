@@ -629,7 +629,7 @@ export default function MyChildren() {
           const uploadRes = await apiClient.customRequest("/upload", {
             method: "POST",
             data: formData,
-            headers: { "Content-Type": "multipart/form-data" }
+            // Let the browser/HTTP client automatically set Content-Type with the correct boundary
           });
           uploadedCardUrl = uploadRes.data?.url || uploadRes.url || null;
         } catch (uploadErr) {
@@ -822,7 +822,7 @@ export default function MyChildren() {
 
   return (
     <div className="guardian-page-wrapper min-h-screen bg-theme-bg-primary transition-colors duration-200">
-      <div className="lg:hidden sticky top-0 z-30 w-full bg-theme-bg-primary border-b border-theme-border-primary shadow-sm transition-colors duration-200">
+      <div className="min-[1025px]:hidden sticky top-0 z-30 w-full bg-theme-bg-primary border-b border-theme-border-primary shadow-sm transition-colors duration-200">
         <GuardianTopHeader
           title=""
           onRefresh={fetchChildren}
@@ -838,13 +838,13 @@ export default function MyChildren() {
           <>
             <Button
               onClick={() => setShowRegisterModal(true)}
-              className="guardian-module-hero__primary-btn lg:hidden"
+              className="guardian-module-hero__primary-btn min-[1025px]:hidden"
               size="sm"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add New Child
             </Button>
-            <div className="hidden lg:flex guardian-desktop-pageheader-actions guardian-desktop-pageheader-actions--with-primary">
+            <div className="hidden min-[1025px]:flex guardian-desktop-pageheader-actions guardian-desktop-pageheader-actions--with-primary">
               <button
                 type="button"
                 onClick={fetchChildren}
@@ -909,14 +909,14 @@ export default function MyChildren() {
             </Button>
           </div>
         ) : (
-          <div className="guardian-children-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 lg:gap-6">
+          <div className="guardian-children-grid grid grid-cols-1 min-[640px]:grid-cols-2 min-[1025px]:grid-cols-3 gap-4 md:gap-5 lg:gap-6">
             {children.map((child) => (
               <div
                 key={child.id}
                 className="guardian-child-card guardian-theme-card glassmorphism-card rounded-xl border border-transparent backdrop-blur-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group overflow-hidden bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-blue-500/10"
               >
                 <div className="p-6">
-                  <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-start justify-between gap-3 mb-6">
                     <div className="w-14 h-14 bg-gradient-to-br from-blue-400/30 to-purple-500/30 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
                       {normalizeSexForDisplay(child.sex) === "M" ? (
                         <User className="w-8 h-8 guardian-card-icon-accent guardian-card-icon-accent--blue" />
@@ -957,17 +957,17 @@ export default function MyChildren() {
                     </div>
                   )}
 
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between items-center py-2 border-b border-theme-border-primary">
-                      <span className="guardian-card-text-secondary">
-                        Date of Birth
-                      </span>
+                    <div className="space-y-3 text-sm">
+                      <div className="flex flex-col gap-1 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between py-2 border-b border-theme-border-primary">
+                        <span className="guardian-card-text-secondary">
+                          Date of Birth
+                        </span>
                       <span className="font-semibold guardian-card-text-primary">
                         {formatDate(child.dob)}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-theme-border-primary">
-                      <span className="guardian-card-text-secondary">Age</span>
+                      <div className="flex flex-col gap-1 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between py-2 border-b border-theme-border-primary">
+                        <span className="guardian-card-text-secondary">Age</span>
                       <span className="font-semibold guardian-card-text-primary">
                         {Math.floor(
                           (new Date() - new Date(child.dob)) /
@@ -976,16 +976,16 @@ export default function MyChildren() {
                         years
                       </span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-theme-border-primary">
-                      <span className="guardian-card-text-secondary">Sex</span>
+                      <div className="flex flex-col gap-1 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between py-2 border-b border-theme-border-primary">
+                        <span className="guardian-card-text-secondary">Sex</span>
                       <span className="font-semibold guardian-card-text-primary">
                         {normalizeSexForDisplay(child.sex) === "M" ? "Male" : "Female"}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center py-2">
-                      <span className="guardian-card-text-secondary">
-                        Health Center
-                      </span>
+                      <div className="flex flex-col gap-1 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between py-2">
+                        <span className="guardian-card-text-secondary">
+                          Health Center
+                        </span>
                       <span className="font-semibold guardian-card-text-primary truncate max-w-[150px]">
                         {child.health_center || "Not specified"}
                       </span>
@@ -1001,48 +1001,46 @@ export default function MyChildren() {
                   </div>
                 </div>
 
-                <div className="guardian-child-actions">
+                <div className="flex flex-row flex-nowrap items-stretch gap-1.5 sm:gap-2 p-3 sm:p-4 border-t border-theme-border-primary bg-white/5 backdrop-blur-md">
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="flex-1 justify-center guardian-card-action guardian-card-action--neutral"
+                    className="flex-1 min-w-0 flex-col h-auto py-2 px-1 justify-center items-center gap-1 guardian-card-action guardian-card-action--neutral"
                     onClick={() =>
                       navigate(guardianRoutePaths.vaccinationRecordsByChild(child.id))
                     }
                   >
-                    <FileText className="w-4 h-4 mr-2" />
-                    Records
+                    <FileText className="w-4 h-4 sm:w-5 sm:h-5 mx-0" />
+                    <span className="text-[10px] sm:text-xs font-semibold leading-none truncate max-w-full">Records</span>
                   </Button>
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="flex-1 justify-center guardian-card-action guardian-card-action--neutral"
+                    className="flex-1 min-w-0 flex-col h-auto py-2 px-1 justify-center items-center gap-1 guardian-card-action guardian-card-action--neutral"
                     onClick={() =>
                       navigate(guardianRoutePaths.appointmentBooking(child.id))
                     }
                   >
-                    <Calendar className="w-4 h-4 mr-2" />
-                    Schedule
+                    <Calendar className="w-4 h-4 sm:w-5 sm:h-5 mx-0" />
+                    <span className="text-[10px] sm:text-xs font-semibold leading-none truncate max-w-full">Schedule</span>
                   </Button>
-                </div>
-                <div className="guardian-child-actions border-t-0 pt-0">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="flex-1 justify-center guardian-card-action guardian-card-action--edit"
+                    className="flex-1 min-w-0 flex-col h-auto py-2 px-1 justify-center items-center gap-1 guardian-card-action guardian-card-action--edit"
                     onClick={() => handleEditChild(child)}
                   >
-                    <Edit2 className="w-4 h-4 mr-1" />
-                    Edit
+                    <Edit2 className="w-4 h-4 sm:w-5 sm:h-5 mx-0" />
+                    <span className="text-[10px] sm:text-xs font-semibold leading-none truncate max-w-full">Edit</span>
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="flex-1 justify-center guardian-card-action guardian-card-action--delete"
+                    className="flex-1 min-w-0 flex-col h-auto py-2 px-1 justify-center items-center gap-1 guardian-card-action guardian-card-action--delete"
                     onClick={() => handleDeleteChildClick(child)}
                   >
-                    <Trash2 className="w-4 h-4 mr-1" />
-                    Delete
+                    <Trash2 className="w-4 h-4 sm:w-5 sm:h-5 mx-0 text-red-500" />
+                    <span className="text-[10px] sm:text-xs font-semibold leading-none truncate max-w-full text-red-600 dark:text-red-400">Delete</span>
                   </Button>
                 </div>
               </div>
@@ -1056,51 +1054,51 @@ export default function MyChildren() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base sm:text-lg font-bold text-theme-primary">Quick Actions</h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4">
               <Button
                 variant="secondary"
-                className="p-6 h-auto flex-col items-center text-center guardian-quick-action-card guardian-quick-action-card--blue"
+                className="p-3 sm:p-6 h-auto flex-col items-center justify-center text-center guardian-quick-action-card guardian-quick-action-card--blue"
                 onClick={() => navigate(guardianRoutePaths.vaccinationRecords)}
               >
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400/30 to-purple-500/30 backdrop-blur-sm flex items-center justify-center mb-3">
-                  <FileText className="w-6 h-6 guardian-card-icon-accent guardian-card-icon-accent--blue" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-400/30 to-purple-500/30 backdrop-blur-sm flex items-center justify-center mb-2 sm:mb-3">
+                  <FileText className="w-5 h-5 sm:w-6 sm:h-6 guardian-card-icon-accent guardian-card-icon-accent--blue" />
                 </div>
-                <span className="font-bold guardian-quick-action-title">
-                  View All Records
+                <span className="text-xs sm:text-sm font-bold guardian-quick-action-title leading-tight">
+                  Records
                 </span>
-                <span className="text-xs guardian-quick-action-description mt-1">
+                <span className="hidden sm:block text-xs guardian-quick-action-description mt-1">
                   Complete history for all children
                 </span>
               </Button>
 
               <Button
                 variant="secondary"
-                className="p-6 h-auto flex-col items-center text-center guardian-quick-action-card guardian-quick-action-card--emerald"
+                className="p-3 sm:p-6 h-auto flex-col items-center justify-center text-center guardian-quick-action-card guardian-quick-action-card--emerald"
                 onClick={() => navigate(guardianRoutePaths.appointmentBooking())}
               >
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400/30 to-teal-500/30 backdrop-blur-sm flex items-center justify-center mb-3">
-                  <Calendar className="w-6 h-6 guardian-card-icon-accent guardian-card-icon-accent--emerald" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-emerald-400/30 to-teal-500/30 backdrop-blur-sm flex items-center justify-center mb-2 sm:mb-3">
+                  <Calendar className="w-5 h-5 sm:w-6 sm:h-6 guardian-card-icon-accent guardian-card-icon-accent--emerald" />
                 </div>
-                <span className="font-bold guardian-quick-action-title">
-                  Book Appointment
+                <span className="text-xs sm:text-sm font-bold guardian-quick-action-title leading-tight">
+                  Schedule
                 </span>
-                <span className="text-xs guardian-quick-action-description mt-1">
+                <span className="hidden sm:block text-xs guardian-quick-action-description mt-1">
                   Schedule a new vaccination visit
                 </span>
               </Button>
 
               <Button
                 variant="secondary"
-                className="p-6 h-auto flex-col items-center text-center guardian-quick-action-card guardian-quick-action-card--purple"
+                className="p-3 sm:p-6 h-auto flex-col items-center justify-center text-center guardian-quick-action-card guardian-quick-action-card--purple"
                 onClick={() => navigate(guardianRoutePaths.documents)}
               >
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400/30 to-pink-500/30 backdrop-blur-sm flex items-center justify-center mb-3">
-                  <FileText className="w-6 h-6 guardian-card-icon-accent guardian-card-icon-accent--purple" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-purple-400/30 to-pink-500/30 backdrop-blur-sm flex items-center justify-center mb-2 sm:mb-3">
+                  <FileText className="w-5 h-5 sm:w-6 sm:h-6 guardian-card-icon-accent guardian-card-icon-accent--purple" />
                 </div>
-                <span className="font-bold guardian-quick-action-title">
-                  Documents Hub
+                <span className="text-xs sm:text-sm font-bold guardian-quick-action-title leading-tight">
+                  Documents
                 </span>
-                <span className="text-xs guardian-quick-action-description mt-1">
+                <span className="hidden sm:block text-xs guardian-quick-action-description mt-1">
                   Open current charts, records, and document-ready views
                 </span>
               </Button>
@@ -1242,24 +1240,24 @@ export default function MyChildren() {
                       error={registerFieldErrors.dob}
                       required
                     />
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-theme-secondary">
-                        Gender *
+                    <div className="space-y-1">
+                      <label className="block text-sm font-semibold text-gray-800 dark:text-white mb-1.5">
+                        Gender <span className="text-red-500 ml-1">*</span>
                       </label>
                       <select
                         name="sex"
                         value={formData.sex}
                         onChange={handleRegisterChange}
                         required
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-theme-bg-input text-theme-primary ${
-                          registerFieldErrors.sex ? "border-red-400" : "border-theme-border-primary"
+                        className={`w-full px-3 py-2.5 sm:py-2 text-sm sm:text-base border rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-opacity-20 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-60 disabled:cursor-not-allowed ${
+                          registerFieldErrors.sex ? "border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-600 focus:ring-red-500 focus:border-red-500" : "border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 dark:hover:border-gray-500"
                         }`}
                       >
-                        <option value="M">Male</option>
-                        <option value="F">Female</option>
+                        <option value="M" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">Male</option>
+                        <option value="F" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">Female</option>
                       </select>
                       {registerFieldErrors.sex && (
-                        <p className="text-xs text-red-300 mt-1">{registerFieldErrors.sex}</p>
+                        <p className="mt-1.5 text-sm font-medium text-red-600 dark:text-red-400">{registerFieldErrors.sex}</p>
                       )}
                     </div>
                   </div>
@@ -1362,24 +1360,24 @@ export default function MyChildren() {
                       error={registerFieldErrors.dob}
                       required
                     />
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-theme-secondary">
-                        Gender *
+                    <div className="space-y-1">
+                      <label className="block text-sm font-semibold text-gray-800 dark:text-white mb-1.5">
+                        Gender <span className="text-red-500 ml-1">*</span>
                       </label>
                       <select
                         name="sex"
                         value={formData.sex}
                         onChange={handleRegisterChange}
                         required
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-theme-bg-input text-theme-primary ${
-                          registerFieldErrors.sex ? "border-red-400" : "border-theme-border-primary"
+                        className={`w-full px-3 py-2.5 sm:py-2 text-sm sm:text-base border rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-opacity-20 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-60 disabled:cursor-not-allowed ${
+                          registerFieldErrors.sex ? "border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-600 focus:ring-red-500 focus:border-red-500" : "border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 dark:hover:border-gray-500"
                         }`}
                       >
-                        <option value="M">Male</option>
-                        <option value="F">Female</option>
+                        <option value="M" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">Male</option>
+                        <option value="F" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">Female</option>
                       </select>
                       {registerFieldErrors.sex && (
-                        <p className="text-xs text-red-300 mt-1">{registerFieldErrors.sex}</p>
+                        <p className="mt-1.5 text-sm font-medium text-red-600 dark:text-red-400">{registerFieldErrors.sex}</p>
                       )}
                     </div>
                   </div>
@@ -1715,24 +1713,24 @@ export default function MyChildren() {
                 error={editFieldErrors.dob}
                 required
               />
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-theme-secondary">
-                  Gender *
+              <div className="space-y-1">
+                <label className="block text-sm font-semibold text-gray-800 dark:text-white mb-1.5">
+                  Gender <span className="text-red-500 ml-1">*</span>
                 </label>
                 <select
                   name="sex"
                   value={editFormData.sex}
                   onChange={handleEditChange}
                   required
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-theme-bg-input text-theme-primary ${
-                    editFieldErrors.sex ? "border-red-400" : "border-theme-border-primary"
+                  className={`w-full px-3 py-2.5 sm:py-2 text-sm sm:text-base border rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-opacity-20 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-60 disabled:cursor-not-allowed ${
+                    editFieldErrors.sex ? "border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-600 focus:ring-red-500 focus:border-red-500" : "border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 dark:hover:border-gray-500"
                   }`}
                 >
-                  <option value="M">Male</option>
-                  <option value="F">Female</option>
+                  <option value="M" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">Male</option>
+                  <option value="F" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">Female</option>
                 </select>
                 {editFieldErrors.sex && (
-                  <p className="text-xs text-red-300 mt-1">{editFieldErrors.sex}</p>
+                  <p className="mt-1.5 text-sm font-medium text-red-600 dark:text-red-400">{editFieldErrors.sex}</p>
                 )}
               </div>
             </div>

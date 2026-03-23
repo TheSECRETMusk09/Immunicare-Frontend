@@ -925,7 +925,7 @@ export default function InfantPersonalRecord({
         <InfantDocuments
           infantId={infantId}
           onDocumentChange={(doc) => {
-            console.log("Document changed:", doc);
+            // Refresh if needed when document changes
           }}
         />
       </div>

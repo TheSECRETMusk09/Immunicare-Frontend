@@ -28,6 +28,56 @@ const resolveProviderName = (record) =>
   record?.administered_by_name ||
   PROVIDER_FALLBACK_LABEL;
 
+const VaccinationRecordCard = ({ vaccine, status, formatDate }) => (
+  <article className="guardian-table-card">
+    <div className="guardian-table-card__header">
+      <div className="min-w-0">
+        <h3 className="guardian-table-card__title">{vaccine.vaccine_name}</h3>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          Dose {vaccine.dose_no || 1}
+        </p>
+      </div>
+      <span
+        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+          status.color === "green"
+            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+            : status.color === "red"
+              ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+              : status.color === "yellow"
+                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+        }`}
+      >
+        {status.label}
+      </span>
+    </div>
+    <div className="guardian-table-card__rows">
+      <div className="guardian-table-card__row">
+        <span className="guardian-table-card__label">Provider</span>
+        <span className="guardian-table-card__value">{resolveProviderName(vaccine)}</span>
+      </div>
+      <div className="guardian-table-card__row">
+        <span className="guardian-table-card__label">Due Date</span>
+        <span className="guardian-table-card__value">{formatDate(vaccine.due_date)}</span>
+      </div>
+      <div className="guardian-table-card__row">
+        <span className="guardian-table-card__label">Date Given</span>
+        <span className="guardian-table-card__value">{formatDate(vaccine.admin_date)}</span>
+      </div>
+      <div className="guardian-table-card__row">
+        <span className="guardian-table-card__label">Action</span>
+        <span className="guardian-table-card__value">
+          {vaccine.isScheduleOnly
+            ? "Awaiting dose"
+            : vaccine.admin_date
+              ? "Recorded by health center"
+              : "—"}
+        </span>
+      </div>
+    </div>
+  </article>
+);
+
 export default function UserVaccinationRecords() {
   const { guardianId } = useAuth();
   const { childId } = useParams();
@@ -332,7 +382,7 @@ export default function UserVaccinationRecords() {
 
   return (
     <div className="guardian-page-wrapper min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 w-full bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-200">
+      <div className="min-[1025px]:hidden fixed top-0 left-0 right-0 z-40 w-full bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-200">
         <GuardianTopHeader
           title=""
           onRefresh={() => {
@@ -346,14 +396,14 @@ export default function UserVaccinationRecords() {
         />
       </div>
 
-      <div className="pt-14 sm:pt-16 lg:pt-0">
+      <div className="pt-14 sm:pt-16 min-[1025px]:pt-0">
         <GuardianModuleHeader
         title="Vaccination Records"
         subtitle="Track and manage your child's vaccination history"
         icon={<FileText className="w-8 h-8 text-white" />}
         actions={
-          <div className="flex items-center gap-2">
-            <div className="hidden lg:flex guardian-desktop-pageheader-actions mr-2">
+          <div className="guardian-inline-actions flex items-center gap-2">
+            <div className="hidden min-[1025px]:flex guardian-desktop-pageheader-actions mr-2">
               <button
                 type="button"
                 onClick={() => {
@@ -436,22 +486,22 @@ export default function UserVaccinationRecords() {
               className="bg-white dark:bg-gray-800 rounded-xl p-4 cursor-pointer"
               onClick={() => setShowChildDropdown(!showChildDropdown)}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0">
                   <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 rounded-full flex items-center justify-center">
                     <span className="text-xl">
                       {selectedChild?.sex === "M" ? "👦" : "👧"}
                     </span>
                   </div>
-                  <div>
-                    <p className="font-semibold text-gray-900 dark:text-gray-100">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900 dark:text-gray-100 break-words">
                       {selectedChild?.first_name} {selectedChild?.last_name}
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 break-words">
                       {calculateAge(selectedChild?.dob)} • Born{" "}
                       {formatDate(selectedChild?.dob)}
                     </p>
-                    <p className="text-xs font-mono text-gray-600 dark:text-gray-300 mt-1">
+                    <p className="text-xs font-mono text-gray-600 dark:text-gray-300 mt-1 break-all">
                       Infant Control Number: {selectedChild?.control_number || "Pending"}
                     </p>
                   </div>
@@ -522,7 +572,7 @@ export default function UserVaccinationRecords() {
           </div>
 
           {/* Summary Cards - Child Specific Only */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 min-[480px]:grid-cols-2 min-[1025px]:grid-cols-3 gap-3">
             <Card className="p-4 flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
                 <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -665,10 +715,10 @@ export default function UserVaccinationRecords() {
 
           {/* Tab Navigation - Simplified for Guardian */}
           {viewMode !== "booklet" && (
-            <div className="flex gap-1 sm:gap-2 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+            <div className="guardian-tab-bar border-b border-gray-200 dark:border-gray-700 pb-2">
               <button
                 onClick={() => setViewMode("records")}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-all ${
+                className={`guardian-tab-bar__item flex items-center gap-2 text-sm font-medium transition-all ${
                   viewMode === "records"
                     ? "bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border-b-2 border-primary-500"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -678,7 +728,7 @@ export default function UserVaccinationRecords() {
               </button>
               <button
                 onClick={() => setViewMode("schedule")}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-all ${
+                className={`guardian-tab-bar__item flex items-center gap-2 text-sm font-medium transition-all ${
                   viewMode === "schedule"
                     ? "bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border-b-2 border-primary-500"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -688,7 +738,7 @@ export default function UserVaccinationRecords() {
               </button>
               <button
                 onClick={() => setViewMode("upcoming")}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-all ${
+                className={`guardian-tab-bar__item flex items-center gap-2 text-sm font-medium transition-all ${
                   viewMode === "upcoming"
                     ? "bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border-b-2 border-primary-500"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -718,8 +768,21 @@ export default function UserVaccinationRecords() {
                 <ImmunizationRecordBooklet infantId={selectedChild.id} />
               ) : (
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
-                  {/* Mobile-friendly Table */}
-                  <div className="overflow-x-auto">
+                  <div className="guardian-table-card-list p-4 min-[768px]:hidden">
+                    {filteredRecords.map((vaccine) => {
+                      const status = getVaccineStatus(vaccine);
+                      return (
+                        <VaccinationRecordCard
+                          key={vaccine.id || vaccine.vaccine_id}
+                          vaccine={vaccine}
+                          status={status}
+                          formatDate={formatDate}
+                        />
+                      );
+                    })}
+                  </div>
+                  {/* Tablet/Desktop table */}
+                  <div className="guardian-table-scroll-shell hidden min-[768px]:block">
                     <table className="w-full">
                       <thead className="bg-gray-50 dark:bg-gray-700">
                         <tr>

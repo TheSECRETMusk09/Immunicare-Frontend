@@ -238,7 +238,6 @@ const GuardianNotificationsPage = () => {
     notifications,
     unreadCount,
     loading,
-    updateFilters,
     refresh,
     markAsRead,
     markAsUnread,
@@ -247,7 +246,7 @@ const GuardianNotificationsPage = () => {
   } = useGuardianNotifications({ limit: 50, pollingInterval: 0 });
 
   // Get socket connection for real-time updates
-  const { isConnected, notifications: socketNotifications, on, off } = useSocket();
+  const { isConnected, on, off } = useSocket();
   const [socketRealTimeNotifications, setSocketRealTimeNotifications] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -257,7 +256,6 @@ const GuardianNotificationsPage = () => {
 
     // Listen for new notifications
     const handleNewNotification = (data) => {
-      console.log("Real-time notification received:", data);
       if (data?.notification) {
         setSocketRealTimeNotifications(prev => [data.notification, ...prev]);
       }
@@ -265,14 +263,12 @@ const GuardianNotificationsPage = () => {
 
     // Listen for notification updates
     const handleNotificationUpdated = (data) => {
-      console.log("Real-time notification updated:", data);
       // Trigger a refresh to get the latest state
       refresh();
     };
 
     // Listen for notification deletion
     const handleNotificationDeleted = (data) => {
-      console.log("Real-time notification deleted:", data);
       setSocketRealTimeNotifications(prev =>
         prev.filter(n => n.id !== data.notificationId)
       );
@@ -280,7 +276,6 @@ const GuardianNotificationsPage = () => {
 
     // Listen for all notifications read
     const handleAllRead = (data) => {
-      console.log("Real-time all notifications read:", data);
       setSocketRealTimeNotifications(prev =>
         prev.map(n => ({ ...n, isRead: true }))
       );
@@ -391,7 +386,7 @@ const GuardianNotificationsPage = () => {
 
   return (
     <div className="guardian-page-wrapper min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-      <div className="lg:hidden sticky top-0 z-30 w-full bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm transition-colors duration-200">
+      <div className="min-[1025px]:hidden sticky top-0 z-30 w-full bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm transition-colors duration-200">
         <GuardianTopHeader
           title=""
           onRefresh={handleRefresh}
@@ -404,7 +399,7 @@ const GuardianNotificationsPage = () => {
         subtitle="Stay updated with your children's health"
         icon={<Bell className="w-8 h-8 text-white" />}
         actions={
-          <div className="hidden lg:flex guardian-desktop-pageheader-actions">
+          <div className="hidden min-[1025px]:flex guardian-desktop-pageheader-actions">
             <button
               type="button"
               onClick={handleRefresh}
@@ -426,12 +421,12 @@ const GuardianNotificationsPage = () => {
         }
       />
 
-      <main className="guardian-page-content space-y-4 md:space-y-5 lg:space-y-6 p-4 md:p-6">
+      <main className="guardian-page-content space-y-4 md:space-y-5 lg:space-y-6">
         {/* Utility Row */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-5 border border-gray-100 dark:border-gray-700 shadow-sm">
-          <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-5 border border-gray-100 dark:border-gray-700 shadow-sm">
+          <div className="flex flex-col min-[768px]:flex-row gap-4 justify-between items-stretch min-[768px]:items-center">
             {/* Search */}
-            <div className="relative w-full sm:w-64">
+            <div className="relative w-full min-[768px]:w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
@@ -443,15 +438,15 @@ const GuardianNotificationsPage = () => {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-2 w-full min-[768px]:w-auto">
               <button
                 onClick={markAllAsRead}
-                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex-1 min-[768px]:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 disabled={unreadCount === 0}
               >
                 <CheckCheck size={16} />
-                <span className="hidden sm:inline">Mark all read</span>
-                <span className="sm:hidden">Read all</span>
+                  <span className="hidden min-[768px]:inline">Mark all read</span>
+                  <span className="min-[768px]:hidden">Read all</span>
               </button>
             </div>
           </div>

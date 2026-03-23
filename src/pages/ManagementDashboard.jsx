@@ -7,13 +7,9 @@ import HolidayDisplay from "../components/Dashboard/HolidayDisplay";
 import UserManagement from "./UserManagement";
 import InfantManagement from "./InfantManagement";
 import Appointments from "./Appointments";
-import InventoryManagement from "./InventoryManagement";
 import Reports from "./Reports";
-import Analytics from "./Analytics";
 import Announcements from "./Announcements";
 import Notifications from "./Notifications";
-import Settings from "./Settings";
-import HealthInformation from "./HealthInformation";
 import infantService from "../services/infantService";
 import { normalizeInfantsResponse } from "../utils/adminDataAdapters";
 import VaccineScheduleBooklet from "../components/VaccineScheduleBooklet";
@@ -78,22 +74,6 @@ export default function ManagementDashboard() {
   useEffect(() => {
     fetchInfants();
   }, [fetchInfants]);
-
-  const navItems = [
-    { id: "overview", name: "Overview", icon: "📊" },
-    { id: "users", name: "User Management", icon: "👥" },
-    { id: "infants", name: "Infant Management", icon: "👶" },
-    { id: "appointments", name: "Appointments", icon: "📅" },
-    { id: "inventory", name: "Inventory", icon: "📦" },
-    { id: "vaccinations", name: "Vaccinations", icon: "💉" },
-    { id: "analytics", name: "Analytics", icon: "📈" },
-    { id: "digital-papers", name: "Digital Papers", icon: "📄" },
-    { id: "announcements", name: "Announcements", icon: "📢" },
-    { id: "notifications", name: "Notifications", icon: "🔔" },
-    { id: "health-info", name: "Health Info", icon: "🏥" },
-    { id: "reports", name: "Reports", icon: "📑" },
-    { id: "settings", name: "Settings", icon: "⚙️" },
-  ];
 
   const renderSection = () => {
     // If an infant is selected, show the infant details view with action buttons
@@ -233,9 +213,6 @@ export default function ManagementDashboard() {
         return null;
       case "reports":
         return <Reports />;
-      case "settings":
-        navigate("/settings");
-        return null;
       case "overview":
       default:
         return (
@@ -290,7 +267,7 @@ export default function ManagementDashboard() {
                   {infantSearchQuery ? "No infants match your search" : "No infants registered yet"}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                   {filteredInfants.slice(0, 6).map((infant) => (
                     <div
                       key={infant.id}
@@ -372,7 +349,7 @@ export default function ManagementDashboard() {
             </div>
 
             {/* Quick Stats - Top Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
               <Card
                 className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-primary-500"
                 onClick={() => setActiveSection("users")}
@@ -424,7 +401,7 @@ export default function ManagementDashboard() {
             </div>
 
             {/* Quick Stats - Second Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
               <Card
                 className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-danger-500"
                 onClick={() => navigate("/vaccination-management")}
@@ -464,7 +441,7 @@ export default function ManagementDashboard() {
             </div>
 
             {/* Quick Stats - Third Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
               <Card
                 className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-pink-500"
                 onClick={() => navigate("/announcements")}
@@ -503,8 +480,8 @@ export default function ManagementDashboard() {
               </Card>
             </div>
 
-            {/* Reports and Settings Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Reports Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
               <Card
                 className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-cyan-500"
                 onClick={() => setActiveSection("reports")}
@@ -517,22 +494,10 @@ export default function ManagementDashboard() {
                   Generate reports
                 </p>
               </Card>
-              <Card
-                className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-gray-500"
-                onClick={() => setActiveSection("settings")}
-              >
-                <div className="text-4xl mb-3">⚙️</div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                  Settings
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  System configuration
-                </p>
-              </Card>
             </div>
 
             {/* Management Features */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6 sm:gap-8">
               <Card
                 className="p-6 flex flex-col h-full"
                 title="👥 User Management"
@@ -713,20 +678,6 @@ export default function ManagementDashboard() {
                   View Reports
                 </Button>
               </Card>
-
-              <Card className="p-6 flex flex-col h-full" title="⚙️ Settings">
-                <p className="text-gray-600 dark:text-gray-400 mb-6 flex-grow">
-                  Configure system settings, facility information, and global
-                  preferences. Manage user roles and permissions.
-                </p>
-                <Button
-                  onClick={() => navigate("/settings")}
-                  variant="secondary"
-                  className="w-full"
-                >
-                  System Settings
-                </Button>
-              </Card>
             </div>
 
             {/* Admin Features */}
@@ -735,7 +686,7 @@ export default function ManagementDashboard() {
                 <h3 className="text-xl font-bold text-warning-800 dark:text-warning-200 mb-6 flex items-center gap-3">
                   <span className="text-2xl">🔒</span> Administrator Features
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-xl bg-warning-100 dark:bg-warning-900/50 flex items-center justify-center text-warning-600 dark:text-warning-400 text-2xl flex-shrink-0">
                       🔐
@@ -787,7 +738,7 @@ export default function ManagementDashboard() {
   };
 
   return (
-    <div className="space-y-8 px-6 max-w-7xl mx-auto">
+    <div className="space-y-6 sm:space-y-8 px-4 sm:px-6 lg:px-8 max-w-[1600px] mx-auto w-full">
       {/* Section Content */}
       <div className="animate-fade-in">{renderSection()}</div>
     </div>

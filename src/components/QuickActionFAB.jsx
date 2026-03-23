@@ -225,7 +225,7 @@ const QuickActionFAB = ({
   return (
     <div
       ref={menuRef}
-      className={`fixed bottom-20 right-4 z-40 flex flex-col items-end gap-3 ${className}`}
+      className={`guardian-quick-fab fixed z-40 flex flex-col items-end gap-3 ${className}`}
       style={{
         transform: isVisible ? 'translateY(0)' : 'translateY(100px)',
         opacity: isVisible ? 1 : 0,
@@ -234,7 +234,8 @@ const QuickActionFAB = ({
     >
       {/* Action Menu Items */}
       <div
-        className={`flex flex-col items-end gap-2 transition-all duration-300 ${
+        id="quick-actions-menu"
+        className={`guardian-quick-fab__actions flex flex-col items-end gap-2 transition-all duration-300 ${
           isOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-4 pointer-events-none'
         }`}
         role="menu"
@@ -252,7 +253,7 @@ const QuickActionFAB = ({
           >
             {/* Label */}
             <span
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium shadow-lg whitespace-nowrap ${
+              className={`guardian-quick-fab__label px-3 py-1.5 rounded-lg text-sm font-medium shadow-lg whitespace-nowrap ${
                 action.isEmergency
                   ? 'bg-red-100 text-red-800 dark:bg-red-900/80 dark:text-red-200'
                   : 'bg-white text-gray-800 dark:bg-gray-800 dark:text-gray-200'
@@ -265,7 +266,7 @@ const QuickActionFAB = ({
             {/* Action Button */}
             <button
               onClick={() => handleAction(action.id)}
-              className={`w-12 h-12 rounded-full shadow-lg flex items-center justify-center text-white transition-all duration-200 ${action.color} ${action.darkColor} hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900`}
+              className={`guardian-quick-fab__action-btn w-12 h-12 rounded-full shadow-lg flex items-center justify-center text-white transition-all duration-200 ${action.color} ${action.darkColor} hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900`}
               style={{
                 minWidth: '48px',
                 minHeight: '48px',
@@ -291,7 +292,7 @@ const QuickActionFAB = ({
       <button
         ref={buttonRef}
         onClick={toggleMenu}
-        className={`w-14 h-14 rounded-full shadow-xl flex items-center justify-center text-white transition-all duration-300 ${
+        className={`guardian-quick-fab__trigger w-14 h-14 rounded-full shadow-xl flex items-center justify-center text-white transition-all duration-300 ${
           isOpen
             ? 'bg-gray-600 hover:bg-gray-700 rotate-45 dark:bg-gray-700 dark:hover:bg-gray-600'
             : 'bg-gradient-to-br from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 hover:scale-105'
@@ -319,7 +320,7 @@ const QuickActionFAB = ({
       {/* Backdrop for mobile */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/20 dark:bg-black/40 z-[-1] md:hidden"
+          className="fixed inset-0 bg-black/20 dark:bg-black/40 z-[-1] min-[768px]:hidden"
           onClick={() => setIsOpen(false)}
           aria-hidden="true"
         />

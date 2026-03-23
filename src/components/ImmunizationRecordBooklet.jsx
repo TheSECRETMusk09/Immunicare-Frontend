@@ -298,10 +298,17 @@ const BOOKLET_VACCINE_ROWS = [
 ];
 
 const PRINTABLE_STYLES = `
-  * {
-    box-sizing: border-box;
+  :root {
+    color-scheme: light;
   }
 
+  * {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  html,
   body {
     margin: 0;
     padding: 18px;
@@ -315,6 +322,7 @@ const PRINTABLE_STYLES = `
     margin: 0 auto;
     background: #ffffff;
     padding: 24px 22px 28px;
+    border: 1px solid #d1d5db;
   }
 
   .record-booklet-print__title {
@@ -383,8 +391,29 @@ const PRINTABLE_STYLES = `
 
   .record-booklet-print__table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: separate;
-    border-spacing: 0 6px;
+    border-spacing: 0 4px;
+  }
+
+  .record-booklet-print__column--vaccine {
+    width: 23%;
+  }
+
+  .record-booklet-print__column--doses {
+    width: 20%;
+  }
+
+  .record-booklet-print__column--dates {
+    width: 34%;
+  }
+
+  .record-booklet-print__column--remarks {
+    width: 23%;
+  }
+
+  .record-booklet-print__table thead {
+    display: table-header-group;
   }
 
   .record-booklet-print__table th {
@@ -395,6 +424,8 @@ const PRINTABLE_STYLES = `
     text-align: center;
     padding: 9px 10px;
     border: 2px solid #0f6967;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
   }
 
   .record-booklet-print__table td {
@@ -403,10 +434,20 @@ const PRINTABLE_STYLES = `
     padding: 8px 10px;
     vertical-align: top;
     font-size: 13px;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .record-booklet-print__table tbody tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   .record-booklet-print__vaccine {
     font-weight: 700;
+    line-height: 1.15;
   }
 
   .record-booklet-print__dose-list,
@@ -443,6 +484,7 @@ const PRINTABLE_STYLES = `
   .record-booklet-print__dose-label {
     font-size: 12px;
     font-weight: 600;
+    line-height: 1.15;
   }
 
   .record-booklet-print__date-grid {
@@ -489,21 +531,129 @@ const PRINTABLE_STYLES = `
 
   @media print {
     @page {
-      size: landscape;
-      margin: 10mm;
+      size: A4 landscape;
+      margin: 8mm;
     }
 
+    html,
     body {
       padding: 0;
       background: #ffffff;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
+      width: 297mm;
+      min-height: 210mm;
+      overflow: visible;
     }
 
     .record-booklet-print {
-      width: 100%;
-      padding: 0;
+      width: 281mm;
+      max-width: 100%;
+      padding: 5mm 5.5mm 5mm;
       box-shadow: none;
+      border: none;
+    }
+
+    .record-booklet-print__title {
+      margin-bottom: 8px;
+      font-size: 22px;
+    }
+
+    .record-booklet-print__details {
+      grid-template-columns: 1.25fr 1fr 0.95fr;
+      gap: 10px 14px;
+      margin-bottom: 10px;
+    }
+
+    .record-booklet-print__field {
+      margin-bottom: 4px;
+      gap: 5px;
+      font-size: 11px;
+    }
+
+    .record-booklet-print__label {
+      font-size: 11px;
+    }
+
+    .record-booklet-print__value {
+      min-height: 14px;
+      padding: 0 1px 1px;
+    }
+
+    .record-booklet-print__value--wide {
+      min-width: 0;
+      width: 100%;
+    }
+
+    .record-booklet-print__value--medium {
+      min-width: 0;
+      width: 120px;
+      max-width: 100%;
+    }
+
+    .record-booklet-print__value--narrow {
+      min-width: 0;
+      width: 70px;
+      max-width: 100%;
+    }
+
+    .record-booklet-print__table {
+      border-spacing: 0 2px;
+    }
+
+    .record-booklet-print__table th {
+      font-size: 10px;
+      padding: 5px 6px;
+    }
+
+    .record-booklet-print__table td {
+      font-size: 10px;
+      padding: 4px 6px;
+    }
+
+    .record-booklet-print__dose-list,
+    .record-booklet-print__date-grid,
+    .record-booklet-print__remarks {
+      min-height: 0;
+    }
+
+    .record-booklet-print__dose-list,
+    .record-booklet-print__date-grid {
+      gap: 4px;
+    }
+
+    .record-booklet-print__dose-item {
+      gap: 6px;
+    }
+
+    .record-booklet-print__dose-badge {
+      width: 15px;
+      height: 15px;
+      font-size: 9px;
+    }
+
+    .record-booklet-print__dose-label {
+      font-size: 9.5px;
+    }
+
+    .record-booklet-print__date-slot {
+      min-height: 24px;
+      padding: 9px 4px 4px;
+      font-size: 9.5px;
+    }
+
+    .record-booklet-print__date-slot-index {
+      top: 2px;
+      left: 4px;
+      font-size: 8px;
+    }
+
+    .record-booklet-print__remarks {
+      font-size: 9.5px;
+      line-height: 1.15;
+    }
+
+    .record-booklet-print__empty-row td {
+      min-height: 16px;
+      height: 16px;
     }
   }
 `;
@@ -1181,16 +1331,72 @@ export default function ImmunizationRecordBooklet({ infantId }) {
               </div>
             </div>
 
-            <div className="flex gap-2 self-start">
-              <Button onClick={handlePrint} variant="secondary">
+            <div className="flex w-full flex-col gap-2 self-start min-[480px]:w-auto min-[480px]:flex-row">
+              <Button onClick={handlePrint} variant="secondary" className="w-full min-[480px]:w-auto">
                 📄 Download PDF
               </Button>
-              <Button onClick={handlePrint}>🖨️ Print</Button>
+              <Button onClick={handlePrint} className="w-full min-[480px]:w-auto">🖨️ Print</Button>
             </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="guardian-table-card-list p-4 min-[768px]:hidden">
+          {bookletRows.map((row) => {
+            const noteEntries = row.slots.filter((slot) => hasDisplayValue(slot.notes));
+
+            return (
+              <article key={`mobile-${row.key}`} className="guardian-table-card">
+                <div className="guardian-table-card__header">
+                  <div className="min-w-0">
+                    <h4 className="guardian-table-card__title">{row.vaccineLabel}</h4>
+                  </div>
+                </div>
+
+                <div className="guardian-table-card__rows">
+                  {row.slots.map((slot) => (
+                    <div key={`mobile-slot-${slot.key}`} className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 dark:border-gray-700 dark:bg-gray-900/40">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                          Dose {slot.displayDoseNumber}
+                        </span>
+                        <span
+                          className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadgeClassName(slot.status)}`}
+                        >
+                          {slot.status}
+                        </span>
+                      </div>
+                      <div className="mt-2 grid gap-2 text-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="text-gray-500 dark:text-gray-400">Schedule</span>
+                          <span className="text-right font-medium text-gray-900 dark:text-gray-100">{slot.scheduleLabel}</span>
+                        </div>
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="text-gray-500 dark:text-gray-400">Date Administered</span>
+                          <span className="text-right font-medium text-gray-900 dark:text-gray-100">{hasDisplayValue(slot.adminDate) ? formatDate(slot.adminDate) : '—'}</span>
+                        </div>
+                        {hasDisplayValue(slot.notes) && (
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-gray-500 dark:text-gray-400">Remarks</span>
+                            <span className="text-right font-medium text-gray-900 dark:text-gray-100 break-words">{slot.notes}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {!noteEntries.length && (
+                    <div className="guardian-table-card__row">
+                      <span className="guardian-table-card__label">Remarks</span>
+                      <span className="guardian-table-card__value">—</span>
+                    </div>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="guardian-table-scroll-shell hidden min-[768px]:block">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
@@ -1353,6 +1559,12 @@ export default function ImmunizationRecordBooklet({ infantId }) {
           </section>
 
           <table className="record-booklet-print__table">
+            <colgroup>
+              <col className="record-booklet-print__column--vaccine" />
+              <col className="record-booklet-print__column--doses" />
+              <col className="record-booklet-print__column--dates" />
+              <col className="record-booklet-print__column--remarks" />
+            </colgroup>
             <thead>
               <tr>
                 <th>Bakuna</th>

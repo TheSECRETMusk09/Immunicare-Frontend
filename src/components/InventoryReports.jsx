@@ -345,7 +345,7 @@ export default function InventoryReports() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -461,7 +461,7 @@ export default function InventoryReports() {
 
       {/* Filters */}
       <Card className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Category
@@ -821,94 +821,6 @@ export default function InventoryReports() {
             </div>
           </Card>
         </Tab>
-        {/* Suppressing Suppliers tab as backend integration is not complete
-        <Tab id="suppliers" label="Suppliers" icon="🏢">
-          {/* Suppliers Table */}
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                      Supplier Code
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                      Supplier Name
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                      Contact
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                      Performance Score
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {suppliers.map((supplier) => (
-                    <tr
-                      key={supplier.supplier_id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-700"
-                    >
-                      <td className="px-4 py-3 text-sm font-mono text-gray-900 dark:text-gray-100">
-                        {supplier.supplier_code}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {supplier.supplier_name}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {supplier.email}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                        <div>{supplier.contact_person}</div>
-                        <div>{supplier.phone}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-green-500 rounded-full"
-                              style={{
-                                width: `${supplier.avg_overall_score || 0}%`,
-                              }}
-                            />
-                          </div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">
-                            {supplier.avg_overall_score?.toFixed(1) || "N/A"}%
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`px-2 py-0.5 text-xs rounded ${
-                            supplier.is_active
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {supplier.is_active ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Button size="sm" variant="outline">
-                          View Details
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        </Tab>
-        */}
       </Tabs>
 
       {/* Export Modal */}

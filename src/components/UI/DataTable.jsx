@@ -96,23 +96,8 @@ const DataTable = ({
   actionsHeaderClassName = "",
   actionsCellClassName = "",
 }) => {
-  // Debug logging
-  React.useEffect(() => {
-    console.log("[DataTable] Received data:", data);
-    console.log("[DataTable] Data type:", typeof data);
-    console.log("[DataTable] Is array:", Array.isArray(data));
-    if (Array.isArray(data)) {
-      console.log("[DataTable] Data length:", data.length);
-    }
-  }, [data]);
-
   // Normalize data to ensure it's always an array
   const normalizedData = React.useMemo(() => normalizeData(data), [data]);
-
-  // Debug logging for normalized data
-  React.useEffect(() => {
-    console.log("[DataTable] Normalized data length:", normalizedData.length);
-  }, [normalizedData]);
 
   // Track if we've encountered an error (for logging/monitoring)
   React.useEffect(() => {

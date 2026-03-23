@@ -205,8 +205,9 @@ const Announcements = () => {
       };
       const newAnnouncement = await apiClient.createAnnouncement(payload);
 
-      if (status === "published" && newAnnouncement?.id) {
-        await apiClient.publishAnnouncement(newAnnouncement.id);
+      const createdId = newAnnouncement?.id || newAnnouncement?.data?.id || newAnnouncement?.announcement_id;
+      if (status === "published" && createdId) {
+        await apiClient.publishAnnouncement(createdId);
       }
 
       await fetchAnnouncements();

@@ -113,7 +113,7 @@ export default function MobileBottomNav() {
 
   return (
     <nav
-      className="mobile-bottom-nav fixed bottom-0 left-0 right-0 z-[100] bg-white lg:hidden"
+      className="mobile-bottom-nav fixed bottom-0 left-0 right-0 z-[100] bg-white min-[768px]:hidden"
       role="navigation"
       aria-label="Mobile guardian navigation"
       style={{
@@ -123,7 +123,7 @@ export default function MobileBottomNav() {
         boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.08)',
       }}
     >
-      <div className="flex items-center justify-around px-2 py-1.5">
+      <div className="grid grid-cols-5 items-center gap-1 px-2 py-1.5">
         {navItems.map((item, index) => {
           const Icon = item.icon;
           const active = activeStates[index];
@@ -132,8 +132,8 @@ export default function MobileBottomNav() {
             <button
               type="button"
               key={item.name}
-              onClick={() => handleNavigation(item.path, index)}
-              className={`mobile-bottom-nav-item relative flex flex-col items-center justify-center gap-0.5 min-w-[62px] min-h-[52px] rounded-xl transition-all duration-200 ${
+              onClick={() => handleNavigation(item.path)}
+              className={`mobile-bottom-nav-item relative flex w-full min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 transition-all duration-200 ${
                 active
                   ? 'text-emerald-600'
                   : 'text-gray-400 hover:text-gray-600'
@@ -159,7 +159,7 @@ export default function MobileBottomNav() {
                 />
               </div>
               <span
-                className={`mobile-bottom-nav-label text-[10px] font-semibold transition-all duration-200 ${
+                className={`mobile-bottom-nav-label text-[9px] min-[360px]:text-[10px] font-semibold transition-all duration-200 ${
                   active ? 'text-emerald-600' : 'text-gray-500'
                 }`}
                 style={{

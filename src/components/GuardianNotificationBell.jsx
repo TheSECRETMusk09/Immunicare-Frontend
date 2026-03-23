@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import guardianNotificationService from "../services/guardianNotificationService";
 import { useAuth } from "../contexts/AuthContext";
+import { useSocket } from "../contexts/SocketContext";
 import {
   isExternalNotificationUrl,
   resolveNotificationActionUrl,
@@ -165,6 +166,7 @@ const GuardianNotificationBell = () => {
 
   const dropdownRef = useRef(null);
   const bellRef = useRef(null);
+  const { isConnected, on, off } = useSocket();
 
   // Fetch notifications
   const fetchNotifications = useCallback(async () => {
@@ -290,6 +292,26 @@ const GuardianNotificationBell = () => {
       fetchNotifications();
     }
   }, [isOpen, fetchNotifications]);
+
+  // Real-time updates via Socket
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const handleNewNotification = (data) => {
+      setUnreadCount((prev) => prev + 1);
+      if (isOpen) {
+        fetchNotifications();
+      }
+    };
+
+    on("notification", handleNewNotification);
+    on("critical-notification", handleNewNotification);
+
+    return () => {
+      off("notification", handleNewNotification);
+      off("critical-notification", handleNewNotification);
+    };
+  }, [isConnected, on, off, isOpen, fetchNotifications]);
 
   return (
     <div className="relative">

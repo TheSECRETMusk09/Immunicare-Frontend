@@ -13,7 +13,6 @@ import {
   ChevronDown,
   ChevronRight,
   FileSpreadsheet,
-  FileText,
   User,
   Bell,
   Baby,
@@ -455,7 +454,7 @@ const GuardianSidebar = memo(
           </nav>
 
           {/* Children Count Indicator - Mobile */}
-          <div className="lg:hidden px-4 py-3 border-t border-gray-100">
+          <div className="min-[1025px]:hidden px-4 py-3 border-t border-gray-100 dark:border-gray-700">
             <div className="flex items-center gap-3 bg-emerald-50 rounded-xl px-4 py-3">
               <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
                 <Baby className="w-4 h-4 text-emerald-600" />

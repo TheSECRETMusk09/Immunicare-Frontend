@@ -9,13 +9,53 @@ import {
   normalizeVaccinationRecordsResponse,
   normalizeVaccinationRecordResponse,
   normalizeVaccineInventoryResponse,
+  buildFefoBatchOptions,
 } from "../utils/adminDataAdapters";
 import { getApprovedBrandsForVaccine } from "../constants/approvedVaccines";
 import {
-  buildHealthWorkerOptions,
-  buildInventorySourceOptionLabel,
+  buildVaccinationBatchOptionLabel,
   resolveLotBatchValue,
 } from "../utils/vaccinationFormOptions";
+
+const ADMINISTERED_BY_ROLE_OPTIONS = [
+  { value: "nurse", label: "Nurse" },
+  { value: "midwife", label: "Midwife" },
+];
+
+const normalizeRoleName = (value) => String(value || "").trim().toLowerCase();
+
+const resolveAdministeredByRole = (user = {}) => {
+  const normalizedRole = normalizeRoleName(user.role_name || user.role);
+  return normalizedRole === "nurse" || normalizedRole === "midwife"
+    ? normalizedRole
+    : "";
+};
+
+const buildAdministeredByDisplayName = (user = {}) => {
+  const composedName = [user.first_name, user.middle_name, user.last_name]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(" ");
+
+  if (composedName) {
+    return composedName;
+  }
+
+  return String(
+    user.full_name || user.name || user.username || user.email || `User ${user.id || ""}`,
+  ).trim();
+};
+
+const normalizeSearchValue = (value) => String(value || "").trim().toLowerCase();
+
+const formatDateInputValue = (value, fallback = "") => {
+  if (!value) return fallback;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return fallback;
+  return parsed.toISOString().split("T")[0];
+};
+
+const createTodayDateInput = () => new Date().toISOString().split("T")[0];
 
 const injectionSiteOptions = [
   { value: "", label: "Select Site" },
@@ -79,8 +119,9 @@ const nextAppointmentOptions = [
 
 const INITIAL_FORM = {
   vaccine_id: "",
+  batch_id: "",
   vaccine_inventory_id: "",
-  date_administered: new Date().toISOString().split("T")[0],
+  date_administered: createTodayDateInput(),
   time_administered: "",
   dose_number: 1,
   lot_batch_number: "",
@@ -88,12 +129,34 @@ const INITIAL_FORM = {
   site_of_injection: "",
   route_of_injection: "IM",
   administered_by: "",
+  administered_by_role: "",
+  administered_by_search: "",
   manufacturer: "",
   reaction: "",
   reaction_other: "",
   notes: "",
   next_appointment_type: "",
   next_appointment_date: "",
+  status: "completed",
+};
+
+const createInitialFormState = (prefill = {}) => {
+  const normalizedDoseNumber = Number(prefill.dose_number ?? prefill.dose_no ?? 1) || 1;
+
+  return {
+    ...INITIAL_FORM,
+    vaccine_id: prefill.vaccine_id ? String(prefill.vaccine_id) : "",
+    dose_number: Math.max(1, normalizedDoseNumber),
+    date_administered: formatDateInputValue(
+      prefill.date_administered ?? prefill.admin_date,
+      createTodayDateInput(),
+    ),
+    next_appointment_date: formatDateInputValue(
+      prefill.next_appointment_date ?? prefill.next_due_date,
+      "",
+    ),
+    status: String(prefill.status || INITIAL_FORM.status).toLowerCase() || INITIAL_FORM.status,
+  };
 };
 
 export default function InjectVaccineModal({
@@ -101,6 +164,7 @@ export default function InjectVaccineModal({
   onClose,
   infantId,
   infantName,
+  prefillContext = null,
   onSuccess = () => {},
 }) {
   const { isAdmin, user } = useAuth();
@@ -113,6 +177,10 @@ export default function InjectVaccineModal({
   const [selectedInfantId, setSelectedInfantId] = useState(infantId || "");
   const [eligibleVaccines, setEligibleVaccines] = useState(null);
   const [eligibleLoading, setEligibleLoading] = useState(false);
+  const [showAdministeredBySuggestions, setShowAdministeredBySuggestions] = useState(false);
+  const [vaccinationBatchOptions, setVaccinationBatchOptions] = useState([]);
+  const [vaccinationBatchOptionsLoading, setVaccinationBatchOptionsLoading] = useState(false);
+  const [vaccinationBatchOptionsError, setVaccinationBatchOptionsError] = useState(null);
 
   const [formData, setFormData] = useState(INITIAL_FORM);
 
@@ -129,19 +197,67 @@ export default function InjectVaccineModal({
         await Promise.all([
           apiClient.getVaccines(),
           apiClient.getInfants(),
-          apiClient.getVaccineInventory({
-            ...(scopedClinicId ? { clinic_id: scopedClinicId } : {}),
-          }),
-          apiClient.getSystemUsers({ limit: 100, roles: "nurse,midwife" }).catch(() => ({ data: [] })),
+          apiClient.getVaccineInventory(
+            scopedClinicId ? { clinic_id: scopedClinicId } : {}
+          ),
+          apiClient
+            .getSystemUsers({
+              limit: 200,
+              roles: "nurse,midwife",
+              is_active: true,
+            })
+            .catch(() => ({ data: [] })),
         ]);
 
       const normalizedVaccines = normalizeVaccinesResponse(vaccinesResponse);
       const normalizedInfants = normalizeInfantsResponse(infantsResponse);
       const normalizedInventory = normalizeVaccineInventoryResponse(inventoryResponse);
-      const normalizedHealthWorkers = buildHealthWorkerOptions(
-        systemUsersResponse,
-        scopedClinicId,
-      );
+
+      const allUsers = Array.isArray(systemUsersResponse)
+        ? systemUsersResponse
+        : (systemUsersResponse?.data || systemUsersResponse?.users || []);
+
+      const normalizedHealthWorkers = allUsers
+        .map((rawUser) => {
+          const id = Number(rawUser?.id);
+          const role = resolveAdministeredByRole(rawUser);
+          const isActive =
+            rawUser?.is_active !== false &&
+            normalizeRoleName(rawUser?.status) !== "inactive";
+          const isGuardianAccount =
+            rawUser?.is_guardian_account === true ||
+            normalizeRoleName(rawUser?.role_name) === "guardian";
+          const scopedUserClinicId =
+            Number(rawUser?.clinic_id || rawUser?.facility_id || 0) || null;
+
+          if (!Number.isFinite(id) || id <= 0) return null;
+          if (!role || !isActive || isGuardianAccount) return null;
+          if (scopedClinicId && scopedUserClinicId !== Number(scopedClinicId)) {
+            return null;
+          }
+
+          const displayName = buildAdministeredByDisplayName(rawUser);
+          const roleLabel = role === "midwife" ? "Midwife" : "Nurse";
+
+          return {
+            ...rawUser,
+            id,
+            role,
+            roleLabel,
+            displayName,
+            optionLabel: `${displayName} (${roleLabel})`,
+            searchText: [
+              displayName,
+              rawUser?.username || "",
+              rawUser?.email || "",
+              rawUser?.contact || "",
+            ]
+              .join(" ")
+              .toLowerCase(),
+          };
+        })
+        .filter(Boolean)
+        .sort((left, right) => left.optionLabel.localeCompare(right.optionLabel));
 
       setVaccines(normalizedVaccines);
       setInfants(normalizedInfants);
@@ -194,16 +310,22 @@ export default function InjectVaccineModal({
   useEffect(() => {
     if (isOpen) {
       void fetchData();
-      if (infantId) {
-        setSelectedInfantId(infantId);
-      } else {
-        setSelectedInfantId("");
-      }
-      setFormData(INITIAL_FORM);
+
+      const normalizedPrefillInfantId =
+        Number(prefillContext?.infant_id ?? prefillContext?.infantId ?? infantId ?? 0) ||
+        null;
+
+      setSelectedInfantId(normalizedPrefillInfantId ? String(normalizedPrefillInfantId) : "");
+      setFormData(createInitialFormState(prefillContext || {}));
+
       setError(null);
       setSuccess(null);
+      setShowAdministeredBySuggestions(false);
+      setVaccinationBatchOptions([]);
+      setVaccinationBatchOptionsLoading(false);
+      setVaccinationBatchOptionsError(null);
     }
-  }, [isOpen, infantId, fetchData]);
+  }, [isOpen, infantId, fetchData, prefillContext]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -260,15 +382,13 @@ export default function InjectVaccineModal({
     return allVaccines.find(v => v.vaccineId === Number(formData.vaccine_id)) || null;
   }, [eligibleVaccines, formData.vaccine_id]);
 
-  const vaccineInventoryOptions = useMemo(() => {
-    if (!formData.vaccine_id) return [];
-    return inventoryRecords.filter(
-      (record) =>
-        record.vaccine_id === Number(formData.vaccine_id) &&
-        (!scopedClinicId || record.clinic_id === Number(scopedClinicId)) &&
-        Number(record.stock_on_hand || 0) > 0,
-    );
-  }, [inventoryRecords, formData.vaccine_id, scopedClinicId]);
+  const selectedBatchOption = useMemo(
+    () =>
+      vaccinationBatchOptions.find(
+        (option) => String(option.batch_id) === String(formData.batch_id || ""),
+      ) || null,
+    [vaccinationBatchOptions, formData.batch_id],
+  );
 
   const selectedInventoryRecord = useMemo(
     () =>
@@ -276,6 +396,25 @@ export default function InjectVaccineModal({
         (record) => record.id === Number(formData.vaccine_inventory_id),
       ) || null,
     [inventoryRecords, formData.vaccine_inventory_id],
+  );
+
+  const batchSourceSelectOptions = useMemo(
+    () => [
+      {
+        value: "",
+        label: vaccinationBatchOptionsLoading
+          ? "Loading valid FEFO batch sources..."
+          : vaccinationBatchOptions.length
+            ? "Select FEFO batch source"
+            : "No valid FEFO batch source available for this vaccine",
+      },
+      ...vaccinationBatchOptions.map((record) => ({
+        value: String(record.batch_id),
+        label: buildVaccinationBatchOptionLabel(record),
+        disabled: record.selection_disabled,
+      })),
+    ],
+    [vaccinationBatchOptions, vaccinationBatchOptionsLoading],
   );
 
   const selectedVaccineBrandOptions = useMemo(() => {
@@ -300,32 +439,296 @@ export default function InjectVaccineModal({
       : "";
   }, [healthWorkerUsers, user?.id]);
 
-  const healthWorkerSelectOptions = useMemo(
-    () => [
+  const healthWorkerById = useMemo(
+    () => new Map(healthWorkerUsers.map((entry) => [Number(entry.id), entry])),
+    [healthWorkerUsers],
+  );
+
+  const selectedAdministeredByWorker = useMemo(() => {
+    const administeredById = Number(formData.administered_by || 0);
+    if (!administeredById) return null;
+    return healthWorkerById.get(administeredById) || null;
+  }, [healthWorkerById, formData.administered_by]);
+
+  const administeredByUsersByRole = useMemo(() => {
+    const selectedRole = normalizeRoleName(formData.administered_by_role);
+    if (!selectedRole) {
+      return [];
+    }
+
+    return healthWorkerUsers.filter((entry) => entry.role === selectedRole);
+  }, [healthWorkerUsers, formData.administered_by_role]);
+
+  const administeredBySuggestions = useMemo(() => {
+    const normalizedQuery = normalizeSearchValue(formData.administered_by_search);
+
+    if (!administeredByUsersByRole.length) {
+      return [];
+    }
+
+    if (!normalizedQuery) {
+      return administeredByUsersByRole.slice(0, 12);
+    }
+
+    return administeredByUsersByRole
+      .filter((entry) => entry.searchText.includes(normalizedQuery))
+      .slice(0, 12);
+  }, [administeredByUsersByRole, formData.administered_by_search]);
+
+  const administeredByRoleSelectOptions = useMemo(() => {
+    const roleCount = healthWorkerUsers.reduce(
+      (accumulator, entry) => {
+        const role = normalizeRoleName(entry.role);
+        if (role === "nurse" || role === "midwife") {
+          accumulator[role] += 1;
+        }
+        return accumulator;
+      },
+      { nurse: 0, midwife: 0 },
+    );
+
+    return [
       {
         value: "",
         label: healthWorkerUsers.length
-          ? "Select Nurse or Midwife"
+          ? "Select Nurse or Midwife role"
           : "No Nurse or Midwife users available",
       },
-      ...healthWorkerUsers.map((entry) => ({
-        value: String(entry.id),
-        label: entry.optionLabel,
+      ...ADMINISTERED_BY_ROLE_OPTIONS.map((option) => ({
+        value: option.value,
+        label:
+          roleCount[option.value] > 0
+            ? `${option.label} (${roleCount[option.value]})`
+            : option.label,
       })),
-    ],
-    [healthWorkerUsers],
-  );
+    ];
+  }, [healthWorkerUsers]);
 
   useEffect(() => {
     if (!isOpen || formData.administered_by || !defaultAdministeredBy) {
       return;
     }
 
+    const defaultHealthWorker = healthWorkerById.get(Number(defaultAdministeredBy || 0)) || null;
+    if (!defaultHealthWorker) {
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      administered_by: defaultAdministeredBy,
+      administered_by: String(defaultHealthWorker.id),
+      administered_by_role: prev.administered_by_role || defaultHealthWorker.role,
+      administered_by_search: prev.administered_by_search || defaultHealthWorker.displayName,
     }));
-  }, [defaultAdministeredBy, formData.administered_by, isOpen]);
+  }, [defaultAdministeredBy, formData.administered_by, healthWorkerById, isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      return;
+    }
+
+    setShowAdministeredBySuggestions(false);
+  }, [isOpen]);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    if (!isOpen || !formData.vaccine_id) {
+      setVaccinationBatchOptions([]);
+      setVaccinationBatchOptionsError(null);
+      setVaccinationBatchOptionsLoading(false);
+      return () => {
+        isCurrent = false;
+      };
+    }
+
+    setVaccinationBatchOptionsLoading(true);
+    setVaccinationBatchOptionsError(null);
+
+    apiClient
+      .getVaccineInventoryStatus(Number(formData.vaccine_id))
+      .then((response) => {
+        if (!isCurrent) return;
+
+        setVaccinationBatchOptions(
+          buildFefoBatchOptions({
+            batches: response,
+            inventoryRecords,
+            vaccineId: formData.vaccine_id,
+            clinicId: scopedClinicId,
+          }),
+        );
+      })
+      .catch((err) => {
+        if (!isCurrent) return;
+
+        setVaccinationBatchOptions([]);
+        setVaccinationBatchOptionsError(
+          err.message || "Failed to load FEFO batch inventory for the selected vaccine.",
+        );
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setVaccinationBatchOptionsLoading(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [formData.vaccine_id, inventoryRecords, isOpen, scopedClinicId]);
+
+  useEffect(() => {
+    if (!isOpen || !formData.vaccine_id) {
+      return;
+    }
+
+    if (!vaccinationBatchOptions.length) {
+      if (formData.batch_id || formData.vaccine_inventory_id || formData.lot_batch_number) {
+        setFormData((prev) => ({
+          ...prev,
+          batch_id: "",
+          vaccine_inventory_id: "",
+          lot_batch_number: "",
+        }));
+      }
+      return;
+    }
+
+    const matchingSelectedOption = vaccinationBatchOptions.find(
+      (option) =>
+        String(option.batch_id) === String(formData.batch_id || "") && !option.selection_disabled,
+    );
+
+    const nextSelectedOption =
+      matchingSelectedOption ||
+      vaccinationBatchOptions.find((option) => !option.selection_disabled) ||
+      null;
+
+    const nextBatchId = nextSelectedOption ? String(nextSelectedOption.batch_id) : "";
+    const nextInventoryRecordId = nextSelectedOption?.matched_inventory_record_id
+      ? String(nextSelectedOption.matched_inventory_record_id)
+      : "";
+    const nextLotBatchValue = resolveLotBatchValue(
+      nextSelectedOption?.lot_batch_number,
+      nextSelectedOption?.matched_inventory_record?.lot_batch_number,
+    );
+
+    if (
+      String(formData.batch_id || "") === nextBatchId &&
+      String(formData.vaccine_inventory_id || "") === nextInventoryRecordId &&
+      String(formData.lot_batch_number || "") === nextLotBatchValue
+    ) {
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      batch_id: nextBatchId,
+      vaccine_inventory_id: nextInventoryRecordId,
+      lot_batch_number: nextLotBatchValue,
+    }));
+  }, [
+    formData.batch_id,
+    formData.lot_batch_number,
+    formData.vaccine_id,
+    formData.vaccine_inventory_id,
+    isOpen,
+    vaccinationBatchOptions,
+  ]);
+
+  const handleAdministeredBySelection = useCallback((entry) => {
+    if (!entry) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      administered_by: String(entry.id),
+      administered_by_role: entry.role,
+      administered_by_search: entry.displayName,
+    }));
+    setShowAdministeredBySuggestions(false);
+  }, []);
+
+  const handleAdministeredByRoleChange = useCallback(
+    (event) => {
+      const nextRole = normalizeRoleName(event.target.value);
+
+      setFormData((prev) => {
+        const existingSelection = healthWorkerById.get(Number(prev.administered_by || 0));
+        const shouldPreserveExistingSelection =
+          existingSelection && existingSelection.role === nextRole;
+
+        return {
+          ...prev,
+          administered_by_role: nextRole,
+          administered_by: shouldPreserveExistingSelection
+            ? String(existingSelection.id)
+            : "",
+          administered_by_search: shouldPreserveExistingSelection
+            ? existingSelection.displayName
+            : "",
+        };
+      });
+
+      setShowAdministeredBySuggestions(true);
+    },
+    [healthWorkerById],
+  );
+
+  const handleAdministeredBySearchChange = useCallback(
+    (event) => {
+      const nextSearch = event.target.value;
+      const normalizedSearch = normalizeSearchValue(nextSearch);
+
+      setFormData((prev) => {
+        const existingSelection = healthWorkerById.get(Number(prev.administered_by || 0));
+        const shouldKeepSelection =
+          existingSelection &&
+          normalizeSearchValue(existingSelection.displayName) === normalizedSearch;
+
+        return {
+          ...prev,
+          administered_by_search: nextSearch,
+          administered_by: shouldKeepSelection ? String(existingSelection.id) : "",
+        };
+      });
+
+      setShowAdministeredBySuggestions(true);
+    },
+    [healthWorkerById],
+  );
+
+  const handleAdministeredBySearchBlur = useCallback(() => {
+    const currentSearch = normalizeSearchValue(formData.administered_by_search);
+
+    if (currentSearch) {
+      const exactMatch = administeredByUsersByRole.find((entry) => {
+        const exactCandidates = [
+          entry.displayName,
+          entry.optionLabel,
+          entry.username,
+          entry.email,
+        ]
+          .filter(Boolean)
+          .map((candidate) => normalizeSearchValue(candidate));
+
+        return exactCandidates.includes(currentSearch);
+      });
+
+      if (exactMatch) {
+        setFormData((prev) => ({
+          ...prev,
+          administered_by: String(exactMatch.id),
+          administered_by_role: exactMatch.role,
+          administered_by_search: exactMatch.displayName,
+        }));
+      }
+    }
+
+    window.setTimeout(() => {
+      setShowAdministeredBySuggestions(false);
+    }, 120);
+  }, [administeredByUsersByRole, formData.administered_by_search]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -351,8 +754,17 @@ export default function InjectVaccineModal({
       return;
     }
 
+    const selectedBatchId = Number(formData.batch_id || 0) || null;
+    if (!selectedBatchId) {
+      setError("Please select a valid FEFO batch source.");
+      setLoading(false);
+      return;
+    }
+
     if (!formData.vaccine_inventory_id) {
-      setError("Please select the inventory record to deduct stock from.");
+      setError(
+        "The selected FEFO batch is not linked to an inventory sheet record. Update Inventory Management first.",
+      );
       setLoading(false);
       return;
     }
@@ -364,22 +776,28 @@ export default function InjectVaccineModal({
         : null;
 
     if (!administeredBy) {
-      setError("Please select a Nurse or Midwife in the Administered By dropdown.");
+      setError(
+        "Please select a Nurse or Midwife using the Administered By role and name fields.",
+      );
       setLoading(false);
       return;
     }
 
     const lotBatchValue =
-      resolveLotBatchValue(formData.lot_batch_number, selectedInventoryRecord?.lot_batch_number) ||
-      "";
+      resolveLotBatchValue(
+        formData.lot_batch_number,
+        selectedBatchOption?.lot_batch_number,
+        selectedInventoryRecord?.lot_batch_number,
+      ) || "";
 
     if (!lotBatchValue) {
-      setError("The selected inventory record does not have a Lot / Batch number.");
+      setError("The selected inventory source does not have a Lot / Batch number.");
       setLoading(false);
       return;
     }
 
     let createdVaccinationRecordId = null;
+    let usedTransactionalEndpoint = false;
 
     try {
       const recordPayload = {
@@ -388,6 +806,8 @@ export default function InjectVaccineModal({
         dose_no: Number(formData.dose_number) || 1,
         admin_date: formData.date_administered,
         administered_by: administeredBy,
+        batch_id: selectedBatchId,
+        vaccine_inventory_id: Number(formData.vaccine_inventory_id) || null,
         site_of_injection: formData.site_of_injection || null,
         route_of_injection: formData.route_of_injection || null,
         reactions:
@@ -401,44 +821,41 @@ export default function InjectVaccineModal({
         batch_number: lotBatchValue || null,
         manufacturer: formData.manufacturer || null,
         expiration_date: formData.expiration_date || null,
-        status: "completed",
+        status: formData.status || "completed",
       };
 
-      const createdVaccinationResponse =
-        await apiClient.createVaccinationRecord(recordPayload);
-      const normalizedCreatedVaccination = normalizeVaccinationRecordResponse(
-        createdVaccinationResponse,
-      );
-      createdVaccinationRecordId = normalizedCreatedVaccination?.id || null;
+      if (typeof apiClient.recordVaccinationWithInventory === "function") {
+        const response = await apiClient.recordVaccinationWithInventory(recordPayload);
+        const normalizedCreatedVaccination = normalizeVaccinationRecordResponse(
+          response?.vaccination || response?.data?.vaccination || response,
+        );
+        createdVaccinationRecordId = normalizedCreatedVaccination?.id || null;
+        usedTransactionalEndpoint = true;
+      } else {
+        const createdVaccinationResponse =
+          await apiClient.createVaccinationRecord(recordPayload);
+        const normalizedCreatedVaccination = normalizeVaccinationRecordResponse(
+          createdVaccinationResponse,
+        );
+        createdVaccinationRecordId = normalizedCreatedVaccination?.id || null;
 
-       console.log('Creating inventory transaction with payload:', {
-         vaccine_inventory_id: Number(formData.vaccine_inventory_id),
-         vaccine_id: Number(formData.vaccine_id),
-         clinic_id: selectedInventoryRecord?.clinic_id ? Number(selectedInventoryRecord.clinic_id) : undefined,
-         transaction_type: 'ISSUE',
-         quantity: 1,
-         lot_batch_number: lotBatchValue || null,
-         reference_number: createdVaccinationRecordId
-           ? `VAC-${createdVaccinationRecordId}`
-           : null,
-         notes: createdVaccinationRecordId
-           ? `Vaccination record ${createdVaccinationRecordId} administered to infant ID ${selectedInfantId}`
-           : `Vaccination administered to infant ID ${selectedInfantId}`,
-       });
-       await apiClient.createVaccineInventoryTransaction({
-         vaccine_inventory_id: Number(formData.vaccine_inventory_id),
-         vaccine_id: Number(formData.vaccine_id),
-         clinic_id: selectedInventoryRecord?.clinic_id ? Number(selectedInventoryRecord.clinic_id) : undefined,
-         transaction_type: "ISSUE",
-         quantity: 1,
-         lot_batch_number: lotBatchValue || null,
-         reference_number: createdVaccinationRecordId
-           ? `VAC-${createdVaccinationRecordId}`
-           : null,
-         notes: createdVaccinationRecordId
-           ? `Vaccination record ${createdVaccinationRecordId} administered to infant ID ${selectedInfantId}`
-           : `Vaccination administered to infant ID ${selectedInfantId}`,
-       });
+        await apiClient.createVaccineInventoryTransaction({
+          vaccine_inventory_id: Number(formData.vaccine_inventory_id),
+          vaccine_id: Number(formData.vaccine_id),
+          clinic_id: selectedInventoryRecord?.clinic_id
+            ? Number(selectedInventoryRecord.clinic_id)
+            : undefined,
+          transaction_type: "ISSUE",
+          quantity: 1,
+          lot_batch_number: lotBatchValue || null,
+          reference_number: createdVaccinationRecordId
+            ? `VAC-${createdVaccinationRecordId}`
+            : null,
+          notes: createdVaccinationRecordId
+            ? `Vaccination record ${createdVaccinationRecordId} administered to infant ID ${selectedInfantId}`
+            : `Vaccination administered to infant ID ${selectedInfantId}`,
+        });
+      }
 
       setSuccess("Vaccination recorded and inventory updated successfully.");
 
@@ -449,10 +866,10 @@ export default function InjectVaccineModal({
       }, 1000);
      } catch (err) {
        console.error("Error recording vaccination:", err);
-       if (createdVaccinationRecordId) {
-         try {
-           await apiClient.deleteVaccinationRecord(createdVaccinationRecordId);
-         } catch (rollbackError) {
+       if (createdVaccinationRecordId && !usedTransactionalEndpoint) {
+          try {
+            await apiClient.deleteVaccinationRecord(createdVaccinationRecordId);
+          } catch (rollbackError) {
            console.error(
              "Failed to rollback vaccination record after inventory transaction failure:",
              rollbackError,
@@ -482,6 +899,7 @@ export default function InjectVaccineModal({
         setFormData((prev) => ({
           ...prev,
           [name]: value,
+          batch_id: "",
           vaccine_inventory_id: "",
           lot_batch_number: "",
           manufacturer: "",
@@ -496,6 +914,7 @@ export default function InjectVaccineModal({
       [name]: value,
       ...(name === "vaccine_id"
         ? {
+            batch_id: "",
             vaccine_inventory_id: "",
             lot_batch_number: "",
             manufacturer: "",
@@ -508,7 +927,7 @@ export default function InjectVaccineModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="💉 Record Vaccine Administration"
+      title="💉 Record Vaccinations"
       size="md"
       footer={
         <AdminModalActions>
@@ -519,9 +938,14 @@ export default function InjectVaccineModal({
             type="submit"
             variant="primary"
             form="injectVaccineForm"
-            disabled={loading || !isAdmin || healthWorkerUsers.length === 0}
+            disabled={
+              loading ||
+              !isAdmin ||
+              healthWorkerUsers.length === 0 ||
+              vaccinationBatchOptionsLoading
+            }
           >
-            {loading ? "Recording..." : "Record Vaccination"}
+            {loading ? "Recording..." : "Record Vaccinations"}
           </Button>
         </AdminModalActions>
       }
@@ -638,38 +1062,64 @@ export default function InjectVaccineModal({
 
         <div className="admin-field-group">
           <Select
-            label="Inventory Record"
-            name="vaccine_inventory_id"
-            value={formData.vaccine_inventory_id}
+            label="Batch Source (FEFO)"
+            name="batch_id"
+            value={formData.batch_id}
             onChange={(e) => {
-              const selectedId = e.target.value;
-              const inventoryRecord = inventoryRecords.find(
-                (record) => record.id === Number(selectedId),
+              const selectedBatchId = e.target.value;
+              const batchOption = vaccinationBatchOptions.find(
+                (record) => record.batch_id === Number(selectedBatchId),
               );
-              const lotBatchValue = resolveLotBatchValue(inventoryRecord?.lot_batch_number);
+
               setFormData((prev) => ({
                 ...prev,
-                vaccine_inventory_id: selectedId,
-                lot_batch_number: lotBatchValue,
+                batch_id: selectedBatchId,
+                vaccine_inventory_id: batchOption?.matched_inventory_record_id
+                  ? String(batchOption.matched_inventory_record_id)
+                  : "",
+                lot_batch_number: resolveLotBatchValue(
+                  batchOption?.lot_batch_number,
+                  batchOption?.matched_inventory_record?.lot_batch_number,
+                ),
               }));
             }}
-            options={[
-              {
-                value: "",
-                label: vaccineInventoryOptions.length
-                  ? "Select inventory source"
-                  : "No San Nicolas inventory available",
-              },
-              ...vaccineInventoryOptions.map((record) => ({
-                value: record.id,
-                label: buildInventorySourceOptionLabel(record),
-              })),
-            ]}
+            options={batchSourceSelectOptions}
             required
           />
-          {!vaccineInventoryOptions.length && formData.vaccine_id && (
+          {vaccinationBatchOptionsLoading && formData.vaccine_id && (
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              Loading FEFO-eligible batch sources for the selected vaccine...
+            </p>
+          )}
+          {vaccinationBatchOptionsError && formData.vaccine_id && (
+            <p className="mt-2 text-xs text-red-700 dark:text-red-300">
+              {vaccinationBatchOptionsError}
+            </p>
+          )}
+          {!vaccinationBatchOptionsLoading &&
+            !vaccinationBatchOptionsError &&
+            !vaccinationBatchOptions.length &&
+            formData.vaccine_id && (
             <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
-              No available stock was found for the selected vaccine in Barangay San Nicolas Health Center inventory.
+              No non-expired FEFO batch with available stock was found for the selected vaccine.
+            </p>
+          )}
+          {!vaccinationBatchOptionsLoading &&
+            vaccinationBatchOptions.length > 0 &&
+            vaccinationBatchOptions.every((option) => option.selection_disabled) && (
+              <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                Valid batches were found, but none are linked to an inventory sheet record.
+                Update Inventory Management before recording this vaccination.
+              </p>
+            )}
+          {selectedBatchOption?.is_fefo_recommended && !selectedBatchOption?.selection_disabled && (
+            <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">
+              FEFO recommended batch selected automatically to use the earliest valid expiry first.
+            </p>
+          )}
+          {selectedBatchOption?.is_expiring_soon && (
+            <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+              Selected batch expires soon on {new Date(selectedBatchOption.expiry_date).toLocaleDateString()}.
             </p>
           )}
         </div>
@@ -794,16 +1244,88 @@ export default function InjectVaccineModal({
 
         <div className="admin-field-group">
           <Select
-            label="Administered By"
-            name="administered_by"
-            value={formData.administered_by}
-            onChange={handleChange}
-            options={healthWorkerSelectOptions}
+            label="Administered By Role"
+            value={formData.administered_by_role}
+            onChange={handleAdministeredByRoleChange}
+            options={administeredByRoleSelectOptions}
             required
           />
+
+          <div className="mt-3 relative">
+            <Input
+              label="Administered By Name"
+              value={formData.administered_by_search}
+              onChange={handleAdministeredBySearchChange}
+              onFocus={() => setShowAdministeredBySuggestions(true)}
+              onBlur={handleAdministeredBySearchBlur}
+              placeholder={
+                formData.administered_by_role
+                  ? "Type to search Nurse or Midwife name"
+                  : "Select role first"
+              }
+              disabled={
+                !formData.administered_by_role ||
+                administeredByUsersByRole.length === 0
+              }
+              autoComplete="off"
+              containerClassName="mb-0"
+              required
+            />
+
+            {showAdministeredBySuggestions &&
+              formData.administered_by_role &&
+              administeredBySuggestions.length > 0 && (
+                <ul className="absolute z-40 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                  {administeredBySuggestions.map((entry) => (
+                    <li key={entry.id}>
+                      <button
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          handleAdministeredBySelection(entry);
+                        }}
+                      >
+                        <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {entry.displayName}
+                        </span>
+                        <span className="block text-xs text-gray-500 dark:text-gray-400">
+                          {entry.roleLabel}
+                          {entry.username ? ` • ${entry.username}` : ""}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+          </div>
+
           {!healthWorkerUsers.length && (
             <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
               No active Nurse or Midwife users were found for this facility.
+            </p>
+          )}
+
+          {formData.administered_by_role &&
+            healthWorkerUsers.length > 0 &&
+            administeredByUsersByRole.length === 0 && (
+              <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                No active {formData.administered_by_role === "midwife" ? "Midwife" : "Nurse"} users are available for this facility.
+              </p>
+            )}
+
+          {formData.administered_by_role &&
+            Boolean(normalizeSearchValue(formData.administered_by_search)) &&
+            administeredBySuggestions.length === 0 &&
+            !selectedAdministeredByWorker && (
+              <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                No matching user found. Select a name from the autocomplete suggestions.
+              </p>
+            )}
+
+          {selectedAdministeredByWorker && (
+            <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">
+              Selected {selectedAdministeredByWorker.roleLabel}: {selectedAdministeredByWorker.displayName}
             </p>
           )}
         </div>
@@ -843,6 +1365,22 @@ export default function InjectVaccineModal({
             value={formData.next_appointment_date}
             onChange={handleChange}
             min={formData.date_administered}
+          />
+        </div>
+
+        <div className="admin-field-group">
+          <Select
+            label="Status"
+            name="status"
+            value={formData.status}
+            onChange={handleChange}
+            options={[
+              { value: "pending", label: "Pending" },
+              { value: "completed", label: "Completed" },
+              { value: "due", label: "Due" },
+              { value: "overdue", label: "Overdue" },
+            ]}
+            required
           />
         </div>
 
