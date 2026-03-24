@@ -8,6 +8,7 @@ import {
   EmptyState,
   SkeletonTable,
 } from "./UI";
+import { toArrayPayload } from "../utils/adminDataAdapters";
 import apiClient from "../utils/api";
 
 const DIGITAL_PAPER_SHORTCUTS = [
@@ -59,7 +60,7 @@ export default function DownloadCenter({ onRefresh }) {
         apiClient.getPaperTemplates(),
       ]);
 
-      setDownloads(downloadsData.data || []);
+      setDownloads(toArrayPayload(downloadsData) || []);
       setInfants(Array.isArray(infantsData) ? infantsData : (infantsData?.data || []));
       setTemplates(templatesData.data || []);
     } catch (err) {

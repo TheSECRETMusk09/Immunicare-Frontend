@@ -148,7 +148,7 @@ export default function AnalyticsDashboard() {
         growthData,
         dashboardStats,
         demographicsData,
-        adminSummaryData,
+        absoluteStatsData,
       ] = await Promise.allSettled([
         apiClient.getVaccinationAnalytics(params),
         apiClient.getAppointmentAnalytics(params),
@@ -156,7 +156,7 @@ export default function AnalyticsDashboard() {
         apiClient.getGrowthStats(params),
         apiClient.getDashboardStats(params),
         apiClient.getDemographicsAnalytics(params),
-        apiClient.request("/reports/admin/summary"),
+        apiClient.getDashboardStats(), // Fetch absolute totals without time range filter
       ]);
 
       // Transform data for charts
@@ -181,7 +181,7 @@ export default function AnalyticsDashboard() {
 
       // Get stats from dashboard or use individual responses
       const stats = dashboardStats.status === 'fulfilled' ? unwrapApiPayload(dashboardStats.value) : {};
-      const adminSummary = adminSummaryData.status === 'fulfilled' ? unwrapApiPayload(adminSummaryData.value) : {};
+      const absoluteStats = absoluteStatsData.status === 'fulfilled' ? unwrapApiPayload(absoluteStatsData.value) : {};
 
       // Transform demographics for gender chart
       const demoPayload = demographicsData.status === 'fulfilled' ? unwrapApiPayload(demographicsData.value) : null;
@@ -205,15 +205,15 @@ export default function AnalyticsDashboard() {
         growth,
         gender,
         stats: {
-          vaccinations: summary.administeredInPeriod || summary.completedToday || stats.vaccinations || 0,
-          appointments: stats.appointments || 0,
-          infants: adminSummary.infants?.total || stats.total_infants || stats.infants || summary.uniqueInfantsServed || 0,
-          guardians: adminSummary.guardians?.total || stats.total_guardians || stats.guardians || 0,
+          vaccinations: absoluteStats.total_vaccinations || absoluteStats.vaccinations || stats.vaccinations || 0,
+          appointments: absoluteStats.total_appointments || absoluteStats.appointments || stats.appointments || 0,
+          infants: absoluteStats.total_infants || absoluteStats.infants || stats.total_infants || 0,
+          guardians: absoluteStats.total_guardians || absoluteStats.guardians || stats.total_guardians || 0,
           lowStock: summary.lowStock || inventoryData.value?.lowStockCount || 0,
           pendingVaccinations: summary.dueInPeriod || 0,
           overdueVaccinations: summary.overdue || 0,
-          completedVaccinations: summary.administeredInPeriod || stats.vaccinations || summary.completedToday || 0,
-          childrenTracked: adminSummary.infants?.total || summary.uniqueInfantsServed || stats.infants || 0,
+          completedVaccinations: absoluteStats.total_vaccinations || absoluteStats.vaccinations || stats.vaccinations || 0,
+          childrenTracked: absoluteStats.total_infants || absoluteStats.infants || summary.uniqueInfantsServed || 0,
           vaccinationCoverage: summary.coverageRate || 0,
         },
         criticalAlerts,

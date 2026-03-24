@@ -24,6 +24,17 @@ import {
   PasswordInput,
 } from "../components/UI";
 import {
+  PUROK_OPTIONS,
+  getPurokStreetColorOptions,
+  isValidPurokStreetColorSelection,
+} from "../constants/purokOptions";
+import {
+  getDefaultAuthenticatedRouteFromUser,
+  normalizeAuthUser,
+  resolveRoleType,
+} from "../utils/authRedirect";
+import { trackEvent } from "../utils/telemetry";
+import {
   Plus,
   ArrowLeft,
   Home,
@@ -33,6 +44,7 @@ import {
   Mail,
   Baby,
   Shield,
+  MapPin,
 } from "lucide-react";
 
 const Register = () => {
@@ -43,8 +55,11 @@ const Register = () => {
     phone: "",
     password: "",
     confirmPassword: "",
-    address: "",
-    infantName: "",
+    purok: "",
+    streetColor: "",
+    infantFirstName: "",
+    infantLastName: "",
+    infantSex: "",
     infantDob: "",
     relationship: "parent",
   });
@@ -62,16 +77,23 @@ const Register = () => {
   const today = new Date();
   const maxDate = today.toISOString().split("T")[0];
 
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, login, user } = useAuth();
   const { isOnline, isBackendReachable } = useNetworkStatus();
   const navigate = useNavigate();
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate("/guardian/dashboard", { replace: true });
+    if (isAuthenticated && user) {
+      const userData = normalizeAuthUser(user);
+      const isGuardian = resolveRoleType(userData.role) === "GUARDIAN";
+
+      if (isGuardian && userData.has_completed_onboarding === false) {
+        navigate('/guardian/introduction', { replace: true });
+      } else {
+        navigate(getDefaultAuthenticatedRouteFromUser(userData), { replace: true });
+      }
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, user]);
 
   // Check network status
   useEffect(() => {
@@ -108,9 +130,12 @@ const Register = () => {
     phone: "phone",
     password: "password",
     confirmPassword: "confirmPassword",
-    address: "address",
+    purok: "purok",
+    street_color: "streetColor",
     relationship: "relationship",
-    infantName: "infantName",
+    infant_first_name: "infantFirstName",
+    infant_last_name: "infantLastName",
+    infant_sex: "infantSex",
     infantDob: "infantDob",
   };
 
@@ -242,14 +267,28 @@ const Register = () => {
           return "Passwords do not match";
         }
         return null;
-      case "infantName":
+      case "purok":
+        if (!value) return "Purok is required";
+        return null;
+      case "streetColor":
+        if (!value) return "Purok-Street-Color is required";
+        if (formData.purok && !isValidPurokStreetColorSelection(formData.purok, value)) {
+          return "Selected Purok-Street-Color does not match the selected Purok";
+        }
+        return null;
+      case "infantFirstName":
         if (value && value.trim() !== "" && value.length < 2) {
-          return "Infant name must be at least 2 characters";
+          return "First name must be at least 2 characters";
+        }
+        return null;
+      case "infantLastName":
+        if (value && value.trim() !== "" && value.length < 2) {
+          return "Last name must be at least 2 characters";
         }
         return null;
       case "infantDob":
         if (!value || value.trim() === "") {
-          return "Date of birth is required";
+          return null;
         }
         const dob = new Date(value);
         const now = new Date();
@@ -266,11 +305,20 @@ const Register = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === "purok" ? { streetColor: "" } : {})
+    }));
 
     // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: null }));
+    if (errors[name] || (name === "purok" && errors.streetColor)) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        if (name === "purok") delete next.streetColor;
+        return next;
+      });
     }
   };
 
@@ -289,6 +337,10 @@ const Register = () => {
       return;
     }
 
+    const hasInfantInfo = Boolean(
+      formData.infantFirstName || formData.infantLastName || formData.infantDob || formData.infantSex
+    );
+
     // Validate all fields
     const newErrors = {};
     const fieldsToValidate = [
@@ -298,11 +350,17 @@ const Register = () => {
       "phone",
       "password",
       "confirmPassword",
+      "purok",
+      "streetColor",
       "relationship",
     ];
 
-    if (formData.infantName || formData.infantDob) {
-      fieldsToValidate.push("infantName", "infantDob");
+    if (hasInfantInfo) {
+      if (!formData.infantFirstName?.trim()) newErrors.infantFirstName = "First name is required";
+      if (!formData.infantLastName?.trim()) newErrors.infantLastName = "Last name is required";
+      if (!formData.infantDob) newErrors.infantDob = "Date of birth is required";
+      if (!formData.infantSex) newErrors.infantSex = "Gender is required";
+      fieldsToValidate.push("infantFirstName", "infantLastName", "infantDob", "infantSex");
     }
 
     fieldsToValidate.forEach((field) => {
@@ -347,8 +405,11 @@ const Register = () => {
         phone: formData.phone.trim(),
         password: formData.password,
         confirmPassword: formData.confirmPassword,
-        address: formData.address.trim() || undefined,
-        infantName: formData.infantName.trim() || undefined,
+        purok: formData.purok,
+        streetColor: formData.streetColor,
+        infantFirstName: formData.infantFirstName.trim() || undefined,
+        infantLastName: formData.infantLastName.trim() || undefined,
+        infantSex: formData.infantSex || undefined,
         infantDob: formData.infantDob || undefined,
         relationship: formData.relationship,
       };
@@ -357,9 +418,15 @@ const Register = () => {
       const response = await apiClient.register(registrationData);
 
       setRegistrationPayload(registrationData);
+      sessionStorage.setItem('pendingVerificationPhone', registrationData.phone);
+      if (registrationData.email) {
+        sessionStorage.setItem('pendingVerificationEmail', registrationData.email);
+      }
       setPendingVerification(
         createPendingVerificationState(response, registrationData.phone),
       );
+
+      trackEvent("registration_step_completed", { step: "details_submitted", hasChild: hasInfantInfo });
     } catch (error) {
       console.error("Registration error:", error);
 
@@ -421,6 +488,26 @@ const Register = () => {
         await apiClient.verifyGuardianRegistration(verificationPhone, otpCode);
         setPendingVerification(null);
         setSuccess(true);
+
+        trackEvent("account_created", { method: "otp_verified" });
+
+        // Attempt auto-login to seamlessly transition to Introduction or Dashboard
+        if (login) {
+          const loginIdentifier = formData.email || formData.phone;
+          if (loginIdentifier && formData.password) {
+            setTimeout(async () => {
+              try {
+                await login({
+                  username: loginIdentifier,
+                  password: formData.password,
+                  expectedRole: resolveRoleType("GUARDIAN"),
+                });
+              } catch (err) {
+                console.warn("Auto-login failed after registration:", err);
+              }
+            }, 1500);
+          }
+        }
       } catch (error) {
         const message =
           error?.response?.data?.error ||
@@ -432,11 +519,24 @@ const Register = () => {
         setOtpLoading(false);
       }
     },
-    [formData.phone, normalizePhoneForVerification, pendingVerification?.phone],
+    [
+      formData.phone,
+      formData.email,
+      formData.password,
+      login,
+      normalizePhoneForVerification,
+      pendingVerification?.phone,
+    ],
   );
 
   const handleResendOtp = useCallback(async () => {
-    if (!registrationPayload) {
+    const storedPhone = sessionStorage.getItem('pendingVerificationPhone');
+    const storedEmail = sessionStorage.getItem('pendingVerificationEmail');
+
+    const phoneToUse = pendingVerification?.phone || registrationPayload?.phone || storedPhone;
+    const emailToUse = registrationPayload?.email || storedEmail;
+
+    if (!phoneToUse) {
       const payloadError = new Error("Registration session expired. Please register again.");
       setOtpError(payloadError.message);
       throw payloadError;
@@ -447,12 +547,12 @@ const Register = () => {
 
     try {
       const response = await apiClient.resendGuardianRegistrationOtp({
-        phone: normalizePhoneForVerification(pendingVerification?.phone || registrationPayload?.phone),
-        email: registrationPayload?.email,
+        phone: normalizePhoneForVerification(phoneToUse),
+        email: emailToUse,
       });
       const nextPendingVerification = createPendingVerificationState(
         response,
-        registrationPayload.phone,
+        phoneToUse,
       );
 
       setPendingVerification(nextPendingVerification);
@@ -483,6 +583,7 @@ const Register = () => {
     extractRetryAfterSeconds,
     pendingVerification?.phone,
     registrationPayload,
+    normalizePhoneForVerification,
   ]);
 
   // Offline state UI
@@ -553,17 +654,18 @@ const Register = () => {
             </h2>
             <p className="text-white/70 mb-6 leading-relaxed">
               Your guardian account has been successfully verified and activated.
-              You can now sign in and manage your child immunization records.
+              You will be securely signed in shortly...
             </p>
-            <p className="text-sm text-white/50 mb-10">
-              Thank you for completing the registration process.
-            </p>
+            <div className="flex justify-center mb-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+            </div>
             <Button
               onClick={() => navigate("/login")}
               size="lg"
-              className="w-full py-4 text-lg font-bold shadow-lg bg-white text-primary-700 hover:bg-gray-100"
+              variant="outline"
+              className="w-full py-3 sm:py-4 text-base font-bold border-white/30 text-white hover:bg-white/10 transition-colors"
             >
-              Go to Login
+              Sign In Manually
             </Button>
           </div>
         </div>
@@ -708,23 +810,42 @@ const Register = () => {
                   className="bg-white/10 backdrop-blur-sm border-white/30 text-white placeholder-white/50"
                 />
               </div>
-              <div className="mt-4 sm:mt-6">
-                <label
-                  htmlFor="address"
-                  className="block text-sm font-bold text-white mb-2"
-                >
-                  Home Address{" "}
-                  <span className="text-white/60 font-normal">(optional)</span>
-                </label>
-                <textarea
-                  id="address"
-                  name="address"
-                  value={formData.address}
+            </section>
+
+            {/* Address Information */}
+            <section>
+              <div className="flex items-center gap-2 mb-4 sm:mb-6 pb-2 border-b border-white/20">
+                <MapPin className="w-5 h-5 text-white" />
+                <h3 className="text-base sm:text-lg font-bold text-white">
+                  Address Information
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                <Select
+                  label="Purok"
+                  id="purok"
+                  name="purok"
+                  value={formData.purok}
                   onChange={handleChange}
-                  placeholder="Enter your full address"
-                  rows={2}
-                  className="block w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent transition-all"
+                  onBlur={handleBlur}
                   disabled={loading}
+                  required
+                  error={errors.purok}
+                  className="bg-white/10 backdrop-blur-md border border-white/30 text-white rounded-xl shadow-lg"
+                  options={PUROK_OPTIONS}
+                />
+                <Select
+                  label="Purok-Street-Color"
+                  id="streetColor"
+                  name="streetColor"
+                  value={formData.streetColor}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  disabled={loading || !formData.purok}
+                  required
+                  error={errors.streetColor}
+                  className="bg-white/10 backdrop-blur-md border border-white/30 text-white rounded-xl shadow-lg"
+                  options={getPurokStreetColorOptions(formData.purok)}
                 />
               </div>
             </section>
@@ -811,14 +932,26 @@ const Register = () => {
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <TextInput
-                  label="Child's Name"
-                  id="infantName"
-                  name="infantName"
-                  value={formData.infantName}
+                  label="Child's First Name"
+                  id="infantFirstName"
+                  name="infantFirstName"
+                  value={formData.infantFirstName}
                   onChange={handleChange}
                   onBlur={handleBlur}
-                  placeholder="Enter child's full name"
-                  error={errors.infantName}
+                  placeholder="Enter first name"
+                  error={errors.infantFirstName}
+                  disabled={loading}
+                  className="bg-white/10 backdrop-blur-sm border-white/30 text-white placeholder-white/50"
+                />
+                <TextInput
+                  label="Child's Last Name"
+                  id="infantLastName"
+                  name="infantLastName"
+                  value={formData.infantLastName}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  placeholder="Enter last name"
+                  error={errors.infantLastName}
                   disabled={loading}
                   className="bg-white/10 backdrop-blur-sm border-white/30 text-white placeholder-white/50"
                 />
@@ -835,6 +968,21 @@ const Register = () => {
                   max={maxDate}
                   className="bg-white/10 backdrop-blur-sm border-white/30 text-white"
                 />
+                <Select
+                  label="Gender"
+                  id="infantSex"
+                  name="infantSex"
+                  value={formData.infantSex}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  disabled={loading}
+                  error={errors.infantSex}
+                  className="bg-white/10 backdrop-blur-md border border-white/30 text-white rounded-xl shadow-lg"
+                >
+                  <option value="" className="text-gray-900">Select gender</option>
+                  <option value="M" className="text-gray-900">Male</option>
+                  <option value="F" className="text-gray-900">Female</option>
+                </Select>
                 <div className="md:col-span-2">
                   <Select
                     label="Relationship to Child"
@@ -847,12 +995,12 @@ const Register = () => {
                     error={errors.relationship}
                     className="bg-white/10 backdrop-blur-md border border-white/30 text-white rounded-xl shadow-lg"
                   >
-                    <option value="">Select relationship</option>
-                    <option value="parent">Parent</option>
-                    <option value="mother">Mother</option>
-                    <option value="father">Father</option>
-                    <option value="guardian">Guardian</option>
-                    <option value="other">Other</option>
+                    <option value="" className="text-gray-900">Select relationship</option>
+                    <option value="parent" className="text-gray-900">Parent</option>
+                    <option value="mother" className="text-gray-900">Mother</option>
+                    <option value="father" className="text-gray-900">Father</option>
+                    <option value="guardian" className="text-gray-900">Guardian</option>
+                    <option value="other" className="text-gray-900">Other</option>
                   </Select>
                 </div>
               </div>
@@ -865,7 +1013,8 @@ const Register = () => {
                 disabled={loading}
                 loading={loading}
                 size="lg"
-                className="w-full sm:w-auto px-6 sm:px-12 py-3 sm:py-4 text-base sm:text-xl font-bold shadow-xl bg-green-600 text-white hover:bg-green-400"
+                variant="primary"
+                className="w-full sm:w-auto px-6 sm:px-12 py-3 sm:py-4 text-base sm:text-xl font-bold shadow-xl"
               >
                 Create Account
               </Button>

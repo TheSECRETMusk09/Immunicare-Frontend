@@ -7,6 +7,7 @@ import {
   normalizeAuthUser,
   resolveRoleType,
 } from "../utils/authRedirect";
+import { trackEvent, identifyUser } from "../utils/telemetry";
 import { WifiOff, Home } from "lucide-react";
 import { Button, Alert, PasswordInput, RememberMeCheckbox } from "../components/UI";
 
@@ -270,7 +271,13 @@ const GuardianLoginPage = () => {
   useEffect(() => {
     if (isAuthenticated && user) {
       const userData = normalizeAuthUser(user);
-      navigate(getDefaultAuthenticatedRouteFromUser(userData), { replace: true });
+      const isGuardian = resolveRoleType(userData.role) === "GUARDIAN";
+
+      if (isGuardian && userData.has_completed_onboarding === false) {
+        navigate('/guardian/introduction', { replace: true });
+      } else {
+        navigate(getDefaultAuthenticatedRouteFromUser(userData), { replace: true });
+      }
     }
   }, [isAuthenticated, navigate, user]);
 
@@ -359,10 +366,18 @@ const GuardianLoginPage = () => {
       if (!result.success) {
         setServerError(result.error || "Login failed.");
       } else {
-        // Redirect based on normalized role immediately after successful login
-        navigate(getDefaultAuthenticatedRouteFromUser(result.user), {
-          replace: true,
-        });
+        const userData = normalizeAuthUser(result.user);
+        identifyUser(userData.id, { role: userData.role });
+        trackEvent("login_success", { role: userData.role });
+
+        const isGuardian = resolveRoleType(userData.role) === "GUARDIAN";
+
+        if (isGuardian && userData.has_completed_onboarding === false) {
+          trackEvent("intro_started");
+          navigate('/guardian/introduction', { replace: true });
+        } else {
+          navigate(getDefaultAuthenticatedRouteFromUser(userData), { replace: true });
+        }
       }
     } catch {
       setServerError("Unexpected error occurred.");

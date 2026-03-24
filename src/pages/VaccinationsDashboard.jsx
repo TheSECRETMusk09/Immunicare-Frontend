@@ -409,7 +409,7 @@ const VaccinationsDashboard = () => {
       await fetchData({ silent: true });
       setShowEditModal(false);
     } catch (err) {
-      setError(err.message || "Failed to save vaccination record.");
+      setError(err.response?.data?.error || err.message || "Failed to save vaccination record.");
     } finally {
       setMutationInFlight(false);
       setSaving(false);
@@ -425,7 +425,7 @@ const VaccinationsDashboard = () => {
       setVaccinationRecords((prev) => prev.filter((record) => record.id !== recordId));
       await fetchData({ silent: true });
     } catch (err) {
-      setError(err.message || "Failed to delete vaccination record.");
+      setError(err.response?.data?.error || err.message || "Failed to delete vaccination record.");
     } finally {
       setMutationInFlight(false);
       setDeletingRecordId(null);

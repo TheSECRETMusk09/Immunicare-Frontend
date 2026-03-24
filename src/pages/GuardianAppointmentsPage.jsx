@@ -22,6 +22,7 @@ import {
   isDateAvailableForBooking,
   getHolidayTypeClass,
 } from "../utils/holidays";
+import { trackEvent } from "../utils/telemetry";
 
 const isWeekendDate = (value) => {
   return isWeekend(value);
@@ -467,7 +468,7 @@ export default function GuardianAppointmentsPage() {
     }
   }, [guardianId]);
 
-  const fetchCalendarAvailability = useCallback(async () => {
+  const fetchCalendarAvailability = useCallback(async (signal) => {
     if (!guardianId) {
       setInventorySummary({
         totalAvailableStock: 0,
@@ -481,7 +482,7 @@ export default function GuardianAppointmentsPage() {
     try {
       const response = await apiClient.getAppointmentCalendarAvailability({
         month: toMonthKey(monthCursor),
-      });
+      }, { signal });
 
       setInventorySummary(
         response?.inventory || {
@@ -490,7 +491,8 @@ export default function GuardianAppointmentsPage() {
           vaccines: [],
         }
       );
-    } catch {
+    } catch (err) {
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       setInventorySummary({
         totalAvailableStock: 0,
         availableVaccines: 0,
@@ -501,7 +503,7 @@ export default function GuardianAppointmentsPage() {
     }
   }, [guardianId, monthCursor]);
 
-  const fetchDateDetails = useCallback(async () => {
+  const fetchDateDetails = useCallback(async (signal) => {
     if (!guardianId || !selectedDate) {
       setSelectedDateDetails(null);
       return;
@@ -509,9 +511,10 @@ export default function GuardianAppointmentsPage() {
 
     setDateDetailsLoading(true);
     try {
-      const details = await apiClient.getAppointmentDateDetails(selectedDate);
+      const details = await apiClient.getAppointmentDateDetails(selectedDate, {}, { signal });
       setSelectedDateDetails(details || null);
-    } catch {
+    } catch (err) {
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       setSelectedDateDetails(null);
     } finally {
       setDateDetailsLoading(false);
@@ -556,11 +559,15 @@ export default function GuardianAppointmentsPage() {
   }, [bootstrapPage]);
 
   useEffect(() => {
-    fetchCalendarAvailability();
+    const abortController = new AbortController();
+    fetchCalendarAvailability(abortController.signal);
+    return () => abortController.abort();
   }, [fetchCalendarAvailability]);
 
   useEffect(() => {
-    fetchDateDetails();
+    const abortController = new AbortController();
+    fetchDateDetails(abortController.signal);
+    return () => abortController.abort();
   }, [fetchDateDetails]);
 
   useEffect(() => {
@@ -571,23 +578,26 @@ export default function GuardianAppointmentsPage() {
       }
 
       setAvailabilityChecking(true);
+      const abortController = new AbortController();
       try {
         const result = await apiClient.checkAppointmentAvailability({
           scheduled_date: formData.scheduled_date,
           vaccine_id: formData.vaccine_id || undefined,
-        });
+        }, { signal: abortController.signal });
         setAvailabilityFeedback(result);
-      } catch {
+      } catch (err) {
+        if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
         setAvailabilityFeedback(null);
       } finally {
         setAvailabilityChecking(false);
       }
+      return () => abortController.abort();
     };
 
     runAvailabilityCheck();
   }, [guardianId, formData.scheduled_date, formData.vaccine_id]);
 
-  const fetchTimeSlots = useCallback(async () => {
+  const fetchTimeSlots = useCallback(async (signal) => {
     if (!guardianId || !showBookingModal || !formData.scheduled_date) {
       setTimeSlots([]);
       setTimeSlotsFeedback(null);
@@ -602,7 +612,7 @@ export default function GuardianAppointmentsPage() {
         scheduled_date: formData.scheduled_date,
         vaccine_id: formData.vaccine_id || undefined,
         exclude_appointment_id: editingAppointment?.id || undefined,
-      });
+      }, { signal });
 
       const slots = Array.isArray(result?.slots) ? result.slots : [];
       setTimeSlots(slots);
@@ -614,6 +624,7 @@ export default function GuardianAppointmentsPage() {
         return { ...previous, scheduled_time: "" };
       });
     } catch (slotError) {
+      if (slotError.name === 'CanceledError' || slotError.code === 'ERR_CANCELED') return;
       setTimeSlots([]);
       setTimeSlotsFeedback({
         available: false,
@@ -626,7 +637,9 @@ export default function GuardianAppointmentsPage() {
   }, [guardianId, showBookingModal, formData.scheduled_date, formData.vaccine_id, editingAppointment?.id]);
 
   useEffect(() => {
-    fetchTimeSlots();
+    const abortController = new AbortController();
+    fetchTimeSlots(abortController.signal);
+    return () => abortController.abort();
   }, [fetchTimeSlots]);
 
   const openCreateModal = () => {
@@ -727,6 +740,10 @@ export default function GuardianAppointmentsPage() {
           vaccine_id: formData.vaccine_id ? parseInt(formData.vaccine_id, 10) : undefined,
         });
         setSuccessMessage("Appointment created successfully.");
+        trackEvent("appointment_booked", {
+          appointmentType: formData.type,
+          source: "calendar_modal"
+        });
       }
 
       setShowBookingModal(false);

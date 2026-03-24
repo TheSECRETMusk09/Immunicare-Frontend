@@ -7,6 +7,7 @@ import GuardianModuleHeader from "../components/GuardianModuleHeader";
 import GuardianTopHeader from "../components/GuardianTopHeader";
 import { LoadingSpinner, Alert, Button } from "../components/UI";
 import { FileCheck, ChevronDown, Activity, CheckCircle } from "lucide-react";
+import { trackEvent } from "../utils/telemetry";
 
 /**
  * GuardianImmunizationChartPage
@@ -98,6 +99,12 @@ export default function GuardianImmunizationChartPage() {
       setSelectedChild(children[0]);
     }
   }, [childId, children, selectedChild]);
+
+  useEffect(() => {
+    if (selectedChild) {
+      trackEvent("immunization_chart_viewed", { childId: selectedChild.id, activeTab });
+    }
+  }, [selectedChild, activeTab]);
 
   // Fetch growth records when switching to growth tab
   useEffect(() => {

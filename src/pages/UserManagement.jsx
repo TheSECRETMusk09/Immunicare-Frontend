@@ -40,6 +40,7 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import useUserManagementSocket from "../hooks/useUserManagementSocket";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 const isSameEntityId = (left, right) => String(left) === String(right);
 
@@ -98,6 +99,17 @@ const normalizeGuardianUsernameForDisplay = (value = "") =>
     .trim()
     .toLowerCase();
 
+const calculatePasswordStrength = (password) => {
+  const checks = [
+    /.{8,}/.test(password),
+    /[A-Z]/.test(password),
+    /[a-z]/.test(password),
+    /[0-9]/.test(password),
+    /[^A-Za-z0-9]/.test(password),
+  ];
+  return checks.filter(Boolean).length;
+};
+
 const USER_MANAGEMENT_TABS = new Set(["admins", "system", "guardians"]);
 
 const resolveUserManagementTab = (value) => {
@@ -128,17 +140,14 @@ export default function UserManagement() {
   const {
     resetUserPassword,
   } = useUserPasswords();
-  const { isAdmin, isSuperAdmin, user, hasPermission, permissionCapabilities } = useAuth();
+  const { isAdmin, isSuperAdmin, user, hasPermission } = useAuth();
   const { success, error: notifyError, warning } = useNotification();
 
   const isSystemAdmin = String(user?.role || "").toUpperCase() === "SYSTEM_ADMIN" || String(user?.role_type || "").toUpperCase() === "SYSTEM_ADMIN";
   const canManageAdmins = isSuperAdmin || isSystemAdmin;
 
   const canCreateUsers = hasPermission("user:create") || isSystemAdmin;
-  const canUpdateUsers = hasPermission("user:update") || isSystemAdmin;
-  const canDeleteUsers = hasPermission("user:delete") || isSystemAdmin;
-  const canUseAdminOverrides =
-    hasPermission("admin:override") || permissionCapabilities?.canUseAdminOverrides;
+  const canManageUsers = ['super_admin', 'system_admin', 'admin'].includes(String(user?.role || user?.role_name || '').toLowerCase());
 
   // Get current user ID for self-protection checks
   const currentUserId = user?.id;
@@ -1024,8 +1033,8 @@ export default function UserManagement() {
       return;
     }
 
-    if (passwordFormData.password.length < 6) {
-      warning("Password must be at least 6 characters long");
+    if (calculatePasswordStrength(passwordFormData.password) < 4) {
+      warning("Password must be at least 8 characters and include a mix of case, numbers, and symbols.");
       return;
     }
 
@@ -1148,7 +1157,7 @@ export default function UserManagement() {
     }
     if (name === "password") {
       if (!value) return "Password is required";
-      if (value.length < 6) return "Must be at least 6 characters";
+      if (calculatePasswordStrength(value) < 4) return "Password must meet strength requirements (8+ chars, mixed case, numbers, symbols)";
     }
     return null;
   };
@@ -1174,8 +1183,8 @@ export default function UserManagement() {
       return;
     }
 
-    if (adminFormData.password.length < 6) {
-      warning("Password must be at least 6 characters long");
+    if (calculatePasswordStrength(adminFormData.password) < 4) {
+      warning("Password must be at least 8 characters and include a mix of case, numbers, and symbols.");
       return;
     }
 
@@ -1535,6 +1544,16 @@ export default function UserManagement() {
     );
   }
 
+  if (!canManageUsers) {
+    return (
+      <PageContainer>
+        <Alert variant="error" title="Access Denied">
+          You do not have permission to view or manage users. This feature is restricted to system administrators.
+        </Alert>
+      </PageContainer>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       {/* Sticky Header Section - Stays fixed at top while scrolling */}
@@ -1712,6 +1731,7 @@ export default function UserManagement() {
 
       {/* Content based on active tab */}
       <div className="flex-1 min-h-0 flex flex-col animate-fade-in">
+        <ErrorBoundary>
         {activeTab === "admins" ? (
           isAdmin ? (
             admins.length === 0 ? (
@@ -2083,6 +2103,7 @@ export default function UserManagement() {
             )}
           </div>
         )}
+        </ErrorBoundary>
       </div>
       </div>
 
@@ -2675,8 +2696,8 @@ export default function UserManagement() {
                     showPasswordAriaLabel="Show admin account password"
                     hidePasswordAriaLabel="Hide admin account password"
                     required
-                    placeholder="Enter password (min 6 characters)"
-                    minLength={6}
+                    placeholder="Enter password (min 8 characters)"
+                    minLength={8}
                   />
                 </div>
                 <div className="admin-field-group">

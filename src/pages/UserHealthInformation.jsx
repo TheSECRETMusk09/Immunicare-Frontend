@@ -11,6 +11,7 @@ import {
 } from "../components/UI";
 import apiClient from "../utils/api";
 import { Activity, ArrowLeft, Plus, Loader2 } from "lucide-react";
+import { trackEvent } from "../utils/telemetry";
 
 export default function UserHealthInformation() {
   const { childId } = useParams();
@@ -28,19 +29,12 @@ export default function UserHealthInformation() {
     notes: "",
   });
 
-  useEffect(() => {
-    if (childId) {
-      fetchChildData();
-      fetchHealthRecords();
-    }
-  }, [childId, fetchChildData, fetchHealthRecords]);
-
   const fetchChildData = useCallback(async () => {
     try {
       const response = await apiClient.getInfant(childId);
       setChild(response.data);
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.message);
     }
   }, [childId]);
 
@@ -50,11 +44,24 @@ export default function UserHealthInformation() {
       const response = await apiClient.getHealthRecords(childId);
       setHealthRecords(response.data || []);
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.message);
     } finally {
       setLoading(false);
     }
   }, [childId]);
+
+  useEffect(() => {
+    if (childId) {
+      fetchChildData();
+      fetchHealthRecords();
+    }
+  }, [childId, fetchChildData, fetchHealthRecords]);
+
+  useEffect(() => {
+    if (child) {
+      trackEvent("health_information_viewed", { childId: child.id });
+    }
+  }, [child]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -73,9 +80,10 @@ export default function UserHealthInformation() {
         temperature: "",
         notes: "",
       });
+      trackEvent("health_record_added", { childId });
       fetchHealthRecords();
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.message);
     }
   };
 

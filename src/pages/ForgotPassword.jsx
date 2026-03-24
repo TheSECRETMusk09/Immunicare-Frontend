@@ -413,7 +413,8 @@ const ForgotPassword = () => {
                   disabled={loading}
                   loading={loading}
                   size="lg"
-                  className="w-full py-3 sm:py-4 text-base sm:text-lg font-bold shadow-lg bg-green-600 text-white hover:bg-green-400"
+                  variant="primary"
+                  className="w-full py-3 sm:py-4 text-base sm:text-lg font-bold shadow-lg"
                 >
                   Send Verification Code
                 </Button>
@@ -489,7 +490,8 @@ const ForgotPassword = () => {
                   disabled={loading || otp.length !== 6}
                   loading={loading}
                   size="lg"
-                  className="w-full py-3 sm:py-4 text-base sm:text-lg font-bold shadow-lg bg-green-600 text-white hover:bg-green-400"
+                  variant="primary"
+                  className="w-full py-3 sm:py-4 text-base sm:text-lg font-bold shadow-lg"
                 >
                   Verify Code
                 </Button>
@@ -593,7 +595,8 @@ const ForgotPassword = () => {
                   disabled={loading || !newPassword || !confirmPassword}
                   loading={loading}
                   size="lg"
-                  className="w-full py-3 sm:py-4 text-base sm:text-lg font-bold shadow-lg bg-green-600 text-white hover:bg-green-400"
+                  variant="primary"
+                  className="w-full py-3 sm:py-4 text-base sm:text-lg font-bold shadow-lg"
                 >
                   Reset Password
                 </Button>

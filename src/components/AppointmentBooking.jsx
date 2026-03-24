@@ -51,6 +51,7 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
 
   // Fetch eligible vaccines when infantId changes
   useEffect(() => {
+    const abortController = new AbortController();
     const fetchEligibleVaccines = async () => {
       if (!infantId) {
         setEligibleVaccines(null);
@@ -59,9 +60,10 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
 
       setEligibleLoading(true);
       try {
-        const response = await apiClient.getEligibleVaccines(infantId);
+        const response = await apiClient.getEligibleVaccines(infantId, { signal: abortController.signal });
         setEligibleVaccines(response);
       } catch (err) {
+        if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
         console.error("Error fetching eligible vaccines:", err);
         setEligibleVaccines(null);
       } finally {
@@ -70,10 +72,12 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
     };
 
     fetchEligibleVaccines();
+    return () => abortController.abort();
   }, [infantId]);
 
   // Fetch suggested appointments when date changes
   useEffect(() => {
+    const abortController = new AbortController();
     const fetchSuggestions = async () => {
       if (!infantId) return;
 
@@ -85,7 +89,7 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
           infantId,
           guardianId: guardianId || user?.id,
           clinicId: user?.clinic_id || user?.facility_id
-        });
+        }, null, null, { signal: abortController.signal });
         const payload = response?.data || response;
         setSuggestedSlots(
           Array.isArray(payload?.suggestions)
@@ -95,6 +99,7 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
               : [],
         );
       } catch (err) {
+        if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
         setSuggestionError(err.message || 'Failed to load suggested appointments');
         setSuggestedSlots([]);
       } finally {
@@ -103,7 +108,8 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
     };
 
     fetchSuggestions();
-  }, [infantId, selectedDate]);
+    return () => abortController.abort();
+  }, [infantId, selectedDate, guardianId, user?.id, user?.clinic_id, user?.facility_id]);
 
   const handleDateChange = (date) => {
     setSelectedDate(date);
@@ -144,7 +150,7 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
       setLoading(false);
       if (onAppointmentBooked) onAppointmentBooked(response.data || appointmentData);
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.response?.data?.message || err.message);
       setLoading(false);
     }
   };

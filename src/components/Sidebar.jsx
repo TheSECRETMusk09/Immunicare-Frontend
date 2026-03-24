@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { usePrefetchDashboard } from "../hooks/useCachedData";
 import { adminRoutePaths } from "../utils/routePaths";
-import AdminHeader from "./UI/AdminHeader";
 import {
   LayoutDashboard,
   BarChart3,
@@ -20,6 +19,9 @@ import {
   ChevronRight,
   Building2,
   LogOut,
+  Sun,
+  Moon,
+  User,
 } from "lucide-react";
 
 const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
@@ -71,6 +73,10 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
     { name: "Announcements", icon: Megaphone },
     { name: "Notifications", icon: Bell },
   ];
+
+  const userRole = String(user?.role || user?.role_name || '').toLowerCase();
+  const canManageUsers = ['super_admin', 'system_admin', 'admin'].includes(userRole);
+  const filteredNavItems = navItems.filter(item => item.name === "User Management" ? canManageUsers : true);
 
   const datePart = currentDateTime.toLocaleDateString("en-US", {
     weekday: "long",
@@ -243,7 +249,7 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
             </p>
           </div>
 
-          {navItems.map((item, index) => (
+          {filteredNavItems.map((item, index) => (
             <div key={item.name}>
               <button
                 type="button"
@@ -327,29 +333,64 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
           ))}
         </nav>
 
-        {/* User Profile Section - Top of sidebar */}
-        <div className="mt-auto border-t dark:border-gray-700">
-          {/* Health Center Info - Displayed at top */}
-<div className="px-4 py-3 border-b dark:border-gray-700 bg-indigo-50 dark:bg-indigo-900/20">
-  <div className="flex items-center gap-2">
-    <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-    <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
-      {(() => {
-        const healthCenter = user?.clinic || user?.healthCenter;
-        if (!healthCenter) return "San Nicolas Health Center";
-        // Map "Main Health Center" to "San Nicolas Health Center" for display
-        if (healthCenter === "Main Health Center") return "San Nicolas Health Center";
-        return healthCenter;
-      })()}
-    </span>
-  </div>
-</div>
+        {/* Footer Section */}
+        <div className="mt-auto border-t dark:border-gray-700 p-4 space-y-2">
+          {/* Health Center Info */}
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/30">
+            <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-800/50 rounded-full flex items-center justify-center shrink-0">
+              <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300 truncate">
+              {(() => {
+                const healthCenter = user?.clinic || user?.healthCenter;
+                if (!healthCenter) return "San Nicolas Health Center";
+                // Map "Main Health Center" to "San Nicolas Health Center" for display
+                if (healthCenter === "Main Health Center") return "San Nicolas Health Center";
+                return healthCenter;
+              })()}
+            </span>
+          </div>
 
-          <AdminHeader
-            darkMode={darkMode}
-            onToggleDarkMode={handleToggleDarkMode}
-            onLogout={() => setShowLogoutConfirm(true)}
-          />
+          {/* Dark Mode Toggle */}
+          <button
+            onClick={handleToggleDarkMode}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-200 font-medium"
+          >
+            <div className="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center shrink-0">
+              {darkMode ? <Sun className="w-4 h-4 text-yellow-500" /> : <Moon className="w-4 h-4 text-gray-600 dark:text-gray-300" />}
+            </div>
+            <span className="flex-1 text-left text-sm font-semibold">
+              {darkMode ? "Light Mode" : "Dark Mode"}
+            </span>
+          </button>
+
+          {/* User Profile & Logout */}
+          <button
+            onClick={() => setShowLogoutConfirm(true)}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-200 font-medium group"
+          >
+            <div className="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center shrink-0 group-hover:bg-red-100 dark:group-hover:bg-red-900/50 transition-colors">
+              <User className="w-4 h-4 text-gray-600 dark:text-gray-300 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors" />
+            </div>
+            <div className="flex-1 text-left min-w-0">
+              <p className="text-sm font-semibold truncate text-gray-900 dark:text-white group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
+                {user?.firstName || user?.username || "Admin"}
+              </p>
+              <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 tracking-wide mt-0.5 mb-0.5 truncate">
+                {(() => {
+                  const roleStr = user?.display_role || user?.role_name || user?.role || "User";
+                  return roleStr
+                    .split('_')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                    .join(' ');
+                })()}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                {user?.email || "No email available"}
+              </p>
+            </div>
+            <LogOut className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors" />
+          </button>
         </div>
       </aside>
 

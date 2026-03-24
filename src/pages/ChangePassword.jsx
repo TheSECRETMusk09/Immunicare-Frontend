@@ -17,6 +17,17 @@ const ChangePassword = () => {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  const calculatePasswordStrength = (password) => {
+    const checks = [
+      /.{8,}/.test(password),
+      /[A-Z]/.test(password),
+      /[a-z]/.test(password),
+      /[0-9]/.test(password),
+      /[^A-Za-z0-9]/.test(password),
+    ];
+    return checks.filter(Boolean).length;
+  };
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -27,8 +38,8 @@ const ChangePassword = () => {
       return;
     }
 
-    if (form.newPassword.length < 8) {
-      setError("New password must be at least 8 characters long.");
+    if (calculatePasswordStrength(form.newPassword) < 4) {
+      setError("Password must be at least 8 characters and include uppercase, lowercase, numbers, and special characters.");
       return;
     }
 

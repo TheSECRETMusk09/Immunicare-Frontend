@@ -15,8 +15,7 @@ export default function HealthAlerts({
 }) {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  // setError is intentionally unused - reserved for future error handling improvements
+  const [error] = useState(null);
 
   // Store the generateAlerts function in ref for retry functionality
   const generateAlertsRef = useRef(null);

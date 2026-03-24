@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import documentService from "../services/documentService";
 import { Modal, Button, Input } from "./UI";
 
@@ -30,12 +30,7 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
   const [pendingFile, setPendingFile] = useState(null);
   const [uploadForm, setUploadForm] = useState({ documentType: "vaccination_card", description: "" });
 
-  // Load documents on mount and when filter changes
-  useEffect(() => {
-    loadDocuments();
-  }, [infantId, selectedFilter]);
-
-  const loadDocuments = async () => {
+  const loadDocuments = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -54,12 +49,17 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
       }
     } catch (err) {
       console.error("Error loading documents:", err);
-      setError(err.message || "Failed to load documents");
+      setError(err.response?.data?.error || err.message || "Failed to load documents");
       setDocuments([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [infantId, selectedFilter]);
+
+  // Load documents on mount and when filter changes
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
 
   const handleFileSelect = async (event) => {
     const file = event.target.files?.[0];
@@ -156,7 +156,7 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
       }
     } catch (err) {
       console.error("Error uploading document:", err);
-      setError(err.message || "Failed to upload document");
+      setError(err.response?.data?.error || err.message || "Failed to upload document");
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -179,7 +179,7 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Error downloading document:", err);
-      setError("Failed to download document");
+      setError(err.response?.data?.error || err.message || "Failed to download document");
     }
   };
 
@@ -192,7 +192,7 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
       window.open(url, "_blank");
     } catch (err) {
       console.error("Error viewing document:", err);
-      setError("Failed to view document");
+      setError(err.response?.data?.error || err.message || "Failed to view document");
     }
   };
 
@@ -214,7 +214,7 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
       }
     } catch (err) {
       console.error("Error deleting document:", err);
-      setError(err.message || "Failed to delete document");
+      setError(err.response?.data?.error || err.message || "Failed to delete document");
     } finally {
       setShowDeleteConfirm(null);
     }

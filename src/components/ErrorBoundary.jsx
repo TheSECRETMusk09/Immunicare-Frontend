@@ -1,104 +1,41 @@
-import React from "react";
-import { Button } from "./UI";
+import React from 'react';
+import { AlertCircle, RefreshCw } from 'lucide-react';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
+    this.state = { hasError: false, error: null };
   }
 
   static getDerivedStateFromError(error) {
-    // Update state so the next render will show the fallback UI
-    return { hasError: true };
+    return { hasError: true, error };
   }
 
   componentDidCatch(error, errorInfo) {
-    // Log error details
-    this.setState({
-      error: error,
-      errorInfo: errorInfo,
-    });
-
-    // Log to console for debugging
-    console.error("ErrorBoundary caught an error:", error, errorInfo);
-
-    // In production, you might want to log to an error reporting service
-    if (process.env.NODE_ENV === "production") {
-      // TODO: Send to error reporting service like Sentry
-      // Example: Sentry.captureException(error);
-    }
+    // Can be logged to an error reporting service here
+    console.error("Uncaught error in component tree:", error, errorInfo);
   }
-
-  handleReset = () => {
-    this.setState({ hasError: false, error: null, errorInfo: null });
-    // Reload the page to reset the application state
-    window.location.reload();
-  };
-
-  handleGoHome = () => {
-    this.setState({ hasError: false, error: null, errorInfo: null });
-    window.location.href = "/";
-  };
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-          <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 text-center">
-            {/* Error Icon */}
-            <div className="mx-auto h-20 w-20 flex items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30 mb-6">
-              <svg
-                className="h-10 w-10 text-red-600 dark:text-red-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
-            </div>
-
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              Something Went Wrong
-            </h1>
-
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
-              We apologize for the inconvenience. An unexpected error has
-              occurred.
-            </p>
-
-            {process.env.NODE_ENV === "development" && this.state.error && (
-              <div className="mb-6 text-left">
-                <details className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 overflow-auto max-h-64">
-                  <summary className="font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
-                    Error Details
-                  </summary>
-                  <pre className="mt-2 text-xs text-red-600 dark:text-red-400 whitespace-pre-wrap">
-                    {this.state.error.toString()}
-                    {"\n"}
-                    {this.state.errorInfo?.componentStack}
-                  </pre>
-                </details>
-              </div>
-            )}
-
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button onClick={this.handleReset} variant="primary">
-                Try Again
-              </Button>
-              <Button onClick={this.handleGoHome} variant="secondary">
-                Go to Home
-              </Button>
-            </div>
-
-            <p className="mt-6 text-sm text-gray-500 dark:text-gray-400">
-              If the problem persists, please contact support.
-            </p>
+        <div className="flex flex-col items-center justify-center p-8 m-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-2xl">
+          <div className="w-12 h-12 bg-red-100 dark:bg-red-900/50 rounded-full flex items-center justify-center mb-4">
+            <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
           </div>
+          <h3 className="text-lg font-bold text-red-800 dark:text-red-300 mb-2">
+            Something went wrong
+          </h3>
+          <p className="text-sm text-red-600 dark:text-red-400 text-center max-w-md mb-6">
+            We encountered an unexpected error while loading this section. Our team has been notified.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Reload Page
+          </button>
         </div>
       );
     }

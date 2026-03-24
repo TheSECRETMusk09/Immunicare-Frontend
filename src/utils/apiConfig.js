@@ -34,6 +34,11 @@ export const normalizeApiBaseUrl = (rawUrl = process.env.REACT_APP_API_URL) => {
     return removeTrailingSlash(trimmedUrl) || "/";
   }
 
+  // Ignore absolute URLs in development to enforce proxy usage
+  if (!isProductionBuild) {
+    return null;
+  }
+
   const normalizedAbsoluteUrl = normalizeAbsoluteUrl(trimmedUrl);
   if (!normalizedAbsoluteUrl) {
     return null;

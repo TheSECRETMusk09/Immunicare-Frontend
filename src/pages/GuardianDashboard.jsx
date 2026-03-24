@@ -28,7 +28,10 @@ import GuardianModuleHeader from '../components/GuardianModuleHeader';
 import { useAuth } from '../contexts/AuthContext';
 import apiClient from '../utils/api';
 import { triggerGuardianAddChildModal } from '../components/QuickActionFAB';
+import guardianNotificationService from '../services/guardianNotificationService';
 import TransferVaccinationHistory from '../components/VaccinationManagement/TransferVaccinationHistory';
+import { trackEvent } from '../utils/telemetry';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 const unwrapApiPayload = (value) => {
   if (value && typeof value === 'object' && 'data' in value) {
@@ -356,6 +359,7 @@ const ErrorState = ({ message, onRetry }) => (
 const GuardianDashboard = () => {
   const navigate = useNavigate();
   const { guardianId } = useAuth();
+  const dashboardRef = React.useRef(null);
 
   // State for data, loading, and errors
   const [stats, setStats] = useState({
@@ -542,6 +546,21 @@ const GuardianDashboard = () => {
     return () => window.clearInterval(intervalId);
   }, [fetchDashboardData]);
 
+  // Accessibility: Focus main content when loaded
+  useEffect(() => {
+    if (!loading && !error && dashboardRef.current) {
+      // Give the DOM a tiny bit of time to render before focusing
+      setTimeout(() => dashboardRef.current?.focus(), 100);
+    }
+  }, [loading, error]);
+
+  // Telemetry: track dashboard view and general stats
+  useEffect(() => {
+    if (!loading && !error) {
+      trackEvent("dashboard_first_view", { childrenCount: stats.childrenCount, overdueCount: stats.overdueCount });
+    }
+  }, [loading, error, stats.childrenCount, stats.overdueCount]);
+
   // Format date for appointment display
   const formatAppointmentDate = (dateString) => {
     const date = new Date(dateString);
@@ -561,7 +580,13 @@ const GuardianDashboard = () => {
   // Handle notification dismiss
   const handleDismissNotification = async (notificationId) => {
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
-    // Optionally call API to mark as read/dismissed
+    try {
+      await guardianNotificationService.markAsRead(notificationId);
+      trackEvent("notification_dismissed", { notificationId });
+    } catch (err) {
+      console.warn(`Failed to mark notification ${notificationId} as read:`, err);
+      // Optionally, add the notification back to the list on failure or show a toast.
+    }
   };
 
   // Calculate vaccination progress
@@ -575,6 +600,9 @@ const GuardianDashboard = () => {
     };
   }, [stats.vaccinatedCount, stats.pendingCount]);
 
+  // Phase 2: Derived Data Lag fix - Show skeleton if children exist but 0 total vaccines are mapped yet
+  const isGeneratingSchedule = stats.childrenCount > 0 && vaccinationProgress.total === 0;
+
   return (
     <div className="guardian-page-wrapper min-h-screen bg-theme-bg-primary transition-colors duration-200">
       <div className="min-[1025px]:hidden fixed top-0 left-0 right-0 z-40 w-full bg-theme-bg-primary border-b border-theme-border-primary shadow-sm transition-colors duration-200">
@@ -586,6 +614,7 @@ const GuardianDashboard = () => {
       </div>
 
       <div className="pt-14 sm:pt-16 min-[1025px]:pt-0">
+        <div ref={dashboardRef} tabIndex="-1" className="focus:outline-none">
         <GuardianModuleHeader
           title="Guardian Dashboard"
           subtitle="Welcome back! "
@@ -626,6 +655,7 @@ const GuardianDashboard = () => {
         />
 
         <main className="guardian-page-content space-y-4 md:space-y-5 lg:space-y-6">
+        <ErrorBoundary>
 
         {/* Error State */}
         {error && (
@@ -761,24 +791,33 @@ const GuardianDashboard = () => {
               </div>
               <h2 className="text-base sm:text-lg font-bold text-theme-primary">Vaccination Progress</h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ProgressCard
-                title="Overall Progress"
-                completed={vaccinationProgress.completed}
-                pending={vaccinationProgress.pending}
-                total={vaccinationProgress.total}
-                icon={CheckCircle}
-                color="emerald"
-              />
-              <ProgressCard
-                title="This Month"
-                completed={Math.min(stats.vaccinatedCount, 5)}
-                pending={stats.pendingCount}
-                total={Math.max(stats.vaccinatedCount + stats.pendingCount, 5)}
-                icon={Calendar}
-                color="blue"
-              />
-            </div>
+
+            {isGeneratingSchedule ? (
+              <div className="bg-theme-bg-card rounded-2xl p-6 sm:p-8 border border-theme-border-primary text-center shadow-sm">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-3"></div>
+                <h3 className="text-sm font-bold text-theme-primary mb-1">Analyzing Baseline Schedule...</h3>
+                <p className="text-xs text-theme-secondary">We are generating the personalized vaccination schedule for your newly added child. This may take a moment.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <ProgressCard
+                  title="Overall Progress"
+                  completed={vaccinationProgress.completed}
+                  pending={vaccinationProgress.pending}
+                  total={vaccinationProgress.total}
+                  icon={CheckCircle}
+                  color="emerald"
+                />
+                <ProgressCard
+                  title="This Month"
+                  completed={Math.min(stats.vaccinatedCount, 5)}
+                  pending={stats.pendingCount}
+                  total={Math.max(stats.vaccinatedCount + stats.pendingCount, 5)}
+                  icon={Calendar}
+                  color="blue"
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -898,19 +937,42 @@ const GuardianDashboard = () => {
                 <ChildCardSkeleton />
               ) : children.length === 0 ? (
                 <div className="lg:px-0">
-                  <EmptyState
-                    icon={Baby}
-                    title="No Children Registered"
-                    description="Add your first child to get started tracking their vaccinations"
-                    actionLabel="Add Child"
-                    onAction={() => {
-                      navigate('/guardian/children');
-                      setTimeout(() => {
-                        triggerGuardianAddChildModal();
-                      }, 0);
-                    }}
-                    variant="primary"
-                  />
+                  <div className="relative overflow-hidden bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-2xl p-6 sm:p-8 border border-emerald-100 dark:border-emerald-800/50 text-center shadow-sm">
+                    <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Baby className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <h3 className="text-lg font-bold text-emerald-900 dark:text-emerald-100 mb-2">
+                      Welcome to Immunicare!
+                    </h3>
+                    <p className="text-sm text-emerald-700 dark:text-emerald-300 mb-6 max-w-sm mx-auto">
+                      Your dashboard is ready. To begin tracking vaccination schedules and booking appointments, please add your child's profile.
+                    </p>
+                    <button
+                      onClick={() => {
+                        navigate('/guardian/children');
+                        setTimeout(() => {
+                          triggerGuardianAddChildModal();
+                        }, 0);
+                      }}
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-all shadow-md hover:shadow-lg"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Your First Child
+                    </button>
+
+                    <div className="mt-6 pt-4 border-t border-emerald-200/50 dark:border-emerald-800/50">
+                      <button
+                        onClick={() => {
+                          trackEvent("intro_replayed");
+                          navigate('/guardian/introduction');
+                        }}
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
+                      >
+                        <Info className="w-4 h-4" />
+                        Replay Introduction Tour
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1082,7 +1144,9 @@ const GuardianDashboard = () => {
               )}
             </div>
         </div>
+        </ErrorBoundary>
         </main>
+        </div>
       </div>
 
       {/* Transfer Vaccination History Modal */}

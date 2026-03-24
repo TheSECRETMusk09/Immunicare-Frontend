@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { AlertCircle, CheckCircle, RefreshCw, Bell, User } from "lucide-react";
 import { Alert } from "../components/UI";
 import apiClient from "../utils/api";
+import { trackEvent } from "../utils/telemetry";
 import GuardianTopHeader from "../components/GuardianTopHeader";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
 import "../css/guardian-profile.css";
@@ -173,8 +174,10 @@ export default function Profile() {
 
       if (isGuardian && profileGuardianId) {
         await apiClient.updateGuardianProfile(profileGuardianId, formData);
+        trackEvent("profile_updated", { role: "guardian" });
       } else if (user?.id) {
         await apiClient.updateUserProfile(user.id, formData);
+        trackEvent("profile_updated", { role: "system_user" });
       }
 
       setSuccess("Profile updated successfully!");

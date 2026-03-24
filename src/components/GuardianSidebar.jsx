@@ -517,8 +517,17 @@ const GuardianSidebar = memo(
               </div>
               {!isCollapsed && (
                 <div className="flex-1 text-left min-w-0">
-                  <p className="text-sm font-semibold truncate">
+                  <p className="text-sm font-semibold truncate text-gray-900 dark:text-white">
                     {user?.firstName || user?.username || "Guardian"}
+                  </p>
+                  <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 tracking-wide mt-0.5 mb-0.5 truncate">
+                    {(() => {
+                      const roleStr = user?.display_role || user?.role_name || user?.role || "Guardian";
+                      return roleStr
+                        .split('_')
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                        .join(' ');
+                    })()}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                     {user?.email || "guardian@example.com"}

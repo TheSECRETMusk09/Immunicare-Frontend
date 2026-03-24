@@ -17,7 +17,6 @@ import {
   Loader2,
   CheckCircle,
 } from "lucide-react";
-import apiClient from "../utils/api";
 
 const GuardianIntroduction = () => {
   console.log("GuardianIntroduction component loaded");
@@ -39,11 +38,6 @@ const GuardianIntroduction = () => {
     guardianCount: true,
     vaccinationDate: true,
     communityData: true,
-  });
-  const [, setErrors] = useState({
-    guardianCount: null,
-    vaccinationDate: null,
-    communityData: null,
   });
 
   // Respect user's theme preference - dark mode is now fully supported
@@ -89,29 +83,8 @@ const GuardianIntroduction = () => {
   // Fetch dynamic data with caching
   const fetchGuardianCount = useCallback(async () => {
     try {
-      // Check cache first (valid for 5 minutes)
-      const cached = sessionStorage.getItem('guardianCount');
-      const cachedTime = sessionStorage.getItem('guardianCountTime');
-      if (cached && cachedTime && Date.now() - parseInt(cachedTime) < 300000) {
-        setGuardianCount(parseInt(cached));
-        setLoading(prev => ({ ...prev, guardianCount: false }));
-        return;
-      }
-
-      let count = 10542;
-      try {
-        const response = await apiClient.customRequest('/public/stats');
-        if (response && response.data && response.data.guardiansCount) {
-          count = response.data.guardiansCount;
-        }
-      } catch (err) {
-        console.warn("Public stats API unavailable, using fallback value");
-      }
-      setGuardianCount(count);
-      sessionStorage.setItem('guardianCount', count.toString());
-      sessionStorage.setItem('guardianCountTime', Date.now().toString());
-    } catch (error) {
-      setErrors(prev => ({ ...prev, guardianCount: error.message }));
+      // Use representative static data to prevent unnecessary network overhead
+      // from unauthenticated public landing page visits.
       setGuardianCount(10542);
     } finally {
       setLoading(prev => ({ ...prev, guardianCount: false }));
@@ -120,46 +93,14 @@ const GuardianIntroduction = () => {
 
   const fetchNextVaccinationDate = useCallback(async () => {
     try {
-      // Check cache first
-      const cached = sessionStorage.getItem('nextVaccinationDate');
-      const cachedTime = sessionStorage.getItem('nextVaccinationDateTime');
-      if (cached && cachedTime && Date.now() - parseInt(cachedTime) < 300000) {
-        setNextVaccinationDate(cached);
-        setLoading(prev => ({ ...prev, vaccinationDate: false }));
-        return;
-      }
-
-      let formattedDate;
-      try {
-        const response = await apiClient.customRequest('/public/stats');
-        if (response && response.data && response.data.nextVaccinationDate) {
-          const apiDate = new Date(response.data.nextVaccinationDate);
-          formattedDate = apiDate.toLocaleDateString('en-US', {
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric'
-          });
-        }
-      } catch (err) {
-        console.warn("Public stats API unavailable, using fallback date");
-      }
-
-      if (!formattedDate) {
-        const today = new Date();
-        const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 15);
-        formattedDate = nextMonth.toLocaleDateString('en-US', {
-          month: 'long',
-          day: 'numeric',
-          year: 'numeric'
-        });
-      }
-
+      const today = new Date();
+      const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 15);
+      const formattedDate = nextMonth.toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      });
       setNextVaccinationDate(formattedDate);
-      sessionStorage.setItem('nextVaccinationDate', formattedDate);
-      sessionStorage.setItem('nextVaccinationDateTime', Date.now().toString());
-    } catch (error) {
-      setErrors(prev => ({ ...prev, vaccinationDate: error.message }));
-      setNextVaccinationDate('April 15, 2026');
     } finally {
       setLoading(prev => ({ ...prev, vaccinationDate: false }));
     }
@@ -167,15 +108,6 @@ const GuardianIntroduction = () => {
 
   const fetchCommunityData = useCallback(async () => {
     try {
-      // Check cache first
-      const cached = sessionStorage.getItem('communityData');
-      const cachedTime = sessionStorage.getItem('communityDataTime');
-      if (cached && cachedTime && Date.now() - parseInt(cachedTime) < 600000) {
-        setCommunityData(JSON.parse(cached));
-        setLoading(prev => ({ ...prev, communityData: false }));
-        return;
-      }
-
       let data = {
          population: 42765,
          barangay: 'San Nicolas',
@@ -183,24 +115,7 @@ const GuardianIntroduction = () => {
          source: 'Philippine Statistics Authority (PSA), 2020 Census',
          lastUpdated: new Date().toISOString(),
       };
-
-      try {
-        const response = await apiClient.customRequest('/public/stats');
-        if (response && response.data && response.data.communityData) {
-          data = {
-            ...data,
-            ...response.data.communityData
-          };
-        }
-      } catch (err) {
-        console.warn("Public stats API unavailable, using fallback community data");
-      }
-
       setCommunityData(data);
-      sessionStorage.setItem('communityData', JSON.stringify(data));
-      sessionStorage.setItem('communityDataTime', Date.now().toString());
-    } catch (error) {
-      setErrors(prev => ({ ...prev, communityData: error.message }));
     } finally {
       setLoading(prev => ({ ...prev, communityData: false }));
     }

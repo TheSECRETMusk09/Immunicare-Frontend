@@ -31,6 +31,7 @@ import {
   GUARDIAN_INFANT_REGISTERED_EVENT,
   triggerGuardianAddChildModal,
 } from "../components/QuickActionFAB";
+import { trackEvent } from "../utils/telemetry";
 
 // Get minimum booking date (today)
 const getMinDate = () => {
@@ -425,10 +426,15 @@ export default function GuardianAppointmentBooking() {
       setCreatedAppointment(newAppointment?.data || newAppointment);
       setSuccess(true);
 
+      trackEvent("appointment_booked", {
+        appointmentType: formData.type,
+        hasControlNumber: !!selectedChild?.control_number
+      });
+
       // Send SMS confirmation (backend should handle this)
     } catch (err) {
       console.error("Error creating appointment:", err);
-      setError(err.message || "Failed to create appointment");
+      setError(err.response?.data?.error || err.message || "Failed to create appointment");
     } finally {
       setSubmitting(false);
     }

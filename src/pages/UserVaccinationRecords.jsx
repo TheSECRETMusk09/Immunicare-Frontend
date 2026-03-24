@@ -19,6 +19,7 @@ import {
   Bell,
   User,
 } from "lucide-react";
+import { trackEvent } from "../utils/telemetry";
 import ImmunizationRecordBooklet from "../components/ImmunizationRecordBooklet";
 
 const PROVIDER_FALLBACK_LABEL = "Provider unavailable";
@@ -118,7 +119,7 @@ export default function UserVaccinationRecords() {
         setChildReadiness(null);
       }
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.message);
     } finally {
       setLoading(false);
     }
@@ -208,6 +209,12 @@ export default function UserVaccinationRecords() {
       });
     }
   }, [childId, children, navigate]);
+
+  useEffect(() => {
+    if (selectedChild) {
+      trackEvent("vaccination_records_viewed", { childId: selectedChild.id, viewMode });
+    }
+  }, [selectedChild, viewMode]);
 
   useEffect(() => {
     if (selectedChild) {

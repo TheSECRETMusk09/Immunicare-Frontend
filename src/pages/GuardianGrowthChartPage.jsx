@@ -6,6 +6,7 @@ import apiClient from "../utils/api";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
 import { Alert, Button, LoadingSpinner } from "../components/UI";
 import { toArrayPayload } from "../utils/adminDataAdapters";
+import { trackEvent } from "../utils/telemetry";
 
 const toFiniteNumber = (value) => {
   const parsed = Number(value);
@@ -146,6 +147,12 @@ export default function GuardianGrowthChartPage() {
       setSelectedChild(routeChild);
     }
   }, [childId, children, selectedChild?.id]);
+
+  useEffect(() => {
+    if (selectedChild) {
+      trackEvent("growth_chart_viewed", { childId: selectedChild.id });
+    }
+  }, [selectedChild]);
 
   const latestRecord = useMemo(() => {
     if (!growthRecords.length) return null;

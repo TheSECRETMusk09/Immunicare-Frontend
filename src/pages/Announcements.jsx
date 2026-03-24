@@ -228,7 +228,7 @@ const Announcements = () => {
           ...backendFields,
         }));
       }
-      setError(err.message || "Failed to create announcement");
+      setError(err.response?.data?.error || err.message || "Failed to create announcement");
       console.error("Error creating announcement:", err);
     } finally {
       setIsSubmitting(false);
@@ -242,7 +242,7 @@ const Announcements = () => {
       await apiClient.publishAnnouncement(announcement.id);
       await fetchAnnouncements();
     } catch (err) {
-      setError(err.message || "Failed to publish announcement");
+      setError(err.response?.data?.error || err.message || "Failed to publish announcement");
     } finally {
       setIsPublishingAnnouncementId(null);
     }
@@ -255,7 +255,7 @@ const Announcements = () => {
         await apiClient.archiveAnnouncement(announcement.id);
         await fetchAnnouncements();
       } catch (err) {
-        setError(err.message || "Failed to archive announcement");
+      setError(err.response?.data?.error || err.message || "Failed to archive announcement");
       } finally {
         setIsArchivingAnnouncementId(null);
       }
@@ -270,7 +270,7 @@ const Announcements = () => {
         setAnnouncements(prevAnnouncements => prevAnnouncements.filter(a => a.id !== announcement.id));
         await fetchDeliverySummaries(); // Update delivery summaries
       } catch (err) {
-        setError(err.message || "Failed to delete announcement");
+      setError(err.response?.data?.error || err.message || "Failed to delete announcement");
         // Refetch announcements on error to ensure consistency
         await fetchAnnouncements();
       } finally {
@@ -290,7 +290,7 @@ const Announcements = () => {
       });
       setDeliveryRows(Array.isArray(result?.rows) ? result.rows : []);
     } catch (err) {
-      setError(err.message || "Failed to load delivery details");
+      setError(err.response?.data?.error || err.message || "Failed to load delivery details");
     } finally {
       setDeliveryRowsLoading(false);
     }

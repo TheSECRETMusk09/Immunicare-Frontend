@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import apiClient from "../utils/api";
-import { Button, Input, Card, Modal } from "./UI";
+import { Button, Card } from "./UI";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function InventoryMonitoringDashboard() {
@@ -8,37 +8,25 @@ export default function InventoryMonitoringDashboard() {
   const [inventory, setInventory] = useState([]);
   const [vaccines, setVaccines] = useState([]);
   const [alerts, setAlerts] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedVaccine, setSelectedVaccine] = useState(null);
-  const [showBatchModal, setShowBatchModal] = useState(false);
-  const [showSupplierModal, setShowSupplierModal] = useState(false);
 
-  useEffect(() => {
-    if (isAdmin) {
-      fetchDashboardData();
-    }
-  }, [isAdmin]);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
       const clinicId = user?.clinic_id || user?.facility_id || 1;
-      const [inventoryRes, vaccinesRes, alertsRes, suppliersRes] =
+      const [inventoryRes, vaccinesRes, alertsRes] =
         await Promise.all([
           apiClient.getVaccineInventory().catch(() => ({ data: [] })),
           apiClient.getVaccines().catch(() => ({ data: [] })),
           apiClient.getVaccineStockAlerts({ clinic_id: clinicId, status: "ACTIVE" }).catch(() => ({ data: [] })),
-          apiClient.getSuppliers().catch(() => ({ data: [] })),
         ]);
 
       const inventoryList = inventoryRes?.data || inventoryRes?.inventory || inventoryRes || [];
       const vaccinesList = vaccinesRes?.data || vaccinesRes || [];
       const alertsList = alertsRes?.data || alertsRes || [];
-      const suppliersList = suppliersRes?.data || suppliersRes || [];
 
       setInventory(inventoryList);
       setVaccines(vaccinesList);
@@ -59,14 +47,19 @@ export default function InventoryMonitoringDashboard() {
       });
 
       setAlerts(synchronizedAlerts);
-      setSuppliers(suppliersList);
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
       setError(err.message || "Failed to load dashboard data");
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.clinic_id, user?.facility_id]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchDashboardData();
+    }
+  }, [isAdmin, fetchDashboardData]);
 
   const getVaccineStats = () => {
     const totalVaccines = inventory.length;

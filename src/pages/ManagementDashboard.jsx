@@ -17,9 +17,10 @@ import ImmunizationRecordBooklet from "../components/ImmunizationRecordBooklet";
 import InfantPersonalRecord from "../components/InfantPersonalRecord";
 import ImmunizationChart from "../components/ImmunizationChart";
 import { Input } from "../components/UI";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 export default function ManagementDashboard() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState("overview");
 
@@ -29,6 +30,9 @@ export default function ManagementDashboard() {
   const [selectedInfant, setSelectedInfant] = useState(null);
   const [activeInfantView, setActiveInfantView] = useState(null); // 'personal', 'details', 'records', 'chart'
   const [infantSearchQuery, setInfantSearchQuery] = useState("");
+
+  const userRole = String(user?.role || user?.role_name || '').toLowerCase();
+  const canManageUsers = ['super_admin', 'system_admin', 'admin'].includes(userRole);
 
   // Fetch infants for the action buttons
   const fetchInfants = useCallback(async () => {
@@ -350,6 +354,7 @@ export default function ManagementDashboard() {
 
             {/* Quick Stats - Top Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
+              {canManageUsers && (
               <Card
                 className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-primary-500"
                 onClick={() => setActiveSection("users")}
@@ -362,6 +367,7 @@ export default function ManagementDashboard() {
                   Manage guardians and system users
                 </p>
               </Card>
+              )}
               <Card
                 className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-success-500"
                 onClick={() => setActiveSection("infants")}
@@ -498,6 +504,7 @@ export default function ManagementDashboard() {
 
             {/* Management Features */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6 sm:gap-8">
+              {canManageUsers && (
               <Card
                 className="p-6 flex flex-col h-full"
                 title="👥 User Management"
@@ -514,6 +521,7 @@ export default function ManagementDashboard() {
                   Manage Users
                 </Button>
               </Card>
+              )}
 
               <Card
                 className="p-6 flex flex-col h-full"
@@ -740,7 +748,11 @@ export default function ManagementDashboard() {
   return (
     <div className="space-y-6 sm:space-y-8 px-4 sm:px-6 lg:px-8 max-w-[1600px] mx-auto w-full">
       {/* Section Content */}
-      <div className="animate-fade-in">{renderSection()}</div>
+      <div className="animate-fade-in">
+        <ErrorBoundary>
+          {renderSection()}
+        </ErrorBoundary>
+      </div>
     </div>
   );
 }

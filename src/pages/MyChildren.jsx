@@ -45,6 +45,7 @@ import {
   createTransferVaccineEntry,
   validateTransferHistoryEntries,
 } from "../utils/transferCasePayloads";
+import { trackEvent } from "../utils/telemetry";
 
 const getErrorFieldMap = (error) => {
   if (!error || !error.response || !error.response.data) {
@@ -724,6 +725,7 @@ export default function MyChildren() {
       setRegisterSuccess("Transfer-in case submitted successfully! Our staff will review your child's vaccination history.");
 
       triggerGuardianInfantRegistered(infantData);
+      trackEvent("child_profile_created", { method: "transfer_in" });
 
       // Refresh children list
       await fetchChildren();
@@ -791,6 +793,7 @@ export default function MyChildren() {
       setRegisterSuccess("Child registered successfully!");
 
       triggerGuardianInfantRegistered(infantData);
+      trackEvent("child_profile_created", { method: "direct_registration" });
 
       // Refresh children list immediately for instant UI sync
       await fetchChildren();

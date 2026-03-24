@@ -1,5 +1,5 @@
 import React from "react";
-import { Card } from "../components/UI";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 const BasePage = ({ title, description, children }) => {
   return (
@@ -12,7 +12,9 @@ const BasePage = ({ title, description, children }) => {
           <p className="text-gray-600 dark:text-gray-400 mt-1">{description}</p>
         )}
       </div>
-      {children}
+      <ErrorBoundary>
+        {children}
+      </ErrorBoundary>
     </div>
   );
 };

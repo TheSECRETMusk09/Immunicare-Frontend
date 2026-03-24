@@ -271,9 +271,17 @@ const isTokenExpiringSoon = (token) => {
     );
     const payload = JSON.parse(jsonPayload);
     const expTime = payload.exp * 1000;
+    const iatTime = payload.iat ? payload.iat * 1000 : 0;
 
-    // Refresh if less than 2 minutes (120000 ms) remaining
-    return (expTime - Date.now()) > 0 && (expTime - Date.now()) < 120000;
+    // Phase 3: Proactive Token Refresh at 75% lifetime
+    if (iatTime && expTime) {
+      const totalLifetime = expTime - iatTime;
+      const timePassed = Date.now() - iatTime;
+      return timePassed > (totalLifetime * 0.75) && (expTime - Date.now()) > 0;
+    }
+
+    // Fallback: Refresh if less than 15 minutes (900000 ms) remaining
+    return (expTime - Date.now()) > 0 && (expTime - Date.now()) < 900000;
   } catch (e) {
     return false;
   }
@@ -1029,8 +1037,8 @@ class ApiClient {
   }
 
   // Vaccine Eligibility - Get eligible vaccines for an infant
-  async getEligibleVaccines(infantId) {
-    return this.request(`/vaccinations/eligible/${infantId}`);
+  async getEligibleVaccines(infantId, options = {}) {
+    return this.request(`/vaccinations/eligible/${infantId}`, { method: 'GET', ...options });
   }
 
   // Vaccine Eligibility - Get next dose info for a specific vaccine
@@ -1101,7 +1109,7 @@ class ApiClient {
      return this.request(`/vaccinations/inventory-status/${vaccineId}`);
    }
 
-   async getAppointmentSuggestions(input, legacyGuardianId = null, legacyClinicId = null) {
+  async getAppointmentSuggestions(input, legacyGuardianId = null, legacyClinicId = null, options = {}) {
      const normalizedInput =
        input && typeof input === "object"
          ? input
@@ -1130,6 +1138,7 @@ class ApiClient {
 
      return this.request(url, {
        method: 'GET',
+      ...options
      });
    }
 
@@ -1315,7 +1324,7 @@ class ApiClient {
     return this.request(`/appointments/availability/check?${params}`);
   }
 
-  async getAppointmentTimeSlots({ scheduled_date, vaccine_id, clinic_id, exclude_appointment_id } = {}) {
+  async getAppointmentTimeSlots({ scheduled_date, vaccine_id, clinic_id, exclude_appointment_id } = {}, options = {}) {
     const params = new URLSearchParams();
     if (scheduled_date) params.append("scheduled_date", scheduled_date);
     if (vaccine_id) params.append("vaccine_id", vaccine_id);
@@ -1324,24 +1333,24 @@ class ApiClient {
       params.append("exclude_appointment_id", exclude_appointment_id);
     }
 
-    return this.request(`/appointments/availability/slots?${params}`);
+    return this.request(`/appointments/availability/slots?${params}`, { method: 'GET', ...options });
   }
 
-  async getAppointmentCalendarAvailability({ month, start_date, end_date, clinic_id } = {}) {
+  async getAppointmentCalendarAvailability({ month, start_date, end_date, clinic_id } = {}, options = {}) {
     const params = new URLSearchParams();
     if (month) params.append("month", month);
     if (start_date) params.append("start_date", start_date);
     if (end_date) params.append("end_date", end_date);
     if (clinic_id) params.append("clinic_id", clinic_id);
 
-    return this.request(`/appointments/availability/calendar?${params}`);
+    return this.request(`/appointments/availability/calendar?${params}`, { method: 'GET', ...options });
   }
 
-  async getAppointmentDateDetails(date, { clinic_id } = {}) {
+  async getAppointmentDateDetails(date, { clinic_id } = {}, options = {}) {
     const params = new URLSearchParams();
     if (clinic_id) params.append("clinic_id", clinic_id);
     const suffix = params.toString() ? `?${params}` : "";
-    return this.request(`/appointments/availability/date/${date}${suffix}`);
+    return this.request(`/appointments/availability/date/${date}${suffix}`, { method: 'GET', ...options });
   }
 
   async getAppointment(id) {
@@ -1389,11 +1398,11 @@ class ApiClient {
   }
 
   // Blocked Dates Management endpoints (Admin)
-  async getBlockedDates({ month, clinic_id } = {}) {
+  async getBlockedDates({ month, clinic_id } = {}, options = {}) {
     const params = new URLSearchParams();
     if (month) params.append('month', month);
     if (clinic_id) params.append('clinic_id', clinic_id);
-    return this.request(`/appointments/blocked-dates?${params}`);
+    return this.request(`/appointments/blocked-dates?${params}`, { method: 'GET', ...options });
   }
 
   async toggleBlockedDate({ date, reason, clinic_id }) {

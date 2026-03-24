@@ -10,7 +10,7 @@ import apiClient from "../utils/api";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function MonitoringDashboard({ onRefresh }) {
-  const { hasPermission, isAdmin, isAdminOrSuperAdmin, user } = useAuth();
+  const { hasPermission, isAdmin, isHealthcareWorker, user } = useAuth();
   const [monitoringData, setMonitoringData] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,7 +22,17 @@ export default function MonitoringDashboard({ onRefresh }) {
       .split("T")[0],
     end_date: new Date().toISOString().split("T")[0],
   });
-  const canAccessMonitoring = hasPermission("dashboard:analytics");
+
+  const canAccessMonitoring =
+    hasPermission("dashboard:analytics") ||
+    isAdmin ||
+    isHealthcareWorker ||
+    user?.role === "nurse" ||
+    user?.role === "midwife" ||
+    user?.role === "doctor" ||
+    user?.role === "physician" ||
+    user?.role === "admin" ||
+    user?.role === "super_admin";
 
   const fetchData = useCallback(async () => {
     if (!canAccessMonitoring) {

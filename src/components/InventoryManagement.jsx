@@ -2,7 +2,6 @@ import React, {
   useState,
   useEffect,
   useCallback,
-  useRef,
   useMemo,
 } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -328,7 +327,6 @@ const InventorySheetPrintReport = ({ reportDate, printRows, printTotals, dateRan
 
 export default function InventoryManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const printRef = useRef(null);
   const { user } = useAuth();
   const fallbackClinicId = user?.clinic_id || user?.facility_id || 1;
 
@@ -598,7 +596,7 @@ export default function InventoryManagement() {
 
       alert("Inventory sheet saved successfully!");
     } catch (err) {
-      setError(err.message || "Failed to save inventory sheet data.");
+      setError(err.response?.data?.error || err.message || "Failed to save inventory sheet data.");
     } finally {
       setLoading(false);
     }
@@ -870,7 +868,7 @@ export default function InventoryManagement() {
           ...backendFields,
         }));
       }
-      setError(err.message || "Failed to save inventory transaction.");
+      setError(err.response?.data?.error || err.message || "Failed to save inventory transaction.");
     }
   };
 
@@ -1183,7 +1181,6 @@ export default function InventoryManagement() {
           <Card className="overflow-hidden p-0 print:shadow-none print:border-none dark:bg-gray-800 dark:border-gray-700">
             <div className="overflow-auto print:overflow-visible">
               <table
-                ref={printRef}
                 className="w-full border-collapse text-xs sm:text-sm"
                 id="inventory-table"
               >

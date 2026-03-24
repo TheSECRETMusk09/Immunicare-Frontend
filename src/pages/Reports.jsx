@@ -161,8 +161,33 @@ const Reports = () => {
 
   const fetchAdminSummary = useCallback(async () => {
     try {
-      const response = await apiClient.request("/reports/admin/summary");
-      setAdminSummary(response.data);
+      const [summaryResponse, absoluteStatsResponse] = await Promise.all([
+        apiClient.request("/reports/admin/summary"),
+        apiClient.getDashboardStats() // Fetch absolute totals to ensure consistency
+      ]);
+
+      const summaryData = summaryResponse?.data || summaryResponse || {};
+      const absoluteStats = absoluteStatsResponse?.data?.data || absoluteStatsResponse?.data || absoluteStatsResponse || {};
+
+      const mergedSummary = { ...summaryData };
+
+      // Override the potentially filtered/differently-calculated infants total
+      // with the absolute truth from the dashboard stats
+      if (mergedSummary.infants) {
+        mergedSummary.infants.total = absoluteStats.total_infants || absoluteStats.infants || mergedSummary.infants.total || 0;
+      }
+      if (mergedSummary.guardians) {
+        mergedSummary.guardians.total = absoluteStats.total_guardians || absoluteStats.guardians || mergedSummary.guardians.total || 0;
+      }
+      if (mergedSummary.appointments) {
+        mergedSummary.appointments.total = absoluteStats.total_appointments || absoluteStats.appointments || mergedSummary.appointments.total || 0;
+      }
+      if (mergedSummary.vaccination) {
+        mergedSummary.vaccination.total = absoluteStats.total_vaccinations || absoluteStats.vaccinations || mergedSummary.vaccination.total || 0;
+        mergedSummary.vaccination.completed = absoluteStats.total_vaccinations || absoluteStats.vaccinations || mergedSummary.vaccination.completed || 0;
+      }
+
+      setAdminSummary(mergedSummary);
     } catch (err) {
       console.error("Error fetching admin summary:", err);
     }

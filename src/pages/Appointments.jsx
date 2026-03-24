@@ -174,6 +174,7 @@ export default function Appointments() {
   const [rowAction, setRowAction] = useState({ id: null, action: null });
   const [statusFilter, setStatusFilter] = useState('all');
   const lastAppliedAppointmentsSignatureRef = useRef("");
+  const latestMonthKeyRef = useRef("");
 
   const initialAppointmentsSignature = useMemo(
     () =>
@@ -312,7 +313,7 @@ export default function Appointments() {
     notes: "",
   });
 
-  const fetchTimeSlots = useCallback(async (date, excludeId = undefined) => {
+  const fetchTimeSlots = useCallback(async (date, excludeId = undefined, signal) => {
     if (!showBookingModal && !showEditModal) {
       setTimeSlots([]);
       setTimeSlotsFeedback(null);
@@ -332,12 +333,13 @@ export default function Appointments() {
       const result = await apiClient.getAppointmentTimeSlots({
         scheduled_date: date,
         exclude_appointment_id: excludeId,
-      });
+      }, { signal });
 
       const slots = Array.isArray(result?.slots) ? result.slots : [];
       setTimeSlots(slots);
       setTimeSlotsFeedback(result || null);
     } catch (slotError) {
+      if (slotError.name === 'CanceledError' || slotError.code === 'ERR_CANCELED') return;
       setTimeSlots([]);
       setTimeSlotsFeedback({
         available: false,
@@ -349,15 +351,19 @@ export default function Appointments() {
   }, [showBookingModal, showEditModal]);
 
   useEffect(() => {
+    const abortController = new AbortController();
     if (showBookingModal && createFormData.scheduled_date) {
-      fetchTimeSlots(createFormData.scheduled_date);
+      fetchTimeSlots(createFormData.scheduled_date, undefined, abortController.signal);
     }
+    return () => abortController.abort();
   }, [showBookingModal, createFormData.scheduled_date, fetchTimeSlots]);
 
   useEffect(() => {
+    const abortController = new AbortController();
     if (showEditModal && editFormData.scheduled_date) {
-      fetchTimeSlots(editFormData.scheduled_date, editFormData.id);
+      fetchTimeSlots(editFormData.scheduled_date, editFormData.id, abortController.signal);
     }
+    return () => abortController.abort();
   }, [showEditModal, editFormData.scheduled_date, editFormData.id, fetchTimeSlots]);
 
   const getSelectedInfantControlNumber = useCallback(
@@ -368,36 +374,35 @@ export default function Appointments() {
     [infants],
   );
 
-  // Fetch calendar availability from API (matching GuardianAppointmentsPage)
-  const fetchCalendarAvailability = useCallback(async () => {
-    setCalendarLoading(true);
-    try {
-      const response = await apiClient.getAppointmentCalendarAvailability({
-        month: toMonthKey(monthCursor),
-      });
-
-      const dates = Array.isArray(response?.dates) ? response.dates : [];
-      const mapped = dates.reduce((accumulator, current) => {
-        accumulator[current.date] = current;
-        return accumulator;
-      }, {});
-    } catch (err) {
-      // Handled silently
-    } finally {
-      setCalendarLoading(false);
-    }
+  // Keep track of the latest month key to prevent race conditions during rapid navigation
+  useEffect(() => {
+    latestMonthKeyRef.current = toMonthKey(monthCursor);
   }, [monthCursor]);
 
-  // Fetch blocked dates from API
-  const fetchBlockedDates = useCallback(async () => {
-    try {
-      const response = await apiClient.getBlockedDates({
-        month: toMonthKey(monthCursor),
-      });
+  // Phase 3: Combine Calendar API Calls to prevent duplicate fetching and network waterfalls
+  const fetchCalendarData = useCallback(async (signal) => {
+    setCalendarLoading(true);
+    const monthKey = toMonthKey(monthCursor);
 
-      setBlockedDates(response?.blockedDates || {});
+    try {
+      const [, blockedRes] = await Promise.allSettled([
+        apiClient.getAppointmentCalendarAvailability({ month: monthKey }, { signal }),
+        apiClient.getBlockedDates({ month: monthKey }, { signal })
+      ]);
+
+      // Drop stale responses if the user rapidly changed the month
+      if (latestMonthKeyRef.current !== monthKey) return;
+
+      if (blockedRes.status === 'fulfilled') {
+        setBlockedDates(blockedRes.value?.blockedDates || {});
+      } else {
+        setBlockedDates({});
+      }
     } catch (err) {
-      setBlockedDates({});
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
+      if (latestMonthKeyRef.current === monthKey) setBlockedDates({});
+    } finally {
+      if (latestMonthKeyRef.current === monthKey) setCalendarLoading(false);
     }
   }, [monthCursor]);
 
@@ -410,7 +415,7 @@ export default function Appointments() {
       });
 
       // Refresh blocked dates after toggle
-      await fetchBlockedDates();
+      await fetchCalendarData();
 
       return result;
     } catch (err) {
@@ -421,11 +426,13 @@ export default function Appointments() {
 
   // Fetch calendar availability when month changes
   useEffect(() => {
-    fetchCalendarAvailability();
-    fetchBlockedDates();
-  }, [fetchCalendarAvailability, fetchBlockedDates]);
+    const abortController = new AbortController();
+    fetchCalendarData(abortController.signal);
+    return () => abortController.abort();
+  }, [fetchCalendarData]);
 
   useEffect(() => {
+    const abortController = new AbortController();
     const fetchBookingDateDetails = async () => {
       if (!showBookingModal || !createFormData.scheduled_date) {
         setBookingDateDetails(null);
@@ -435,14 +442,17 @@ export default function Appointments() {
       try {
         const details = await apiClient.getAppointmentDateDetails(
           createFormData.scheduled_date,
+          {}, { signal: abortController.signal }
         );
         setBookingDateDetails(details || null);
       } catch (err) {
+        if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
         setBookingDateDetails(null);
       }
     };
 
     fetchBookingDateDetails();
+    return () => abortController.abort();
   }, [showBookingModal, createFormData.scheduled_date]);
 
   // Handle date cell click
@@ -453,6 +463,7 @@ export default function Appointments() {
   };
 
   useEffect(() => {
+    const abortController = new AbortController();
     const fetchSelectedDateDetails = async () => {
       if (!selectedDate || !showDateDetailsModal) {
         return;
@@ -460,9 +471,10 @@ export default function Appointments() {
 
       try {
         setDateDetailsLoading(true);
-        const details = await apiClient.getAppointmentDateDetails(selectedDate);
+        const details = await apiClient.getAppointmentDateDetails(selectedDate, {}, { signal: abortController.signal });
         setSelectedDateDetails(details || null);
       } catch (err) {
+        if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
         setSelectedDateDetails(null);
       } finally {
         setDateDetailsLoading(false);
@@ -470,6 +482,7 @@ export default function Appointments() {
     };
 
     fetchSelectedDateDetails();
+    return () => abortController.abort();
   }, [selectedDate, showDateDetailsModal]);
 
   // Get appointments for a specific date
@@ -625,7 +638,7 @@ export default function Appointments() {
       await apiClient.updateAppointment(appointment.id, { status: "scheduled" });
       await refreshAppointments();
     } catch (err) {
-      setError(err.message || "Failed to approve appointment");
+      setError(err.response?.data?.error || err.message || "Failed to approve appointment");
       console.error("Error approving appointment:", err);
     } finally {
       setRowAction({ id: null, action: null });
@@ -639,7 +652,7 @@ export default function Appointments() {
       await apiClient.completeAppointment(appointment.id, "Completed by admin");
       await refreshAppointments();
     } catch (err) {
-      setError(err.message || "Failed to complete appointment");
+      setError(err.response?.data?.error || err.message || "Failed to complete appointment");
       console.error("Error completing appointment:", err);
     } finally {
       setRowAction({ id: null, action: null });
@@ -697,7 +710,7 @@ export default function Appointments() {
       setSelectedAppointment(null);
       setCancelModalError("");
     } catch (err) {
-      setCancelModalError(err.message || "Failed to cancel appointment");
+      setCancelModalError(err.response?.data?.error || err.message || "Failed to cancel appointment");
       console.error("Error cancelling appointment:", err);
     } finally {
       setIsSubmitting(false);
@@ -883,7 +896,7 @@ export default function Appointments() {
           ...backendFields,
         }));
       }
-      setCreateFormError(err.message || "Failed to create appointment");
+      setCreateFormError(err.response?.data?.error || err.message || "Failed to create appointment");
       console.error("Error creating appointment:", err);
     } finally {
       setIsSubmitting(false);
@@ -976,7 +989,7 @@ export default function Appointments() {
           ...backendFields,
         }));
       }
-      setError(err.message || "Failed to update appointment");
+      setError(err.response?.data?.error || err.message || "Failed to update appointment");
       console.error("Error updating appointment:", err);
     } finally {
       setIsSubmitting(false);

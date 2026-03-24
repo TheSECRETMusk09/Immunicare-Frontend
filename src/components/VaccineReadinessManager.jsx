@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Button, Modal, Select, Alert } from "./UI";
 import apiClient from "../utils/api";
-import { Check, X, Clock, AlertCircle, Lock, Unlock, RefreshCw } from "lucix-react";
+import { Check, X, Clock, AlertCircle, Lock, Unlock, RefreshCw } from "lucide-react";
 
 /**
  * VaccineReadinessManager Component

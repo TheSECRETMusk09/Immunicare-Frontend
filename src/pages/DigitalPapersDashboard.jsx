@@ -56,17 +56,18 @@ export default function DigitalPapersDashboard() {
   const fetchStats = async () => {
     try {
       setLoading(true);
-      const [templates, downloads, completions] = await Promise.all([
+      const [templates, recentDownloads, allDownloads, completions] = await Promise.all([
         apiClient.getPaperTemplates(),
         apiClient.getDownloadHistory({ limit: 10 }),
+        apiClient.getDownloadHistory(), // Fetch absolute totals to prevent artificial shrinkage
         apiClient.getDocumentAlerts({ status: "PENDING", limit: 5 }),
       ]);
 
       setStats({
         totalTemplates: templates.data?.length || 0,
-        totalDownloads: downloads.data?.length || 0,
+        totalDownloads: allDownloads.total || allDownloads.data?.length || allDownloads.length || 0,
         pendingCompletions: completions.data?.length || 0,
-        recentActivity: downloads.data || [],
+        recentActivity: recentDownloads.data || recentDownloads || [],
       });
     } catch (err) {
       setError(err.message);

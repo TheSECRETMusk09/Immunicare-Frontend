@@ -242,7 +242,7 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
       }
     } catch (err) {
       console.error("Error importing vaccines:", err);
-      error(err.message || "Failed to import vaccines");
+      error(err.response?.data?.error || err.message || "Failed to import vaccines");
     } finally {
       setIsImporting(false);
     }
@@ -276,7 +276,7 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
       }
     } catch (err) {
       console.error("Error validating transfer-in case:", err);
-      error(err.message || "Failed to validate transfer-in case");
+      error(err.response?.data?.error || err.message || "Failed to validate transfer-in case");
     } finally {
       setIsValidating(false);
     }
