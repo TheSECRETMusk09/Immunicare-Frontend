@@ -91,6 +91,18 @@ input[data-remember-me-checkbox="true"] {
     width: 100%;
   }
 
+  /* Keep dashboard notification dismiss controls compact.
+     The generic card button rule above also matches theme utility classes like
+     bg-theme-bg-card, which collapses the notification text column on mobile. */
+  .guardian-dashboard-notification-dismiss {
+    width: auto !important;
+    min-width: 44px;
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
   /* Form submit buttons (respect standardized form action containers) */
   button[type="submit"]:not(.form-actions button):not(.form-actions-modern button):not(.form-actions-standardized button):not(.admin-modal-footer button):not(.admin-modal-actions button):not(.guardian-form-actions button),
   .form-submit button:not(.form-actions button):not(.form-actions-modern button):not(.form-actions-standardized button):not(.admin-modal-footer button):not(.admin-modal-actions button):not(.guardian-form-actions button) {

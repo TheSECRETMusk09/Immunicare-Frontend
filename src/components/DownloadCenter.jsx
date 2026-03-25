@@ -32,6 +32,44 @@ const DIGITAL_PAPER_SHORTCUTS = [
   },
 ];
 
+const normalizeDownloadRecord = (record = {}) => ({
+  ...record,
+  template_name: record.template_name || record.title || "Document",
+  template_type: record.template_type || record.document_type || "DOCUMENT",
+  infant_first_name: record.infant_first_name || record.first_name || "",
+  infant_last_name: record.infant_last_name || record.last_name || "",
+  user_first_name: record.user_first_name || record.generated_by_first || "",
+  user_last_name: record.user_last_name || record.generated_by_last || "",
+  download_type: record.download_type || record.document_type || record.template_type || "PDF",
+  download_status:
+    record.download_status ||
+    (String(record.status || "").toUpperCase() || "COMPLETED"),
+  download_date: record.download_date || record.last_downloaded || record.created_at || null,
+});
+
+const triggerDocumentDownload = (blob, downloadId) => {
+  const normalizedBlob = blob instanceof Blob ? blob : new Blob([blob]);
+  const url = window.URL.createObjectURL(normalizedBlob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", `document-${downloadId}.pdf`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
+const formatDownloadDate = (value) => {
+  if (!value) {
+    return "Not available";
+  }
+
+  const parsedDate = new Date(value);
+  return Number.isNaN(parsedDate.getTime())
+    ? "Not available"
+    : parsedDate.toLocaleString();
+};
+
 export default function DownloadCenter({ onRefresh }) {
   const navigate = useNavigate();
   const [downloads, setDownloads] = useState([]);
@@ -60,9 +98,9 @@ export default function DownloadCenter({ onRefresh }) {
         apiClient.getPaperTemplates(),
       ]);
 
-      setDownloads(toArrayPayload(downloadsData) || []);
+      setDownloads((toArrayPayload(downloadsData) || []).map(normalizeDownloadRecord));
       setInfants(Array.isArray(infantsData) ? infantsData : (infantsData?.data || []));
-      setTemplates(templatesData.data || []);
+      setTemplates(templatesData?.data || templatesData || []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -94,27 +132,8 @@ export default function DownloadCenter({ onRefresh }) {
 
   const handleDownload = async (downloadId) => {
     try {
-      const response = await apiClient.customRequest(`/documents/${downloadId}/download`, { responseType: 'blob' });
-      // Handle file download
-      if (response && response.data && typeof response.data === 'object' && response.data.file_path) {
-        const link = document.createElement("a");
-        link.href = response.data.file_path;
-        link.download = response.data.file_name || "document";
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      } else if (response) {
-        // Create download link
-        const blob = response.data instanceof Blob ? response.data : new Blob([response.data || response]);
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.setAttribute("download", `document-${downloadId}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
-      }
+      const blob = await apiClient.downloadDocument(downloadId);
+      triggerDocumentDownload(blob, downloadId);
     } catch (err) {
       setError(err.message);
     }
@@ -332,7 +351,7 @@ export default function DownloadCenter({ onRefresh }) {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                    {new Date(download.download_date).toLocaleString()}
+                    {formatDownloadDate(download.download_date)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
@@ -575,7 +594,7 @@ export default function DownloadCenter({ onRefresh }) {
                 Generated Date
               </label>
               <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-                {new Date(selectedDownload.download_date).toLocaleString()}
+                {formatDownloadDate(selectedDownload.download_date)}
               </p>
             </div>
 

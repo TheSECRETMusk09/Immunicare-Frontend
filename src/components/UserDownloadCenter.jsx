@@ -1,8 +1,46 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button, Input, Modal, Card, Alert } from "./UI";
+import { useAuth } from "../contexts/AuthContext";
 import apiClient from "../utils/api";
 
+const normalizeDownloadRecord = (record = {}) => ({
+  ...record,
+  template_name: record.template_name || record.title || "Document",
+  template_type: record.template_type || record.document_type || "DOCUMENT",
+  infant_first_name: record.infant_first_name || record.first_name || "",
+  infant_last_name: record.infant_last_name || record.last_name || "",
+  download_type: record.download_type || record.document_type || record.template_type || "PDF",
+  download_status:
+    record.download_status ||
+    (String(record.status || "").toUpperCase() || "COMPLETED"),
+  download_date: record.download_date || record.last_downloaded || record.created_at || null,
+});
+
+const triggerDocumentDownload = (blob, downloadId) => {
+  const normalizedBlob = blob instanceof Blob ? blob : new Blob([blob]);
+  const url = window.URL.createObjectURL(normalizedBlob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", `document-${downloadId}.pdf`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
+const formatDownloadDate = (value) => {
+  if (!value) {
+    return "Not available";
+  }
+
+  const parsedDate = new Date(value);
+  return Number.isNaN(parsedDate.getTime())
+    ? "Not available"
+    : parsedDate.toLocaleString();
+};
+
 export default function UserDownloadCenter() {
+  const { guardianId } = useAuth();
   const [downloads, setDownloads] = useState([]);
   const [infants, setInfants] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -17,28 +55,28 @@ export default function UserDownloadCenter() {
     download_type: "PDF",
   });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [downloadsData, infantsData, templatesData] = await Promise.all([
         apiClient.getDownloadHistory({ limit: 50 }),
-        apiClient.getInfants(),
+        guardianId ? apiClient.getInfantsByGuardian(guardianId) : Promise.resolve({ data: [] }),
         apiClient.getPaperTemplates(),
       ]);
 
-      setDownloads(downloadsData.data || []);
+      setDownloads((downloadsData?.data || downloadsData || []).map(normalizeDownloadRecord));
       setInfants(Array.isArray(infantsData) ? infantsData : (infantsData?.data || []));
-      setTemplates(templatesData.data || []);
+      setTemplates(templatesData?.data || templatesData || []);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [guardianId]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleGenerateDocument = async (e) => {
     e.preventDefault();
@@ -61,26 +99,8 @@ export default function UserDownloadCenter() {
 
   const handleDownload = async (downloadId) => {
     try {
-      const response = await apiClient.customRequest(`/documents/${downloadId}/download`, { responseType: 'blob' });
-      // Handle file download
-      if (response && response.data && typeof response.data === 'object' && response.data.file_path) {
-        const link = document.createElement("a");
-        link.href = response.data.file_path;
-        link.download = response.data.file_name || "document";
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      } else if (response) {
-        const blob = response.data instanceof Blob ? response.data : new Blob([response.data || response]);
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.setAttribute("download", `document-${downloadId}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
-      }
+      const blob = await apiClient.downloadDocument(downloadId);
+      triggerDocumentDownload(blob, downloadId);
     } catch (err) {
       setError(err.message);
     }
@@ -250,7 +270,7 @@ export default function UserDownloadCenter() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                      {new Date(download.download_date).toLocaleString()}
+                      {formatDownloadDate(download.download_date)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span

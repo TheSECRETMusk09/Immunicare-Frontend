@@ -5,6 +5,7 @@ import apiClient from "../utils/api";
 import { guardianRoutePaths } from "../utils/routePaths";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
 import GuardianTopHeader from "../components/GuardianTopHeader";
+import GuardianVaccinationCompletionModal from "../components/GuardianVaccinationCompletionModal";
 import { Button, Card, Input } from "../components/UI";
 import {
   Search,
@@ -29,7 +30,33 @@ const resolveProviderName = (record) =>
   record?.administered_by_name ||
   PROVIDER_FALLBACK_LABEL;
 
-const VaccinationRecordCard = ({ vaccine, status, formatDate }) => (
+const normalizeScheduleRecord = (scheduleItem) => ({
+  id:
+    scheduleItem?.recordId ||
+    `schedule-${scheduleItem?.vaccine?.id || scheduleItem?.vaccineId}-${scheduleItem?.dose?.number || scheduleItem?.doseNumber || 1}`,
+  recordId: scheduleItem?.recordId || null,
+  vaccine_id: scheduleItem?.vaccine?.id || scheduleItem?.vaccineId || null,
+  vaccine_name:
+    scheduleItem?.vaccine?.name || scheduleItem?.vaccineName || "Unknown vaccine",
+  dose_no: scheduleItem?.dose?.number || scheduleItem?.doseNumber || 1,
+  total_doses: scheduleItem?.dose?.total || scheduleItem?.totalDoses || 1,
+  due_date: scheduleItem?.schedule?.dueDate || scheduleItem?.dueDate || null,
+  admin_date: scheduleItem?.lastAdministered || scheduleItem?.adminDate || null,
+  status: scheduleItem?.status || "upcoming",
+  isScheduleOnly: !scheduleItem?.recordId,
+  isReady: Boolean(scheduleItem?.isReady),
+  canBeAdministered: Boolean(scheduleItem?.canBeAdministered),
+  schedule_id: scheduleItem?.schedule?.id || scheduleItem?.scheduleId || null,
+  source_facility: scheduleItem?.source_facility || null,
+});
+
+const VaccinationRecordCard = ({
+  vaccine,
+  status,
+  formatDate,
+  actionLabel,
+  onAction,
+}) => (
   <article className="guardian-table-card">
     <div className="guardian-table-card__header">
       <div className="min-w-0">
@@ -68,11 +95,20 @@ const VaccinationRecordCard = ({ vaccine, status, formatDate }) => (
       <div className="guardian-table-card__row">
         <span className="guardian-table-card__label">Action</span>
         <span className="guardian-table-card__value">
+          {actionLabel ? (
+            <button
+              type="button"
+              onClick={() => onAction?.(vaccine)}
+              className="mb-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700"
+            >
+              {actionLabel}
+            </button>
+          ) : null}
           {vaccine.isScheduleOnly
             ? "Awaiting dose"
             : vaccine.admin_date
               ? "Recorded by health center"
-              : "—"}
+              : "Not recorded"}
         </span>
       </div>
     </div>
@@ -93,6 +129,8 @@ export default function UserVaccinationRecords() {
   const [viewMode, setViewMode] = useState("records"); // "records", "schedule", "upcoming"
   const [searchQuery, setSearchQuery] = useState("");
   const [showChildDropdown, setShowChildDropdown] = useState(false);
+  const [vaccinationActionTarget, setVaccinationActionTarget] = useState(null);
+  const [actionFeedback, setActionFeedback] = useState("");
 
   // Readiness state for next-dose prediction
   const [childReadiness, setChildReadiness] = useState(null);
@@ -129,7 +167,7 @@ export default function UserVaccinationRecords() {
     try {
       const [recordsResponse, schedulesResponse] = await Promise.all([
         apiClient.getVaccinationsByInfant(childId),
-        apiClient.getVaccinationSchedulesByInfant(childId),
+        apiClient.getInfantVaccinationSchedule(childId),
       ]);
       // Handle both direct array response and wrapped response
       const recordsData = Array.isArray(recordsResponse)
@@ -147,9 +185,11 @@ export default function UserVaccinationRecords() {
 
       setVaccinationRecords(normalizedRecords);
       setVaccinationSchedules(
-        Array.isArray(schedulesResponse)
-          ? schedulesResponse
-          : schedulesResponse?.data || [],
+        Array.isArray(schedulesResponse?.schedule)
+          ? schedulesResponse.schedule
+          : Array.isArray(schedulesResponse)
+            ? schedulesResponse
+            : schedulesResponse?.data || [],
       );
     } catch (err) {
       console.error("Error fetching vaccination data:", err);
@@ -220,8 +260,48 @@ export default function UserVaccinationRecords() {
     if (selectedChild) {
       fetchVaccinationData(selectedChild.id);
       fetchReadiness(selectedChild.id);
+      setActionFeedback("");
     }
   }, [selectedChild, fetchVaccinationData, fetchReadiness]);
+
+  const normalizedScheduleRecords = useMemo(
+    () => vaccinationSchedules.map((scheduleItem) => normalizeScheduleRecord(scheduleItem)),
+    [vaccinationSchedules],
+  );
+
+  const pendingConfirmationCount = useMemo(
+    () =>
+      normalizedScheduleRecords.filter(
+        (record) => String(record.status || "").toLowerCase() === "pending_confirmation",
+      ).length,
+    [normalizedScheduleRecords],
+  );
+
+  const resolveActionLabel = (vaccine) => {
+    if (vaccine.admin_date || String(vaccine.status || "").toLowerCase() === "completed") {
+      return "Edit Date";
+    }
+
+    return "Mark Completed";
+  };
+
+  const openVaccinationActionModal = (vaccine) => {
+    setVaccinationActionTarget(vaccine);
+  };
+
+  const handleVaccinationActionSuccess = useCallback(
+    async (message) => {
+      if (!selectedChild?.id) {
+        return;
+      }
+
+      await fetchVaccinationData(selectedChild.id);
+      await fetchReadiness(selectedChild.id);
+      setVaccinationActionTarget(null);
+      setActionFeedback(message);
+    },
+    [fetchReadiness, fetchVaccinationData, selectedChild],
+  );
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -280,8 +360,30 @@ export default function UserVaccinationRecords() {
   }, [vaccinationRecords]);
 
   const getVaccineStatus = (vaccine) => {
-    if (vaccine.admin_date || String(vaccine.status || "").toLowerCase() === "completed") {
+    const normalizedStatus = String(vaccine.status || "").toLowerCase();
+
+    if (vaccine.admin_date || normalizedStatus === "completed") {
       return { status: "Completed", color: "green", label: "Completed" };
+    }
+
+    if (normalizedStatus === "ready") {
+      return { status: "Ready", color: "green", label: "Ready" };
+    }
+
+    if (normalizedStatus === "pending_confirmation") {
+      return {
+        status: "Pending Confirmation",
+        color: "yellow",
+        label: "Pending Confirmation",
+      };
+    }
+
+    if (normalizedStatus === "due_soon") {
+      return { status: "Due Soon", color: "yellow", label: "Due Soon" };
+    }
+
+    if (normalizedStatus === "upcoming") {
+      return { status: "Upcoming", color: "gray", label: "Upcoming" };
     }
 
     if (!vaccine.due_date) {
@@ -305,7 +407,13 @@ export default function UserVaccinationRecords() {
 
   // Filter records based on search and view mode
   const filteredRecords = useMemo(() => {
-    let records = [...vaccinationRecords];
+    let records =
+      viewMode === "records"
+        ? [...vaccinationRecords]
+        : normalizedScheduleRecords.map((record) => ({
+            ...record,
+            provider_name: resolveProviderName(record),
+          }));
 
     // Filter by search
     if (searchQuery) {
@@ -319,47 +427,14 @@ export default function UserVaccinationRecords() {
 
     // Filter by view mode
     if (viewMode === "upcoming") {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
       records = records.filter((v) => {
-        if (v.admin_date) return false;
-        if (!v.due_date) return true;
-        const dueDate = new Date(v.due_date);
-        dueDate.setHours(0, 0, 0, 0);
-        const daysUntilDue = Math.ceil(
-          (dueDate - today) / (1000 * 60 * 60 * 24),
-        );
-        return daysUntilDue >= 0;
-      });
-    } else if (viewMode === "schedule") {
-      // Show all scheduled vaccines with their expected timing
-      records = vaccinationSchedules.map((schedule) => {
-        const scheduleVaccineId = schedule.vaccine_id || schedule.vaccineId;
-        const scheduleDoseNumber = schedule.dose_number || schedule.doseNumber || 1;
-        const existingRecord = vaccinationRecords.find(
-          (r) =>
-            r.vaccine_id === scheduleVaccineId &&
-            Number(r.dose_no || r.dose_number || 1) === Number(scheduleDoseNumber),
-        );
-        return (
-          existingRecord || {
-            ...schedule,
-            vaccine_id: scheduleVaccineId,
-            vaccine_name: schedule.vaccine_name || schedule.vaccineName,
-            dose_no: scheduleDoseNumber,
-            due_date: schedule.dueDate || schedule.due_date || null,
-            admin_date: null,
-            status:
-              schedule.status ||
-              (schedule.isOverdue ? "overdue" : schedule.isNextDueDose ? "pending" : "upcoming"),
-            isScheduleOnly: true,
-          }
-        );
+        const normalizedStatus = String(v.status || "").toLowerCase();
+        return !["completed", "overdue"].includes(normalizedStatus);
       });
     }
 
     return records;
-  }, [vaccinationRecords, vaccinationSchedules, searchQuery, viewMode]);
+  }, [normalizedScheduleRecords, searchQuery, vaccinationRecords, viewMode]);
 
   const handleChildSelect = (child) => {
     setShowChildDropdown(false);
@@ -579,12 +654,12 @@ export default function UserVaccinationRecords() {
           </div>
 
           {/* Summary Cards - Child Specific Only */}
-          <div className="grid grid-cols-1 min-[480px]:grid-cols-2 min-[1025px]:grid-cols-3 gap-3">
-            <Card className="p-4 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+          <div className="guardian-vaccination-summary-grid grid grid-cols-1 min-[480px]:grid-cols-2 min-[1025px]:grid-cols-3 gap-3">
+            <Card className="guardian-vaccination-summary-card p-4 flex items-center gap-4">
+              <div className="guardian-vaccination-summary-card__icon w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
                 <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
               </div>
-              <div>
+              <div className="guardian-vaccination-summary-card__body">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                   {stats.completed}
                 </p>
@@ -594,11 +669,11 @@ export default function UserVaccinationRecords() {
               </div>
             </Card>
 
-            <Card className="p-4 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
+            <Card className="guardian-vaccination-summary-card p-4 flex items-center gap-4">
+              <div className="guardian-vaccination-summary-card__icon w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
                 <Clock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
               </div>
-              <div>
+              <div className="guardian-vaccination-summary-card__body">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                   {stats.upcoming}
                 </p>
@@ -608,11 +683,11 @@ export default function UserVaccinationRecords() {
               </div>
             </Card>
 
-            <Card className="p-4 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+            <Card className="guardian-vaccination-summary-card p-4 flex items-center gap-4">
+              <div className="guardian-vaccination-summary-card__icon w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
                 <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
               </div>
-              <div>
+              <div className="guardian-vaccination-summary-card__body">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                   {stats.overdue}
                 </p>
@@ -712,6 +787,21 @@ export default function UserVaccinationRecords() {
             </div>
           )}
 
+          {actionFeedback ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+              {actionFeedback}
+            </div>
+          ) : null}
+
+          {pendingConfirmationCount > 0 ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              Your child is old enough for at least one next dose, but this health center has not
+              yet confirmed readiness for on-site administration. If the vaccine was already given
+              elsewhere, use <span className="font-semibold">Mark Completed</span>, enter the
+              administered date, and upload the transfer file or vaccination proof.
+            </div>
+          ) : null}
+
           {/* Loading State for Readiness */}
           {selectedChild && readinessLoading && (
             <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 flex items-center justify-center">
@@ -741,7 +831,7 @@ export default function UserVaccinationRecords() {
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
                 }`}
               >
-                <Calendar className="w-4 h-4" /> Schedule
+                <Calendar className="w-4 h-4" /> Scheduling
               </button>
               <button
                 onClick={() => setViewMode("upcoming")}
@@ -784,6 +874,8 @@ export default function UserVaccinationRecords() {
                           vaccine={vaccine}
                           status={status}
                           formatDate={formatDate}
+                          actionLabel={resolveActionLabel(vaccine)}
+                          onAction={openVaccinationActionModal}
                         />
                       );
                     })}
@@ -865,12 +957,19 @@ export default function UserVaccinationRecords() {
                                 </span>
                               </td>
                               <td className="px-4 py-4 whitespace-nowrap text-sm">
+                                <button
+                                  type="button"
+                                  onClick={() => openVaccinationActionModal(vaccine)}
+                                  className="mb-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700"
+                                >
+                                  {resolveActionLabel(vaccine)}
+                                </button>
                                 <span className="text-xs text-gray-400 dark:text-gray-500">
                                   {vaccine.isScheduleOnly
                                     ? "Awaiting dose"
                                     : vaccine.admin_date
                                       ? "Recorded by health center"
-                                      : "—"}
+                                      : "Not recorded"}
                                 </span>
                               </td>
                             </tr>
@@ -899,6 +998,14 @@ export default function UserVaccinationRecords() {
         </>
       )}
       </main>
+
+      <GuardianVaccinationCompletionModal
+        isOpen={Boolean(vaccinationActionTarget)}
+        onClose={() => setVaccinationActionTarget(null)}
+        child={selectedChild}
+        vaccination={vaccinationActionTarget}
+        onSuccess={handleVaccinationActionSuccess}
+      />
     </div>
   );
 }

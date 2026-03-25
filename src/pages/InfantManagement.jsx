@@ -8,6 +8,7 @@ import ImmunizationChart from "../components/ImmunizationChart";
 import TransferInCases from "./TransferInCases";
 import AddInfantModal from "../components/AddInfantModal";
 import InjectVaccineModal from "../components/InjectVaccineModal";
+import VaccineReadinessManager from "../components/VaccineReadinessManager";
 import useInfantManagementSocket from "../hooks/useInfantManagementSocket";
 import { normalizeInfantsResponse } from "../utils/adminDataAdapters";
 import {
@@ -85,6 +86,8 @@ export default function InfantManagement() {
   const [activeView, setActiveView] = useState("list"); // 'list', 'schedule', 'records', 'personal', 'chart'
   const [showAddModal, setShowAddModal] = useState(false);
   const [showInjectModal, setShowInjectModal] = useState(false);
+  const [showReadinessModal, setShowReadinessModal] = useState(false);
+  const [readinessTargetInfant, setReadinessTargetInfant] = useState(null);
   const [recordVaccinationPrefill, setRecordVaccinationPrefill] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
@@ -236,6 +239,16 @@ export default function InfantManagement() {
   const handleAddSuccess = () => {
     setShowAddModal(false);
     void fetchInfants();
+  };
+
+  const openReadinessManager = (infant) => {
+    setReadinessTargetInfant(infant || null);
+    setShowReadinessModal(true);
+  };
+
+  const closeReadinessManager = () => {
+    setShowReadinessModal(false);
+    setReadinessTargetInfant(null);
   };
 
   // Centralized filter + memory-safe chunking
@@ -463,6 +476,15 @@ export default function InfantManagement() {
       >
         <BarChart2 className="w-4 h-4" /> Chart
       </Button>
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() => openReadinessManager(row)}
+        className="gap-1.5"
+        title="Manage vaccine readiness"
+      >
+        Ready
+      </Button>
     </div>
   );
 
@@ -536,6 +558,14 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
               </div>
             </div>
           </div>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => openReadinessManager(selectedInfant)}
+          >
+            Manage Readiness
+          </Button>
 
           <div className="flex flex-wrap gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
             <button
@@ -896,6 +926,20 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSuccess={handleAddSuccess}
+      />
+
+      <VaccineReadinessManager
+        isOpen={showReadinessModal}
+        onClose={closeReadinessManager}
+        infantId={readinessTargetInfant?.id}
+        infantName={
+          readinessTargetInfant
+            ? `${readinessTargetInfant.first_name} ${readinessTargetInfant.last_name}`
+            : ""
+        }
+        onSuccess={() => {
+          void fetchInfants(true);
+        }}
       />
 
       {/* Inject Vaccine Modal */}

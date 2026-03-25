@@ -104,6 +104,61 @@ const getEventColor = (status) => {
   }
 };
 
+const isVaccinationAppointmentType = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return true;
+  return normalized.includes("vacc");
+};
+
+const getEligibleReadinessEntries = (readiness = null) => {
+  const safeReadiness =
+    readiness && typeof readiness === "object" ? readiness : {};
+
+  return [
+    ...(Array.isArray(safeReadiness.overdueVaccines)
+      ? safeReadiness.overdueVaccines
+      : []),
+    ...(Array.isArray(safeReadiness.dueVaccines)
+      ? safeReadiness.dueVaccines
+      : []),
+  ];
+};
+
+const getReadinessAlertConfig = (readiness = null) => {
+  const status = String(readiness?.readinessStatus || "").toUpperCase();
+  const primaryLabel = getEligibleReadinessEntries(readiness)[0]?.label || null;
+
+  switch (status) {
+    case "OVERDUE":
+      return {
+        variant: "warning",
+        message: primaryLabel
+          ? `${primaryLabel} is overdue and ready to schedule.`
+          : "A vaccine is overdue and ready to schedule.",
+      };
+    case "READY":
+      return {
+        variant: "success",
+        message: primaryLabel
+          ? `${primaryLabel} is ready to schedule now.`
+          : "This child is ready to schedule the next vaccine.",
+      };
+    case "PENDING_CONFIRMATION":
+      return {
+        variant: "warning",
+        message:
+          "This child is waiting for health center confirmation before a vaccination appointment can be booked.",
+      };
+    case "UPCOMING":
+      return {
+        variant: "info",
+        message: "This child is not yet eligible for the next vaccination appointment.",
+      };
+    default:
+      return null;
+  }
+};
+
 const canMutateAppointment = (status) => !["completed", "attended", "cancelled"].includes(status);
 const CALENDAR_WEEK_START = 0; // Sunday-first column order (Sun ... Sat)
 
@@ -118,6 +173,8 @@ export default function GuardianAppointmentsPage() {
   const [children, setChildren] = useState([]);
   const [vaccines, setVaccines] = useState([]);
   const [appointments, setAppointments] = useState([]);
+  const [selectedChildReadiness, setSelectedChildReadiness] = useState(null);
+  const [childReadinessLoading, setChildReadinessLoading] = useState(false);
 
   // FullCalendar state (from Admin Dashboard)
   const [calendarView, setCalendarView] = useState("dayGridMonth");
@@ -169,6 +226,54 @@ export default function GuardianAppointmentsPage() {
     type: "Vaccination",
     notes: "",
   });
+
+  const selectedChild = useMemo(() => (
+    children.find((child) => String(child.id) === String(formData.infant_id)) || null
+  ), [children, formData.infant_id]);
+
+  const isVaccinationFlow = useMemo(() => (
+    isVaccinationAppointmentType(formData.type)
+  ), [formData.type]);
+
+  const eligibleVaccines = useMemo(() => {
+    const eligibleEntries = getEligibleReadinessEntries(selectedChildReadiness);
+    const eligibleIds = new Set();
+
+    return eligibleEntries.reduce((accumulator, entry) => {
+      const vaccineId = Number.parseInt(entry?.vaccineId, 10);
+      if (!Number.isInteger(vaccineId) || vaccineId <= 0 || eligibleIds.has(vaccineId)) {
+        return accumulator;
+      }
+
+      eligibleIds.add(vaccineId);
+      const matchingVaccine = vaccines.find(
+        (vaccine) => Number.parseInt(vaccine?.id, 10) === vaccineId,
+      );
+
+      accumulator.push({
+        id: vaccineId,
+        label:
+          matchingVaccine?.name ||
+          matchingVaccine?.vaccine_name ||
+          entry?.label ||
+          `Vaccine #${vaccineId}`,
+      });
+      return accumulator;
+    }, []);
+  }, [selectedChildReadiness, vaccines]);
+
+  const readinessAlert = useMemo(() => (
+    isVaccinationFlow ? getReadinessAlertConfig(selectedChildReadiness) : null
+  ), [isVaccinationFlow, selectedChildReadiness]);
+
+  const bookingBlockedByReadiness = useMemo(() => {
+    if (!isVaccinationFlow || !formData.infant_id) {
+      return false;
+    }
+
+    const status = String(selectedChildReadiness?.readinessStatus || "").toUpperCase();
+    return status === "PENDING_CONFIRMATION" || status === "UPCOMING";
+  }, [formData.infant_id, isVaccinationFlow, selectedChildReadiness]);
 
   const calendarCurrentLabel = useMemo(() => {
     const safeCurrentDate =
@@ -559,6 +664,74 @@ export default function GuardianAppointmentsPage() {
   }, [bootstrapPage]);
 
   useEffect(() => {
+    if (!isVaccinationFlow) {
+      setSelectedChildReadiness(null);
+      setChildReadinessLoading(false);
+      setFormData((previous) => (
+        previous.vaccine_id ? { ...previous, vaccine_id: "" } : previous
+      ));
+    }
+  }, [isVaccinationFlow]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncSelectedChildReadiness = async () => {
+      const infantId = Number.parseInt(formData.infant_id, 10);
+      if (!showBookingModal || !guardianId || !isVaccinationFlow || !Number.isInteger(infantId)) {
+        setSelectedChildReadiness(null);
+        setChildReadinessLoading(false);
+        return;
+      }
+
+      setChildReadinessLoading(true);
+
+      try {
+        const response = await apiClient.getVaccinationReadiness(infantId);
+        if (cancelled) {
+          return;
+        }
+
+        const readiness = response?.success ? response.data : response?.data || null;
+        setSelectedChildReadiness(readiness);
+
+        const eligibleIdList = getEligibleReadinessEntries(readiness)
+          .map((entry) => String(entry?.vaccineId))
+          .filter(Boolean);
+        const eligibleIds = new Set(
+          eligibleIdList,
+        );
+
+        setFormData((previous) => {
+          if (eligibleIdList.length === 0) {
+            return previous.vaccine_id ? { ...previous, vaccine_id: "" } : previous;
+          }
+
+          if (previous.vaccine_id && eligibleIds.has(String(previous.vaccine_id))) {
+            return previous;
+          }
+
+          return { ...previous, vaccine_id: eligibleIdList[0] };
+        });
+      } catch (readinessError) {
+        if (!cancelled) {
+          setSelectedChildReadiness(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setChildReadinessLoading(false);
+        }
+      }
+    };
+
+    syncSelectedChildReadiness();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.infant_id, guardianId, isVaccinationFlow, showBookingModal]);
+
+  useEffect(() => {
     const abortController = new AbortController();
     fetchCalendarAvailability(abortController.signal);
     return () => abortController.abort();
@@ -689,6 +862,19 @@ export default function GuardianAppointmentsPage() {
 
     if (!formData.infant_id || !formData.scheduled_date || !formData.scheduled_time) {
       setError("Please select a child, date, and time before submitting.");
+      return;
+    }
+
+    if (isVaccinationFlow && childReadinessLoading) {
+      setError("Please wait while we confirm the child's vaccine readiness.");
+      return;
+    }
+
+    if (bookingBlockedByReadiness) {
+      setError(
+        readinessAlert?.message ||
+          "This child is not yet eligible for a vaccination appointment.",
+      );
       return;
     }
 
@@ -1256,18 +1442,45 @@ export default function GuardianAppointmentsPage() {
               ))}
             </Select>
 
-            <Select
-              label="Vaccine (optional)"
-              value={formData.vaccine_id}
-              onChange={(event) => setFormData((previous) => ({ ...previous, vaccine_id: event.target.value }))}
-            >
-              <option value="">Auto-assign based on schedule</option>
-              {vaccines.map((vaccine) => (
-                <option key={vaccine.id} value={vaccine.id}>
-                  {vaccine.name || vaccine.vaccine_name}
-                </option>
-              ))}
-            </Select>
+            {selectedChild?.latest_transfer_case_status === "for_validation" && (
+              <Alert variant="warning">
+                This child's transfer records are still under review. Vaccination booking will stay locked until the health center confirms the transferred doses.
+              </Alert>
+            )}
+
+            {isVaccinationFlow && (
+              <>
+                {childReadinessLoading ? (
+                  <Alert variant="info">Checking vaccine readiness for the selected child...</Alert>
+                ) : (
+                  readinessAlert && (
+                    <Alert variant={readinessAlert.variant}>{readinessAlert.message}</Alert>
+                  )
+                )}
+
+                <Select
+                  label="Eligible Vaccine"
+                  value={formData.vaccine_id}
+                  onChange={(event) => setFormData((previous) => ({ ...previous, vaccine_id: event.target.value }))}
+                  disabled={!formData.infant_id || childReadinessLoading || bookingBlockedByReadiness}
+                >
+                  <option value="">
+                    {!formData.infant_id
+                      ? "Select child first"
+                      : childReadinessLoading
+                        ? "Checking readiness..."
+                        : eligibleVaccines.length > 0
+                          ? "Auto-select next eligible vaccine"
+                          : "No eligible vaccine available yet"}
+                  </option>
+                  {eligibleVaccines.map((vaccine) => (
+                    <option key={vaccine.id} value={vaccine.id}>
+                      {vaccine.label}
+                    </option>
+                  ))}
+                </Select>
+              </>
+            )}
 
             {isPhilippineHoliday(formData.scheduled_date) && (
               <Alert variant="warning">
@@ -1365,6 +1578,8 @@ export default function GuardianAppointmentsPage() {
                 actionRole="primary"
                 loading={formSubmitting}
                 disabled={
+                  childReadinessLoading ||
+                  bookingBlockedByReadiness ||
                   (availabilityFeedback ? !availabilityFeedback.available : false) ||
                   timeSlotsLoading ||
                   (timeSlotsFeedback ? !timeSlotsFeedback.available : false) ||

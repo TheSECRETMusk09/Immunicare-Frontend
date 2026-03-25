@@ -97,6 +97,12 @@ const clearAuthStorage = () => {
   safeLocalStorage.removeItem("rememberMe");
 };
 
+const isRequestCanceled = (error) =>
+  axios.isCancel(error) ||
+  error?.code === "ERR_CANCELED" ||
+  error?.name === "CanceledError" ||
+  error?.message === "canceled";
+
 const persistAuthSession = ({ accessToken, user, rememberMe = false } = {}) => {
   const targetStorage = rememberMe ? safeLocalStorage : safeSessionStorage;
   const secondaryStorage = rememberMe ? safeSessionStorage : safeLocalStorage;
@@ -239,6 +245,10 @@ axiosRetry(axiosClient, {
     return retryCount * 1000; // exponential backoff
   },
   retryCondition: (error) => {
+    if (isRequestCanceled(error)) {
+      return false;
+    }
+
     if (!canRetryRequest(error.config)) {
       return false;
     }
@@ -331,6 +341,10 @@ axiosClient.interceptors.response.use(
     const originalRequest = error.config;
 
     if (!originalRequest) {
+      return Promise.reject(error);
+    }
+
+    if (isRequestCanceled(error)) {
       return Promise.reject(error);
     }
 
@@ -450,7 +464,9 @@ class ApiClient {
       .request(requestConfig)
       .then((response) => response.data)
       .catch((error) => {
-        console.error("API request failed:", error);
+        if (!isRequestCanceled(error)) {
+          console.error("API request failed:", error);
+        }
         throw error;
       })
       .finally(() => {
@@ -499,16 +515,30 @@ class ApiClient {
 
   // Custom request method for non-standard endpoints
   async customRequest(url, options = {}) {
-    try {
-      const response = await this.client.request({
-        url,
-        ...options,
-      });
-      return response;
-    } catch (error) {
-      console.error("Custom API request failed:", error);
-      throw error;
+      try {
+        const response = await this.client.request({
+          url,
+          ...options,
+        });
+        return response;
+      } catch (error) {
+        if (!isRequestCanceled(error)) {
+          console.error("Custom API request failed:", error);
+        }
+        throw error;
+      }
     }
+
+  async uploadFile(file, fieldName = "file") {
+    const formData = new FormData();
+    formData.append(fieldName, file);
+
+    const response = await this.customRequest("/uploads/upload", {
+      method: "POST",
+      data: formData,
+    });
+
+    return response?.data || response;
   }
 
   // Auth endpoints
@@ -866,6 +896,13 @@ class ApiClient {
     });
   }
 
+  async registerGuardianTransferChild(payload) {
+    return this.request("/transfer-in-cases/register-child", {
+      method: "POST",
+      data: payload,
+    });
+  }
+
   async getTransferInCases(filters = {}) {
     const params = new URLSearchParams(filters);
     const suffix = params.toString() ? `?${params.toString()}` : "";
@@ -981,10 +1018,24 @@ class ApiClient {
     });
   }
 
-  async updateGuardianVaccinationAdminDate(id, admin_date) {
+  async markGuardianVaccinationCompleted(recordData) {
+    return this.request("/vaccinations/records/guardian-complete", {
+      method: "POST",
+      data: recordData,
+    });
+  }
+
+  async updateGuardianVaccinationAdminDate(id, adminDateOrPayload) {
+    const payload =
+      adminDateOrPayload &&
+      typeof adminDateOrPayload === "object" &&
+      !Array.isArray(adminDateOrPayload)
+        ? adminDateOrPayload
+        : { admin_date: adminDateOrPayload };
+
     return this.request(`/vaccinations/records/${id}/guardian-date`, {
       method: "PUT",
-      data: { admin_date },
+      data: payload,
     });
   }
 
@@ -1587,7 +1638,10 @@ class ApiClient {
   }
 
   async downloadDocument(downloadId) {
-    return this.request(`/documents/download/${downloadId}`);
+    return this.request(`/documents/download/${downloadId}`, {
+      method: "GET",
+      responseType: "blob",
+    });
   }
 
   async getDocumentAnalytics(filters = {}) {

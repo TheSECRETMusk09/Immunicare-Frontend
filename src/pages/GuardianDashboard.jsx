@@ -29,7 +29,6 @@ import { useAuth } from '../contexts/AuthContext';
 import apiClient from '../utils/api';
 import { triggerGuardianAddChildModal } from '../components/QuickActionFAB';
 import guardianNotificationService from '../services/guardianNotificationService';
-import TransferVaccinationHistory from '../components/VaccinationManagement/TransferVaccinationHistory';
 import { trackEvent } from '../utils/telemetry';
 import ErrorBoundary from '../components/ErrorBoundary';
 
@@ -68,6 +67,84 @@ const inferNotificationType = (notification = {}) => {
   if (rawType.includes('alert') || rawType.includes('error') || rawType.includes('warning')) return 'alert';
   return 'info';
 };
+
+const buildDueVaccineIdentity = (child, vaccine, dueDate) => {
+  const vaccineId =
+    vaccine?.schedule?.vaccineId ||
+    vaccine?.vaccine?.id ||
+    vaccine?.id ||
+    vaccine?.vaccineId ||
+    vaccine?.name ||
+    'vaccine';
+  const doseNumber =
+    vaccine?.schedule?.doseNumber ||
+    vaccine?.dose?.number ||
+    vaccine?.doseNumber ||
+    vaccine?.dose_no ||
+    vaccine?.dose_number ||
+    'dose';
+  const dueDateKey =
+    dueDate ||
+    vaccine?.schedule?.dueDate ||
+    vaccine?.dueDate ||
+    vaccine?.scheduledDate ||
+    'no-date';
+
+  return `${child?.id || 'child'}-${vaccineId}-${doseNumber}-${dueDateKey}`;
+};
+
+const TRANSFER_STATUS_META = {
+  approved: {
+    label: 'Transfer Approved',
+    className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  },
+  for_validation: {
+    label: 'Transfer Review',
+    className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+  },
+  needs_clarification: {
+    label: 'Needs Clarification',
+    className: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',
+  },
+  rejected: {
+    label: 'Transfer Rejected',
+    className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+  },
+};
+
+const APPOINTMENT_STATUS_META = {
+  scheduled: {
+    label: 'Scheduled',
+    className: 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300',
+  },
+  confirmed: {
+    label: 'Confirmed',
+    className: 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300',
+  },
+  rescheduled: {
+    label: 'Rescheduled',
+    className: 'bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300',
+  },
+  pending: {
+    label: 'Pending',
+    className: 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300',
+  },
+  attended: {
+    label: 'Attended',
+    className: 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300',
+  },
+  cancelled: {
+    label: 'Cancelled',
+    className: 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300',
+  },
+  no_show: {
+    label: 'No Show',
+    className: 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300',
+  },
+};
+
+const getAppointmentStatusMeta = (status) =>
+  APPOINTMENT_STATUS_META[String(status || '').toLowerCase()] || APPOINTMENT_STATUS_META.scheduled;
 
 // ============================================
 // SKELETON LOADING COMPONENTS
@@ -278,11 +355,11 @@ const NotificationItem = ({ notification, onDismiss }) => {
   const colorClass = getColor(notification.type || 'info');
 
   return (
-    <div className="flex items-start gap-3 p-3 rounded-xl bg-theme-bg-card border border-theme-border-primary hover:shadow-sm transition-shadow">
+    <div className="guardian-dashboard-notification-item flex items-start gap-3 p-3 rounded-xl bg-theme-bg-card border border-theme-border-primary hover:shadow-sm transition-shadow">
       <div className={`p-2 rounded-lg ${colorClass} flex-shrink-0`}>
         <Icon className="w-4 h-4" />
       </div>
-      <div className="flex-1 min-w-0">
+      <div className="guardian-dashboard-notification-content flex-1 min-w-0">
         <p className="text-sm font-medium text-theme-primary leading-snug break-words">
           {notification.title || notification.message?.substring(0, 50)}
         </p>
@@ -295,8 +372,9 @@ const NotificationItem = ({ notification, onDismiss }) => {
       </div>
       {onDismiss && (
         <button
+          type="button"
           onClick={() => onDismiss(notification.id)}
-          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          className="guardian-dashboard-notification-dismiss text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
         >
           <X className="w-4 h-4" />
         </button>
@@ -377,10 +455,6 @@ const GuardianDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // State for transfer vaccination modal
-  const [showTransferModal, setShowTransferModal] = useState(false);
-  const [selectedInfant, setSelectedInfant] = useState(null);
-
   // Fetch data from API
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
@@ -418,6 +492,29 @@ const GuardianDashboard = () => {
         }));
       }
       setChildren(childrenData);
+
+      const vaccinationScheduleResponses = await Promise.allSettled(
+        childrenData.map((child) => apiClient.getInfantVaccinationSchedule(child.id)),
+      );
+
+      const vaccinationScheduleMap = new Map();
+      vaccinationScheduleResponses.forEach((response, index) => {
+        const childId = childrenData[index]?.id;
+        if (!childId) {
+          return;
+        }
+
+        if (response.status === 'fulfilled') {
+          const normalizedSchedule =
+            normalizeArrayPayload(response.value, ['schedule']) ||
+            response.value?.schedule ||
+            [];
+          vaccinationScheduleMap.set(childId, normalizedSchedule);
+          return;
+        }
+
+        vaccinationScheduleMap.set(childId, []);
+      });
 
       // Process appointments data
       let appointmentsData = [];
@@ -473,27 +570,51 @@ const GuardianDashboard = () => {
 
       // Calculate due/overdue vaccinations
       const dueVaccinesList = [];
+      const seenDueVaccines = new Set();
       childrenData.forEach(child => {
-        const childDueVaccines = child.vaccinations?.filter(v => {
+        const scheduleEntries = vaccinationScheduleMap.get(child.id);
+        const candidateVaccines = Array.isArray(scheduleEntries) && scheduleEntries.length > 0
+          ? scheduleEntries
+          : child.vaccinations || [];
+
+        const childDueVaccines = candidateVaccines.filter(v => {
           if (v.status === 'completed') return false;
-          const dueDate = v.dueDate || v.scheduledDate;
+          const dueDate =
+            v.schedule?.dueDate ||
+            v.dueDate ||
+            v.scheduledDate;
           if (!dueDate) return false;
           const due = new Date(dueDate);
           const daysUntil = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
           return daysUntil <= 30; // Due within 30 days
-        }) || [];
+        });
 
         childDueVaccines.forEach(vaccine => {
-          const dueDate = vaccine.dueDate || vaccine.scheduledDate;
+          const dueDate =
+            vaccine.schedule?.dueDate ||
+            vaccine.dueDate ||
+            vaccine.scheduledDate;
           const daysUntil = Math.ceil((new Date(dueDate) - today) / (1000 * 60 * 60 * 24));
+          const dueVaccineId = buildDueVaccineIdentity(child, vaccine, dueDate);
+
+          if (seenDueVaccines.has(dueVaccineId)) {
+            return;
+          }
+
+          seenDueVaccines.add(dueVaccineId);
           dueVaccinesList.push({
-            id: `${child.id}-${vaccine.id}`,
+            id: dueVaccineId,
             childId: child.id,
             childName: child.name || `${child.first_name} ${child.last_name}`.trim(),
-            vaccineName: vaccine.name || vaccine.vaccineName,
+            vaccineName:
+              vaccine.vaccine?.name ||
+              vaccine.name ||
+              vaccine.vaccineName,
             dueDate: dueDate,
             daysUntilDue: daysUntil,
-            status: daysUntil < 0 ? 'overdue' : daysUntil <= 7 ? 'due_soon' : 'upcoming',
+            status:
+              vaccine.status ||
+              (daysUntil < 0 ? 'overdue' : daysUntil <= 7 ? 'due_soon' : 'upcoming'),
           });
         });
       });
@@ -893,18 +1014,12 @@ const GuardianDashboard = () => {
               <span className="text-xs sm:text-sm font-semibold guardian-dashboard-quick-action__label text-center">Records</span>
             </button>
             <button
-              onClick={() => {
-                // Open transfer modal - need to select a child first
-                if (children.length > 0) {
-                  setSelectedInfant(children[0]);
-                  setShowTransferModal(true);
-                } else {
-                  navigate('/guardian/children');
-                  setTimeout(() => {
-                    triggerGuardianAddChildModal();
-                  }, 0);
-                }
-              }}
+              onClick={() => navigate('/guardian/children', {
+                state: {
+                  openGuardianRegistrationModal: true,
+                  registrationType: 'transfer',
+                },
+              })}
               className="guardian-quick-action-btn guardian-dashboard-quick-action flex flex-col items-center justify-center p-4 sm:p-5 bg-gradient-to-br from-cyan-500 to-cyan-600 dark:from-cyan-600 dark:to-cyan-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 min-h-[100px] sm:min-h-[120px]"
             >
               <ArrowRightCircle className="w-6 h-6 sm:w-7 sm:h-7 guardian-dashboard-quick-action__icon mb-2" />
@@ -1005,6 +1120,11 @@ const GuardianDashboard = () => {
                               ID: {child.controlNumber}
                             </p>
                           )}
+                          {child.latest_transfer_case_status && TRANSFER_STATUS_META[child.latest_transfer_case_status] && (
+                            <span className={`inline-flex mt-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${TRANSFER_STATUS_META[child.latest_transfer_case_status].className}`}>
+                              {TRANSFER_STATUS_META[child.latest_transfer_case_status].label}
+                            </span>
+                          )}
                           <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-medium">
                             {Number(child.completed_vaccinations || 0)} completed • {Number(child.pending_vaccinations || 0)} pending
                           </p>
@@ -1057,6 +1177,7 @@ const GuardianDashboard = () => {
                 <div className="space-y-3">
                   {appointments.slice(0, 3).map((appointment) => {
                     const dateInfo = formatAppointmentDate(appointment.scheduledDate || appointment.date);
+                    const statusMeta = getAppointmentStatusMeta(appointment.status);
                     return (
                       <div
                         key={appointment.id}
@@ -1081,8 +1202,8 @@ const GuardianDashboard = () => {
                               </p>
                             )}
                           </div>
-                          <span className="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold rounded-full flex-shrink-0">
-                            {appointment.status === 'confirmed' ? 'Confirmed' : 'Scheduled'}
+                          <span className={`px-2.5 py-1 text-xs font-bold rounded-full flex-shrink-0 ${statusMeta.className}`}>
+                            {statusMeta.label}
                           </span>
                         </div>
                       </div>
@@ -1148,23 +1269,6 @@ const GuardianDashboard = () => {
         </main>
         </div>
       </div>
-
-      {/* Transfer Vaccination History Modal */}
-      {showTransferModal && selectedInfant && (
-        <TransferVaccinationHistory
-          infantId={selectedInfant.id}
-          infantName={selectedInfant.name || `${selectedInfant.first_name} ${selectedInfant.last_name}`}
-          onClose={() => {
-            setShowTransferModal(false);
-            setSelectedInfant(null);
-          }}
-          onSuccess={(result) => {
-            setShowTransferModal(false);
-            setSelectedInfant(null);
-            fetchDashboardData();
-          }}
-        />
-      )}
     </div>
   );
 };

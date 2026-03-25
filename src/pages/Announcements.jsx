@@ -357,7 +357,7 @@ const Announcements = () => {
   }
 
   return (
-    <div className="space-y-6 px-6">
+    <div className="flex h-full min-h-0 flex-col gap-6 overflow-y-auto modern-scrollbar px-6 pb-6 pt-6">
       {/* Sticky Header Section - Stays fixed at top while scrolling */}
       <div className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6 -mx-6 -mt-6">
         <PageHeader

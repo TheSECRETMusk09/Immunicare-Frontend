@@ -798,7 +798,7 @@ const Notifications = () => {
   const hasData = adaptedNotifications.length > 0;
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* Page Header - Fixed/Sticky at top */}
       <div className="flex-shrink-0 sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6">
         <PageHeader
@@ -1037,7 +1037,7 @@ const Notifications = () => {
           </Card>
           </div>
 
-          <div className="flex-1 overflow-y-auto auto-hide-scrollbar pr-2 pb-2">
+          <div className="flex-1 overflow-y-auto modern-scrollbar pr-2 pb-2">
 
           {filteredNotifications.length === 0 ? (
             <Card className="border border-dashed border-slate-300 bg-white/80 p-8 text-center dark:border-slate-600 dark:bg-slate-900/70">

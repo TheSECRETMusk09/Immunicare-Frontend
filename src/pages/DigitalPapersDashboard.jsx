@@ -56,19 +56,45 @@ export default function DigitalPapersDashboard() {
   const fetchStats = async () => {
     try {
       setLoading(true);
-      const [templates, recentDownloads, allDownloads, completions] = await Promise.all([
-        apiClient.getPaperTemplates(),
-        apiClient.getDownloadHistory({ limit: 10 }),
-        apiClient.getDownloadHistory(), // Fetch absolute totals to prevent artificial shrinkage
-        apiClient.getDocumentAlerts({ status: "PENDING", limit: 5 }),
-      ]);
+      setError(null);
+      const [templatesResult, recentDownloadsResult, allDownloadsResult, completionsResult] =
+        await Promise.allSettled([
+          apiClient.getPaperTemplates(),
+          apiClient.getDownloadHistory({ limit: 10 }),
+          apiClient.getDownloadHistory(), // Fetch absolute totals to prevent artificial shrinkage
+          apiClient.getDocumentAlerts({ status: "PENDING", limit: 5 }),
+        ]);
+
+      const templates =
+        templatesResult.status === "fulfilled" ? templatesResult.value : null;
+      const recentDownloads =
+        recentDownloadsResult.status === "fulfilled"
+          ? recentDownloadsResult.value
+          : null;
+      const allDownloads =
+        allDownloadsResult.status === "fulfilled" ? allDownloadsResult.value : null;
+      const completions =
+        completionsResult.status === "fulfilled" ? completionsResult.value : null;
 
       setStats({
         totalTemplates: templates.data?.length || 0,
-        totalDownloads: allDownloads.total || allDownloads.data?.length || allDownloads.length || 0,
+        totalDownloads:
+          allDownloads.pagination?.total ||
+          allDownloads.total ||
+          allDownloads.data?.length ||
+          allDownloads.length ||
+          0,
         pendingCompletions: completions.data?.length || 0,
         recentActivity: recentDownloads.data || recentDownloads || [],
       });
+
+      if (
+        templatesResult.status === "rejected" &&
+        recentDownloadsResult.status === "rejected" &&
+        allDownloadsResult.status === "rejected"
+      ) {
+        throw new Error("Failed to load digital papers overview");
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -131,7 +157,7 @@ export default function DigitalPapersDashboard() {
   }
 
   return (
-    <div className="space-y-8 p-6">
+    <div className="flex h-full min-h-0 flex-col gap-8 overflow-y-auto modern-scrollbar p-6">
       {/* Header */}
       <PageHeader
         title="Digital Papers Management"
@@ -184,7 +210,7 @@ export default function DigitalPapersDashboard() {
       />
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
         <Card className="p-6 text-center">
           <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
             Total Templates

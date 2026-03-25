@@ -991,7 +991,7 @@ export default function InventoryManagement() {
   const totals = calculateTotals();
 
   return (
-    <div className="inventory-management space-y-4 p-4">
+    <div className="inventory-management flex h-full min-h-0 flex-col gap-4 overflow-y-auto modern-scrollbar p-4">
       {/* Header - Hidden on Print */}
       <div className="print:hidden">
         <PageHeader

@@ -29,6 +29,21 @@ const CANONICAL_ROLES = {
   GUARDIAN: "GUARDIAN",
 };
 
+const HEALTHCARE_WORKER_ALIASES = new Set([
+  "clinic_manager",
+  "public_health_nurse",
+  "inventory_manager",
+  "physician",
+  "doctor",
+  "health_worker",
+  "healthcare_worker",
+  "nurse",
+  "midwife",
+  "nutritionist",
+  "dentist",
+  "staff",
+]);
+
 // AuthProvider component
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -194,6 +209,9 @@ export function AuthProvider({ children }) {
   const isSuperAdmin = normalizedLegacyRole === "super_admin";
   const isRoleAdmin = normalizedLegacyRole === "admin";
   const isAdminOrSuperAdmin = isSuperAdmin || isRoleAdmin;
+  const isHealthcareWorker =
+    normalizedRoleType === CANONICAL_ROLES.SYSTEM_ADMIN ||
+    HEALTHCARE_WORKER_ALIASES.has(normalizedLegacyRole);
   const guardianId = user?.guardian_id || user?.id;
   const permissions = useMemo(() => normalizePermissions(user?.permissions), [user]);
   const permissionCapabilities = useMemo(
@@ -221,6 +239,7 @@ export function AuthProvider({ children }) {
       isGuardian,
       isSuperAdmin,
       isAdminOrSuperAdmin,
+      isHealthcareWorker,
       guardianId,
       forcePasswordChange,
       login,
@@ -241,6 +260,7 @@ export function AuthProvider({ children }) {
       isGuardian,
       isSuperAdmin,
       isAdminOrSuperAdmin,
+      isHealthcareWorker,
       guardianId,
       forcePasswordChange,
       login,
