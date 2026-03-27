@@ -104,61 +104,6 @@ const getEventColor = (status) => {
   }
 };
 
-const isVaccinationAppointmentType = (value) => {
-  const normalized = String(value || "").trim().toLowerCase();
-  if (!normalized) return true;
-  return normalized.includes("vacc");
-};
-
-const getEligibleReadinessEntries = (readiness = null) => {
-  const safeReadiness =
-    readiness && typeof readiness === "object" ? readiness : {};
-
-  return [
-    ...(Array.isArray(safeReadiness.overdueVaccines)
-      ? safeReadiness.overdueVaccines
-      : []),
-    ...(Array.isArray(safeReadiness.dueVaccines)
-      ? safeReadiness.dueVaccines
-      : []),
-  ];
-};
-
-const getReadinessAlertConfig = (readiness = null) => {
-  const status = String(readiness?.readinessStatus || "").toUpperCase();
-  const primaryLabel = getEligibleReadinessEntries(readiness)[0]?.label || null;
-
-  switch (status) {
-    case "OVERDUE":
-      return {
-        variant: "warning",
-        message: primaryLabel
-          ? `${primaryLabel} is overdue and ready to schedule.`
-          : "A vaccine is overdue and ready to schedule.",
-      };
-    case "READY":
-      return {
-        variant: "success",
-        message: primaryLabel
-          ? `${primaryLabel} is ready to schedule now.`
-          : "This child is ready to schedule the next vaccine.",
-      };
-    case "PENDING_CONFIRMATION":
-      return {
-        variant: "warning",
-        message:
-          "This child is waiting for health center confirmation before a vaccination appointment can be booked.",
-      };
-    case "UPCOMING":
-      return {
-        variant: "info",
-        message: "This child is not yet eligible for the next vaccination appointment.",
-      };
-    default:
-      return null;
-  }
-};
-
 const canMutateAppointment = (status) => !["completed", "attended", "cancelled"].includes(status);
 const CALENDAR_WEEK_START = 0; // Sunday-first column order (Sun ... Sat)
 
@@ -173,8 +118,6 @@ export default function GuardianAppointmentsPage() {
   const [children, setChildren] = useState([]);
   const [vaccines, setVaccines] = useState([]);
   const [appointments, setAppointments] = useState([]);
-  const [selectedChildReadiness, setSelectedChildReadiness] = useState(null);
-  const [childReadinessLoading, setChildReadinessLoading] = useState(false);
 
   // FullCalendar state (from Admin Dashboard)
   const [calendarView, setCalendarView] = useState("dayGridMonth");
@@ -226,54 +169,6 @@ export default function GuardianAppointmentsPage() {
     type: "Vaccination",
     notes: "",
   });
-
-  const selectedChild = useMemo(() => (
-    children.find((child) => String(child.id) === String(formData.infant_id)) || null
-  ), [children, formData.infant_id]);
-
-  const isVaccinationFlow = useMemo(() => (
-    isVaccinationAppointmentType(formData.type)
-  ), [formData.type]);
-
-  const eligibleVaccines = useMemo(() => {
-    const eligibleEntries = getEligibleReadinessEntries(selectedChildReadiness);
-    const eligibleIds = new Set();
-
-    return eligibleEntries.reduce((accumulator, entry) => {
-      const vaccineId = Number.parseInt(entry?.vaccineId, 10);
-      if (!Number.isInteger(vaccineId) || vaccineId <= 0 || eligibleIds.has(vaccineId)) {
-        return accumulator;
-      }
-
-      eligibleIds.add(vaccineId);
-      const matchingVaccine = vaccines.find(
-        (vaccine) => Number.parseInt(vaccine?.id, 10) === vaccineId,
-      );
-
-      accumulator.push({
-        id: vaccineId,
-        label:
-          matchingVaccine?.name ||
-          matchingVaccine?.vaccine_name ||
-          entry?.label ||
-          `Vaccine #${vaccineId}`,
-      });
-      return accumulator;
-    }, []);
-  }, [selectedChildReadiness, vaccines]);
-
-  const readinessAlert = useMemo(() => (
-    isVaccinationFlow ? getReadinessAlertConfig(selectedChildReadiness) : null
-  ), [isVaccinationFlow, selectedChildReadiness]);
-
-  const bookingBlockedByReadiness = useMemo(() => {
-    if (!isVaccinationFlow || !formData.infant_id) {
-      return false;
-    }
-
-    const status = String(selectedChildReadiness?.readinessStatus || "").toUpperCase();
-    return status === "PENDING_CONFIRMATION" || status === "UPCOMING";
-  }, [formData.infant_id, isVaccinationFlow, selectedChildReadiness]);
 
   const calendarCurrentLabel = useMemo(() => {
     const safeCurrentDate =
@@ -664,74 +559,6 @@ export default function GuardianAppointmentsPage() {
   }, [bootstrapPage]);
 
   useEffect(() => {
-    if (!isVaccinationFlow) {
-      setSelectedChildReadiness(null);
-      setChildReadinessLoading(false);
-      setFormData((previous) => (
-        previous.vaccine_id ? { ...previous, vaccine_id: "" } : previous
-      ));
-    }
-  }, [isVaccinationFlow]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const syncSelectedChildReadiness = async () => {
-      const infantId = Number.parseInt(formData.infant_id, 10);
-      if (!showBookingModal || !guardianId || !isVaccinationFlow || !Number.isInteger(infantId)) {
-        setSelectedChildReadiness(null);
-        setChildReadinessLoading(false);
-        return;
-      }
-
-      setChildReadinessLoading(true);
-
-      try {
-        const response = await apiClient.getVaccinationReadiness(infantId);
-        if (cancelled) {
-          return;
-        }
-
-        const readiness = response?.success ? response.data : response?.data || null;
-        setSelectedChildReadiness(readiness);
-
-        const eligibleIdList = getEligibleReadinessEntries(readiness)
-          .map((entry) => String(entry?.vaccineId))
-          .filter(Boolean);
-        const eligibleIds = new Set(
-          eligibleIdList,
-        );
-
-        setFormData((previous) => {
-          if (eligibleIdList.length === 0) {
-            return previous.vaccine_id ? { ...previous, vaccine_id: "" } : previous;
-          }
-
-          if (previous.vaccine_id && eligibleIds.has(String(previous.vaccine_id))) {
-            return previous;
-          }
-
-          return { ...previous, vaccine_id: eligibleIdList[0] };
-        });
-      } catch (readinessError) {
-        if (!cancelled) {
-          setSelectedChildReadiness(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setChildReadinessLoading(false);
-        }
-      }
-    };
-
-    syncSelectedChildReadiness();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [formData.infant_id, guardianId, isVaccinationFlow, showBookingModal]);
-
-  useEffect(() => {
     const abortController = new AbortController();
     fetchCalendarAvailability(abortController.signal);
     return () => abortController.abort();
@@ -862,19 +689,6 @@ export default function GuardianAppointmentsPage() {
 
     if (!formData.infant_id || !formData.scheduled_date || !formData.scheduled_time) {
       setError("Please select a child, date, and time before submitting.");
-      return;
-    }
-
-    if (isVaccinationFlow && childReadinessLoading) {
-      setError("Please wait while we confirm the child's vaccine readiness.");
-      return;
-    }
-
-    if (bookingBlockedByReadiness) {
-      setError(
-        readinessAlert?.message ||
-          "This child is not yet eligible for a vaccination appointment.",
-      );
       return;
     }
 
@@ -1046,39 +860,37 @@ export default function GuardianAppointmentsPage() {
         {successMessage && <Alert variant="success">{successMessage}</Alert>}
         {calendarGuardFeedback && <Alert variant="warning">{calendarGuardFeedback}</Alert>}
 
-        {isMobile && (
-          <section className="guardian-appointments-mobile-switch" aria-label="Appointments view switcher">
-            <div className="guardian-appointments-mobile-switch__tabs" role="tablist">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mobileViewMode === "calendar"}
-                className={`guardian-appointments-mobile-switch__tab ${mobileViewMode === "calendar" ? "is-active" : ""}`}
-                onClick={() => setMobileViewMode("calendar")}
-              >
-                Calendar
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mobileViewMode === "upcoming"}
-                className={`guardian-appointments-mobile-switch__tab ${mobileViewMode === "upcoming" ? "is-active" : ""}`}
-                onClick={() => setMobileViewMode("upcoming")}
-              >
-                Upcoming
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mobileViewMode === "history"}
-                className={`guardian-appointments-mobile-switch__tab ${mobileViewMode === "history" ? "is-active" : ""}`}
-                onClick={() => setMobileViewMode("history")}
-              >
-                History
-              </button>
-            </div>
-          </section>
-        )}
+        <section className="guardian-appointments-mobile-switch md:hidden block mb-4" aria-label="Appointments view switcher">
+          <div className="guardian-appointments-mobile-switch__tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mobileViewMode === "calendar"}
+              className={`guardian-appointments-mobile-switch__tab ${mobileViewMode === "calendar" ? "is-active" : ""}`}
+              onClick={() => setMobileViewMode("calendar")}
+            >
+              Calendar
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mobileViewMode === "upcoming"}
+              className={`guardian-appointments-mobile-switch__tab ${mobileViewMode === "upcoming" ? "is-active" : ""}`}
+              onClick={() => setMobileViewMode("upcoming")}
+            >
+              Upcoming
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mobileViewMode === "history"}
+              className={`guardian-appointments-mobile-switch__tab ${mobileViewMode === "history" ? "is-active" : ""}`}
+              onClick={() => setMobileViewMode("history")}
+            >
+              History
+            </button>
+          </div>
+        </section>
 
         {inventorySummary.totalAvailableStock <= 0 && (
           <Alert variant="warning">
@@ -1095,8 +907,8 @@ export default function GuardianAppointmentsPage() {
         <div className="guardian-appointments-layout grid grid-cols-1 min-[768px]:grid-cols-2 min-[1025px]:grid-cols-3 gap-4 md:gap-5 lg:gap-6">
           {/* Left Column - FullCalendar (Admin-style) */}
           <section
-            className={`guardian-calendar-wrapper-expanded min-[768px]:col-span-2 min-[1025px]:col-span-2 ${
-              isMobile && mobileViewMode !== "calendar" ? "hidden" : ""
+            className={`guardian-calendar-wrapper-expanded md:col-span-2 lg:col-span-2 ${
+              mobileViewMode !== "calendar" ? "hidden md:block" : "block"
             }`}
           >
             {/* Calendar Navigation Controls (Admin-style) */}
@@ -1239,25 +1051,23 @@ export default function GuardianAppointmentsPage() {
               </div>
             </div>
 
-            {isMobile && (
-              <div className="px-3 pb-3">
-                <Button variant="secondary" size="sm" className="w-full" onClick={handleOpenDateDetails}>
-                  Open selected date details
-                </Button>
-              </div>
-            )}
+            <div className="px-3 pb-3 md:hidden">
+              <Button variant="secondary" size="sm" className="w-full" onClick={handleOpenDateDetails}>
+                Open selected date details
+              </Button>
+            </div>
           </section>
 
           {/* Right Column - Selected Date & Upcoming Appointments & History (KEEP EXISTING CARDS) */}
           <aside
-            className={`guardian-appointments-sidebar grid grid-cols-1 gap-4 md:gap-5 min-[768px]:col-span-2 min-[768px]:grid-cols-2 min-[1025px]:col-span-1 min-[1025px]:grid-cols-1 ${
-              isMobile && mobileViewMode === "calendar" ? "guardian-appointments-sidebar--mobile-secondary" : ""
+            className={`guardian-appointments-sidebar grid grid-cols-1 gap-4 md:gap-5 md:col-span-2 md:grid-cols-2 lg:col-span-1 lg:grid-cols-1 ${
+              mobileViewMode === "calendar" ? "max-md:guardian-appointments-sidebar--mobile-secondary" : ""
             }`}
           >
             {/* Selected Date Card */}
             <section
-              className={`guardian-selected-date-card rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 min-[768px]:col-span-2 min-[1025px]:col-span-1 ${
-                isMobile && mobileViewMode !== "calendar" ? "hidden" : ""
+              className={`guardian-selected-date-card rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 md:col-span-2 lg:col-span-1 ${
+                mobileViewMode !== "calendar" ? "hidden md:block" : "block"
               }`}
             >
               <div className="flex items-center justify-between mb-3">
@@ -1307,7 +1117,7 @@ export default function GuardianAppointmentsPage() {
             {/* Upcoming Appointments Card */}
             <section
               className={`guardian-upcoming-appointments-card rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 ${
-                isMobile && mobileViewMode !== "upcoming" ? "hidden" : ""
+                mobileViewMode !== "upcoming" ? "hidden md:block" : "block"
               }`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -1375,7 +1185,7 @@ export default function GuardianAppointmentsPage() {
             {/* Appointment History Card */}
             <section
               className={`guardian-appointment-history-card rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 ${
-                isMobile && mobileViewMode !== "history" ? "hidden" : ""
+                mobileViewMode !== "history" ? "hidden md:block" : "block"
               }`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -1442,45 +1252,18 @@ export default function GuardianAppointmentsPage() {
               ))}
             </Select>
 
-            {selectedChild?.latest_transfer_case_status === "for_validation" && (
-              <Alert variant="warning">
-                This child's transfer records are still under review. Vaccination booking will stay locked until the health center confirms the transferred doses.
-              </Alert>
-            )}
-
-            {isVaccinationFlow && (
-              <>
-                {childReadinessLoading ? (
-                  <Alert variant="info">Checking vaccine readiness for the selected child...</Alert>
-                ) : (
-                  readinessAlert && (
-                    <Alert variant={readinessAlert.variant}>{readinessAlert.message}</Alert>
-                  )
-                )}
-
-                <Select
-                  label="Eligible Vaccine"
-                  value={formData.vaccine_id}
-                  onChange={(event) => setFormData((previous) => ({ ...previous, vaccine_id: event.target.value }))}
-                  disabled={!formData.infant_id || childReadinessLoading || bookingBlockedByReadiness}
-                >
-                  <option value="">
-                    {!formData.infant_id
-                      ? "Select child first"
-                      : childReadinessLoading
-                        ? "Checking readiness..."
-                        : eligibleVaccines.length > 0
-                          ? "Auto-select next eligible vaccine"
-                          : "No eligible vaccine available yet"}
-                  </option>
-                  {eligibleVaccines.map((vaccine) => (
-                    <option key={vaccine.id} value={vaccine.id}>
-                      {vaccine.label}
-                    </option>
-                  ))}
-                </Select>
-              </>
-            )}
+            <Select
+              label="Vaccine (optional)"
+              value={formData.vaccine_id}
+              onChange={(event) => setFormData((previous) => ({ ...previous, vaccine_id: event.target.value }))}
+            >
+              <option value="">Auto-assign based on schedule</option>
+              {vaccines.map((vaccine) => (
+                <option key={vaccine.id} value={vaccine.id}>
+                  {vaccine.name || vaccine.vaccine_name}
+                </option>
+              ))}
+            </Select>
 
             {isPhilippineHoliday(formData.scheduled_date) && (
               <Alert variant="warning">
@@ -1578,8 +1361,6 @@ export default function GuardianAppointmentsPage() {
                 actionRole="primary"
                 loading={formSubmitting}
                 disabled={
-                  childReadinessLoading ||
-                  bookingBlockedByReadiness ||
                   (availabilityFeedback ? !availabilityFeedback.available : false) ||
                   timeSlotsLoading ||
                   (timeSlotsFeedback ? !timeSlotsFeedback.available : false) ||

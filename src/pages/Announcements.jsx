@@ -25,6 +25,13 @@ import {
 const AUDIENCE_OPTIONS = ["all", "patients", "staff"];
 const PRIORITY_OPTIONS = ["low", "medium", "high", "urgent"];
 const STATUS_OPTIONS = ["draft", "published", "archived"];
+const EMPTY_ANNOUNCEMENT_FILTERS = {
+  period_start: "",
+  period_end: "",
+  target_audience: "",
+  status: "",
+  priority: "",
+};
 
 const EMPTY_DELIVERY_SUMMARY = {
   total_recipients: 0,
@@ -37,10 +44,24 @@ const EMPTY_DELIVERY_SUMMARY = {
   cancelled_count: 0,
 };
 
+const createEmptyAnnouncementFilters = () => ({
+  ...EMPTY_ANNOUNCEMENT_FILTERS,
+});
+
+const hasActiveAnnouncementFilters = (filters = {}) =>
+  Object.values(filters || {}).some(
+    (value) => String(value || "").trim().length > 0,
+  );
+
 const Announcements = () => {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [filterError, setFilterError] = useState(null);
+  const [filters, setFilters] = useState(createEmptyAnnouncementFilters);
+  const [appliedFilters, setAppliedFilters] = useState(
+    createEmptyAnnouncementFilters,
+  );
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState({});
@@ -92,7 +113,8 @@ const Announcements = () => {
   const fetchAnnouncements = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await apiClient.getAnnouncements();
+      setError(null);
+      const data = await apiClient.getAnnouncements(appliedFilters);
       const normalized = Array.isArray(data) ? data : [];
       setAnnouncements(normalized);
       await fetchDeliverySummaries(normalized);
@@ -103,7 +125,7 @@ const Announcements = () => {
     } finally {
       setLoading(false);
     }
-  }, [fetchDeliverySummaries]);
+  }, [appliedFilters, fetchDeliverySummaries]);
 
   useEffect(() => {
     fetchAnnouncements();
@@ -302,6 +324,34 @@ const Announcements = () => {
     setFormErrors((prev) => ({ ...prev, [name]: undefined }));
   };
 
+  const handleFilterChange = (event) => {
+    const { name, value } = event.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+    setFilterError(null);
+  };
+
+  const handleApplyFilters = (event) => {
+    event.preventDefault();
+
+    if (
+      filters.period_start &&
+      filters.period_end &&
+      filters.period_end < filters.period_start
+    ) {
+      setFilterError("Posted-to date cannot be earlier than posted-from date.");
+      return;
+    }
+
+    setAppliedFilters({ ...filters });
+  };
+
+  const handleResetFilters = () => {
+    const resetFilters = createEmptyAnnouncementFilters();
+    setFilters(resetFilters);
+    setAppliedFilters(resetFilters);
+    setFilterError(null);
+  };
+
   const getPriorityVariant = (priority) => {
     switch (priority?.toLowerCase()) {
       case "high":
@@ -337,7 +387,10 @@ const Announcements = () => {
     };
   };
 
-  if (loading) {
+  const hasAppliedFilters = hasActiveAnnouncementFilters(appliedFilters);
+  const hasDraftFilters = hasActiveAnnouncementFilters(filters);
+
+  if (loading && announcements.length === 0 && !error) {
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-4">
@@ -357,9 +410,9 @@ const Announcements = () => {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-6 overflow-y-auto modern-scrollbar px-6 pb-6 pt-6">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* Sticky Header Section - Stays fixed at top while scrolling */}
-      <div className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6 -mx-6 -mt-6">
+      <div className="flex-shrink-0 sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-6 pb-4 pt-6">
         <PageHeader
           title="Announcements"
           subtitle="Create and manage facility announcements and updates"
@@ -372,13 +425,102 @@ const Announcements = () => {
         />
       </div>
 
-      {error && (
-        <Alert variant="error" className="mb-4" onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+      <div className="flex-1 min-h-0 overflow-y-auto modern-scrollbar px-6 pb-6 pt-4">
+        {error && (
+          <Alert variant="error" className="mb-4" onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
 
-      <div className="animate-fade-in px-6 -mx-6">
+        {filterError && (
+          <Alert
+            variant="error"
+            className="mb-4"
+            onClose={() => setFilterError(null)}
+          >
+            {filterError}
+          </Alert>
+        )}
+
+        <div className="animate-fade-in">
+        <Card className="mb-4">
+          <form className="space-y-4" onSubmit={handleApplyFilters}>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <Input
+                label="Posted From"
+                type="date"
+                name="period_start"
+                value={filters.period_start}
+                onChange={handleFilterChange}
+                max={filters.period_end || undefined}
+              />
+              <Input
+                label="Posted To"
+                type="date"
+                name="period_end"
+                value={filters.period_end}
+                onChange={handleFilterChange}
+                min={filters.period_start || undefined}
+              />
+              <Select
+                label="Target Audience"
+                name="target_audience"
+                value={filters.target_audience}
+                onChange={handleFilterChange}
+              >
+                <option value="">All Audiences</option>
+                <option value="all">All Users</option>
+                <option value="patients">Guardians / Patients</option>
+                <option value="staff">Staff</option>
+              </Select>
+              <Select
+                label="Status"
+                name="status"
+                value={filters.status}
+                onChange={handleFilterChange}
+              >
+                <option value="">All Statuses</option>
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+                <option value="archived">Archived</option>
+              </Select>
+              <Select
+                label="Priority"
+                name="priority"
+                value={filters.priority}
+                onChange={handleFilterChange}
+              >
+                <option value="">All Priorities</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-gray-200 pt-4 dark:border-gray-700 lg:flex-row lg:items-center lg:justify-between">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {hasAppliedFilters
+                  ? `Showing ${announcements.length} filtered announcement${announcements.length === 1 ? "" : "s"}.`
+                  : `Showing ${announcements.length} announcement${announcements.length === 1 ? "" : "s"}.`}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" variant="primary" loading={loading}>
+                  Apply Filters
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleResetFilters}
+                  disabled={!hasDraftFilters && !hasAppliedFilters}
+                >
+                  Clear Filters
+                </Button>
+              </div>
+            </div>
+          </form>
+        </Card>
+
         {announcements.length === 0 ? (
           <Card>
             <div className="text-center py-12">
@@ -387,7 +529,9 @@ const Announcements = () => {
                 No Announcements
               </h3>
               <p className="text-gray-600 dark:text-gray-400 mb-4">
-                There are no announcements yet. Create one to get started.
+                {hasAppliedFilters
+                  ? "No announcements match the selected filters."
+                  : "There are no announcements yet. Create one to get started."}
               </p>
             </div>
           </Card>
@@ -395,8 +539,8 @@ const Announcements = () => {
           <div className="grid grid-cols-1 gap-4">
             {announcements.map((announcement) => (
               <Card key={announcement.id}>
-                <div className="flex justify-between items-start gap-4">
-                  <div className="flex-1">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">
                         {announcement.title}
@@ -441,60 +585,61 @@ const Announcements = () => {
                       )}
                     </div>
                   </div>
-                     <div className="flex flex-col items-end gap-2">
-                       <Badge variant={getPriorityVariant(announcement.priority)}>
-                         {announcement.priority}
-                       </Badge>
-                       <div className="flex flex-wrap justify-end gap-2">
-                         {announcement.status === "draft" && (
-                           <Button
-                             variant="primary"
-                             size="sm"
-                             onClick={() => handlePublishAnnouncement(announcement)}
-                             disabled={isPublishingAnnouncementId === announcement.id}
-                             loading={isPublishingAnnouncementId === announcement.id}
-                           >
-                             Publish
-                           </Button>
-                         )}
-                         {announcement.status === "published" && (
-                           <Button
-                             variant="outline"
-                             size="sm"
-                             onClick={() => handleArchiveAnnouncement(announcement)}
-                             disabled={isArchivingAnnouncementId === announcement.id}
-                             loading={isArchivingAnnouncementId === announcement.id}
-                           >
-                             Archive
-                           </Button>
-                         )}
-                         {(user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'SYSTEM_ADMIN') && (
-                           <Button
-                             variant="outline"
-                             size="sm"
-                             onClick={() => {
-                               setDeleteModalAnnouncement(announcement);
-                             }}
-                             disabled={isDeletingAnnouncementId === announcement.id}
-                             loading={isDeletingAnnouncementId === announcement.id}
-                           >
-                             Delete
-                           </Button>
-                         )}
-                         <Button
-                           variant="secondary"
-                           size="sm"
-                           onClick={() => openDeliveryModal(announcement)}
-                         >
-                           Delivery Details
-                         </Button>
-                       </div>
-                     </div>
+                  <div className="flex w-full flex-col gap-2 lg:w-auto lg:max-w-[16rem] lg:items-end">
+                    <Badge variant={getPriorityVariant(announcement.priority)}>
+                      {announcement.priority}
+                    </Badge>
+                    <div className="flex flex-wrap gap-2 lg:justify-end">
+                      {announcement.status === "draft" && (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => handlePublishAnnouncement(announcement)}
+                          disabled={isPublishingAnnouncementId === announcement.id}
+                          loading={isPublishingAnnouncementId === announcement.id}
+                        >
+                          Publish
+                        </Button>
+                      )}
+                      {announcement.status === "published" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleArchiveAnnouncement(announcement)}
+                          disabled={isArchivingAnnouncementId === announcement.id}
+                          loading={isArchivingAnnouncementId === announcement.id}
+                        >
+                          Archive
+                        </Button>
+                      )}
+                      {(user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'SYSTEM_ADMIN') && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setDeleteModalAnnouncement(announcement);
+                          }}
+                          disabled={isDeletingAnnouncementId === announcement.id}
+                          loading={isDeletingAnnouncementId === announcement.id}
+                        >
+                          Delete
+                        </Button>
+                      )}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => openDeliveryModal(announcement)}
+                      >
+                        Delivery Details
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </Card>
             ))}
           </div>
         )}
+        </div>
       </div>
 
       {/* Create Announcement Modal */}

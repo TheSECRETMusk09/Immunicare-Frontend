@@ -237,6 +237,15 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
         success(`Successfully imported ${response.data?.summary?.success || 0} vaccines`);
         setShowVaccineImportModal(false);
         fetchCases();
+
+        // Dispatch event to synchronize infant charts and records instantly
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("vaccination-update", {
+              detail: { infant_id: selectedCase.infant_id },
+            })
+          );
+        }
       } else {
         error(response.error || "Failed to import vaccines");
       }

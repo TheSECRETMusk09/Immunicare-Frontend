@@ -98,6 +98,18 @@ export default function InventoryReports() {
     }
   }, [isAdmin, fetchData]);
 
+  useEffect(() => {
+    const handleSync = () => { if (isAdmin) fetchData(); };
+
+    window.addEventListener("vaccination-update", handleSync);
+    window.addEventListener("inventory-update", handleSync);
+
+    return () => {
+      window.removeEventListener("vaccination-update", handleSync);
+      window.removeEventListener("inventory-update", handleSync);
+    };
+  }, [isAdmin, fetchData]);
+
   // Computed data
   const filteredInventory = useMemo(() => {
     return inventory.filter((item) => {

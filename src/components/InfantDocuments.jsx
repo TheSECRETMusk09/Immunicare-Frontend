@@ -49,8 +49,15 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
       }
     } catch (err) {
       console.error("Error loading documents:", err);
-      setError(err.response?.data?.error || err.message || "Failed to load documents");
-      setDocuments([]);
+      const errorMessage = err.response?.data?.error || err.message || "";
+      // Gracefully handle 404 errors (often happens when infant records migrate tables or are newly created)
+      if (err.response?.status === 404 || errorMessage.includes("Infant not found")) {
+        setDocuments([]);
+        setError(null);
+      } else {
+        setError(errorMessage || "Failed to load documents");
+        setDocuments([]);
+      }
     } finally {
       setLoading(false);
     }

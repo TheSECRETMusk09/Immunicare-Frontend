@@ -73,6 +73,20 @@ export default function ActivityFeed({
     fetchActivities();
   }, [fetchActivities]);
 
+  useEffect(() => {
+    const handleSync = () => fetchActivities();
+
+    window.addEventListener("vaccination-update", handleSync);
+    window.addEventListener("appointment-update", handleSync);
+    window.addEventListener("child-data-update", handleSync);
+
+    return () => {
+      window.removeEventListener("vaccination-update", handleSync);
+      window.removeEventListener("appointment-update", handleSync);
+      window.removeEventListener("child-data-update", handleSync);
+    };
+  }, [fetchActivities]);
+
   const formatTimeAgo = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();

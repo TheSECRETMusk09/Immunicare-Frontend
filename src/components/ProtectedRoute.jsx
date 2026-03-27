@@ -30,7 +30,7 @@ const ProtectedRoute = ({
   }
 
   if (requireGuardian && !isGuardian) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/analytics" replace />;
   }
 
   return children;

@@ -25,6 +25,18 @@ export default function StockTransactions() {
     if (isAdmin) fetchTransactions();
   }, [isAdmin, fetchTransactions]);
 
+  useEffect(() => {
+    const handleSync = () => { if (isAdmin) fetchTransactions(); };
+
+    window.addEventListener("vaccination-update", handleSync);
+    window.addEventListener("inventory-update", handleSync);
+
+    return () => {
+      window.removeEventListener("vaccination-update", handleSync);
+      window.removeEventListener("inventory-update", handleSync);
+    };
+  }, [isAdmin, fetchTransactions]);
+
   // Redirect non-admin users
   if (!isAdmin) {
     return (

@@ -10,6 +10,7 @@ import {
 import ImmunizationRecordBooklet from "../../components/ImmunizationRecordBooklet";
 import apiClient from "../../utils/api";
 import { FileCheck, FileText, Printer } from "lucide-react";
+import { downloadWordDocument, PRINT_PAGE_PRESETS } from "../../utils/printDocumentExport";
 
 const sanitizeFileSegment = (value) =>
   String(value || "document")
@@ -76,24 +77,69 @@ export default function ImmunizationRecordPage() {
     fetchInfant();
   }, [fetchInfant]);
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleDownload = () => {
-    const printableNode = document.querySelector(".record-booklet-print");
-    if (!printableNode) {
-      setError("Printable immunization record content is not available yet.");
+  const triggerEmbeddedAction = (actionSelector, missingMessage, fallbackAction) => {
+    const actionButton = document.querySelector(actionSelector);
+    if (!actionButton && typeof fallbackAction === "function") {
+      fallbackAction();
       return;
     }
 
-    downloadHtmlDocument({
-      title: `Child Immunization Record - ${infant?.first_name || "Child"} ${infant?.last_name || "Record"}`,
-      filename: `Immunization_Record_${sanitizeFileSegment(infant?.last_name)}_${sanitizeFileSegment(infant?.first_name)}.html`,
-      markup: printableNode.outerHTML,
-      styles: collectInlineStyles("record-booklet-print"),
-    });
+    if (!actionButton) {
+      setError(missingMessage);
+      return;
+    }
+
+    actionButton.click();
   };
+
+  const handlePrint = () =>
+    triggerEmbeddedAction(
+      '[data-print-action="immunization-record-print"]',
+      "Printable immunization record content is not available yet.",
+      () => window.print(),
+    );
+
+  const handleDownload = () =>
+    triggerEmbeddedAction(
+      '[data-print-action="immunization-record-download"]',
+      "Printable immunization record content is not available yet.",
+      () => {
+        const printableNode = document.querySelector(".record-booklet-print");
+        if (!printableNode) {
+          setError("Printable immunization record content is not available yet.");
+          return;
+        }
+
+        downloadHtmlDocument({
+          title: `Child Immunization Record - ${infant?.first_name || "Child"} ${infant?.last_name || "Record"}`,
+          filename: `Immunization_Record_${sanitizeFileSegment(infant?.last_name)}_${sanitizeFileSegment(infant?.first_name)}.html`,
+          markup: printableNode.outerHTML,
+          styles: collectInlineStyles("record-booklet-print"),
+        });
+      },
+    );
+
+  const handleDownloadWord = () =>
+    triggerEmbeddedAction(
+      '[data-print-action="immunization-record-download-word"]',
+      "Printable immunization record content is not available yet.",
+      () => {
+        const printableNode = document.querySelector(".record-booklet-print");
+        if (!printableNode) {
+          setError("Printable immunization record content is not available yet.");
+          return;
+        }
+
+        downloadWordDocument({
+          html: `<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Child Immunization Record</title><style>${collectInlineStyles("record-booklet-print")}</style></head><body>${printableNode.outerHTML}</body></html>`,
+          filename: `Immunization_Record_${sanitizeFileSegment(infant?.last_name)}_${sanitizeFileSegment(infant?.first_name)}.docx`,
+          title: `Child Immunization Record - ${infant?.first_name || "Child"} ${infant?.last_name || "Record"}`,
+          headerText: "Child Immunization Record Booklet",
+          footerText: "Immunicare immunization record",
+          page: PRINT_PAGE_PRESETS.a4Landscape,
+        });
+      },
+    );
 
   if (loading) {
     return (
@@ -131,6 +177,9 @@ export default function ImmunizationRecordPage() {
           <div className="flex gap-2">
             <Button onClick={handleDownload} variant="secondary">
               <FileText className="w-4 h-4 mr-2" /> Download PDF
+            </Button>
+            <Button onClick={handleDownloadWord} variant="secondary">
+              <FileText className="w-4 h-4 mr-2" /> Download Word
             </Button>
             <Button onClick={handlePrint}><Printer className="w-4 h-4 mr-2" /> Print</Button>
           </div>

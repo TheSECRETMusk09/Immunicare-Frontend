@@ -61,6 +61,18 @@ export default function InventoryMonitoringDashboard() {
     }
   }, [isAdmin, fetchDashboardData]);
 
+  useEffect(() => {
+    const handleSync = () => { if (isAdmin) fetchDashboardData(); };
+
+    window.addEventListener("vaccination-update", handleSync);
+    window.addEventListener("inventory-update", handleSync);
+
+    return () => {
+      window.removeEventListener("vaccination-update", handleSync);
+      window.removeEventListener("inventory-update", handleSync);
+    };
+  }, [isAdmin, fetchDashboardData]);
+
   const getVaccineStats = () => {
     const totalVaccines = inventory.length;
     const criticalStock = alerts.filter(

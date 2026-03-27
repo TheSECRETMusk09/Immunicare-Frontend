@@ -67,7 +67,7 @@ describe("Phase 9 digital papers downloads", () => {
     HTMLAnchorElement.prototype.click = originalClick;
   });
 
-  test("immunization record page downloads the printable record as HTML", async () => {
+  test("immunization record page downloads the printable record as a PDF fallback when embedded controls are unavailable", async () => {
     renderWithRoute(
       "/digital-papers/immunization-records/7",
       <ImmunizationRecordPage />,
@@ -90,7 +90,30 @@ describe("Phase 9 digital papers downloads", () => {
     });
   });
 
-  test("vaccine schedule page downloads the printable schedule as HTML", async () => {
+  test("immunization record page offers Word export", async () => {
+    renderWithRoute(
+      "/digital-papers/immunization-records/7",
+      <ImmunizationRecordPage />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: /child immunization record booklet/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /download word/i }));
+
+    await waitFor(() => {
+      expect(URL.createObjectURL).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(HTMLAnchorElement.prototype.click).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(URL.revokeObjectURL).toHaveBeenCalled();
+    });
+  });
+
+  test("vaccine schedule page downloads the printable schedule as a PDF fallback when embedded controls are unavailable", async () => {
     renderWithRoute(
       "/digital-papers/vaccine-schedule/7",
       <VaccineSchedulePage />,
@@ -101,6 +124,29 @@ describe("Phase 9 digital papers downloads", () => {
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /download pdf/i }));
+
+    await waitFor(() => {
+      expect(URL.createObjectURL).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(HTMLAnchorElement.prototype.click).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(URL.revokeObjectURL).toHaveBeenCalled();
+    });
+  });
+
+  test("vaccine schedule page offers Word export", async () => {
+    renderWithRoute(
+      "/digital-papers/vaccine-schedule/7",
+      <VaccineSchedulePage />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: /vaccine schedule booklet/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /download word/i }));
 
     await waitFor(() => {
       expect(URL.createObjectURL).toHaveBeenCalled();

@@ -54,6 +54,24 @@ export default function CatchUpSchedule({ infantId, onScheduleAppointment }) {
     void fetchCatchUpSchedule();
   }, [infantId, fetchCatchUpSchedule]);
 
+  useEffect(() => {
+    if (!infantId) return;
+
+    const handleUpdate = (e) => {
+      const detailId = Number(e?.detail?.patient_id || e?.detail?.infant_id || e?.detail?.child_id);
+      if (!detailId || detailId === Number(infantId)) {
+        void fetchCatchUpSchedule();
+      }
+    };
+
+    window.addEventListener("vaccination-update", handleUpdate);
+    window.addEventListener("vaccination-readiness-update", handleUpdate);
+    return () => {
+      window.removeEventListener("vaccination-update", handleUpdate);
+      window.removeEventListener("vaccination-readiness-update", handleUpdate);
+    };
+  }, [infantId, fetchCatchUpSchedule]);
+
   const handleScheduleAppointment = (vaccine) => {
     if (onScheduleAppointment) {
       onScheduleAppointment(vaccine);

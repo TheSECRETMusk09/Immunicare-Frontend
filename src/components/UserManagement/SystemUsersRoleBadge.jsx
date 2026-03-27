@@ -30,4 +30,3 @@ export default function SystemUsersRoleBadge({ user }) {
     <Badge variant={getRoleVariant(user?.role_name)}>{getRoleLabel(user)}</Badge>
   );
 }
-

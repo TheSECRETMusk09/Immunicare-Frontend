@@ -4,7 +4,6 @@ import { useAuth } from "../contexts/AuthContext";
 import { usePrefetchDashboard } from "../hooks/useCachedData";
 import { adminRoutePaths } from "../utils/routePaths";
 import {
-  LayoutDashboard,
   BarChart3,
   Users,
   Baby,
@@ -61,7 +60,6 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
   };
 
   const navItems = [
-    { name: "Dashboard", icon: LayoutDashboard },
     { name: "Analytics", icon: BarChart3 },
     { name: "User Management", icon: Users },
     { name: "Infant Management", icon: Baby },
@@ -144,9 +142,8 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
     if (path.includes("/reports")) return "Reports";
     if (path.includes("/announcements")) return "Announcements";
     if (path.includes("/notifications")) return "Notifications";
-    if (path.includes("/dashboard")) return "Dashboard";
 
-    return "Dashboard";
+    return "Analytics";
   };
 
   const toggleSection = (sectionName) => {

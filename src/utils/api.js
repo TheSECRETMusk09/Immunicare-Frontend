@@ -103,6 +103,10 @@ const isRequestCanceled = (error) =>
   error?.name === "CanceledError" ||
   error?.message === "canceled";
 
+const isTimeoutError = (error) =>
+  error?.code === "ECONNABORTED" ||
+  String(error?.message || "").toLowerCase().includes("timeout");
+
 const persistAuthSession = ({ accessToken, user, rememberMe = false } = {}) => {
   const targetStorage = rememberMe ? safeLocalStorage : safeSessionStorage;
   const secondaryStorage = rememberMe ? safeSessionStorage : safeLocalStorage;
@@ -246,6 +250,10 @@ axiosRetry(axiosClient, {
   },
   retryCondition: (error) => {
     if (isRequestCanceled(error)) {
+      return false;
+    }
+
+    if (isTimeoutError(error)) {
       return false;
     }
 
@@ -655,9 +663,22 @@ class ApiClient {
     });
   }
 
+  buildQuerySuffix(params = {}) {
+    const queryParams = new URLSearchParams();
+
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        queryParams.append(key, String(value));
+      }
+    });
+
+    return queryParams.toString() ? `?${queryParams.toString()}` : "";
+  }
+
   // Dashboard endpoints
-  async getDashboardStats() {
-    return this.request("/dashboard/stats");
+  async getDashboardStats(params = {}) {
+    const suffix = this.buildQuerySuffix(params);
+    return this.request(`/dashboard/stats${suffix}`);
   }
 
   async getGuardianStats(guardianId) {
@@ -685,16 +706,18 @@ class ApiClient {
     return this.request(`/infants/${infantId}/activities?limit=${limit}`);
   }
 
-  async getDashboardInfants() {
-    return this.request("/dashboard/infants");
+  async getDashboardInfants(params = {}) {
+    const suffix = this.buildQuerySuffix(params);
+    return this.request(`/dashboard/infants${suffix}`);
   }
 
-  async getDashboardGuardians() {
-    return this.request("/users/guardians");
+  async getDashboardGuardians(params = {}, config = {}) {
+    return this.getGuardians(params, config);
   }
 
-  async getDashboardAppointments() {
-    return this.request("/dashboard/appointments");
+  async getDashboardAppointments(params = {}) {
+    const suffix = this.buildQuerySuffix(params);
+    return this.request(`/dashboard/appointments${suffix}`);
   }
 
   async getAdminVaccinationMonitoring(filters = {}) {
@@ -710,31 +733,34 @@ class ApiClient {
     return this.request(`/dashboard/admin/vaccination-monitoring${suffix}`);
   }
 
-  async getVaccinationAnalytics() {
-    return this.request("/analytics/vaccinations");
+  async getVaccinationAnalytics(params = {}) {
+    const suffix = this.buildQuerySuffix(params);
+    return this.request(`/analytics/vaccinations${suffix}`);
   }
 
-  async getAppointmentAnalytics() {
-    return this.request("/analytics/appointments");
+  async getAppointmentAnalytics(params = {}) {
+    const suffix = this.buildQuerySuffix(params);
+    return this.request(`/analytics/appointments${suffix}`);
   }
 
   // Comprehensive analytics dashboard data
   async getAnalyticsDashboard(params = {}) {
-    const queryParams = new URLSearchParams(params);
-    const suffix = queryParams.toString() ? `?${queryParams.toString()}` : "";
+    const suffix = this.buildQuerySuffix(params);
     return this.request(`/analytics/dashboard${suffix}`);
   }
 
-  async getInventoryAnalytics() {
-    return this.request("/analytics/inventory");
+  async getInventoryAnalytics(params = {}) {
+    const suffix = this.buildQuerySuffix(params);
+    return this.request(`/analytics/inventory${suffix}`);
   }
 
   async getTrendsAnalytics(months = 12) {
     return this.request(`/analytics/trends?months=${months}`);
   }
 
-  async getDemographicsAnalytics() {
-    return this.request("/analytics/demographics");
+  async getDemographicsAnalytics(params = {}) {
+    const suffix = this.buildQuerySuffix(params);
+    return this.request(`/analytics/demographics${suffix}`);
   }
 
   // User Management endpoints
@@ -742,8 +768,12 @@ class ApiClient {
     return this.request("/users/all-users");
   }
 
-  async getGuardians() {
-    return this.request("/users/guardians");
+  async getGuardians(params = {}, config = {}) {
+    const suffix = this.buildQuerySuffix(params);
+    return this.request(`/users/guardians${suffix}`, {
+      method: "GET",
+      ...config,
+    });
   }
 
   async createGuardian(guardianData) {
@@ -787,7 +817,7 @@ class ApiClient {
     });
   }
 
-  async getSystemUsers(params = {}) {
+  async getSystemUsers(params = {}, config = {}) {
     const queryParams = new URLSearchParams();
 
     Object.entries(params || {}).forEach(([key, value]) => {
@@ -797,7 +827,10 @@ class ApiClient {
     });
 
     const suffix = queryParams.toString() ? `?${queryParams.toString()}` : "";
-    return this.request(`/users/system-users${suffix}`);
+    return this.request(`/users/system-users${suffix}`, {
+      method: "GET",
+      ...config,
+    });
   }
 
   async createSystemUser(userData) {
@@ -827,8 +860,9 @@ class ApiClient {
     });
   }
 
-  async getRoles() {
-    return this.request("/users/roles");
+  async getRoles(params = {}) {
+    const suffix = this.buildQuerySuffix(params);
+    return this.request(`/users/roles${suffix}`);
   }
 
   async getClinics() {
@@ -856,6 +890,35 @@ class ApiClient {
         return null;
       }
     }
+  }
+
+  // Settings endpoints
+  async getSettings() {
+    return this.request("/settings");
+  }
+
+  async updateSettings(settings) {
+    return this.request("/settings", {
+      method: "PUT",
+      data: { settings },
+    });
+  }
+
+  async resetSettingsCategory(category) {
+    return this.request(`/settings/${category}/reset`, {
+      method: "POST",
+    });
+  }
+
+  async exportUserSettings() {
+    return this.request("/settings/export");
+  }
+
+  async importUserSettings(settings) {
+    return this.request("/settings/import", {
+      method: "POST",
+      data: { settings },
+    });
   }
 
   // Infants Management endpoints
@@ -1205,7 +1268,7 @@ class ApiClient {
   }
 
   async getInventoryItemsByCategory(category) {
-    return this.request(`/inventory/items/category/${category}`);
+    return this.request(`/inventory/items/type/${category}`);
   }
 
   async createInventoryItem(itemData) {
@@ -1240,6 +1303,25 @@ class ApiClient {
     return this.request("/inventory/suppliers");
   }
 
+  async getInventoryCategories() {
+    const items = await this.getInventoryItems();
+    const normalizedItems = Array.isArray(items) ? items : [];
+
+    return Array.from(new Set(normalizedItems.map((item) => item.type).filter(Boolean))).map(
+      (type) => ({
+        id: type,
+        name: type,
+        label: type,
+      }),
+    );
+  }
+
+  async getWarehouses() {
+    const response = await this.request("/vaccine-supply/facilities/warehouse");
+    const warehouse = response?.warehouse || response?.data?.warehouse || response?.data || response;
+    return Array.isArray(warehouse) ? warehouse : warehouse ? [warehouse] : [];
+  }
+
   async createSupplier(supplierData) {
     return this.request("/inventory/suppliers", {
       method: "POST",
@@ -1251,6 +1333,16 @@ class ApiClient {
     return this.request("/inventory/transactions");
   }
 
+  async getStockTransactions(filters = {}) {
+    const params = new URLSearchParams(filters || {});
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return this.request(`/inventory/transactions${suffix}`);
+  }
+
+  async getStockAlerts(filters = {}) {
+    return this.getVaccineStockAlerts(filters);
+  }
+
   async createInventoryTransaction(transactionData) {
     return this.request("/inventory/transactions", {
       method: "POST",
@@ -1260,6 +1352,36 @@ class ApiClient {
 
   async getInventoryStats() {
     return this.request("/inventory/stats");
+  }
+
+  // Vaccine supply endpoints
+  async getVaccineSupplyCityDashboard() {
+    return this.request("/vaccine-supply/dashboard/city");
+  }
+
+  async getVaccineSupplyBarangayDashboard(facilityId) {
+    return this.request(`/vaccine-supply/dashboard/barangay/${facilityId}`);
+  }
+
+  async getVaccineSupplyDashboardAlerts() {
+    return this.request("/vaccine-supply/dashboard/alerts");
+  }
+
+  async getVaccineSupplyRequests(filters = {}) {
+    const params = new URLSearchParams(filters || {});
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return this.request(`/vaccine-supply/requests${suffix}`);
+  }
+
+  async getVaccineSupplyRequest(id) {
+    return this.request(`/vaccine-supply/requests/${id}`);
+  }
+
+  async reviewVaccineSupplyRequest(id, reviewData) {
+    return this.request(`/vaccine-supply/requests/${id}/review`, {
+      method: "PUT",
+      data: reviewData,
+    });
   }
 
   // Vaccine Inventory Management endpoints (based on ITEMS_vaccines.docx structure)
@@ -1280,10 +1402,32 @@ class ApiClient {
   }
 
   async getVaccineInventoryByClinic(clinicId, filters = {}) {
-    const params = new URLSearchParams(filters);
-    return this.request(
-      `/inventory/vaccine-inventory/clinic/${clinicId}?${params}`,
-    );
+    const params = new URLSearchParams({
+      ...filters,
+      clinic_id: clinicId,
+    });
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return this.request(`/inventory/vaccine-inventory${suffix}`);
+  }
+
+  async getInventoryVaccineBatches(filters = {}) {
+    const params = new URLSearchParams(filters || {});
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return this.request(`/inventory/vaccine-batches${suffix}`);
+  }
+
+  async createInventoryVaccineBatch(batchData) {
+    return this.request("/inventory/vaccine-batches", {
+      method: "POST",
+      data: batchData,
+    });
+  }
+
+  async updateInventoryVaccineBatch(id, batchData) {
+    return this.request(`/inventory/vaccine-batches/${id}`, {
+      method: "PUT",
+      data: batchData,
+    });
   }
 
   async createVaccineInventory(inventoryData) {
@@ -1332,8 +1476,15 @@ class ApiClient {
   }
 
   async getVaccineStockAlerts(filters = {}) {
-    const params = new URLSearchParams(filters);
-    return this.request(`/inventory/vaccine-stock-alerts?${params}`);
+    const params = new URLSearchParams();
+    Object.entries(filters || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        params.append(key, value);
+      }
+    });
+
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return this.request(`/inventory/vaccine-stock-alerts${suffix}`);
   }
 
   async acknowledgeVaccineStockAlert(id) {
@@ -1342,10 +1493,24 @@ class ApiClient {
     });
   }
 
+  async acknowledgeAllVaccineStockAlerts(payload = {}) {
+    return this.request("/inventory/vaccine-stock-alerts/acknowledge-all", {
+      method: "PUT",
+      data: payload,
+    });
+  }
+
   async resolveVaccineStockAlert(id, resolutionNotes) {
     return this.request(`/inventory/vaccine-stock-alerts/${id}/resolve`, {
       method: "PUT",
       data: { resolution_notes: resolutionNotes },
+    });
+  }
+
+  async resolveAllVaccineStockAlerts(payload = {}) {
+    return this.request("/inventory/vaccine-stock-alerts/resolve-all", {
+      method: "PUT",
+      data: payload,
     });
   }
 
@@ -1485,8 +1650,15 @@ class ApiClient {
 
   // Announcements Management endpoints
   async getAnnouncements(filters = {}) {
-    const params = new URLSearchParams(filters);
-    return this.request(`/announcements?${params}`);
+    const params = new URLSearchParams();
+    Object.entries(filters || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        params.append(key, value);
+      }
+    });
+
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return this.request(`/announcements${suffix}`);
   }
 
   async getAnnouncement(id) {
@@ -1992,6 +2164,7 @@ class ApiClient {
 }
 
 export const apiClient = new ApiClient();
+export const api = axiosClient;
 export {
   clearAuthStorage,
   getRememberMePreference,

@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from "react";
+ import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNotification } from "../contexts/NotificationContext";
 import apiClient from "../utils/api";
+import notificationService from "../services/notificationService";
 import GuardianTopHeader from "../components/GuardianTopHeader";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
 import {
@@ -45,66 +46,6 @@ import {
   validateTransferHistoryEntries,
 } from "../utils/transferCasePayloads";
 import { trackEvent } from "../utils/telemetry";
-
-const TRANSFER_STATUS_META = {
-  approved: {
-    label: "Transfer Approved",
-    className:
-      "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-  },
-  for_validation: {
-    label: "Transfer Review",
-    className:
-      "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  },
-  needs_clarification: {
-    label: "Needs Clarification",
-    className:
-      "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
-  },
-  rejected: {
-    label: "Transfer Rejected",
-    className:
-      "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  },
-};
-
-const READINESS_STATUS_META = {
-  READY: {
-    label: "Ready to Schedule",
-    className:
-      "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-    Icon: CheckCircle,
-  },
-  OVERDUE: {
-    label: "Overdue",
-    className:
-      "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-    Icon: AlertCircle,
-  },
-  PENDING_CONFIRMATION: {
-    label: "Awaiting Confirmation",
-    className:
-      "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-    Icon: Clock,
-  },
-  UPCOMING: {
-    label: "Upcoming",
-    className:
-      "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-    Icon: Clock,
-  },
-};
-
-const getReadinessMeta = (readinessStatus) =>
-  READINESS_STATUS_META[String(readinessStatus || "").toUpperCase()] || null;
-
-const getNextReadinessVaccineLabel = (readiness = {}) =>
-  [
-    ...(Array.isArray(readiness.overdueVaccines) ? readiness.overdueVaccines : []),
-    ...(Array.isArray(readiness.dueVaccines) ? readiness.dueVaccines : []),
-    ...(Array.isArray(readiness.blockedVaccines) ? readiness.blockedVaccines : []),
-  ][0]?.label || null;
 
 const getErrorFieldMap = (error) => {
   if (!error || !error.response || !error.response.data) {
@@ -299,27 +240,12 @@ export default function MyChildren() {
   // Check if we're on the "new" route
   const isNewRoute = location.pathname.endsWith("/new");
 
-  const openRegistrationModal = useCallback((mode = "new") => {
-    setRegisterError(null);
-    setRegisterSuccess(null);
-    setRegisterFieldErrors({});
-    setRegistrationType(mode === "transfer" ? "transfer" : "new");
-    setShowRegisterModal(true);
-  }, []);
-
   // Show modal on mount if on new route
   useEffect(() => {
     if (isNewRoute) {
-      openRegistrationModal("new");
+      setShowRegisterModal(true);
     }
-  }, [isNewRoute, openRegistrationModal]);
-
-  useEffect(() => {
-    if (location.state?.openGuardianRegistrationModal) {
-      openRegistrationModal(location.state.registrationType || "new");
-      navigate(location.pathname, { replace: true, state: null });
-    }
-  }, [location.pathname, location.state, navigate, openRegistrationModal]);
+  }, [isNewRoute]);
 
   useEffect(() => {
     const handleOpenAddChildModal = (event) => {
@@ -327,7 +253,10 @@ export default function MyChildren() {
         event.preventDefault();
       }
 
-      openRegistrationModal("new");
+      setRegisterError(null);
+      setRegisterSuccess(null);
+      setRegisterFieldErrors({});
+      setShowRegisterModal(true);
     };
 
     window.addEventListener(
@@ -341,12 +270,12 @@ export default function MyChildren() {
         handleOpenAddChildModal,
       );
     };
-  }, [openRegistrationModal]);
+  }, []);
 
   // Fetch vaccine readiness for a child
   const fetchChildReadiness = useCallback(async (childId) => {
     try {
-      const response = await apiClient.getVaccinationReadiness(childId);
+      const response = await apiClient.get(`/vaccination-readiness/${childId}`);
       if (response?.success) {
         return response.data;
       }
@@ -700,7 +629,15 @@ export default function MyChildren() {
       let uploadedCardUrl = null;
       if (transferFormData.vaccination_card) {
         try {
-          const uploadRes = await apiClient.uploadFile(transferFormData.vaccination_card);
+          const fileData = new FormData();
+          fileData.append("file", transferFormData.vaccination_card);
+
+          // Bypass uploadFile to prevent header/boundary destruction
+          const uploadRes = await apiClient.customRequest("/uploads/upload", {
+            method: "POST",
+            data: fileData,
+            headers: { "Content-Type": undefined } // Forces browser to append the multipart boundary
+          });
           uploadedCardUrl =
             uploadRes?.data?.downloadUrl ||
             uploadRes?.data?.path ||
@@ -712,58 +649,93 @@ export default function MyChildren() {
         }
       }
 
-      const submittedVaccines = buildTransferCaseVaccinesPayload(
-        transferFormData.prior_vaccines,
-        transferFormData.source_facility,
-      );
-
-      const transferRemarks = [
-        transferFormData.notes || null,
-        transferFormData.vaccination_card
-          ? `Guardian selected local proof file: ${transferFormData.vaccination_card.name}`
-          : null,
-      ]
-        .filter(Boolean)
-        .join("\n");
-
-      await apiClient.registerGuardianTransferChild({
-        infant: {
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          dob: formData.dob,
-          sex: normalizeSexForSubmission(formData.sex),
-          guardian_id: guardianId,
-          birth_weight: formData.birth_weight || null,
-          birth_height: formData.birth_length || null,
-          place_of_birth: formData.birthplace || null,
-          purok: formData.purok,
-          street_color: formData.street_color,
-        },
-        source_facility: transferFormData.source_facility,
-        submitted_vaccines: submittedVaccines,
-        vaccination_card_url: uploadedCardUrl,
-        remarks: transferRemarks || null,
-      });
-
-      success(
-        "Transfer-in case submitted successfully! Our staff will review your child's vaccination history.",
-        { title: "Transfer-In Submitted" }
-      );
-
-      transferInSubmitted({
-        childName: `${formData.first_name} ${formData.last_name}`,
-        vaccines: submittedVaccines
-          .map((entry) => `${entry.vaccine_name} dose ${entry.dose_number}`)
-          .join(", "),
-      });
-
-      setRegisterSuccess("Transfer-in case submitted successfully! Our staff will review your child's vaccination history.");
-
-      triggerGuardianInfantRegistered({
+      // First create the infant record
+      const infantData = {
         first_name: formData.first_name,
         last_name: formData.last_name,
         dob: formData.dob,
-      });
+        sex: normalizeSexForSubmission(formData.sex),
+        guardian_id: guardianId,
+        birth_weight: formData.birth_weight || null,
+        birth_height: formData.birth_length || null,
+        place_of_birth: formData.birthplace || null,
+        purok: formData.purok,
+        street_color: formData.street_color,
+        // Transfer-in specific fields
+        transfer_in_source: transferFormData.source_facility,
+        validation_status: "pending_validation",
+        source_facility: transferFormData.source_facility,
+      };
+
+      const infantResponse = await apiClient.createGuardianInfant(infantData);
+
+      // Get the created infant ID
+      const infantId =
+        infantResponse?.data?.id ||
+        infantResponse?.id ||
+        infantResponse?.infant?.id;
+
+       if (infantId) {
+          const submittedVaccines = buildTransferCaseVaccinesPayload(
+            transferFormData.prior_vaccines,
+            transferFormData.source_facility,
+          );
+
+          const transferRemarks = [
+            transferFormData.notes || null,
+            transferFormData.vaccination_card
+              ? `Guardian selected local proof file: ${transferFormData.vaccination_card.name}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join("\n");
+
+          // Create transfer-in case with vaccine history
+          const transferCaseData = {
+            infant_id: infantId,
+            source_facility: transferFormData.source_facility,
+            submitted_vaccines: submittedVaccines,
+            vaccination_card_url: uploadedCardUrl,
+            remarks: transferRemarks || null,
+          };
+
+           // Submit transfer-in case
+           await apiClient.createTransferInCase(transferCaseData);
+
+            // Send notification to guardian
+            success(
+              "Transfer-in case submitted successfully! Our staff will review your child's vaccination history.",
+              { title: "Transfer-In Submitted" }
+            );
+
+            // Trigger transfer-in submitted notification via notification context
+            transferInSubmitted({
+              childName: `${formData.first_name} ${formData.last_name}`,
+              vaccines: submittedVaccines
+                .map((entry) => `${entry.vaccine_name} dose ${entry.dose_number}`)
+                .join(', ')
+            });
+
+            // Send persistent transfer-in submitted notification via notification service
+            try {
+              await notificationService.sendTransferInSubmittedNotification({
+                childName: `${formData.first_name} ${formData.last_name}`,
+                vaccines: submittedVaccines
+                  .map((entry) => `${entry.vaccine_name} dose ${entry.dose_number}`)
+                  .join(', '),
+                guardianId: guardianId,
+                infantId: infantId
+              });
+            } catch (notificationError) {
+              console.error('Failed to send transfer-in submitted notification:', notificationError);
+              // Don't fail the whole operation if notification fails
+            }
+
+       }
+
+      setRegisterSuccess("Transfer-in case submitted successfully! Our staff will review your child's vaccination history.");
+
+      triggerGuardianInfantRegistered(infantData);
       trackEvent("child_profile_created", { method: "transfer_in" });
 
       // Refresh children list
@@ -879,7 +851,7 @@ export default function MyChildren() {
         actions={(
           <>
             <Button
-              onClick={() => openRegistrationModal("new")}
+              onClick={() => setShowRegisterModal(true)}
               className="guardian-module-hero__primary-btn min-[1025px]:hidden"
               size="sm"
             >
@@ -946,157 +918,147 @@ export default function MyChildren() {
               You haven't registered any children yet. Add your first child to
               get started with tracking their health journey.
             </p>
-            <Button size="lg" onClick={() => openRegistrationModal("new")}>
+            <Button size="lg" onClick={() => setShowRegisterModal(true)}>
               Register Your First Child
             </Button>
           </div>
         ) : (
           <div className="guardian-children-grid grid grid-cols-1 min-[640px]:grid-cols-2 min-[1025px]:grid-cols-3 gap-4 md:gap-5 lg:gap-6">
-            {children.map((child) => {
-              const readiness = childrenReadiness[child.id] || null;
-              const readinessMeta = getReadinessMeta(readiness?.readinessStatus);
-              const transferMeta = TRANSFER_STATUS_META[child.latest_transfer_case_status] || null;
-              const nextRecommendedVaccine = getNextReadinessVaccineLabel(readiness);
-              const ReadinessIcon = readinessMeta?.Icon;
-
-              return (
-                <div
-                  key={child.id}
-                  className="guardian-child-card guardian-theme-card glassmorphism-card rounded-xl border border-transparent backdrop-blur-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group overflow-hidden bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-blue-500/10"
-                >
-                  <div className="p-6">
-                    <div className="flex items-start justify-between gap-3 mb-6">
-                      <div className="w-14 h-14 bg-gradient-to-br from-blue-400/30 to-purple-500/30 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                        {normalizeSexForDisplay(child.sex) === "M" ? (
-                          <User className="w-8 h-8 guardian-card-icon-accent guardian-card-icon-accent--blue" />
-                        ) : (
-                          <User className="w-8 h-8 guardian-card-icon-accent guardian-card-icon-accent--pink" />
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="guardian-status-pill guardian-status-pill--active px-3 py-1 text-xs font-bold rounded-full uppercase tracking-wider">
-                          Active
-                        </span>
-                        {readinessMeta && (
-                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full flex items-center gap-1 ${readinessMeta.className}`}>
-                            {ReadinessIcon ? <ReadinessIcon className="w-3 h-3" /> : null}
-                            {readinessMeta.label}
-                          </span>
-                        )}
-                        {transferMeta && (
-                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${transferMeta.className}`}>
-                            {transferMeta.label}
-                          </span>
-                        )}
-                      </div>
+            {children.map((child) => (
+              <div
+                key={child.id}
+                className="guardian-child-card guardian-theme-card glassmorphism-card rounded-xl border border-transparent backdrop-blur-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group overflow-hidden bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-blue-500/10"
+              >
+                <div className="p-6">
+                  <div className="flex items-start justify-between gap-3 mb-6">
+                    <div className="w-14 h-14 bg-gradient-to-br from-blue-400/30 to-purple-500/30 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      {normalizeSexForDisplay(child.sex) === "M" ? (
+                        <User className="w-8 h-8 guardian-card-icon-accent guardian-card-icon-accent--blue" />
+                      ) : (
+                        <User className="w-8 h-8 guardian-card-icon-accent guardian-card-icon-accent--pink" />
+                      )}
                     </div>
-
-                    <h3 className="text-xl font-bold guardian-card-text-primary mb-4">
-                      {child.first_name} {child.last_name}
-                    </h3>
-
-                    {child.control_number && (
-                      <div className="mb-4 inline-block px-3 py-1 rounded guardian-card-chip">
-                        <span className="text-xs guardian-card-text-secondary font-mono tracking-wider">
-                          Infant Control Number: {child.control_number}
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="guardian-status-pill guardian-status-pill--active px-3 py-1 text-xs font-bold rounded-full uppercase tracking-wider">
+                        Active
+                      </span>
+                      {childrenReadiness[child.id] && (
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full flex items-center gap-1 ${
+                          childrenReadiness[child.id].readinessStatus === 'READY' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                          childrenReadiness[child.id].readinessStatus === 'OVERDUE' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                          childrenReadiness[child.id].readinessStatus === 'PENDING_CONFIRMATION' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                          'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                        }`}>
+                          {childrenReadiness[child.id].readinessStatus === 'READY' && <CheckCircle className="w-3 h-3" />}
+                          {childrenReadiness[child.id].readinessStatus === 'OVERDUE' && <AlertCircle className="w-3 h-3" />}
+                          {childrenReadiness[child.id].readinessStatus === 'PENDING_CONFIRMATION' && <Clock className="w-3 h-3" />}
+                          {childrenReadiness[child.id].readinessStatus === 'UPCOMING' && <Clock className="w-3 h-3" />}
+                          {childrenReadiness[child.id].readinessStatus}
                         </span>
-                      </div>
-                    )}
+                      )}
+                    </div>
+                  </div>
+
+                  <h3 className="text-xl font-bold guardian-card-text-primary mb-4">
+                    {child.first_name} {child.last_name}
+                  </h3>
+
+                  {child.control_number && (
+                    <div className="mb-4 inline-block px-3 py-1 rounded guardian-card-chip">
+                      <span className="text-xs guardian-card-text-secondary font-mono tracking-wider">
+                        Infant Control Number: {child.control_number}
+                      </span>
+                    </div>
+                  )}
 
                     <div className="space-y-3 text-sm">
                       <div className="flex flex-col gap-1 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between py-2 border-b border-theme-border-primary">
                         <span className="guardian-card-text-secondary">
                           Date of Birth
                         </span>
-                        <span className="font-semibold guardian-card-text-primary">
-                          {formatDate(child.dob)}
-                        </span>
-                      </div>
+                      <span className="font-semibold guardian-card-text-primary">
+                        {formatDate(child.dob)}
+                      </span>
+                    </div>
                       <div className="flex flex-col gap-1 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between py-2 border-b border-theme-border-primary">
                         <span className="guardian-card-text-secondary">Age</span>
-                        <span className="font-semibold guardian-card-text-primary">
-                          {Math.floor(
-                            (new Date() - new Date(child.dob)) /
-                              (1000 * 60 * 60 * 24 * 365),
-                          )}{" "}
-                          years
-                        </span>
-                      </div>
+                      <span className="font-semibold guardian-card-text-primary">
+                        {Math.floor(
+                          (new Date() - new Date(child.dob)) /
+                            (1000 * 60 * 60 * 24 * 365),
+                        )}{" "}
+                        years
+                      </span>
+                    </div>
                       <div className="flex flex-col gap-1 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between py-2 border-b border-theme-border-primary">
                         <span className="guardian-card-text-secondary">Sex</span>
-                        <span className="font-semibold guardian-card-text-primary">
-                          {normalizeSexForDisplay(child.sex) === "M" ? "Male" : "Female"}
-                        </span>
-                      </div>
+                      <span className="font-semibold guardian-card-text-primary">
+                        {normalizeSexForDisplay(child.sex) === "M" ? "Male" : "Female"}
+                      </span>
+                    </div>
                       <div className="flex flex-col gap-1 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between py-2">
                         <span className="guardian-card-text-secondary">
                           Health Center
                         </span>
-                        <span className="font-semibold guardian-card-text-primary truncate max-w-[150px]">
-                          {child.health_center || "Not specified"}
-                        </span>
-                      </div>
-                      {readiness?.nextAppointmentPrediction && (
-                        <div className="mt-3 pt-3 border-t border-theme-border-primary">
-                          <p className="text-xs text-theme-secondary mb-1">Recommended Date:</p>
-                          <p className="font-semibold text-theme-primary text-sm">
-                            {formatDate(readiness.nextAppointmentPrediction.date)}
-                          </p>
-                          {nextRecommendedVaccine && (
-                            <p className="text-xs text-theme-secondary mt-1">
-                              {nextRecommendedVaccine}
-                            </p>
-                          )}
-                        </div>
-                      )}
+                      <span className="font-semibold guardian-card-text-primary truncate max-w-[150px]">
+                        {child.health_center || "Not specified"}
+                      </span>
                     </div>
-                  </div>
-
-                  <div className="flex flex-row flex-nowrap items-stretch gap-1.5 sm:gap-2 p-3 sm:p-4 border-t border-theme-border-primary bg-white/5 backdrop-blur-md">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="flex-1 min-w-0 flex-col h-auto py-2 px-1 justify-center items-center gap-1 guardian-card-action guardian-card-action--neutral"
-                      onClick={() =>
-                        navigate(guardianRoutePaths.vaccinationRecordsByChild(child.id))
-                      }
-                    >
-                      <FileText className="w-4 h-4 sm:w-5 sm:h-5 mx-0" />
-                      <span className="text-[10px] sm:text-xs font-semibold leading-none truncate max-w-full">Records</span>
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="flex-1 min-w-0 flex-col h-auto py-2 px-1 justify-center items-center gap-1 guardian-card-action guardian-card-action--neutral"
-                      onClick={() =>
-                        navigate(guardianRoutePaths.appointmentBooking(child.id))
-                      }
-                    >
-                      <Calendar className="w-4 h-4 sm:w-5 sm:h-5 mx-0" />
-                      <span className="text-[10px] sm:text-xs font-semibold leading-none truncate max-w-full">Schedule</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="flex-1 min-w-0 flex-col h-auto py-2 px-1 justify-center items-center gap-1 guardian-card-action guardian-card-action--edit"
-                      onClick={() => handleEditChild(child)}
-                    >
-                      <Edit2 className="w-4 h-4 sm:w-5 sm:h-5 mx-0" />
-                      <span className="text-[10px] sm:text-xs font-semibold leading-none truncate max-w-full">Edit</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="flex-1 min-w-0 flex-col h-auto py-2 px-1 justify-center items-center gap-1 guardian-card-action guardian-card-action--delete"
-                      onClick={() => handleDeleteChildClick(child)}
-                    >
-                      <Trash2 className="w-4 h-4 sm:w-5 sm:h-5 mx-0 text-red-500" />
-                      <span className="text-[10px] sm:text-xs font-semibold leading-none truncate max-w-full text-red-600 dark:text-red-400">Delete</span>
-                    </Button>
+                    {childrenReadiness[child.id]?.nextAppointmentPrediction && (
+                      <div className="mt-3 pt-3 border-t border-theme-border-primary">
+                        <p className="text-xs text-theme-secondary mb-1">Next Vaccine:</p>
+                        <p className="font-semibold text-theme-primary text-sm">
+                          {childrenReadiness[child.id].nextAppointmentPrediction.date}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
-              );
-            })}
+
+                <div className="flex flex-row flex-nowrap items-stretch gap-1.5 sm:gap-2 p-3 sm:p-4 border-t border-theme-border-primary bg-white/5 backdrop-blur-md">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="flex-1 min-w-0 flex-col h-auto py-2 px-1 justify-center items-center gap-1 guardian-card-action guardian-card-action--neutral"
+                    onClick={() =>
+                      navigate(guardianRoutePaths.vaccinationRecordsByChild(child.id))
+                    }
+                  >
+                    <FileText className="w-4 h-4 sm:w-5 sm:h-5 mx-0" />
+                    <span className="text-[10px] sm:text-xs font-semibold leading-none truncate max-w-full">Records</span>
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="flex-1 min-w-0 flex-col h-auto py-2 px-1 justify-center items-center gap-1 guardian-card-action guardian-card-action--neutral"
+                    onClick={() =>
+                      navigate(guardianRoutePaths.appointmentBooking(child.id))
+                    }
+                  >
+                    <Calendar className="w-4 h-4 sm:w-5 sm:h-5 mx-0" />
+                    <span className="text-[10px] sm:text-xs font-semibold leading-none truncate max-w-full">Schedule</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1 min-w-0 flex-col h-auto py-2 px-1 justify-center items-center gap-1 guardian-card-action guardian-card-action--edit"
+                    onClick={() => handleEditChild(child)}
+                  >
+                    <Edit2 className="w-4 h-4 sm:w-5 sm:h-5 mx-0" />
+                    <span className="text-[10px] sm:text-xs font-semibold leading-none truncate max-w-full">Edit</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1 min-w-0 flex-col h-auto py-2 px-1 justify-center items-center gap-1 guardian-card-action guardian-card-action--delete"
+                    onClick={() => handleDeleteChildClick(child)}
+                  >
+                    <Trash2 className="w-4 h-4 sm:w-5 sm:h-5 mx-0 text-red-500" />
+                    <span className="text-[10px] sm:text-xs font-semibold leading-none truncate max-w-full text-red-600 dark:text-red-400">Delete</span>
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 

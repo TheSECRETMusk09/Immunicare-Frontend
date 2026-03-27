@@ -25,6 +25,18 @@ export default function StockAlerts() {
     if (isAdmin) fetchAlerts();
   }, [isAdmin, fetchAlerts]);
 
+  useEffect(() => {
+    const handleSync = () => { if (isAdmin) fetchAlerts(); };
+
+    window.addEventListener("vaccination-update", handleSync);
+    window.addEventListener("inventory-update", handleSync);
+
+    return () => {
+      window.removeEventListener("vaccination-update", handleSync);
+      window.removeEventListener("inventory-update", handleSync);
+    };
+  }, [isAdmin, fetchAlerts]);
+
   // Redirect non-admin users
   if (!isAdmin) {
     return (

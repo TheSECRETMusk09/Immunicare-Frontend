@@ -24,8 +24,16 @@ jest.mock("../utils/api", () => ({
   default: {
     getAnalyticsDashboard: jest.fn(),
     getFacilityInfo: jest.fn(),
+    getVaccineInventory: jest.fn(),
+    getVaccines: jest.fn(),
     createVaccineInventoryTransaction: jest.fn(),
   },
+}));
+
+jest.mock("../contexts/AuthContext", () => ({
+  useAuth: () => ({
+    user: { id: 100, role_type: "SYSTEM_ADMIN", clinic_id: 7, facility_id: 7 },
+  }),
 }));
 
 jest.mock("../contexts/SocketContext", () => ({
@@ -145,6 +153,8 @@ describe("Admin module URL state persistence", () => {
       city: "Test City",
       barangay: "Test Barangay",
     });
+    apiClient.getVaccineInventory.mockResolvedValue([]);
+    apiClient.getVaccines.mockResolvedValue([]);
   });
 
   test("Analytics deep link keeps Inventory & Reminders active on load", async () => {
@@ -338,21 +348,21 @@ describe("Admin module URL state persistence", () => {
   });
 
   test("Inventory module preserves active tab via URL and storage fallback", async () => {
-    localStorage.setItem("admin.inventory.activeTab", "reports");
+    localStorage.setItem("admin.inventory.activeTab", "stock_alerts");
 
     renderInventoryRoute("/inventory");
 
-    const reportsTabButton = await screen.findByRole("button", {
-      name: /^reports$/i,
+    const stockAlertsTabButton = await screen.findByRole("button", {
+      name: /stock alerts/i,
     });
 
     await waitFor(() => {
       expect(screen.getByTestId("location-search")).toHaveTextContent(
-        "tab=reports",
+        "tab=stock_alerts",
       );
     });
 
-    expect(reportsTabButton).toHaveClass("border-b-2");
+    expect(stockAlertsTabButton).toHaveClass("bg-white");
 
     fireEvent.click(screen.getByRole("button", { name: /inventory sheet/i }));
 

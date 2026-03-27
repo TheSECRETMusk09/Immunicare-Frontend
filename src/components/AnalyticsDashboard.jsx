@@ -1,834 +1,3255 @@
- import React, { useState, useEffect, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  BarChart,
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Divider,
+  FormControl,
+  FormControlLabel,
+  Grid,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Select,
+  Skeleton,
+  Snackbar,
+  Switch,
+  Tab,
+  Tabs,
+  TextField,
+  Tooltip,
+  Typography,
+  useMediaQuery,
+  useTheme,
+} from "@mui/material";
+import {
+  Assessment,
+  CalendarToday,
+  Download,
+  ErrorOutline,
+  Female,
+  Inventory2,
+  LocalHospital,
+  Male,
+  People,
+  Refresh,
+  Warning,
+} from "@mui/icons-material";
+import {
   Bar,
-  PieChart,
-  Pie,
+  BarChart,
+  CartesianGrid,
   Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  AreaChart,
-  Area,
 } from "recharts";
-import {
-  Users,
-  Calendar,
-  Syringe,
-  Package,
-  TrendingUp,
-  AlertTriangle,
-  Download,
-  BarChart2,
-} from "lucide-react";
-import { Button, Select, Card, PageHeader, Alert } from "./UI";
+import { format } from "date-fns";
+import { useLocation, useSearchParams } from "react-router-dom";
 import apiClient from "../utils/api";
+import { useSocket } from "../contexts/SocketContext";
+import { useTheme as useAppTheme } from "../contexts/ThemeContext";
+import { safeLocalStorage, safeSessionStorage } from "../utils/safeStorage";
 
-// Modern chart card component
-const ModernChartCard = ({ title, icon, children, className = "" }) => {
+const VACCINE_OPTIONS = [
+  { value: "ALL", label: "All Vaccines" },
+  { value: "BCG", label: "BCG" },
+  { value: "HEPB", label: "Hepatitis B" },
+  { value: "PENTA", label: "Pentavalent" },
+  { value: "OPV", label: "Oral Polio (OPV)" },
+  { value: "IPV", label: "Inactivated Polio (IPV)" },
+  { value: "PCV", label: "Pneumococcal Conjugate (PCV)" },
+  { value: "MMR", label: "MMR" },
+];
+
+const STATUS_OPTIONS = [
+  { value: "all", label: "All Statuses" },
+  { value: "completed", label: "Completed" },
+  { value: "pending", label: "Pending" },
+  { value: "overdue", label: "Overdue" },
+  { value: "cancelled", label: "Cancelled" },
+  { value: "no_show", label: "No-show" },
+];
+
+const PERIOD_OPTIONS = [
+  { value: "today", label: "Today" },
+  { value: "week", label: "This Week" },
+  { value: "month", label: "This Month" },
+  { value: "custom", label: "Custom Date Range" },
+];
+
+const ANALYTICS_TAB_CONFIG = [
+  { key: "overview", label: "Overview" },
+  { key: "vaccination-analytics", label: "Vaccination Analytics" },
+  { key: "appointments-follow-up", label: "Appointments & Follow-up" },
+  { key: "inventory-reminders", label: "Inventory & Reminders" },
+  { key: "demographics-activity", label: "Demographics & Activity" },
+];
+
+const ANALYTICS_DEFAULT_TAB_KEY = ANALYTICS_TAB_CONFIG[0].key;
+const ANALYTICS_TAB_STORAGE_KEY = "admin.analytics.activeTab";
+const ANALYTICS_CANONICAL_PATH = "/analytics";
+const ANALYTICS_TAB_KEY_SET = new Set(ANALYTICS_TAB_CONFIG.map((tab) => tab.key));
+
+const normalizeAnalyticsTabKey = (value) => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  return ANALYTICS_TAB_KEY_SET.has(normalized) ? normalized : null;
+};
+
+const getStoredAnalyticsTabKey = () => {
+  const sessionTab = normalizeAnalyticsTabKey(safeSessionStorage.getItem(ANALYTICS_TAB_STORAGE_KEY));
+  if (sessionTab) {
+    return sessionTab;
+  }
+
+  return normalizeAnalyticsTabKey(safeLocalStorage.getItem(ANALYTICS_TAB_STORAGE_KEY));
+};
+
+const normalizeAnalyticsTabIndex = (index) => {
+  const parsed = Number.parseInt(index, 10);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed >= ANALYTICS_TAB_CONFIG.length) {
+    return 0;
+  }
+
+  return parsed;
+};
+
+const buildNextTabSearchParams = (nextTabKey) => {
+  const normalizedTabKey = normalizeAnalyticsTabKey(nextTabKey) || ANALYTICS_DEFAULT_TAB_KEY;
+  const next = new URLSearchParams();
+  next.set("tab", normalizedTabKey);
+  return next;
+};
+
+const isCanonicalAnalyticsSearch = (search, tabKey) => {
+  const normalizedTabKey = normalizeAnalyticsTabKey(tabKey);
+  if (!normalizedTabKey) {
+    return false;
+  }
+
+  const params = new URLSearchParams(search);
+  if (normalizeAnalyticsTabKey(params.get("tab")) !== normalizedTabKey) {
+    return false;
+  }
+
+  params.delete("tab");
+  return Array.from(params.keys()).length === 0;
+};
+
+const persistAnalyticsTabKey = (tabKey) => {
+  const normalized = normalizeAnalyticsTabKey(tabKey);
+  if (!normalized) {
+    return;
+  }
+
+  safeSessionStorage.setItem(ANALYTICS_TAB_STORAGE_KEY, normalized);
+  safeLocalStorage.setItem(ANALYTICS_TAB_STORAGE_KEY, normalized);
+};
+
+const CHART_THEME = {
+  palette: {
+    primary: "#5B8DEF",
+    secondary: "#00B8A9",
+    warning: "#FFC857",
+    danger: "#E66A6A",
+    violet: "#8E7CFF",
+    sky: "#3FA7D6",
+    lime: "#9CCC65",
+    male: "#4F7CFF",
+    female: "#A56EFF",
+  },
+  layout: {
+    margin: { left: 8, right: 12, top: 12, bottom: 8 },
+    gridDash: "4 6",
+    barRadius: [10, 10, 0, 0],
+    horizontalBarRadius: [0, 10, 10, 0],
+    pieCornerRadius: 10,
+  },
+};
+
+const GENDER_VISUAL_COLORS = Object.freeze({
+  female: "#EC4899",
+  male: "#3B82F6",
+});
+
+const REPORT_SHORTCUT_GENERATION_MAP = Object.freeze({
+  "vaccination-summary": { type: "vaccination", format: "pdf" },
+  "appointments-followup": { type: "appointment", format: "csv" },
+  "inventory-status": { type: "inventory", format: "excel" },
+  "sms-reminder-log": { type: "consolidated", format: "csv" },
+});
+
+const SHORTCUT_FORMAT_ALIASES = Object.freeze({
+  pdf: "pdf",
+  csv: "csv",
+  excel: "excel",
+  xlsx: "excel",
+});
+
+const SHORTCUT_FORMAT_EXTENSION = Object.freeze({
+  pdf: "pdf",
+  csv: "csv",
+  excel: "xlsx",
+});
+
+const formatDateToIsoDay = (value) => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toISOString().slice(0, 10);
+};
+
+const resolveShortcutDateRange = (filters = {}) => {
+  const period = String(filters.period || "month").toLowerCase();
+
+  if (period === "custom") {
+    return {
+      startDate: filters.startDate || "",
+      endDate: filters.endDate || "",
+    };
+  }
+
+  const end = new Date();
+  end.setHours(0, 0, 0, 0);
+
+  const start = new Date(end);
+  if (period === "today") {
+    // same-day report range
+  } else if (period === "week") {
+    start.setDate(start.getDate() - 6);
+  } else {
+    // default to 30-day analytics-aligned range
+    start.setDate(start.getDate() - 29);
+  }
+
+  return {
+    startDate: formatDateToIsoDay(start),
+    endDate: formatDateToIsoDay(end),
+  };
+};
+
+const normalizeShortcutReportFormat = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  return SHORTCUT_FORMAT_ALIASES[normalized] || null;
+};
+
+const resolveShortcutGenerationConfig = (report = {}) => {
+  const normalizedKey = String(report?.key || "").trim().toLowerCase();
+  const mapped = REPORT_SHORTCUT_GENERATION_MAP[normalizedKey] || null;
+
+  if (mapped) {
+    return {
+      type: mapped.type,
+      format: normalizeShortcutReportFormat(report?.format) || mapped.format,
+    };
+  }
+
+  const reportType = String(report?.reportType || "").trim().toLowerCase() || "consolidated";
+  return {
+    type: reportType,
+    format: normalizeShortcutReportFormat(report?.format) || "pdf",
+  };
+};
+
+const extractFilenameFromContentDisposition = (contentDisposition = "") => {
+  const value = String(contentDisposition || "");
+  const utf8Match = value.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1].trim().replace(/^"|"$/g, ""));
+  }
+
+  const filenameMatch = value.match(/filename=([^;]+)/i);
+  if (filenameMatch?.[1]) {
+    return filenameMatch[1].trim().replace(/^"|"$/g, "");
+  }
+
+  return "";
+};
+
+const formatTrendLabelTick = (value) => {
+  const text = String(value || "");
+  if (!text) {
+    return "";
+  }
+
+  if (text.length <= 10) {
+    return text;
+  }
+
+  return `${text.slice(0, 10)}…`;
+};
+
+const splitWords = (text = "") => String(text).trim().split(/\s+/).filter(Boolean);
+
+const wrapTickLabel = (value, maxLineLength = 14, maxLines = 2) => {
+  const words = splitWords(value);
+  if (!words.length) {
+    return "";
+  }
+
+  const lines = [];
+  let current = "";
+
+  words.forEach((word) => {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length <= maxLineLength) {
+      current = candidate;
+      return;
+    }
+
+    if (current) {
+      lines.push(current);
+      current = word;
+      return;
+    }
+
+    lines.push(word.slice(0, maxLineLength));
+    current = word.length > maxLineLength ? `${word.slice(maxLineLength)}` : "";
+  });
+
+  if (current) {
+    lines.push(current);
+  }
+
+  if (lines.length > maxLines) {
+    const capped = lines.slice(0, maxLines);
+    const last = capped[maxLines - 1];
+    capped[maxLines - 1] = last.length > maxLineLength - 1
+      ? `${last.slice(0, maxLineLength - 1)}…`
+      : `${last}…`;
+    return capped;
+  }
+
+  return lines;
+};
+
+const renderInventoryXAxisTick = ({ x, y, payload, viewportWidth, axisColor }) => {
+  const label = String(payload?.value || "");
+  const isNarrow = viewportWidth < 640;
+  const isMedium = viewportWidth >= 640 && viewportWidth < 960;
+  const wrapped = wrapTickLabel(label, isNarrow ? 9 : isMedium ? 11 : 14, 2);
+  const lineHeight = 12;
+
+  if (isNarrow) {
+    const compact = label.length > 12 ? `${label.slice(0, 12)}…` : label;
+
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text
+          x={0}
+          y={0}
+          dy={14}
+          fill={axisColor}
+          textAnchor="end"
+          transform="rotate(-32)"
+          fontSize={11}
+          fontWeight={500}
+        >
+          {compact}
+        </text>
+      </g>
+    );
+  }
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+      {(Array.isArray(wrapped) ? wrapped : [wrapped]).map((line, index) => (
+        <text
+          key={`${label}-${index}`}
+          x={0}
+          y={0}
+          dy={14 + index * lineHeight}
+          fill={axisColor}
+          textAnchor="middle"
+          fontSize={11}
+          fontWeight={500}
+        >
+          {line}
+        </text>
+      ))}
+    </g>
+  );
+};
+
+const PIE_COLORS = [
+  CHART_THEME.palette.primary,
+  CHART_THEME.palette.secondary,
+  CHART_THEME.palette.warning,
+  CHART_THEME.palette.danger,
+  CHART_THEME.palette.violet,
+  CHART_THEME.palette.sky,
+  CHART_THEME.palette.lime,
+];
+
+const SELECT_MENU_PROPS = {
+  // Keep MUI Select menu in portal to preserve valid anchor positioning.
+  // Backdrop is kept non-blocking so legacy global styles cannot mimic navigation overlays.
+  disablePortal: false,
+  keepMounted: false,
+  hideBackdrop: true,
+  disableScrollLock: true,
+  transitionDuration: 0,
+  slotProps: {
+    backdrop: {
+      invisible: true,
+    },
+    paper: {
+      sx: (theme) => ({
+        maxHeight: 320,
+        zIndex: (theme) => theme.zIndex.modal + 2,
+        bgcolor: theme.palette.mode === 'dark' ? 'rgba(15,23,42,0.95)' : 'background.paper',
+        border: '1px solid',
+        borderColor: theme.palette.mode === 'dark' ? 'rgba(148,163,184,0.3)' : 'divider',
+      }),
+    },
+  },
+  BackdropProps: {
+    invisible: true,
+  },
+  PaperProps: {
+    sx: (theme) => ({
+      maxHeight: 320,
+      zIndex: (theme) => theme.zIndex.modal + 2,
+      bgcolor: theme.palette.mode === 'dark' ? 'rgba(15,23,42,0.95)' : 'background.paper',
+      border: '1px solid',
+      borderColor: theme.palette.mode === 'dark' ? 'rgba(148,163,184,0.3)' : 'divider',
+    }),
+  },
+};
+
+const blurActiveElementIfNeeded = () => {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const activeElement = document.activeElement;
+  if (activeElement && typeof activeElement.blur === "function") {
+    activeElement.blur();
+  }
+};
+
+const safeNum = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+};
+
+const normalizeArray = (...candidates) => {
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate;
+    }
+  }
+
+  return [];
+};
+
+const normalizeObject = (...candidates) => {
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+      return candidate;
+    }
+  }
+
+  return {};
+};
+
+const toTitleCase = (value = "") => {
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+};
+
+const toDateLabel = (value) => {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return parsed.toLocaleDateString("en-PH", {
+    month: "short",
+    day: "numeric",
+  });
+};
+
+const normalizeResponsePayload = (response) => {
+  if (!response) return null;
+
+  if (response.success && response.data) {
+    return response.data;
+  }
+
+  if (response.data && typeof response.data === "object" && !Array.isArray(response.data)) {
+    return response.data;
+  }
+
+  if (typeof response === "object" && !Array.isArray(response)) {
+    return response;
+  }
+
+  return null;
+};
+
+const ensureDefaultAgeGroups = (ageGroups = []) => {
+  const defaultOrder = [
+    "0-5 months",
+    "6-11 months",
+    "12-23 months",
+    "24+ months",
+  ];
+
+  const normalizedByKey = new Map(
+    (Array.isArray(ageGroups) ? ageGroups : []).map((item) => [
+      String(item?.group || "").trim().toLowerCase(),
+      {
+        group: item?.group || "Unknown",
+        count: safeNum(item?.count),
+      },
+    ]),
+  );
+
+  return defaultOrder.map((group) => {
+    const matched = normalizedByKey.get(group.toLowerCase());
+    return matched || { group, count: 0 };
+  });
+};
+
+const ensureDefaultGenderGroups = (genderRows = []) => {
+  const defaults = [
+    { label: "Male", count: 0 },
+    { label: "Female", count: 0 },
+    { label: "Other / Not specified", count: 0 },
+  ];
+
+  const map = new Map();
+
+  (Array.isArray(genderRows) ? genderRows : []).forEach((item) => {
+    const rawLabel = String(item?.label || "Unknown").trim();
+    const normalized = rawLabel.toLowerCase().replace(/\./g, "").trim();
+    const canonicalLabel =
+      normalized === "m" || normalized.startsWith("mal")
+        ? "Male"
+        : normalized === "f" || normalized.startsWith("fem")
+          ? "Female"
+          : rawLabel || "Other / Not specified";
+
+    const previous = map.get(canonicalLabel) || 0;
+    map.set(canonicalLabel, previous + safeNum(item?.count));
+  });
+
+  return defaults.map((entry) => ({
+    label: entry.label,
+    count: map.has(entry.label) ? safeNum(map.get(entry.label)) : entry.count,
+  }));
+};
+
+const normalizeGenderSnapshot = (genderRows = []) => {
+  const normalized = ensureDefaultGenderGroups(genderRows);
+  const maleCount = safeNum(normalized.find((item) => item.label === "Male")?.count);
+  const femaleCount = safeNum(normalized.find((item) => item.label === "Female")?.count);
+  const otherCount = safeNum(normalized.find((item) => item.label === "Other / Not specified")?.count);
+  const total = maleCount + femaleCount + otherCount;
+  const pairTotal = maleCount + femaleCount;
+  const femalePercent = pairTotal > 0 ? Math.round((femaleCount / pairTotal) * 100) : 0;
+  const malePercent = pairTotal > 0 ? 100 - femalePercent : 0;
+
+  return {
+    maleCount,
+    femaleCount,
+    otherCount,
+    total,
+    pairTotal,
+    femalePercent,
+    malePercent,
+    hasActualValues: total > 0,
+  };
+};
+
+const statusLabel = (value = "") => {
+  const normalized = String(value).replace(/[_-]/g, " ").trim();
+  if (!normalized) return "Unknown";
+  return normalized
+    .split(" ")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+};
+
+const toShortDateTime = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("en-PH", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
+const resolveAlertTone = (severity, isDark) => {
+  const normalized = String(severity || "warning").toLowerCase();
+
+  if (normalized === "critical" || normalized === "error") {
+    return {
+      label: "Critical",
+      accent: isDark ? "#FCA5A5" : "#DC2626",
+      chipBg: isDark ? "rgba(239,68,68,0.22)" : "rgba(254,226,226,0.92)",
+      chipText: isDark ? "#FECACA" : "#991B1B",
+      cardBg: isDark
+        ? "linear-gradient(135deg, rgba(127,29,29,0.34) 0%, rgba(153,27,27,0.24) 100%)"
+        : "linear-gradient(135deg, rgba(254,242,242,0.94) 0%, rgba(254,226,226,0.94) 100%)",
+      border: isDark ? "rgba(252,165,165,0.46)" : "rgba(248,113,113,0.44)",
+    };
+  }
+
+  return {
+    label: "Warning",
+    accent: isDark ? "#FCD34D" : "#B45309",
+    chipBg: isDark ? "rgba(245,158,11,0.22)" : "rgba(254,243,199,0.92)",
+    chipText: isDark ? "#FDE68A" : "#92400E",
+    cardBg: isDark
+      ? "linear-gradient(135deg, rgba(146,64,14,0.34) 0%, rgba(180,83,9,0.24) 100%)"
+      : "linear-gradient(135deg, rgba(255,251,235,0.95) 0%, rgba(254,243,199,0.95) 100%)",
+    border: isDark ? "rgba(252,211,77,0.46)" : "rgba(245,158,11,0.4)",
+  };
+};
+
+const resolveActivityTone = (type, isDark) => {
+  const normalized = String(type || "activity").toLowerCase();
+
+  if (normalized.includes("appointment")) {
+    return {
+      badgeBg: isDark ? "rgba(59,130,246,0.28)" : "rgba(219,234,254,0.92)",
+      badgeText: isDark ? "#BFDBFE" : "#1D4ED8",
+      cardBg: isDark ? "rgba(30,58,138,0.22)" : "rgba(239,246,255,0.82)",
+      border: isDark ? "rgba(96,165,250,0.34)" : "rgba(147,197,253,0.5)",
+    };
+  }
+
+  if (normalized.includes("vaccination") || normalized.includes("immun")) {
+    return {
+      badgeBg: isDark ? "rgba(16,185,129,0.28)" : "rgba(209,250,229,0.92)",
+      badgeText: isDark ? "#A7F3D0" : "#047857",
+      cardBg: isDark ? "rgba(6,95,70,0.2)" : "rgba(236,253,245,0.84)",
+      border: isDark ? "rgba(52,211,153,0.34)" : "rgba(134,239,172,0.52)",
+    };
+  }
+
+  if (normalized.includes("inventory") || normalized.includes("stock")) {
+    return {
+      badgeBg: isDark ? "rgba(245,158,11,0.28)" : "rgba(254,243,199,0.92)",
+      badgeText: isDark ? "#FDE68A" : "#B45309",
+      cardBg: isDark ? "rgba(146,64,14,0.2)" : "rgba(255,251,235,0.84)",
+      border: isDark ? "rgba(252,211,77,0.34)" : "rgba(245,158,11,0.44)",
+    };
+  }
+
+  return {
+    badgeBg: isDark ? "rgba(148,163,184,0.26)" : "rgba(241,245,249,0.92)",
+    badgeText: isDark ? "#CBD5E1" : "#334155",
+    cardBg: isDark ? "rgba(30,41,59,0.34)" : "rgba(248,250,252,0.84)",
+    border: isDark ? "rgba(148,163,184,0.3)" : "rgba(203,213,225,0.72)",
+  };
+};
+
+const resolveChartAppearance = (isDark) => {
+
+  return {
+    isDark,
+    cardBackground: isDark
+      ? "linear-gradient(180deg, rgba(15,23,42,0.86) 0%, rgba(15,23,42,0.72) 100%)"
+      : "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+    cardBorder: isDark ? "rgba(148,163,184,0.22)" : "rgba(148,163,184,0.24)",
+    cardShadow: isDark ? "0 14px 30px rgba(2,6,23,0.45)" : "0 14px 30px rgba(15,23,42,0.08)",
+    plotBackground: isDark ? "rgba(15,23,42,0.35)" : "rgba(248,250,252,0.82)",
+    plotBorder: isDark ? "rgba(148,163,184,0.20)" : "rgba(148,163,184,0.25)",
+    gridStroke: isDark ? "rgba(148,163,184,0.20)" : "rgba(100,116,139,0.20)",
+    axisLine: isDark ? "rgba(148,163,184,0.38)" : "rgba(100,116,139,0.30)",
+    axisTick: isDark ? "#CBD5E1" : "#475569",
+    tooltipBackground: isDark ? "rgba(15,23,42,0.96)" : "rgba(255,255,255,0.98)",
+    tooltipBorder: isDark ? "rgba(148,163,184,0.34)" : "rgba(148,163,184,0.35)",
+    tooltipTitle: isDark ? "#F8FAFC" : "#0F172A",
+    tooltipText: isDark ? "#E2E8F0" : "#334155",
+    legendBackground: isDark ? "rgba(30,41,59,0.70)" : "rgba(248,250,252,0.88)",
+    legendBorder: isDark ? "rgba(148,163,184,0.24)" : "rgba(148,163,184,0.34)",
+    legendText: isDark ? "#E2E8F0" : "#334155",
+    centerLabel: isDark ? "#94A3B8" : "#64748B",
+    centerValue: isDark ? "#F8FAFC" : "#0F172A",
+  };
+};
+
+const DashboardChartTooltip = ({ active, payload, label, chartAppearance, valueFormatter }) => {
+  if (!active || !payload || payload.length === 0) {
+    return null;
+  }
+
+  return (
+    <Box
+      sx={{
+        px: 1.25,
+        py: 1,
+        borderRadius: 2,
+        border: "1px solid",
+        borderColor: chartAppearance.tooltipBorder,
+        background: chartAppearance.tooltipBackground,
+        boxShadow: "0 10px 24px rgba(15,23,42,0.2)",
+        minWidth: 170,
+      }}
+    >
+      {label !== undefined && label !== null && label !== "" ? (
+        <Typography variant="caption" sx={{ color: chartAppearance.tooltipTitle, fontWeight: 700, mb: 0.5, display: "block" }}>
+          {label}
+        </Typography>
+      ) : null}
+
+      <Box sx={{ display: "grid", gap: 0.35 }}>
+        {payload.map((entry, index) => {
+          const resolvedName = entry?.name || entry?.dataKey || "Value";
+          const resolvedValue = valueFormatter
+            ? valueFormatter(entry?.value, resolvedName, entry)
+            : safeNum(entry?.value).toLocaleString();
+
+          return (
+            <Box key={`${resolvedName}-${index}`} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+              <Box
+                component="span"
+                sx={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  backgroundColor: entry?.color || CHART_THEME.palette.primary,
+                  flexShrink: 0,
+                }}
+              />
+              <Typography variant="caption" sx={{ color: chartAppearance.tooltipText, fontWeight: 600 }}>
+                {resolvedName}:
+              </Typography>
+              <Typography variant="caption" sx={{ color: chartAppearance.tooltipText, ml: "auto" }}>
+                {resolvedValue}
+              </Typography>
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
+  );
+};
+
+const DashboardLegend = ({ payload = [], chartAppearance, justifyContent = "center" }) => {
+  if (!payload.length) {
+    return null;
+  }
+
+  return (
+    <Box
+      sx={{
+        pt: 1,
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "center",
+        justifyContent,
+        gap: 0.75,
+      }}
+    >
+      {payload.map((entry, index) => (
+        <Box
+          key={`${entry?.value || "legend"}-${index}`}
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 0.75,
+            px: 1,
+            py: 0.35,
+            borderRadius: 999,
+            border: "1px solid",
+            borderColor: chartAppearance.legendBorder,
+            background: chartAppearance.legendBackground,
+          }}
+        >
+          <Box
+            component="span"
+            sx={{
+              width: 10,
+              height: 10,
+              borderRadius: "50%",
+              backgroundColor: entry?.color || CHART_THEME.palette.primary,
+            }}
+          />
+          <Typography variant="caption" sx={{ color: chartAppearance.legendText, fontWeight: 600 }}>
+            {entry?.value}
+          </Typography>
+        </Box>
+      ))}
+    </Box>
+  );
+};
+
+const mapDashboardPayload = (payload) => {
+  const summary = normalizeObject(payload?.summary, payload?.kpis, payload?.overview);
+  const vaccinationAnalytics = normalizeObject(
+    payload?.vaccinationAnalytics,
+    payload?.vaccinations,
+    payload?.immunization,
+  );
+  const appointmentFollowup = normalizeObject(
+    payload?.appointmentFollowup,
+    payload?.appointments,
+    payload?.followup,
+  );
+  const inventory = normalizeObject(payload?.inventory, payload?.stockInventory);
+  const reminders = normalizeObject(payload?.reminders, payload?.sms, payload?.notifications);
+  const demographics = normalizeObject(payload?.demographics, payload?.demographicAnalytics);
+  const trends = normalizeObject(payload?.trends, payload?.timeline, payload?.dailyTrends);
+  const metadata = normalizeObject(payload?.metadata, payload?.meta);
+  const validatedMetrics = normalizeObject(payload?.validatedMetrics, payload?.metrics);
+
+  const summaryLowStock =
+    summary.lowStockVaccines ??
+    summary.lowStockCount ??
+    validatedMetrics.lowStockVaccines ??
+    inventory.lowStockCount ??
+    inventory.lowStockVaccines;
+
+  const summaryAvailableDoses =
+    summary.totalAvailableVaccineDoses ??
+    summary.availableDoses ??
+    validatedMetrics.availableDoses ??
+    inventory.totalAvailableDoses ??
+    inventory.availableDoses;
+
+  const summaryPendingAppointments =
+    summary.pendingAppointments ??
+    summary.pendingAppointmentCount ??
+    validatedMetrics.pendingAppointments ??
+    appointmentFollowup.pending;
+
+  const summaryVaccinationsToday =
+    summary.vaccinationsCompletedToday ??
+    summary.vaccinationsToday ??
+    validatedMetrics.vaccinationsToday ??
+    summary.completedToday;
+
+  const summaryDueForVaccination =
+    summary.infantsDueForVaccination ??
+    summary.dueForVaccination ??
+    validatedMetrics.dueForVaccination ??
+    summary.vaccinationsDue;
+
+  const summaryOverdueVaccinations =
+    summary.overdueVaccinations ??
+    summary.overdueVaccinationCount ??
+    validatedMetrics.overdueVaccinations ??
+    summary.overdue;
+
+  const summaryTotalInfants =
+    summary.totalRegisteredInfants ??
+    summary.totalInfants ??
+    validatedMetrics.totalInfants ??
+    demographics?.coverage?.infants;
+
+  const summaryTotalGuardians =
+    summary.totalGuardians ??
+    summary.guardians ??
+    validatedMetrics.totalGuardians ??
+    demographics?.coverage?.guardians;
+
+  const kpis = {
+    totalInfants: safeNum(summaryTotalInfants),
+    totalGuardians: safeNum(summaryTotalGuardians),
+    vaccinationsToday: safeNum(summaryVaccinationsToday),
+    dueForVaccination: safeNum(summaryDueForVaccination),
+    overdueVaccinations: safeNum(summaryOverdueVaccinations),
+    pendingAppointments: safeNum(summaryPendingAppointments),
+    lowStockVaccines: safeNum(summaryLowStock),
+    availableDoses: safeNum(summaryAvailableDoses),
+  };
+
+  const vaccineProgress = normalizeArray(
+    vaccinationAnalytics.vaccineProgress,
+    vaccinationAnalytics.progress,
+    vaccinationAnalytics.byVaccine,
+    payload?.vaccineProgress,
+  ).map((item) => {
+    const dosesAdministered = item.dosesAdministered ?? item.administered ?? item.completed ?? item.count;
+    const dueCount = item.dueCount ?? item.due ?? item.pendingDue;
+    const overdueCount = item.overdueCount ?? item.overdue ?? item.overdueDue;
+    const infantsCovered = item.infantsCovered ?? item.coveredInfants ?? item.covered;
+
+    const totalPopulation =
+      item.totalPopulation ??
+      item.targetPopulation ??
+      item.totalInfants ??
+      item.expected ??
+      null;
+
+    const inferredCoverageRate =
+      item.coverageRate ??
+      item.coverage_percentage ??
+      item.coveragePercent ??
+      (safeNum(totalPopulation) > 0
+        ? (safeNum(infantsCovered || dosesAdministered) / safeNum(totalPopulation)) * 100
+        : null);
+
+    return {
+      vaccineKey: item.vaccineKey || item.vaccine_code || item.vaccineId || item.vaccine || "",
+      vaccineName:
+        item.vaccineName ||
+        item.vaccine_label ||
+        item.name ||
+        toTitleCase(item.vaccine || item.vaccine_code || "Unknown"),
+      infantsCovered: safeNum(infantsCovered),
+      dosesAdministered: safeNum(dosesAdministered),
+      dueCount: safeNum(dueCount),
+      overdueCount: safeNum(overdueCount),
+      coverageRate: Math.max(0, Math.min(100, safeNum(inferredCoverageRate))),
+    };
+  });
+
+  const vaccinationStatusBreakdown = normalizeArray(
+    vaccinationAnalytics.statusBreakdown,
+    vaccinationAnalytics.status,
+    payload?.vaccinationStatusBreakdown,
+  ).map((item) => ({
+        status: statusLabel(item.status),
+        count: safeNum(item.count ?? item.value ?? item.total),
+      }));
+
+  const appointmentStatusBreakdown = normalizeArray(
+    appointmentFollowup.statusBreakdown,
+    appointmentFollowup.status,
+    payload?.appointmentStatusBreakdown,
+  ).map((item) => ({
+        status: statusLabel(item.status),
+        count: safeNum(item.count ?? item.value ?? item.total),
+      }));
+
+  const rawVaccinationTrend = normalizeArray(
+    trends.vaccination,
+    trends.vaccinations,
+    trends.vaccinationTrend,
+    payload?.vaccinationTrend,
+  );
+
+  const rawAppointmentTrend = normalizeArray(
+    trends.appointments,
+    trends.appointment,
+    trends.appointmentTrend,
+    payload?.appointmentTrend,
+  );
+
+  const trendVaccinations = rawVaccinationTrend.map((point) => {
+    const dateValue = point.date || point.day || point.period || point.timestamp || null;
+    return {
+      label: point.label || point.name || toDateLabel(dateValue),
+      date: dateValue,
+      count: safeNum(point.count ?? point.total ?? point.value),
+    };
+  });
+
+  const trendAppointments = rawAppointmentTrend.map((point) => {
+    const dateValue = point.date || point.day || point.period || point.timestamp || null;
+    return {
+      label: point.label || point.name || toDateLabel(dateValue),
+      date: dateValue,
+      count: safeNum(point.count ?? point.total ?? point.value),
+    };
+  });
+
+  const demographicsAgeGroups = normalizeArray(
+    demographics.ageGroups,
+    demographics.ageDistribution,
+    demographics.byAge,
+  ).map((item) => ({
+        group: item.label || item.group || item.age_group || item.ageGroup || "Unknown",
+        count: safeNum(item.count ?? item.total ?? item.value ?? item.infants),
+      }));
+
+  const demographicsGender = normalizeArray(
+    demographics.genderBreakdown,
+    demographics.gender,
+    demographics.genderDistribution,
+  ).map((item) => ({
+        label: item.label || item.gender || item.sex || item.name || "Unknown",
+        count: safeNum(item.count ?? item.total ?? item.value ?? item.infants),
+      }));
+
+  const normalizedAgeGroups = ensureDefaultAgeGroups(demographicsAgeGroups);
+  const normalizedGenderGroups = ensureDefaultGenderGroups(demographicsGender);
+
+  const activity = normalizeArray(payload?.recentActivity, payload?.activity, payload?.activityFeed);
+  const explicitAlerts = normalizeArray(payload?.alerts);
+  const criticalAlertsFallback = normalizeArray(payload?.criticalAlerts);
+  const alerts = explicitAlerts.length > 0 ? explicitAlerts : criticalAlertsFallback;
+  const reportShortcuts = normalizeArray(payload?.reportShortcuts, payload?.reports);
+  const inventoryByVaccine = normalizeArray(inventory.byVaccine, inventory.vaccines, inventory.breakdown);
+
+  const normalizedScope =
+    metadata?.scope?.locality ||
+    metadata?.scopeLabel ||
+    payload?.scopeLabel ||
+    payload?.scope ||
+    "Current health center scope";
+
+  const normalizedGeneratedAt = metadata?.generatedAt || metadata?.generated_at || payload?.generatedAt || null;
+
+  return {
+    raw: payload,
+    scopeLabel: normalizedScope,
+    generatedAt: normalizedGeneratedAt,
+    kpis,
+    vaccineProgress,
+    vaccinationStatusBreakdown,
+    appointmentStatusBreakdown,
+    trendVaccinations,
+    trendAppointments,
+    demographicsAgeGroups: normalizedAgeGroups,
+    demographicsGender: normalizedGenderGroups,
+    inventory: {
+      totalItems: safeNum(inventory.totalItems ?? inventory.count),
+      totalAvailableDoses: safeNum(inventory.totalAvailableDoses ?? inventory.availableDoses),
+      lowStockCount: safeNum(inventory.lowStockCount ?? inventory.lowStockVaccines),
+      criticalStockCount: safeNum(inventory.criticalStockCount ?? inventory.criticalStockVaccines),
+      outOfStockCount: safeNum(inventory.outOfStockCount ?? inventory.outOfStockVaccines),
+      byVaccine: inventoryByVaccine.map((item) => ({
+        vaccineName: item.vaccineName || item.vaccineKey || "Unknown",
+        availableDoses: safeNum(item.availableDoses ?? item.stock ?? item.count),
+        lowStock: Boolean(item.lowStock),
+        criticalStock: Boolean(item.criticalStock),
+      })),
+    },
+    appointmentFollowup: {
+      totalInPeriod: safeNum(appointmentFollowup.totalInPeriod ?? appointmentFollowup.total),
+      today: safeNum(appointmentFollowup.today ?? appointmentFollowup.todayCount),
+      attended: safeNum(appointmentFollowup.attended ?? appointmentFollowup.completed),
+      pending: safeNum(appointmentFollowup.pending),
+      cancelled: safeNum(appointmentFollowup.cancelled ?? appointmentFollowup.canceled),
+      upcoming7Days: safeNum(appointmentFollowup.upcoming7Days ?? appointmentFollowup.upcoming),
+      overdueFollowUps: safeNum(appointmentFollowup.overdueFollowUps ?? appointmentFollowup.overdue),
+      followUpsToday: safeNum(appointmentFollowup.followUpsToday ?? appointmentFollowup.followupToday),
+      followUpsInPeriod: safeNum(
+        appointmentFollowup.followUpsInPeriod ?? appointmentFollowup.followupInPeriod,
+      ),
+    },
+    reminders: {
+      smsSent: safeNum(reminders.smsSent ?? reminders.sent),
+      smsDelivered: safeNum(reminders.smsDelivered ?? reminders.delivered),
+      smsFailed: safeNum(reminders.smsFailed ?? reminders.failed),
+      deliveryRate: safeNum(reminders.deliveryRate ?? reminders.rate),
+      unreadNotifications: safeNum(reminders.unreadNotifications ?? reminders.unread),
+      failedSmsCount: safeNum(reminders.failedSmsCount ?? reminders.failed),
+    },
+    demographicsCoverage: {
+      infants: safeNum(demographics?.coverage?.infants ?? demographics?.coverageInfants),
+      guardians: safeNum(demographics?.coverage?.guardians ?? demographics?.coverageGuardians),
+    },
+    activity: activity.map((item, index) => ({
+      id: item.id || `activity-${index}`,
+      type: item.type || item.category || "activity",
+      title: item.title || item.name || statusLabel(item.type || item.category || "Activity"),
+      description: item.description || item.message || item.details || "",
+      severity: item.severity || item.level || "info",
+      timestamp: item.timestamp || item.activity_at || item.createdAt || item.updatedAt || null,
+    })),
+    alerts: alerts.map((item, index) => ({
+      id: item.id || `alert-${index}`,
+      severity: item.severity || item.level || "warning",
+      type: item.type || item.category || "alert",
+      message: item.message || item.description || item.title || "Alert",
+      timestamp: item.timestamp || item.alert_at || item.createdAt || null,
+    })),
+    reportShortcuts,
+  };
+};
+
+const FilterBar = ({
+  filters,
+  onChange,
+  onRefresh,
+  onExport,
+  loading,
+  liveSyncEnabled,
+  autoRefresh,
+  onAutoRefreshToggle,
+  isDark,
+  scopeLabel,
+}) => {
+  const surfaceBg = isDark
+    ? "linear-gradient(180deg, rgba(15,23,42,0.9) 0%, rgba(15,23,42,0.74) 100%)"
+    : "background.paper";
+  const surfaceBorder = isDark ? "rgba(148,163,184,0.3)" : "divider";
+  const labelColor = isDark ? "#CBD5E1" : "#475569";
+  const helperColor = isDark ? "#94A3B8" : "#64748B";
+  const fieldOutlineDefault = isDark ? "rgba(148,163,184,0.38)" : "rgba(148,163,184,0.35)";
+
   return (
     <Card
-      className={`bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-lg transition-all duration-300 ${className}`}
+      sx={{
+        mb: 0,
+        bgcolor: surfaceBg,
+        border: "1px solid",
+        borderColor: surfaceBorder,
+        boxShadow: isDark ? "0 12px 28px rgba(2,6,23,0.35)" : "0 8px 22px rgba(15,23,42,0.06)",
+        '& .MuiCardContent-root': {
+          backgroundColor: isDark ? 'rgba(15,23,42,0.9)' : 'transparent',
+        },
+        "& .MuiInputLabel-root": {
+          color: helperColor,
+          fontWeight: 500,
+        },
+        "& .MuiInputLabel-root.Mui-focused": {
+          color: isDark ? "#93C5FD" : "primary.main",
+        },
+        "& .MuiOutlinedInput-root": {
+          color: isDark ? "#F8FAFC" : "text.primary",
+          backgroundColor: isDark ? "rgba(15,23,42,0.28)" : "transparent",
+          "& .MuiOutlinedInput-notchedOutline": {
+            borderColor: fieldOutlineDefault,
+          },
+          "&:hover .MuiOutlinedInput-notchedOutline": {
+            borderColor: isDark ? "rgba(148,163,184,0.62)" : "rgba(100,116,139,0.56)",
+          },
+          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+            borderColor: isDark ? "#60A5FA" : "primary.main",
+          },
+        },
+        "& .MuiSelect-icon": {
+          color: labelColor,
+        },
+        "& .MuiChip-outlined": {
+          borderColor: isDark ? "rgba(148,163,184,0.34)" : "divider",
+          color: labelColor,
+          bgcolor: isDark ? "rgba(30,41,59,0.66)" : "transparent",
+        },
+        "& .MuiChip-colorSuccess": {
+          color: isDark ? "#BBF7D0" : undefined,
+          borderColor: isDark ? "rgba(74,222,128,0.44)" : undefined,
+          bgcolor: isDark ? "rgba(22,101,52,0.3)" : undefined,
+        },
+        "& .MuiFormControlLabel-label": {
+          color: labelColor,
+          fontWeight: 500,
+        },
+      }}
     >
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-3">
-            {title}
-          </h3>
-          {icon && (
-            <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-              {icon}
-            </div>
-          )}
-        </div>
-        <div className="relative">
-          {children}
-        </div>
-      </div>
+      <CardContent>
+        <Grid container spacing={2} alignItems="center">
+          <Grid size={{ xs: 12, lg: 9 }}>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel id="analytics-period-label">Period</InputLabel>
+                  <Select
+                    labelId="analytics-period-label"
+                    value={filters.period}
+                    label="Period"
+                    MenuProps={SELECT_MENU_PROPS}
+                    onChange={(event) => onChange("period", event.target.value)}
+                  >
+                    {PERIOD_OPTIONS.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel id="analytics-vaccine-label">Vaccine</InputLabel>
+                  <Select
+                    labelId="analytics-vaccine-label"
+                    value={filters.vaccineType}
+                    label="Vaccine"
+                    MenuProps={SELECT_MENU_PROPS}
+                    onChange={(event) => onChange("vaccineType", event.target.value)}
+                  >
+                    {VACCINE_OPTIONS.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel id="analytics-status-label">Vaccination Status</InputLabel>
+                  <Select
+                    labelId="analytics-status-label"
+                    value={filters.vaccinationStatus}
+                    label="Vaccination Status"
+                    MenuProps={SELECT_MENU_PROPS}
+                    onChange={(event) => onChange("vaccinationStatus", event.target.value)}
+                  >
+                    {STATUS_OPTIONS.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              {filters.period === "custom" && (
+                <>
+                  <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+                    <TextField
+                      type="date"
+                      size="small"
+                      fullWidth
+                      label="Start Date"
+                      value={filters.startDate || ""}
+                      onChange={(event) => onChange("startDate", event.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+                    <TextField
+                      type="date"
+                      size="small"
+                      fullWidth
+                      label="End Date"
+                      value={filters.endDate || ""}
+                      onChange={(event) => onChange("endDate", event.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                </>
+              )}
+            </Grid>
+          </Grid>
+
+          <Grid size={{ xs: 12, lg: 3 }}>
+            <Box sx={{ display: "flex", justifyContent: { xs: "flex-start", lg: "flex-end" }, gap: 1 }}>
+              <Tooltip title="Refresh analytics now">
+                <span>
+                  <IconButton onClick={onRefresh} disabled={loading} color="primary" aria-label="Refresh analytics">
+                    <Refresh />
+                  </IconButton>
+                </span>
+              </Tooltip>
+
+              <Button
+                variant="outlined"
+                startIcon={<Download />}
+                onClick={onExport}
+                disabled={loading}
+              >
+                Export CSV
+              </Button>
+            </Box>
+          </Grid>
+
+          <Grid size={12}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 1,
+              }}
+            >
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                <Chip
+                  size="small"
+                  color={liveSyncEnabled ? "success" : "default"}
+                  label={liveSyncEnabled ? "Real-time updates active" : "Polling fallback active"}
+                />
+                <Chip size="small" variant="outlined" label={scopeLabel || "Current health center scope"} />
+              </Box>
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    size="small"
+                    checked={autoRefresh}
+                    onChange={(event) => onAutoRefreshToggle(event.target.checked)}
+                  />
+                }
+                label="Auto-refresh"
+              />
+            </Box>
+          </Grid>
+        </Grid>
+      </CardContent>
     </Card>
   );
 };
 
-// Custom tooltip component
-const CustomTooltip = ({ active, payload, label }) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 text-sm">
-        <p className="font-medium text-gray-900 dark:text-white mb-2">{label}</p>
-        {payload.map((entry, index) => (
-          <p
-            key={index}
-            className="flex items-center gap-2 text-gray-700 dark:text-gray-200 font-medium"
-          >
-            <span className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: entry.color }}></span>
-            {entry.name}: {entry.value}
-          </p>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
-
-// Custom legend component
-const CustomLegend = ({ payload }) => {
-  if (payload && payload.length) {
-    return (
-      <div className="flex flex-wrap gap-4 justify-center mt-4">
-        {payload.map((entry, index) => (
-          <div key={index} className="flex items-center gap-2 text-sm">
-            <span
-              className="w-3 h-3 rounded-full"
-              style={{ backgroundColor: entry.color }}
-            ></span>
-            <span className="text-gray-700 dark:text-gray-300 font-medium">{entry.value}</span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
-
-export default function AnalyticsDashboard() {
-  const [timeRange, setTimeRange] = useState("30days");
-  const [activeTab, setActiveTab] = useState("overview");
-  const [data, setData] = useState({});
-  const [loading, setLoading] = useState(true);
-
-  // Transform gender data from API to chart format
-  const transformGenderData = useCallback((demographicsData) => {
-    const breakdown = Array.isArray(demographicsData) ? demographicsData : demographicsData?.genderBreakdown;
-    if (!breakdown || !Array.isArray(breakdown)) {
-      return [
-        { name: 'Male', value: 52, fill: '#3B82F6' },
-        { name: 'Female', value: 48, fill: '#8B5CF6' },
-      ];
-    }
-
-      return breakdown.map((item) => {
-        const label = item.label || 'Unknown';
-        const labelLower = label.toLowerCase();
-        let fill = '#8B5CF6'; // Default Female/fallback
-        if (labelLower === 'male' || labelLower === 'm') {
-          fill = '#3B82F6';
-        } else if (labelLower === 'female' || labelLower === 'f') {
-          fill = '#8B5CF6';
-        } else {
-          fill = '#FFA500'; // Orange for Other / Not specified
-        }
-        return {
-          name: label,
-          value: parseInt(item.count, 10) || 0,
-          fill,
-        };
-      });
-  }, []);
-
-  // Utility to safely unwrap varied API responses
-  const unwrapApiPayload = (res) => {
-    if (!res) return {};
-    if (res.data && res.data.data) return res.data.data;
-    if (res.data) return res.data;
-    return res;
-  };
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      // Fetch real data from API endpoints
-      const params = { range: timeRange };
-      const [
-        vaccinationData,
-        appointmentData,
-        inventoryData,
-        growthData,
-        dashboardStats,
-        demographicsData,
-        absoluteStatsData,
-      ] = await Promise.allSettled([
-        apiClient.getVaccinationAnalytics(params),
-        apiClient.getAppointmentAnalytics(params),
-        apiClient.getInventoryStats(params),
-        apiClient.getGrowthStats(params),
-        apiClient.getDashboardStats(params),
-        apiClient.getDemographicsAnalytics(params),
-        apiClient.getDashboardStats(), // Fetch absolute totals without time range filter
-      ]);
-
-      // Transform data for charts
-      const vacPayload = vaccinationData.status === 'fulfilled' ? unwrapApiPayload(vaccinationData.value) : {};
-      const vaccinations = vacPayload.trends || vacPayload.data || [];
-
-      const apptPayload = appointmentData.status === 'fulfilled' ? unwrapApiPayload(appointmentData.value) : {};
-      const appointments = (apptPayload.statusBreakdown || apptPayload.data || []).map(item => ({
-          status: item.status || item.name || 'Unknown',
-          value: parseInt(item.count || item.value || 0, 10),
-      }));
-
-      const invPayload = inventoryData.status === 'fulfilled' ? unwrapApiPayload(inventoryData.value) : {};
-      const inventory = (invPayload.byVaccine || invPayload.data || []).map(item => ({
-          name: item.vaccineName || item.vaccine_key || item.name || 'Unknown',
-          value: parseInt(item.availableDoses || item.stock_on_hand || item.value || 0, 10),
-          status: item.criticalStock ? 'danger' : item.lowStock ? 'warning' : 'good',
-      }));
-
-      const growthPayload = growthData.status === 'fulfilled' ? unwrapApiPayload(growthData.value) : {};
-      const growth = growthPayload.data || growthPayload.trends || [];
-
-      // Get stats from dashboard or use individual responses
-      const stats = dashboardStats.status === 'fulfilled' ? unwrapApiPayload(dashboardStats.value) : {};
-      const absoluteStats = absoluteStatsData.status === 'fulfilled' ? unwrapApiPayload(absoluteStatsData.value) : {};
-
-      // Transform demographics for gender chart
-      const demoPayload = demographicsData.status === 'fulfilled' ? unwrapApiPayload(demographicsData.value) : null;
-      const gender = demoPayload
-        ? transformGenderData(demoPayload)
-        : [
-            { name: 'Male', value: 52, fill: '#3B82F6' },
-            { name: 'Female', value: 48, fill: '#8B5CF6' },
-          ];
-
-      // Extract summary metrics
-      const summary = vacPayload.summary || vacPayload || {};
-
-      // Get critical stock alerts from inventory
-      const criticalAlerts = invPayload.criticalAlerts || invPayload.alerts || [];
-
-      setData({
-        vaccinations,
-        appointments,
-        inventory,
-        growth,
-        gender,
-        stats: {
-          vaccinations: absoluteStats.total_vaccinations || absoluteStats.vaccinations || stats.vaccinations || 0,
-          appointments: absoluteStats.total_appointments || absoluteStats.appointments || stats.appointments || 0,
-          infants: absoluteStats.total_infants || absoluteStats.infants || stats.total_infants || 0,
-          guardians: absoluteStats.total_guardians || absoluteStats.guardians || stats.total_guardians || 0,
-          lowStock: summary.lowStock || inventoryData.value?.lowStockCount || 0,
-          pendingVaccinations: summary.dueInPeriod || 0,
-          overdueVaccinations: summary.overdue || 0,
-          completedVaccinations: absoluteStats.total_vaccinations || absoluteStats.vaccinations || stats.vaccinations || 0,
-          childrenTracked: absoluteStats.total_infants || absoluteStats.infants || summary.uniqueInfantsServed || 0,
-          vaccinationCoverage: summary.coverageRate || 0,
-        },
-        criticalAlerts,
-        isUsingFallback: false,
-      });
-    } catch (error) {
-      console.error("Error fetching analytics:", error);
-      setData({ isUsingFallback: false });
-      // In a production healthcare system, we must not show hardcoded fake metrics.
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    transformGenderData,
-    timeRange,
-  ]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444"];
-
-  // Check if we're using fallback data
-  const isUsingFallback = data.isUsingFallback === true;
-
-  const [isDarkMode, setIsDarkMode] = useState(
-    typeof document !== "undefined" && document.documentElement.classList.contains("dark")
-  );
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-
-    const checkDarkMode = () => setIsDarkMode(document.documentElement.classList.contains("dark"));
-    checkDarkMode(); // initial check
-
-    const observer = new MutationObserver(checkDarkMode);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-    return () => observer.disconnect();
-  }, []);
-
-  const chartGridStroke = isDarkMode ? "#374151" : "#E5E7EB"; // gray-700 : gray-200
-  const chartAxisStroke = isDarkMode ? "#9CA3AF" : "#6B7280"; // gray-400 : gray-500
-
-  const handleExport = () => {
-    window.print();
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+const KpiCard = ({ title, value, subtitle, icon, color = "primary", loading, isDark }) => {
+  const Icon = icon;
+  const displayValue = typeof value === "number" ? safeNum(value).toLocaleString() : String(value ?? "0");
+  const surfaceBg = isDark
+    ? "linear-gradient(180deg, rgba(15,23,42,0.88) 0%, rgba(15,23,42,0.72) 100%)"
+    : "background.paper";
+  const surfaceBorder = isDark ? "rgba(148,163,184,0.28)" : "divider";
+  const titleColor = isDark ? "#CBD5E1" : "text.secondary";
+  const subtitleColor = isDark ? "#94A3B8" : "text.secondary";
+  const valueColor = isDark ? "#F8FAFC" : "text.primary";
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-gray-50 dark:bg-gray-900" aria-label="Analytics Dashboard">
-      {/* Sticky Header */}
-      <div className="flex-shrink-0 sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6 transition-none transform-none animate-none [&_*]:transition-none [&_*]:transform-none [&_*]:animate-none">
-        <PageHeader
-          title="Analytics Dashboard"
-          subtitle="Operational analytics for one Barangay Health Center in Pasig City"
-          icon={<BarChart2 className="w-8 h-8 text-white" />}
-          actions={
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <Select
-                value={timeRange}
-                onChange={(e) => setTimeRange(e.target.value)}
-                className="w-40 sm:w-48 bg-white/20 border-white/30 text-white placeholder-white/60 focus:border-white focus:ring-white/50"
-              >
-                <option value="7days" className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800">Last 7 days</option>
-                <option value="30days" className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800">Last 30 days</option>
-                <option value="90days" className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800">Last 90 days</option>
-                <option value="1year" className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800">Last year</option>
-              </Select>
-              <Button
-                variant="primary"
-                className="bg-white/20 hover:bg-white/30 text-white border-0"
-                onClick={handleExport}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export Report
-              </Button>
-            </div>
-          }
-        />
-      </div>
+    <Card
+      sx={{
+        height: "100%",
+        bgcolor: surfaceBg,
+        border: "1px solid",
+        borderColor: surfaceBorder,
+        boxShadow: isDark ? "0 10px 22px rgba(2,6,23,0.34)" : "0 6px 16px rgba(15,23,42,0.06)",
+        '& .MuiCardContent-root': {
+          backgroundColor: isDark ? 'rgba(15,23,42,0.72)' : 'transparent',
+        },
+      }}
+    >
+      <CardContent
+        sx={{
+          backgroundColor: isDark ? 'rgba(15,23,42,0.72)' : 'transparent',
+        }}
+      >
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+          <Typography variant="body2" sx={{ color: titleColor }}>
+            {title}
+          </Typography>
+          <Icon color={color} fontSize="small" />
+        </Box>
 
-      {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto p-4 sm:px-6 sm:pb-6 pt-3">
-        <div className="max-w-7xl mx-auto">
-          {!data.stats && !loading && (
-            <Alert variant="error" className="mb-6">
-              Unable to load analytics data. Please check your connection or contact the system administrator.
-            </Alert>
-          )}
-
-        {/* Horizontal Tab Navigation */}
-        <div className="flex space-x-2 overflow-x-auto bg-gray-100 dark:bg-gray-800 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700 mb-6">
-          {[
-            { id: "overview", label: "Overview & KPIs", icon: "📊" },
-            { id: "vaccinations", label: "Vaccinations & Growth", icon: "💉" },
-            { id: "appointments", label: "Appointments & Demographics", icon: "📅" },
-            { id: "inventory", label: "Inventory", icon: "📦" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
-                activeTab === tab.id
-                  ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
-                  : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
-              }`}
-            >
-              <span>{tab.icon}</span>
-              <span>{tab.label}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="animate-fade-in">
-          {activeTab === "overview" && (
-            <div>
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-6 xl:mb-8">
-          <Card className="hover:shadow-md transition-shadow bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Completed Vaccinations
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {data.stats?.completedVaccinations || "0"}
-                </p>
-                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                  Total completed
-                </p>
-              </div>
-              <Syringe className="h-12 w-12 text-blue-500" />
-            </div>
-          </Card>
-
-          <Card className="hover:shadow-md transition-shadow bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Due Soon (7 Days)
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {data.stats?.pendingVaccinations || "0"}
-                </p>
-                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
-                  Upcoming doses
-                </p>
-              </div>
-              <Calendar className="h-12 w-12 text-yellow-500" />
-            </div>
-          </Card>
-
-          <Card className="hover:shadow-md transition-shadow bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Children Tracked
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {data.stats?.childrenTracked || data.stats?.infants || "0"}
-                </p>
-                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                  Registered infants
-                </p>
-              </div>
-              <Users className="h-12 w-12 text-purple-500" />
-            </div>
-          </Card>
-
-          <Card className="hover:shadow-md transition-shadow bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Critical Stock Alerts
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {data.criticalAlerts?.length || "0"}
-                </p>
-                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                  Needs attention
-                </p>
-              </div>
-              <AlertTriangle className="h-12 w-12 text-red-500" />
-            </div>
-          </Card>
-        </div>
-
-        {/* Infant Management Module Widgets */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-6 xl:mb-8">
-          <Card className="hover:shadow-md transition-shadow bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Total Registered Infants
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {data.stats?.infants || "0"}
-                </p>
-                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                  Active patients
-                </p>
-              </div>
-              <Users className="h-12 w-12 text-blue-500" />
-            </div>
-          </Card>
-
-          <Card className="hover:shadow-md transition-shadow bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Total Guardians
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {data.stats?.guardians || "0"}
-                </p>
-                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                  Registered parents
-                </p>
-              </div>
-              <Users className="h-12 w-12 text-green-500" />
-            </div>
-          </Card>
-
-          <Card className="hover:shadow-md transition-shadow bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Overdue Vaccinations
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {data.stats?.overdueVaccinations || "0"}
-                </p>
-                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                  Requires action
-                </p>
-              </div>
-              <AlertTriangle className="h-12 w-12 text-red-500" />
-            </div>
-          </Card>
-
-          <Card className="hover:shadow-md transition-shadow bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Vaccination Coverage
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {data.stats?.vaccinationCoverage || "0"}%
-                </p>
-                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                  Completion rate
-                </p>
-              </div>
-              <TrendingUp className="h-12 w-12 text-green-500" />
-            </div>
-          </Card>
-        </div>
-
-            {/* Alerts and Notifications */}
-            <Card className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    System Alerts
-                  </h3>
-                  <AlertTriangle className="h-5 w-5 text-red-500" />
-                </div>
-                <div className="space-y-4">
-                  {data.criticalAlerts && data.criticalAlerts.length > 0 ? (
-                    data.criticalAlerts.map((alert, idx) => (
-                      <div key={idx} className="flex items-center space-x-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                        <AlertTriangle className="h-5 w-5 text-red-500" />
-                        <div>
-                          <h4 className="font-medium text-red-900 dark:text-red-200">
-                            {alert.title || `Stock Alert: ${alert.vaccineName || 'Vaccine'}`}
-                          </h4>
-                          <p className="text-sm text-red-700 dark:text-red-300">
-                            {alert.message || `Current stock is critically low. Reorder recommended.`}
-                          </p>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="flex items-center space-x-3 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                      <div className="text-green-500 text-xl">✅</div>
-                      <div>
-                        <h4 className="font-medium text-green-900 dark:text-green-200">
-                          All Clear
-                        </h4>
-                        <p className="text-sm text-green-700 dark:text-green-300">
-                          No active system or stock alerts.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Card>
-            </div>
-          )}
-
-          {activeTab === "vaccinations" && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 xl:gap-8 mb-6 xl:mb-8">
-        {/* Charts Grid */}
-          {/* Vaccination Trends */}
-          <ModernChartCard
-            title="Vaccination Trends"
-            icon={<TrendingUp className="h-5 w-5 text-blue-500" />}
-          >
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart
-                data={data.vaccinations}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
-                <XAxis
-                  dataKey="month"
-                  stroke={chartAxisStroke}
-                  tick={{ fontSize: 12, fill: chartAxisStroke }}
-                />
-                <YAxis
-                  stroke={chartAxisStroke}
-                  tick={{ fontSize: 12, fill: chartAxisStroke }}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend content={<CustomLegend />} />
-                <Bar
-                  dataKey="administered"
-                  fill="#3B82F6"
-                  name="Administered"
-                  radius={[8, 8, 0, 0]}
-                />
-                <Bar
-                  dataKey="scheduled"
-                  fill="#10B981"
-                  name="Scheduled"
-                  radius={[8, 8, 0, 0]}
-                />
-                <Bar
-                  dataKey="pending"
-                  fill="#F59E0B"
-                  name="Pending"
-                  radius={[8, 8, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </ModernChartCard>
-
-          {/* Growth Monitoring Trends */}
-          <ModernChartCard
-            title="Growth Monitoring Trends"
-            icon={<Users className="h-5 w-5 text-purple-500" />}
-          >
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart
-                data={data.growth}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              >
-                <defs>
-                  <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={isDarkMode ? 0.6 : 0.8}/>
-                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={isDarkMode ? 0.1 : 0}/>
-                  </linearGradient>
-                  <linearGradient id="colorHeight" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10B981" stopOpacity={isDarkMode ? 0.6 : 0.8}/>
-                    <stop offset="95%" stopColor="#10B981" stopOpacity={isDarkMode ? 0.1 : 0}/>
-                  </linearGradient>
-                  <linearGradient id="colorHead" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#F59E0B" stopOpacity={isDarkMode ? 0.6 : 0.8}/>
-                    <stop offset="95%" stopColor="#F59E0B" stopOpacity={isDarkMode ? 0.1 : 0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
-                <XAxis
-                  dataKey="week"
-                  stroke={chartAxisStroke}
-                  tick={{ fontSize: 12, fill: chartAxisStroke }}
-                  label={{ value: 'Week', position: 'insideBottom', offset: -5, fill: chartAxisStroke, fontSize: 12, fontWeight: 500 }}
-                />
-                <YAxis
-                  stroke={chartAxisStroke}
-                  tick={{ fontSize: 12, fill: chartAxisStroke }}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend content={<CustomLegend />} />
-                <Area
-                  type="monotone"
-                  dataKey="weight"
-                  stackId="1"
-                  stroke="#3B82F6"
-                  fillOpacity={1}
-                  fill="url(#colorWeight)"
-                  name="Weight"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="height"
-                  stackId="1"
-                  stroke="#10B981"
-                  fillOpacity={1}
-                  fill="url(#colorHeight)"
-                  name="Height"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="headCircumference"
-                  stackId="1"
-                  stroke="#F59E0B"
-                  fillOpacity={1}
-                  fill="url(#colorHead)"
-                  name="Head Circumference"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ModernChartCard>
-            </div>
-          )}
-
-          {activeTab === "appointments" && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 xl:gap-8 mb-6 xl:mb-8">
-              {/* Appointment Status */}
-              <ModernChartCard
-                title="Appointment Status Distribution"
-                icon={<Calendar className="h-5 w-5 text-green-500" />}
-              >
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={data.appointments}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent, x, y, cx }) => (
-                        <text
-                          x={x}
-                          y={y}
-                          fill={chartAxisStroke}
-                          textAnchor={x > cx ? 'start' : 'end'}
-                          dominantBaseline="central"
-                          fontSize={12}
-                          fontWeight={500}
-                        >
-                          {`${name} ${(percent * 100).toFixed(0)}%`}
-                        </text>
-                      )}
-                      outerRadius={100}
-                      innerRadius={60}
-                      fill="#8884d8"
-                      dataKey="value"
-                      cornerRadius={8}
-                      stroke="none"
-                    >
-                      {data.appointments.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={COLORS[index % COLORS.length]}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend content={<CustomLegend />} />
-                    <text
-                      x="50%"
-                      y="50%"
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      className="text-gray-600 dark:text-gray-400 text-sm font-medium"
-                      fill="currentColor"
-                    >
-                      Appointments
-                    </text>
-                    <text
-                      x="50%"
-                      y="58%"
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      className="text-xl font-bold text-gray-900 dark:text-white"
-                      fill="currentColor"
-                    >
-                      100%
-                    </text>
-                  </PieChart>
-                </ResponsiveContainer>
-              </ModernChartCard>
-
-              {/* Gender Distribution */}
-              <ModernChartCard
-                title="Gender Distribution"
-                icon={<Users className="h-5 w-5 text-purple-500" />}
-              >
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={data.gender}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent, x, y, cx }) => (
-                        <text
-                          x={x}
-                          y={y}
-                          fill={chartAxisStroke}
-                          textAnchor={x > cx ? 'start' : 'end'}
-                          dominantBaseline="central"
-                          fontSize={12}
-                          fontWeight={500}
-                        >
-                          {`${name} ${(percent * 100).toFixed(0)}%`}
-                        </text>
-                      )}
-                      outerRadius={100}
-                      innerRadius={60}
-                      fill="#8884d8"
-                      dataKey="value"
-                      cornerRadius={8}
-                      stroke="none"
-                    >
-                      {data.gender.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.fill}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend content={<CustomLegend />} />
-                    <text
-                      x="50%"
-                      y="50%"
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      className="text-gray-600 dark:text-gray-400 text-sm font-medium"
-                      fill="currentColor"
-                    >
-                      Total
-                    </text>
-                    <text
-                      x="50%"
-                      y="58%"
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      className="text-xl font-bold text-gray-900 dark:text-white"
-                      fill="currentColor"
-                    >
-                      100%
-                    </text>
-                  </PieChart>
-                </ResponsiveContainer>
-              </ModernChartCard>
-            </div>
-          )}
-
-          {activeTab === "inventory" && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 xl:gap-8 mb-6 xl:mb-8">
-              {/* Inventory Status */}
-              <ModernChartCard
-                title="Inventory Status"
-                icon={<Package className="h-5 w-5 text-orange-500" />}
-              >
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart
-                    data={data.inventory}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
-                    <XAxis
-                      dataKey="name"
-                      stroke={chartAxisStroke}
-                      tick={{ fontSize: 12, fill: chartAxisStroke }}
-                    />
-                    <YAxis
-                      stroke={chartAxisStroke}
-                      tick={{ fontSize: 12, fill: chartAxisStroke }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend content={<CustomLegend />} />
-                    <Bar
-                      dataKey="value"
-                      fill={(entry) => {
-                        if (entry.status === "danger") return "#EF4444";
-                        if (entry.status === "warning") return "#F59E0B";
-                        return "#10B981";
-                      }}
-                      radius={[8, 8, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-                <div className="mt-4 flex justify-center space-x-6 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-green-500 rounded"></div>
-                    <span className="text-gray-700 dark:text-gray-300">Good Stock</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-                    <span className="text-gray-700 dark:text-gray-300">Low Stock</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-red-500 rounded"></div>
-                    <span className="text-gray-700 dark:text-gray-300">Critical</span>
-                  </div>
-                </div>
-              </ModernChartCard>
-            </div>
-          )}
-        </div>
-        </div>
-      </div>
-    </div>
+        {loading ? (
+          <>
+            <Skeleton width="60%" height={36} />
+            <Skeleton width="80%" />
+          </>
+        ) : (
+          <>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: valueColor }}>
+              {displayValue}
+            </Typography>
+            {subtitle ? (
+              <Typography variant="caption" sx={{ color: subtitleColor }}>
+                {subtitle}
+              </Typography>
+            ) : null}
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
-}
+};
+
+const KpiSummaryGrid = ({ data, loading, isDark }) => {
+  const kpis = data?.kpis || {};
+  const reminders = data?.reminders || {};
+
+  return (
+    <Grid container spacing={2} sx={{ mb: 3 }}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <KpiCard
+          title="Total Registered Infants"
+          value={kpis.totalInfants}
+          subtitle="Barangay scope"
+          icon={People}
+          color="primary"
+          loading={loading}
+          isDark={isDark}
+        />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <KpiCard
+          title="Total Guardians"
+          value={kpis.totalGuardians}
+          subtitle="Linked to active infants"
+          icon={People}
+          color="info"
+          loading={loading}
+          isDark={isDark}
+        />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <KpiCard
+          title="Vaccinations Completed Today"
+          value={kpis.vaccinationsToday}
+          subtitle="Completed or attended"
+          icon={LocalHospital}
+          color="success"
+          loading={loading}
+          isDark={isDark}
+        />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <KpiCard
+          title="Infants Due for Vaccination"
+          value={kpis.dueForVaccination}
+          subtitle={`${safeNum(kpis.overdueVaccinations)} overdue`}
+          icon={Warning}
+          color="warning"
+          loading={loading}
+          isDark={isDark}
+        />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <KpiCard
+          title="Pending Appointments"
+          value={kpis.pendingAppointments}
+          subtitle="Scheduled / confirmed / rescheduled"
+          icon={CalendarToday}
+          color="info"
+          loading={loading}
+          isDark={isDark}
+        />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <KpiCard
+          title="Low-stock Vaccines"
+          value={kpis.lowStockVaccines}
+          subtitle="Needs replenishment"
+          icon={Inventory2}
+          color="error"
+          loading={loading}
+          isDark={isDark}
+        />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <KpiCard
+          title="Available Vaccine Doses"
+          value={kpis.availableDoses}
+          subtitle="Current stock on hand"
+          icon={Inventory2}
+          color="success"
+          loading={loading}
+          isDark={isDark}
+        />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <KpiCard
+          title="SMS Reminder Delivery Rate"
+          value={`${safeNum(reminders.deliveryRate).toFixed(1)}%`}
+          subtitle={`${safeNum(reminders.smsDelivered)} delivered / ${safeNum(reminders.smsSent)} sent`}
+          icon={Assessment}
+          color="primary"
+          loading={loading}
+          isDark={isDark}
+        />
+      </Grid>
+    </Grid>
+  );
+};
+
+const ChartCard = ({
+  title,
+  subtitle,
+  loading,
+  empty,
+  emptyMessage,
+  children,
+  ariaLabel,
+  chartAppearance,
+  chartHeight = 300,
+}) => {
+  return (
+    <Card
+      sx={{
+        height: "100%",
+        borderRadius: 3,
+        border: "1px solid",
+        borderColor: chartAppearance.cardBorder,
+        background: chartAppearance.cardBackground,
+        boxShadow: chartAppearance.cardShadow,
+        overflow: "hidden",
+        '& .MuiCardContent-root': {
+          backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+        },
+      }}
+    >
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.25 },
+          backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.72)' : 'transparent',
+        }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: "-0.01em", color: chartAppearance.isDark ? '#FFFFFF' : 'text.primary' }}>
+          {title}
+        </Typography>
+        {subtitle ? (
+          <Typography variant="body2" sx={{ mb: 2, lineHeight: 1.5, color: chartAppearance.isDark ? '#94A3B8' : 'text.secondary' }}>
+            {subtitle}
+          </Typography>
+        ) : (
+          <Box sx={{ mb: 2 }} />
+        )}
+
+        {loading ? (
+          <Skeleton variant="rectangular" height={chartHeight} sx={{ borderRadius: 2.5 }} />
+        ) : empty ? (
+          <Box
+            role="status"
+            aria-live="polite"
+            sx={{
+              minHeight: chartHeight,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "1px dashed",
+              borderColor: chartAppearance.plotBorder,
+              borderRadius: 2.5,
+              background: chartAppearance.plotBackground,
+              color: "text.secondary",
+              textAlign: "center",
+              px: 2,
+            }}
+          >
+            {emptyMessage || "No records available for current filters."}
+          </Box>
+        ) : (
+          <Box
+            role="img"
+            aria-label={ariaLabel}
+            sx={{
+              minHeight: chartHeight,
+              borderRadius: 2.5,
+              border: "1px solid",
+              borderColor: chartAppearance.plotBorder,
+              background: chartAppearance.plotBackground,
+              p: { xs: 1, sm: 1.5 },
+            }}
+          >
+            {children}
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+const VaccineProgressSection = ({ data, loading, chartAppearance }) => {
+  const rows = data?.vaccineProgress || [];
+  const axisTick = { fill: chartAppearance.axisTick, fontSize: 12, fontWeight: 500 };
+  const axisLine = { stroke: chartAppearance.axisLine };
+
+  return (
+    <Grid container spacing={2} sx={{ mb: 3 }}>
+      <Grid size={{ xs: 12, lg: 8 }}>
+        <ChartCard
+          title="Vaccine-specific Immunization Progress"
+          subtitle="Coverage across BCG, HepB, Pentavalent, OPV, IPV, PCV, and MMR"
+          loading={loading}
+          empty={rows.length === 0}
+          ariaLabel="Bar chart of doses administered, due count, and overdue count by vaccine type"
+          chartAppearance={chartAppearance}
+          chartHeight={320}
+        >
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart data={rows} margin={CHART_THEME.layout.margin} barGap={10}>
+              <CartesianGrid
+                stroke={chartAppearance.gridStroke}
+                strokeDasharray={CHART_THEME.layout.gridDash}
+                vertical={false}
+              />
+              <XAxis dataKey="vaccineName" tick={axisTick} axisLine={axisLine} tickLine={axisLine} />
+              <YAxis allowDecimals={false} tick={axisTick} axisLine={axisLine} tickLine={axisLine} />
+              <RechartsTooltip
+                cursor={{ fill: chartAppearance.isDark ? "rgba(148,163,184,0.10)" : "rgba(148,163,184,0.12)" }}
+                content={<DashboardChartTooltip chartAppearance={chartAppearance} />}
+              />
+              <Legend
+                verticalAlign="bottom"
+                align="center"
+                content={(legendProps) => <DashboardLegend {...legendProps} chartAppearance={chartAppearance} />}
+              />
+              <Bar
+                dataKey="dosesAdministered"
+                name="Doses Administered"
+                fill={CHART_THEME.palette.primary}
+                radius={CHART_THEME.layout.barRadius}
+                maxBarSize={38}
+              />
+              <Bar
+                dataKey="dueCount"
+                name="Due"
+                fill={CHART_THEME.palette.warning}
+                radius={CHART_THEME.layout.barRadius}
+                maxBarSize={38}
+              />
+              <Bar
+                dataKey="overdueCount"
+                name="Overdue"
+                fill={CHART_THEME.palette.danger}
+                radius={CHART_THEME.layout.barRadius}
+                maxBarSize={38}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </Grid>
+
+      <Grid size={{ xs: 12, lg: 4 }}>
+        <ChartCard
+          title="Coverage Rate by Vaccine"
+          subtitle="Unique infant coverage percentage"
+          loading={loading}
+          empty={rows.length === 0}
+          ariaLabel="Horizontal bar chart of infant coverage rate by vaccine"
+          chartAppearance={chartAppearance}
+          chartHeight={320}
+        >
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart data={rows} layout="vertical" margin={{ left: 24, right: 16, top: 12, bottom: 8 }}>
+              <CartesianGrid
+                stroke={chartAppearance.gridStroke}
+                strokeDasharray={CHART_THEME.layout.gridDash}
+                vertical={false}
+              />
+              <XAxis
+                type="number"
+                domain={[0, 100]}
+                unit="%"
+                tick={axisTick}
+                axisLine={axisLine}
+                tickLine={axisLine}
+              />
+              <YAxis
+                type="category"
+                dataKey="vaccineName"
+                width={128}
+                tick={axisTick}
+                axisLine={axisLine}
+                tickLine={axisLine}
+              />
+              <RechartsTooltip
+                cursor={{ fill: chartAppearance.isDark ? "rgba(148,163,184,0.10)" : "rgba(148,163,184,0.12)" }}
+                content={
+                  <DashboardChartTooltip
+                    chartAppearance={chartAppearance}
+                    valueFormatter={(value) => `${safeNum(value).toFixed(1)}%`}
+                  />
+                }
+              />
+              <Bar
+                dataKey="coverageRate"
+                fill={CHART_THEME.palette.secondary}
+                name="Coverage Rate (%)"
+                radius={CHART_THEME.layout.horizontalBarRadius}
+                maxBarSize={20}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </Grid>
+    </Grid>
+  );
+};
+
+const AppointmentAndFollowupSection = ({ data, loading, chartAppearance }) => {
+  const appointment = data?.appointmentFollowup || {};
+  const statusData = data?.appointmentStatusBreakdown || [];
+  const appointmentTotal = statusData.reduce((total, entry) => total + safeNum(entry.count), 0);
+  const surfaceBg = chartAppearance.isDark
+    ? "linear-gradient(180deg, rgba(15,23,42,0.88) 0%, rgba(15,23,42,0.74) 100%)"
+    : "background.paper";
+  const surfaceBorder = chartAppearance.isDark ? "rgba(148,163,184,0.3)" : "divider";
+
+  return (
+    <Grid container spacing={2} sx={{ mb: 3 }}>
+      <Grid size={{ xs: 12, md: 6 }}>
+        <Card
+          sx={{
+            height: "100%",
+            bgcolor: surfaceBg,
+            border: "1px solid",
+            borderColor: surfaceBorder,
+            boxShadow: chartAppearance.isDark
+              ? "0 12px 26px rgba(2,6,23,0.36)"
+              : "0 8px 18px rgba(15,23,42,0.06)",
+            '& .MuiCardContent-root': {
+              backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            },
+          }}
+        >
+          <CardContent
+            sx={{
+              backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: chartAppearance.isDark ? '#FFFFFF' : 'text.primary' }}>
+              Appointment and Follow-up Summary
+            </Typography>
+
+            {loading ? (
+              <Grid container spacing={1.5}>
+                {[...Array(6)].map((_, index) => (
+                  <Grid size={6} key={index}>
+                    <Skeleton height={64} sx={{ borderRadius: 1 }} />
+                  </Grid>
+                ))}
+              </Grid>
+            ) : (
+              <Grid container spacing={1.5}>
+                <Grid size={6}>
+                  <SummaryMiniCard label="Total In Period" value={appointment.totalInPeriod} isDark={chartAppearance.isDark} />
+                </Grid>
+                <Grid size={6}>
+                  <SummaryMiniCard label="Today" value={appointment.today} isDark={chartAppearance.isDark} />
+                </Grid>
+                <Grid size={6}>
+                  <SummaryMiniCard label="Upcoming (7 Days)" value={appointment.upcoming7Days} isDark={chartAppearance.isDark} />
+                </Grid>
+                <Grid size={6}>
+                  <SummaryMiniCard label="Overdue Follow-ups" value={appointment.overdueFollowUps} error isDark={chartAppearance.isDark} />
+                </Grid>
+                <Grid size={6}>
+                  <SummaryMiniCard label="Follow-ups Today" value={appointment.followUpsToday} isDark={chartAppearance.isDark} />
+                </Grid>
+                <Grid size={6}>
+                  <SummaryMiniCard label="Follow-ups in Period" value={appointment.followUpsInPeriod} isDark={chartAppearance.isDark} />
+                </Grid>
+              </Grid>
+            )}
+          </CardContent>
+        </Card>
+      </Grid>
+
+      <Grid size={{ xs: 12, md: 6 }}>
+        <ChartCard
+          title="Appointment Status Distribution"
+          subtitle="Current filtered appointment outcomes"
+          loading={loading}
+          empty={statusData.length === 0}
+          ariaLabel="Pie chart of appointment statuses"
+          chartAppearance={chartAppearance}
+          chartHeight={300}
+        >
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={statusData}
+                dataKey="count"
+                nameKey="status"
+                innerRadius={70}
+                outerRadius={106}
+                paddingAngle={2}
+                cornerRadius={CHART_THEME.layout.pieCornerRadius}
+                stroke={chartAppearance.plotBackground}
+                strokeWidth={2}
+              >
+                {statusData.map((_, index) => (
+                  <Cell key={`appointment-status-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                ))}
+              </Pie>
+              <RechartsTooltip content={<DashboardChartTooltip chartAppearance={chartAppearance} />} />
+              <Legend
+                verticalAlign="bottom"
+                align="center"
+                content={(legendProps) => <DashboardLegend {...legendProps} chartAppearance={chartAppearance} />}
+              />
+              <text
+                x="50%"
+                y="46%"
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fill={chartAppearance.centerLabel}
+                fontSize="12"
+                fontWeight="600"
+              >
+                Total
+              </text>
+              <text
+                x="50%"
+                y="56%"
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fill={chartAppearance.centerValue}
+                fontSize="24"
+                fontWeight="700"
+              >
+                {appointmentTotal.toLocaleString()}
+              </text>
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </Grid>
+    </Grid>
+  );
+};
+
+const InventorySection = ({ data, loading, chartAppearance, viewportWidth }) => {
+  const inventory = data?.inventory || {};
+  const rows = inventory.byVaccine || [];
+  const axisTick = { fill: chartAppearance.axisTick, fontSize: 12, fontWeight: 500 };
+  const axisLine = { stroke: chartAppearance.axisLine };
+  const mobileLayout = viewportWidth < 640;
+  const tabletLayout = viewportWidth >= 640 && viewportWidth < 960;
+  const surfaceBg = chartAppearance.isDark
+    ? "linear-gradient(180deg, rgba(15,23,42,0.88) 0%, rgba(15,23,42,0.74) 100%)"
+    : "background.paper";
+  const surfaceBorder = chartAppearance.isDark ? "rgba(148,163,184,0.3)" : "divider";
+
+  return (
+    <Grid container spacing={2} sx={{ mb: 3 }}>
+      <Grid size={{ xs: 12, md: 5 }}>
+        <Card
+          sx={{
+            height: "100%",
+            bgcolor: surfaceBg,
+            border: "1px solid",
+            borderColor: surfaceBorder,
+            boxShadow: chartAppearance.isDark
+              ? "0 12px 26px rgba(2,6,23,0.36)"
+              : "0 8px 18px rgba(15,23,42,0.06)",
+            '& .MuiCardContent-root': {
+              backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            },
+          }}
+        >
+          <CardContent
+            sx={{
+              backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: chartAppearance.isDark ? '#FFFFFF' : 'text.primary' }}>
+              Vaccine Inventory Summary            </Typography>
+            {loading ? (
+              <>
+                <Skeleton height={80} />
+                <Skeleton height={80} />
+                <Skeleton height={80} />
+              </>
+            ) : (
+              <Grid container spacing={1.5}>
+                <Grid size={6}>
+                  <SummaryMiniCard label="Total Inventory Items" value={inventory.totalItems} isDark={chartAppearance.isDark} />
+                </Grid>
+                <Grid size={6}>
+                  <SummaryMiniCard label="Available Doses" value={inventory.totalAvailableDoses} isDark={chartAppearance.isDark} />
+                </Grid>
+                <Grid size={6}>
+                  <SummaryMiniCard label="Low-stock" value={inventory.lowStockCount} error isDark={chartAppearance.isDark} />
+                </Grid>
+                <Grid size={6}>
+                  <SummaryMiniCard label="Critical-stock" value={inventory.criticalStockCount} error isDark={chartAppearance.isDark} />
+                </Grid>
+                <Grid size={12}>
+                  <SummaryMiniCard label="Out-of-stock" value={inventory.outOfStockCount} error isDark={chartAppearance.isDark} />
+                </Grid>
+              </Grid>
+            )}
+          </CardContent>
+        </Card>
+      </Grid>
+
+      <Grid size={{ xs: 12, md: 7 }}>
+        <ChartCard
+          title="Available Doses by Vaccine"
+          subtitle="Live inventory stock per vaccine type"
+          loading={loading}
+          empty={rows.length === 0}
+          ariaLabel="Bar chart showing available doses by vaccine"
+          chartAppearance={chartAppearance}
+          chartHeight={300}
+        >
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart
+              data={rows}
+              margin={{
+                left: 8,
+                right: 12,
+                top: 12,
+                bottom: mobileLayout ? 58 : tabletLayout ? 44 : 36,
+              }}
+              barCategoryGap={mobileLayout ? "30%" : "24%"}
+            >
+              <CartesianGrid
+                stroke={chartAppearance.gridStroke}
+                strokeDasharray={CHART_THEME.layout.gridDash}
+                vertical={false}
+              />
+              <XAxis
+                dataKey="vaccineName"
+                interval={0}
+                height={mobileLayout ? 76 : tabletLayout ? 64 : 56}
+                tickLine={false}
+                axisLine={axisLine}
+                tick={(tickProps) => renderInventoryXAxisTick({
+                  ...tickProps,
+                  viewportWidth,
+                  axisColor: chartAppearance.axisTick,
+                })}
+              />
+              <YAxis allowDecimals={false} tick={axisTick} axisLine={axisLine} tickLine={axisLine} />
+              <RechartsTooltip
+                cursor={{ fill: chartAppearance.isDark ? "rgba(148,163,184,0.10)" : "rgba(148,163,184,0.12)" }}
+                content={<DashboardChartTooltip chartAppearance={chartAppearance} />}
+              />
+              <Legend
+                verticalAlign="bottom"
+                align="center"
+                payload={[
+                  { value: "Healthy Stock", color: CHART_THEME.palette.secondary, type: "circle" },
+                  { value: "Low Stock", color: CHART_THEME.palette.warning, type: "circle" },
+                  { value: "Critical Stock", color: CHART_THEME.palette.danger, type: "circle" },
+                ]}
+                content={(legendProps) => <DashboardLegend {...legendProps} chartAppearance={chartAppearance} />}
+              />
+              <Bar
+                dataKey="availableDoses"
+                name="Available Doses"
+                radius={CHART_THEME.layout.barRadius}
+                maxBarSize={40}
+              >
+                {rows.map((entry, index) => {
+                  const fill = entry.criticalStock
+                    ? CHART_THEME.palette.danger
+                    : entry.lowStock
+                      ? CHART_THEME.palette.warning
+                      : CHART_THEME.palette.secondary;
+
+                  return <Cell key={`inventory-cell-${index}`} fill={fill} />;
+                })}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </Grid>
+    </Grid>
+  );
+};
+
+const GenderStatRing = ({
+  label,
+  count,
+  percent,
+  color,
+  chartAppearance,
+  IconComponent,
+}) => {
+  const normalizedPercent = Math.max(0, Math.min(100, safeNum(percent)));
+  const arcDegrees = normalizedPercent * 3.6;
+  const trackColor = chartAppearance.isDark ? "rgba(148,163,184,0.24)" : "rgba(148,163,184,0.30)";
+  const ringInnerBackground = chartAppearance.isDark
+    ? "rgba(15,23,42,0.92)"
+    : "rgba(255,255,255,0.96)";
+
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, minWidth: 132 }}>
+      <Box
+        sx={{
+          width: { xs: 132, sm: 152 },
+          height: { xs: 132, sm: 152 },
+          borderRadius: "50%",
+          background: `conic-gradient(${color} 0deg ${arcDegrees}deg, ${trackColor} ${arcDegrees}deg 360deg)`,
+          p: "10px",
+          boxShadow: chartAppearance.isDark
+            ? "0 10px 24px rgba(2,6,23,0.35)"
+            : "0 10px 24px rgba(15,23,42,0.14)",
+        }}
+      >
+        <Box
+          sx={{
+            width: "100%",
+            height: "100%",
+            borderRadius: "50%",
+            bgcolor: ringInnerBackground,
+            border: "1px solid",
+            borderColor: chartAppearance.plotBorder,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: "50%",
+              border: "2px solid",
+              borderColor: `${color}55`,
+              bgcolor: chartAppearance.isDark ? "rgba(30,41,59,0.85)" : "rgba(248,250,252,0.95)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              mb: 0.65,
+            }}
+          >
+            <IconComponent sx={{ fontSize: 30, color }} />
+          </Box>
+
+          <Typography variant="h5" sx={{ fontWeight: 800, lineHeight: 1, color }}>
+            {`${normalizedPercent}%`}
+          </Typography>
+        </Box>
+      </Box>
+
+      <Typography
+        variant="subtitle1"
+        sx={{
+          fontWeight: 800,
+          color,
+          textTransform: "uppercase",
+          letterSpacing: "0.02em",
+        }}
+      >
+        {label}
+      </Typography>
+      <Typography variant="caption" sx={{ color: chartAppearance.axisTick, fontWeight: 700 }}>
+        {`${safeNum(count).toLocaleString()} infant${safeNum(count) === 1 ? "" : "s"}`}
+      </Typography>
+      <Typography variant="caption" sx={{ color: chartAppearance.axisTick, fontWeight: 600 }}>
+        {`${normalizedPercent}% ${label}`}
+      </Typography>
+    </Box>
+  );
+};
+
+const SmsAndDemographicsSection = ({
+  data,
+  loading,
+  chartAppearance,
+  showGenderChart = false,
+  genderError = "",
+}) => {
+  const reminder = data?.reminders || {};
+  const genderSnapshot = normalizeGenderSnapshot(data?.demographicsGender || []);
+  const {
+    femaleCount,
+    maleCount,
+    otherCount,
+    total: genderTotal,
+    pairTotal: femaleMaleTotal,
+    femalePercent,
+    malePercent,
+    hasActualValues: genderHasActualValues,
+  } = genderSnapshot;
+  const hasGenderError = Boolean(genderError) && !genderHasActualValues;
+
+  const summaryGridSize = showGenderChart ? { xs: 12, lg: 6 } : { xs: 12 };
+  const surfaceBg = chartAppearance.isDark
+    ? "linear-gradient(180deg, rgba(15,23,42,0.88) 0%, rgba(15,23,42,0.74) 100%)"
+    : "background.paper";
+  const surfaceBorder = chartAppearance.isDark ? "rgba(148,163,184,0.3)" : "divider";
+
+  return (
+    <Grid container spacing={2} sx={{ mb: 3 }}>
+      <Grid size={summaryGridSize}>
+        <Card
+          sx={{
+            height: "100%",
+            bgcolor: surfaceBg,
+            border: "1px solid",
+            borderColor: surfaceBorder,
+            boxShadow: chartAppearance.isDark
+              ? "0 12px 26px rgba(2,6,23,0.36)"
+              : "0 8px 18px rgba(15,23,42,0.06)",
+            '& .MuiCardContent-root': {
+              backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            },
+          }}
+        >
+          <CardContent
+            sx={{
+              backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: chartAppearance.isDark ? '#FFFFFF' : 'text.primary' }}>
+              SMS Reminder Analytics            </Typography>
+            {loading ? (
+              <>
+                <Skeleton height={64} />
+                <Skeleton height={64} />
+                <Skeleton height={64} />
+                <Skeleton height={64} />
+              </>
+            ) : (
+              <Grid container spacing={1.5}>
+                <Grid size={6}>
+                  <SummaryMiniCard label="SMS Sent" value={reminder.smsSent} isDark={chartAppearance.isDark} />
+                </Grid>
+                <Grid size={6}>
+                  <SummaryMiniCard label="SMS Delivered" value={reminder.smsDelivered} isDark={chartAppearance.isDark} />
+                </Grid>
+                <Grid size={6}>
+                  <SummaryMiniCard label="SMS Failed" value={reminder.smsFailed} error isDark={chartAppearance.isDark} />
+                </Grid>
+                <Grid size={6}>
+                  <SummaryMiniCard label="Delivery Rate" value={`${safeNum(reminder.deliveryRate).toFixed(1)}%`} isDark={chartAppearance.isDark} />
+                </Grid>
+                <Grid size={6}>
+                  <SummaryMiniCard label="Unread Notifications" value={reminder.unreadNotifications} isDark={chartAppearance.isDark} />
+                </Grid>
+                <Grid size={6}>
+                  <SummaryMiniCard label="Failed SMS Count" value={reminder.failedSmsCount} error isDark={chartAppearance.isDark} />
+                </Grid>
+              </Grid>
+            )}
+          </CardContent>
+        </Card>
+      </Grid>
+
+      {showGenderChart ? (
+        <Grid size={{ xs: 12, lg: 6 }}>
+          <ChartCard
+            title="Male vs Female Distribution"
+            subtitle="Registered infant gender composition"
+            loading={loading}
+            empty={false}
+            ariaLabel="Gender distribution infographic showing female and male infant percentages"
+            chartAppearance={chartAppearance}
+            chartHeight={320}
+          >
+            <Box sx={{ width: "100%", height: 320, display: "flex", flexDirection: "column" }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 1,
+                  flexWrap: "wrap",
+                  mb: 1.5,
+                }}
+              >
+                <Chip
+                  size="small"
+                  color={hasGenderError ? "warning" : genderHasActualValues ? "success" : "default"}
+                  variant={hasGenderError ? "filled" : "outlined"}
+                  label={hasGenderError
+                    ? "Data unavailable"
+                    : genderHasActualValues
+                      ? "Live demographic split"
+                      : "No records yet"}
+                />
+                <Typography variant="caption" sx={{ color: chartAppearance.axisTick, fontWeight: 700 }}>
+                  {`Total infants: ${safeNum(genderTotal).toLocaleString()}`}
+                </Typography>
+              </Box>
+
+              <Box
+                sx={{
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexDirection: { xs: "column", sm: "row" },
+                  gap: { xs: 1.5, sm: 1 },
+                }}
+              >
+                <GenderStatRing
+                  label="Female"
+                  count={femaleCount}
+                  percent={femalePercent}
+                  color={GENDER_VISUAL_COLORS.female}
+                  chartAppearance={chartAppearance}
+                  IconComponent={Female}
+                />
+
+                <Box
+                  sx={{
+                    px: 1,
+                    py: 0.5,
+                    textAlign: "center",
+                    minWidth: { xs: "100%", sm: 100 },
+                  }}
+                >
+                  <Typography variant="caption" sx={{ color: chartAppearance.centerLabel, fontWeight: 700 }}>
+                    Female vs Male
+                  </Typography>
+                  <Typography
+                    variant="h5"
+                    sx={{
+                      fontWeight: 800,
+                      color: chartAppearance.centerValue,
+                      lineHeight: 1.15,
+                      letterSpacing: "-0.01em",
+                      my: 0.35,
+                    }}
+                  >
+                    {`${femalePercent}% : ${malePercent}%`}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: chartAppearance.axisTick, fontWeight: 600 }}>
+                    {`${safeNum(femaleMaleTotal).toLocaleString()} profiled infants`}
+                  </Typography>
+                </Box>
+
+                <GenderStatRing
+                  label="Male"
+                  count={maleCount}
+                  percent={malePercent}
+                  color={GENDER_VISUAL_COLORS.male}
+                  chartAppearance={chartAppearance}
+                  IconComponent={Male}
+                />
+              </Box>
+
+              <Box sx={{ mt: 1.25 }}>
+                {hasGenderError ? (
+                  <Alert
+                    severity="warning"
+                    sx={{
+                      py: 0,
+                      '& .MuiAlert-message': {
+                        py: 0.45,
+                        fontSize: 12,
+                        fontWeight: 600,
+                      },
+                    }}
+                  >
+                    Unable to load gender analytics right now. Displaying safe defaults of 0% Female and 0% Male.
+                  </Alert>
+                ) : !genderHasActualValues ? (
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      display: "block",
+                      color: chartAppearance.axisTick,
+                      fontWeight: 600,
+                      textAlign: "center",
+                    }}
+                  >
+                    No demographic gender records were returned for the selected filters. Showing explicit 0% Female and 0% Male.
+                  </Typography>
+                ) : otherCount > 0 ? (
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      display: "block",
+                      color: chartAppearance.axisTick,
+                      textAlign: "center",
+                    }}
+                  >
+                    {`${safeNum(otherCount).toLocaleString()} record${safeNum(otherCount) === 1 ? " is" : "s are"} marked as Other / Not specified and excluded from the Female vs Male percentage split.`}
+                  </Typography>
+                ) : null}
+              </Box>
+            </Box>
+          </ChartCard>
+        </Grid>
+      ) : null}
+    </Grid>
+  );
+};
+
+const TrendsSection = ({ data, loading, chartAppearance }) => {
+  const vaxTrend = data?.trendVaccinations || [];
+  const apptTrend = data?.trendAppointments || [];
+
+  const hasVaxData = vaxTrend.length > 0;
+  const hasApptData = apptTrend.length > 0;
+
+  const axisTick = { fill: chartAppearance.axisTick, fontSize: 12, fontWeight: 500 };
+  const axisLine = { stroke: chartAppearance.axisLine };
+
+  return (
+    <Grid container spacing={2} sx={{ mb: 3 }}>
+      <Grid size={{ xs: 12, md: 6 }}>
+        <ChartCard
+          title="Vaccination Trend"
+          subtitle="Daily administered records within selected period"
+          loading={loading}
+          empty={vaxTrend.length === 0}
+          emptyMessage="No timeline points available for the selected date range."
+          ariaLabel="Line chart showing daily vaccination trend"
+          chartAppearance={chartAppearance}
+          chartHeight={280}
+        >
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={vaxTrend} margin={CHART_THEME.layout.margin}>
+              <CartesianGrid
+                stroke={chartAppearance.gridStroke}
+                strokeDasharray={CHART_THEME.layout.gridDash}
+                vertical={false}
+              />
+              <XAxis
+                dataKey="label"
+                tickFormatter={formatTrendLabelTick}
+                minTickGap={14}
+                tick={axisTick}
+                axisLine={axisLine}
+                tickLine={axisLine}
+              />
+              <YAxis allowDecimals={false} tick={axisTick} axisLine={axisLine} tickLine={axisLine} />
+              <RechartsTooltip
+                cursor={{ stroke: CHART_THEME.palette.secondary, strokeOpacity: 0.35 }}
+                content={<DashboardChartTooltip chartAppearance={chartAppearance} />}
+              />
+              <Line
+                type="monotone"
+                dataKey="count"
+                name="Vaccinations"
+                stroke={CHART_THEME.palette.secondary}
+                strokeWidth={3}
+                connectNulls
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                dot={{
+                  r: 2.5,
+                  stroke: chartAppearance.plotBackground,
+                  strokeWidth: 2,
+                  fill: CHART_THEME.palette.secondary,
+                }}
+                activeDot={{ r: 6, fill: CHART_THEME.palette.secondary, strokeWidth: 0 }}
+              />
+              {!hasVaxData ? (
+                <Line
+                  type="monotone"
+                  dataKey="count"
+                  name="No vaccination activity"
+                  stroke={CHART_THEME.palette.warning}
+                  strokeWidth={1.5}
+                  strokeOpacity={0.35}
+                  dot={false}
+                  isAnimationActive={false}
+                />
+              ) : null}
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </Grid>
+
+      <Grid size={{ xs: 12, md: 6 }}>
+        <ChartCard
+          title="Appointment Trend"
+          subtitle="Daily appointment volume within selected period"
+          loading={loading}
+          empty={apptTrend.length === 0}
+          emptyMessage="No timeline points available for the selected date range."
+          ariaLabel="Line chart showing daily appointment trend"
+          chartAppearance={chartAppearance}
+          chartHeight={280}
+        >
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={apptTrend} margin={CHART_THEME.layout.margin}>
+              <CartesianGrid
+                stroke={chartAppearance.gridStroke}
+                strokeDasharray={CHART_THEME.layout.gridDash}
+                vertical={false}
+              />
+              <XAxis
+                dataKey="label"
+                tickFormatter={formatTrendLabelTick}
+                minTickGap={14}
+                tick={axisTick}
+                axisLine={axisLine}
+                tickLine={axisLine}
+              />
+              <YAxis allowDecimals={false} tick={axisTick} axisLine={axisLine} tickLine={axisLine} />
+              <RechartsTooltip
+                cursor={{ stroke: CHART_THEME.palette.primary, strokeOpacity: 0.35 }}
+                content={<DashboardChartTooltip chartAppearance={chartAppearance} />}
+              />
+              <Line
+                type="monotone"
+                dataKey="count"
+                name="Appointments"
+                stroke={CHART_THEME.palette.primary}
+                strokeWidth={3}
+                connectNulls
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                dot={{
+                  r: 2.5,
+                  stroke: chartAppearance.plotBackground,
+                  strokeWidth: 2,
+                  fill: CHART_THEME.palette.primary,
+                }}
+                activeDot={{ r: 6, fill: CHART_THEME.palette.primary, strokeWidth: 0 }}
+              />
+              {!hasApptData ? (
+                <Line
+                  type="monotone"
+                  dataKey="count"
+                  name="No appointment activity"
+                  stroke={CHART_THEME.palette.warning}
+                  strokeWidth={1.5}
+                  strokeOpacity={0.35}
+                  dot={false}
+                  isAnimationActive={false}
+                />
+              ) : null}
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </Grid>
+    </Grid>
+  );
+};
+
+const AlertsActivityReportsSection = ({
+  data,
+  loading,
+  isDark,
+  onReportShortcutDownload,
+  shortcutLoadingKey,
+}) => {
+  const alerts = data?.alerts || [];
+  const activity = data?.activity || [];
+  const reports = data?.reportShortcuts || [];
+  const surfaceBg = isDark
+    ? "linear-gradient(180deg, rgba(15,23,42,0.88) 0%, rgba(15,23,42,0.74) 100%)"
+    : "background.paper";
+  const surfaceBorder = isDark ? "rgba(148,163,184,0.3)" : "divider";
+  const headingColor = isDark ? "#F8FAFC" : "text.primary";
+  const subTextColor = isDark ? "#94A3B8" : "text.secondary";
+
+  return (
+    <Grid container spacing={2}>
+      <Grid size={{ xs: 12, lg: 4 }}>
+        <Card
+          sx={{
+            height: "100%",
+            bgcolor: surfaceBg,
+            border: "1px solid",
+            borderColor: surfaceBorder,
+            boxShadow: isDark ? "0 12px 26px rgba(2,6,23,0.36)" : "0 8px 18px rgba(15,23,42,0.06)",
+            '& .MuiCardContent-root': {
+              backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            },
+          }}
+        >
+          <CardContent
+            sx={{
+              backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: headingColor }}>
+              Critical Alerts
+            </Typography>
+            {loading ? (
+              <>
+                <Skeleton height={80} />
+                <Skeleton height={80} />
+                <Skeleton height={80} />
+              </>
+            ) : alerts.length === 0 ? (
+              <Alert severity="success">No critical alerts for current filters.</Alert>
+            ) : (
+              <Box sx={{ display: "grid", gap: 1.25 }}>
+                {alerts.slice(0, 6).map((item) => (
+                  (() => {
+                    const tone = resolveAlertTone(item.severity, isDark);
+
+                    return (
+                  <Box
+                    key={item.id}
+                    sx={{
+                      border: "1px solid",
+                      borderColor: tone.border,
+                      borderRadius: 2,
+                      px: 1.25,
+                      py: 1,
+                      background: tone.cardBg,
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, mb: 0.75 }}>
+                      <Chip
+                        size="small"
+                        icon={<ErrorOutline sx={{ color: tone.accent }} fontSize="small" />}
+                        label={tone.label}
+                        sx={{
+                          height: 24,
+                          fontWeight: 700,
+                          bgcolor: tone.chipBg,
+                          color: tone.chipText,
+                          border: "1px solid",
+                          borderColor: tone.border,
+                          '& .MuiChip-icon': {
+                            ml: 0.5,
+                          },
+                        }}
+                      />
+                      <Typography variant="caption" sx={{ color: subTextColor, fontWeight: 600 }}>
+                        {toShortDateTime(item.timestamp)}
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: headingColor, lineHeight: 1.4 }}>
+                      {item.message}
+                    </Typography>
+                  </Box>
+                    );
+                  })()
+                ))}
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      </Grid>
+
+      <Grid size={{ xs: 12, lg: 5 }}>
+        <Card
+          sx={{
+            height: "100%",
+            bgcolor: surfaceBg,
+            border: "1px solid",
+            borderColor: surfaceBorder,
+            boxShadow: isDark ? "0 12px 26px rgba(2,6,23,0.36)" : "0 8px 18px rgba(15,23,42,0.06)",
+            '& .MuiCardContent-root': {
+              backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            },
+          }}
+        >
+          <CardContent
+            sx={{
+              backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: headingColor }}>
+              Recent Activity Feed
+            </Typography>
+            {loading ? (
+              <>
+                <Skeleton height={60} />
+                <Skeleton height={60} />
+                <Skeleton height={60} />
+                <Skeleton height={60} />
+              </>
+            ) : activity.length === 0 ? (
+              <Alert severity="info">No recent activity for current filter range.</Alert>
+            ) : (
+              <Box
+                sx={{
+                  display: "grid",
+                  gap: 1,
+                  maxHeight: 332,
+                  overflowY: "auto",
+                  pr: 0.5,
+                  "&::-webkit-scrollbar": {
+                    width: 8,
+                  },
+                  "&::-webkit-scrollbar-thumb": {
+                    backgroundColor: isDark ? "rgba(148,163,184,0.36)" : "rgba(148,163,184,0.5)",
+                    borderRadius: 999,
+                  },
+                }}
+              >
+                {activity.slice(0, 10).map((item) => (
+                  (() => {
+                    const tone = resolveActivityTone(item.type, isDark);
+
+                    return (
+                  <Box
+                    key={item.id}
+                    sx={{
+                      border: "1px solid",
+                      borderColor: tone.border,
+                      borderRadius: 2,
+                      p: 1.1,
+                      background: tone.cardBg,
+                    }}
+                  >
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1, mb: 0.6 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: headingColor, lineHeight: 1.35 }}>
+                        {item.title}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        label={statusLabel(item.type)}
+                        sx={{
+                          height: 22,
+                          borderRadius: 1,
+                          bgcolor: tone.badgeBg,
+                          color: tone.badgeText,
+                          fontWeight: 700,
+                          border: "1px solid",
+                          borderColor: tone.border,
+                          '& .MuiChip-label': {
+                            px: 0.75,
+                          },
+                        }}
+                      />
+                    </Box>
+                    {item.description ? (
+                      <Typography
+                        variant="caption"
+                        display="block"
+                        sx={{ color: subTextColor, lineHeight: 1.45, mb: 0.55 }}
+                      >
+                        {item.description}
+                      </Typography>
+                    ) : null}
+                    <Typography variant="caption" sx={{ color: subTextColor, fontWeight: 600 }}>
+                      {toShortDateTime(item.timestamp)}
+                    </Typography>
+                  </Box>
+                    );
+                  })()
+                ))}
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      </Grid>
+
+      <Grid size={{ xs: 12, lg: 3 }}>
+        <Card
+          sx={{
+            height: "100%",
+            bgcolor: surfaceBg,
+            border: "1px solid",
+            borderColor: surfaceBorder,
+            boxShadow: isDark ? "0 12px 26px rgba(2,6,23,0.36)" : "0 8px 18px rgba(15,23,42,0.06)",
+            '& .MuiCardContent-root': {
+              backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            },
+          }}
+        >
+          <CardContent
+            sx={{
+              backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+            }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: headingColor }}>
+              Report Shortcuts
+            </Typography>
+
+            {loading ? (
+              <>
+                <Skeleton height={54} />
+                <Skeleton height={54} />
+                <Skeleton height={54} />
+              </>
+            ) : reports.length === 0 ? (
+              <Alert severity="info">No report shortcuts available.</Alert>
+            ) : (
+              <Box sx={{ display: "grid", gap: 1 }}>
+                {reports.map((report) => (
+                  (() => {
+                    const reportShortcutKey = String(report?.key || report?.title || "shortcut");
+                    const isShortcutDownloading = shortcutLoadingKey === reportShortcutKey;
+
+                    return (
+                  <Button
+                    key={reportShortcutKey}
+                    variant="outlined"
+                    size="small"
+                    onClick={() => onReportShortcutDownload?.(report)}
+                    disabled={isShortcutDownloading}
+                    sx={{
+                      justifyContent: "space-between",
+                      textTransform: "none",
+                      borderColor: isDark ? "rgba(96,165,250,0.58)" : "rgba(59,130,246,0.52)",
+                      backgroundColor: isDark ? "rgba(30,41,59,0.48)" : "rgba(239,246,255,0.7)",
+                      color: isDark ? "#BFDBFE" : "#1D4ED8",
+                      '&:hover': {
+                        borderColor: isDark ? "rgba(96,165,250,0.8)" : "rgba(37,99,235,0.72)",
+                        backgroundColor: isDark ? "rgba(30,58,138,0.35)" : "rgba(219,234,254,0.85)",
+                      },
+                    }}
+                    endIcon={isShortcutDownloading ? <Refresh fontSize="small" /> : <Download fontSize="small" />}
+                  >
+                    <Box sx={{ textAlign: "left" }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {report.title}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: subTextColor }}>
+                        {isShortcutDownloading ? "PREPARING…" : String(report.format || "").toUpperCase()}
+                      </Typography>
+                    </Box>
+                  </Button>
+                    );
+                  })()
+                ))}
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      </Grid>
+    </Grid>
+  );
+};
+
+const SummaryMiniCard = ({ label, value, error = false, isDark = false }) => {
+  const labelColor = isDark ? '#CBD5E1' : 'text.secondary';
+  const valueColor = error ? (isDark ? '#FCA5A5' : 'error.main') : (isDark ? '#F8FAFC' : 'text.primary');
+
+  return (
+    <Box
+      sx={{
+        border: "1px solid",
+        borderColor: isDark ? 'rgba(148,163,184,0.34)' : 'divider',
+        borderRadius: 2,
+        p: 1.5,
+        minHeight: 72,
+        bgcolor: isDark ? 'rgba(30,41,59,0.68)' : 'transparent',
+      }}
+    >
+      <Typography variant="caption" sx={{ color: labelColor, display: "block" }}>
+        {label}
+      </Typography>
+      <Typography variant="h6" sx={{ fontWeight: 700, color: valueColor }}>
+        {typeof value === "number" ? safeNum(value).toLocaleString() : value}
+      </Typography>
+    </Box>
+  );
+};
+
+const buildQueryParams = (filters) => {
+  const params = {
+    period: filters.period,
+    vaccineType: filters.vaccineType,
+    vaccinationStatus: filters.vaccinationStatus,
+  };
+
+  if (filters.period === "custom") {
+    if (filters.startDate) {
+      params.startDate = filters.startDate;
+    }
+    if (filters.endDate) {
+      params.endDate = filters.endDate;
+    }
+  }
+
+  return params;
+};
+
+const exportRowsToCsv = ({ data, filters }) => {
+  const lines = [
+    ["Category", "Metric", "Value"],
+    ["Scope", "Facility", data?.scopeLabel || "Current health center scope"],
+    ["Filters", "Period", filters.period],
+    ["Filters", "Vaccine Type", filters.vaccineType],
+    ["Filters", "Vaccination Status", filters.vaccinationStatus],
+    ["Summary", "Total Registered Infants", safeNum(data?.kpis?.totalInfants)],
+    ["Summary", "Total Guardians", safeNum(data?.kpis?.totalGuardians)],
+    ["Summary", "Vaccinations Completed Today", safeNum(data?.kpis?.vaccinationsToday)],
+    ["Summary", "Infants Due for Vaccination", safeNum(data?.kpis?.dueForVaccination)],
+    ["Summary", "Overdue Vaccinations", safeNum(data?.kpis?.overdueVaccinations)],
+    ["Summary", "Pending Appointments", safeNum(data?.kpis?.pendingAppointments)],
+    ["Summary", "Low-stock Vaccines", safeNum(data?.kpis?.lowStockVaccines)],
+    ["Summary", "Total Available Vaccine Doses", safeNum(data?.kpis?.availableDoses)],
+  ];
+
+  (data?.vaccineProgress || []).forEach((item) => {
+    lines.push(["Vaccine Progress", `${item.vaccineName} - Doses Administered`, safeNum(item.dosesAdministered)]);
+    lines.push(["Vaccine Progress", `${item.vaccineName} - Due`, safeNum(item.dueCount)]);
+    lines.push(["Vaccine Progress", `${item.vaccineName} - Overdue`, safeNum(item.overdueCount)]);
+    lines.push(["Vaccine Progress", `${item.vaccineName} - Coverage Rate (%)`, safeNum(item.coverageRate)]);
+  });
+
+  return lines.map((line) => line.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(",")).join("\n");
+};
+
+const AnalyticsDashboard = () => {
+  const theme = useTheme();
+  const { darkMode } = useAppTheme();
+  const isDark = darkMode;
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isTabletDown = useMediaQuery(theme.breakpoints.down("md"));
+  const viewportWidth = isMobile ? 560 : isTabletDown ? 840 : 1200;
+  const { on, off, connectionState } = useSocket();
+  const location = useLocation();
+  const [, setSearchParams] = useSearchParams();
+
+  const [filters, setFilters] = useState({
+    period: "month",
+    vaccineType: "ALL",
+    vaccinationStatus: "all",
+    startDate: null,
+    endDate: null,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [dashboardData, setDashboardData] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [refreshWarning, setRefreshWarning] = useState("");
+  const [shortcutLoadingKey, setShortcutLoadingKey] = useState("");
+
+  const pollRef = useRef(null);
+
+  const fetchDashboard = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) {
+      setLoading(true);
+    }
+
+    try {
+      if (!silent) {
+        setError("");
+      }
+      setRefreshWarning("");
+      const params = buildQueryParams(filters);
+      const response = await apiClient.getAnalyticsDashboard(params);
+
+      const normalizedPayload = normalizeResponsePayload(response);
+      if (!normalizedPayload) {
+        throw new Error(response?.error || "Failed to load analytics dashboard data");
+      }
+
+      setDashboardData(mapDashboardPayload(normalizedPayload));
+    } catch (fetchError) {
+      console.error("Analytics dashboard fetch error:", fetchError);
+      const message = fetchError?.message || "Unable to load analytics data";
+
+      if (silent) {
+        setRefreshWarning(`Auto-refresh failed: ${message}`);
+      } else {
+        setError(message);
+      }
+    } finally {
+      if (!silent) {
+        setLoading(false);
+      }
+    }
+  }, [filters]);
+
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
+
+  useEffect(() => {
+    if (!autoRefresh) {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+      }
+      pollRef.current = null;
+      return undefined;
+    }
+
+    pollRef.current = setInterval(() => {
+      fetchDashboard({ silent: true });
+    }, 30000);
+
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+      }
+      pollRef.current = null;
+    };
+  }, [autoRefresh, fetchDashboard]);
+
+  useEffect(() => {
+    const socketEvents = [
+      "appointment_created",
+      "appointment_updated",
+      "appointment_deleted",
+      "vaccination_created",
+      "vaccination_updated",
+      "vaccination_deleted",
+      "inventory_item_created",
+      "inventory_item_updated",
+      "inventory_item_deleted",
+      "vaccine_inventory_created",
+      "vaccine_inventory_updated",
+      "vaccine_inventory_transaction_created",
+      "infant_created",
+      "infant_updated",
+      "infant_deleted",
+      "guardian_created",
+      "guardian_updated",
+      "guardian_deleted",
+    ];
+
+    const listeners = socketEvents.map((eventName) => {
+      const handler = () => {
+        fetchDashboard({ silent: true });
+      };
+      on(eventName, handler);
+      return { eventName, handler };
+    });
+
+    const windowListeners = [
+      "appointment-update",
+      "vaccination-update",
+      "guardian-data-update",
+      "child-data-update",
+    ].map((eventName) => {
+      const handler = () => fetchDashboard({ silent: true });
+      window.addEventListener(eventName, handler);
+      return { eventName, handler };
+    });
+
+    return () => {
+      listeners.forEach(({ eventName, handler }) => off(eventName, handler));
+      windowListeners.forEach(({ eventName, handler }) => window.removeEventListener(eventName, handler));
+    };
+  }, [fetchDashboard, on, off, connectionState]);
+
+  useEffect(() => {
+    return () => {
+      blurActiveElementIfNeeded();
+    };
+  }, []);
+
+  const handleFilterChange = (field, value) => {
+    setFilters((previous) => ({ ...previous, [field]: value }));
+  };
+
+  const handleManualRefresh = () => {
+    fetchDashboard();
+    setSnackbar({ open: true, message: "Analytics refreshed", severity: "success" });
+  };
+
+  const handleExport = () => {
+    try {
+      const csv = exportRowsToCsv({ data: dashboardData, filters });
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `analytics-dashboard-${format(new Date(), "yyyy-MM-dd")}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setSnackbar({ open: true, message: "Analytics CSV exported", severity: "success" });
+    } catch (exportError) {
+      console.error("Analytics export error:", exportError);
+      setSnackbar({ open: true, message: "Export failed", severity: "error" });
+    }
+  };
+
+  const handleReportShortcutDownload = useCallback(async (report) => {
+    const shortcutKey = String(report?.key || report?.title || "report-shortcut");
+    setShortcutLoadingKey(shortcutKey);
+
+    try {
+      const shortcutConfig = resolveShortcutGenerationConfig(report);
+      const dateRange = resolveShortcutDateRange(filters);
+      const reportFilters = {
+        ...(dateRange.startDate ? { startDate: dateRange.startDate } : {}),
+        ...(dateRange.endDate ? { endDate: dateRange.endDate } : {}),
+      };
+
+      if (filters.vaccineType && filters.vaccineType !== "ALL") {
+        reportFilters.vaccineType = filters.vaccineType;
+      }
+
+      if (filters.vaccinationStatus && filters.vaccinationStatus !== "all") {
+        reportFilters.status = filters.vaccinationStatus;
+        reportFilters.vaccinationStatus = filters.vaccinationStatus;
+      }
+
+      const generationResponse = await apiClient.post("/reports/generate", {
+        type: shortcutConfig.type,
+        format: shortcutConfig.format,
+        ...(dateRange.startDate ? { startDate: dateRange.startDate } : {}),
+        ...(dateRange.endDate ? { endDate: dateRange.endDate } : {}),
+        filters: reportFilters,
+      });
+
+      const generatedReportId = generationResponse?.data?.id || generationResponse?.id;
+      if (!generatedReportId) {
+        throw new Error("Report generation did not return a downloadable report identifier.");
+      }
+
+      const downloadResponse = await apiClient.customRequest(
+        `/reports/${generatedReportId}/download`,
+        {
+          method: "GET",
+          responseType: "blob",
+        },
+      );
+
+      const contentDisposition =
+        downloadResponse?.headers?.["content-disposition"] ||
+        downloadResponse?.headers?.["Content-Disposition"] ||
+        "";
+      const resolvedFilename = extractFilenameFromContentDisposition(contentDisposition);
+      const fallbackExtension = SHORTCUT_FORMAT_EXTENSION[shortcutConfig.format] || "dat";
+      const fallbackFilename = `${shortcutConfig.type}-report.${fallbackExtension}`;
+      const filename = resolvedFilename || fallbackFilename;
+
+      const mimeType =
+        downloadResponse?.headers?.["content-type"] ||
+        downloadResponse?.headers?.["Content-Type"] ||
+        "application/octet-stream";
+
+      const responseData = downloadResponse?.data;
+      const fileBlob = responseData instanceof Blob
+        ? responseData
+        : new Blob([responseData], { type: mimeType });
+
+      const objectUrl = window.URL.createObjectURL(fileBlob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.setAttribute("download", filename);
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      window.URL.revokeObjectURL(objectUrl);
+
+      setSnackbar({
+        open: true,
+        message: `${report?.title || "Report"} downloaded`,
+        severity: "success",
+      });
+    } catch (shortcutError) {
+      console.error("Report shortcut download error:", shortcutError);
+      const message = shortcutError?.message || "Unable to download report from shortcut.";
+      setSnackbar({
+        open: true,
+        message,
+        severity: /no data found/i.test(message) ? "info" : "error",
+      });
+    } finally {
+      setShortcutLoadingKey("");
+    }
+  }, [filters]);
+
+  const liveSyncEnabled = useMemo(() => connectionState === "connected", [connectionState]);
+  const chartAppearance = useMemo(() => resolveChartAppearance(isDark), [isDark]);
+  const tabFromUrl = useMemo(() => {
+    const currentSearchParams = new URLSearchParams(location.search);
+    return normalizeAnalyticsTabKey(currentSearchParams.get("tab"));
+  }, [location.search]);
+
+  const activeTabKey = useMemo(
+    () => tabFromUrl || getStoredAnalyticsTabKey() || ANALYTICS_DEFAULT_TAB_KEY,
+    [tabFromUrl],
+  );
+
+  const tab = useMemo(() => {
+    const tabIndex = ANALYTICS_TAB_CONFIG.findIndex((entry) => entry.key === activeTabKey);
+    return normalizeAnalyticsTabIndex(tabIndex);
+  }, [activeTabKey]);
+
+  useEffect(() => {
+    const resolvedTabKey = tabFromUrl || getStoredAnalyticsTabKey() || ANALYTICS_DEFAULT_TAB_KEY;
+    persistAnalyticsTabKey(resolvedTabKey);
+
+    if (isCanonicalAnalyticsSearch(location.search, resolvedTabKey)) {
+      return;
+    }
+
+    const nextParams = buildNextTabSearchParams(resolvedTabKey);
+    setSearchParams(nextParams, { replace: true });
+  }, [location.search, tabFromUrl, setSearchParams]);
+
+  useEffect(() => {
+    if (location.pathname === ANALYTICS_CANONICAL_PATH) {
+      return;
+    }
+
+    console.error(
+      "[AnalyticsDashboard] Unexpected pathname change detected during analytics render:",
+      location.pathname,
+    );
+  }, [location.pathname]);
+
+  const handleTabChange = useCallback(
+    (_event, nextTabIndex) => {
+      blurActiveElementIfNeeded();
+      const safeTabIndex = normalizeAnalyticsTabIndex(nextTabIndex);
+      const nextTabKey = ANALYTICS_TAB_CONFIG[safeTabIndex]?.key || ANALYTICS_DEFAULT_TAB_KEY;
+
+      if (nextTabKey === activeTabKey) {
+        persistAnalyticsTabKey(nextTabKey);
+        return;
+      }
+
+      const nextParams = buildNextTabSearchParams(nextTabKey);
+      setSearchParams(nextParams);
+      persistAnalyticsTabKey(nextTabKey);
+    },
+    [activeTabKey, setSearchParams],
+  );
+
+  const tabs = ANALYTICS_TAB_CONFIG;
+
+  return (
+    <Box sx={{
+      p: { xs: 2, sm: 2.5, md: 3 },
+      bgcolor: isDark ? '#111827' : 'transparent',
+      minHeight: '100vh',
+      borderRadius: isDark ? 2 : 0,
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+      overflow: 'hidden',
+    }}>
+      {/* Sticky Header Section */}
+      <Box sx={{
+        flexShrink: 0,
+        px: { xs: 2, sm: 3 },
+        pt: { xs: 1.5, sm: 2 },
+        pb: 0,
+      }}>
+        <FilterBar
+          filters={filters}
+          onChange={handleFilterChange}
+          onRefresh={handleManualRefresh}
+          onExport={handleExport}
+          loading={loading}
+          liveSyncEnabled={liveSyncEnabled}
+          autoRefresh={autoRefresh}
+          onAutoRefreshToggle={setAutoRefresh}
+          isDark={isDark}
+          scopeLabel={dashboardData?.scopeLabel}
+        />
+
+        <Tabs
+          value={tab}
+          onChange={handleTabChange}
+          variant={isMobile ? "scrollable" : "standard"}
+          scrollButtons="auto"
+          sx={{
+            mb: 2,
+            mt: 3,
+            borderBottom: 1,
+            borderColor: 'divider',
+            '& .MuiTab-root': {
+              color: isDark ? '#FFFFFF' : '#64748B',
+              fontWeight: 700,
+              '&.Mui-selected': {
+                color: isDark ? '#FFFFFF' : '#0F172A',
+                fontWeight: 700,
+              },
+            },
+            '& .MuiTabs-indicator': {
+              backgroundColor: isDark ? '#5B8DEF' : '#5B8DEF',
+            },
+          }}
+          aria-label="Analytics content sections"
+        >
+          {tabs.map((tabConfig) => (
+            <Tab
+              key={tabConfig.key}
+              label={tabConfig.label}
+              sx={{ textTransform: "none", fontWeight: 600 }}
+            />
+          ))}
+        </Tabs>
+      </Box>
+
+      {/* Scrollable Content Area */}
+      <Box sx={{
+        flex: 1,
+        overflowY: 'auto',
+        px: { xs: 2, sm: 3 },
+        pb: { xs: 2, sm: 3 },
+        pt: 3,
+        display: 'flex',
+        flexDirection: 'column',
+        '&::-webkit-scrollbar': { width: '8px' },
+        '&::-webkit-scrollbar-thumb': { backgroundColor: isDark ? 'rgba(148,163,184,0.3)' : 'rgba(148,163,184,0.4)', borderRadius: '4px' },
+      }}>
+
+        {error ? (
+          <Alert
+            severity="error"
+            action={
+              <Button color="inherit" size="small" onClick={handleManualRefresh}>
+                Retry
+              </Button>
+            }
+            sx={{ mb: 2 }}
+          >
+            {error}
+          </Alert>
+        ) : null}
+
+        {refreshWarning ? (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            {refreshWarning}
+          </Alert>
+        ) : null}
+
+        <Typography variant="caption" sx={{ display: "block", mb: 2, color: isDark ? '#64748B' : 'text.secondary' }}>
+          Scope: {dashboardData?.scopeLabel || "Current health center scope"}
+          {dashboardData?.generatedAt ? ` • Last generated: ${toShortDateTime(dashboardData.generatedAt)}` : ""}
+        </Typography>
+
+        {tab === 0 && (
+          <>
+            <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
+            <TrendsSection data={dashboardData} loading={loading} chartAppearance={chartAppearance} />
+          </>
+        )}
+
+        {tab === 1 && (
+          <>
+            <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
+            <Divider sx={{ mb: 3 }} />
+            <VaccineProgressSection data={dashboardData} loading={loading} chartAppearance={chartAppearance} />
+          </>
+        )}
+
+        {tab === 2 && (
+          <>
+            <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
+            <Divider sx={{ mb: 3 }} />
+            <AppointmentAndFollowupSection
+              data={dashboardData}
+              loading={loading}
+              chartAppearance={chartAppearance}
+            />
+          </>
+        )}
+
+        {tab === 3 && (
+          <>
+            <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
+            <Divider sx={{ mb: 3 }} />
+            <InventorySection
+              data={dashboardData}
+              loading={loading}
+              chartAppearance={chartAppearance}
+              viewportWidth={viewportWidth}
+            />
+            <SmsAndDemographicsSection
+              data={dashboardData}
+              loading={loading}
+              chartAppearance={chartAppearance}
+              genderError={error}
+            />
+          </>
+        )}
+
+        {tab === 4 && (
+          <>
+            <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
+            <Divider sx={{ mb: 3 }} />
+            <SmsAndDemographicsSection
+              data={dashboardData}
+              loading={loading}
+              chartAppearance={chartAppearance}
+              showGenderChart
+              genderError={error}
+            />
+            <AlertsActivityReportsSection
+              data={dashboardData}
+              loading={loading}
+              isDark={isDark}
+              onReportShortcutDownload={handleReportShortcutDownload}
+              shortcutLoadingKey={shortcutLoadingKey}
+            />
+          </>
+        )}
+
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={3000}
+          onClose={() => setSnackbar((previous) => ({ ...previous, open: false }))}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        >
+          <Alert
+            onClose={() => setSnackbar((previous) => ({ ...previous, open: false }))}
+            severity={snackbar.severity}
+            variant="filled"
+            sx={{ width: "100%" }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+      </Box>
+    </Box>
+  );
+};
+
+export default AnalyticsDashboard;

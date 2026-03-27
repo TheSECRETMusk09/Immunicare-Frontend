@@ -1,13 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Card, Table, Badge, Button, Modal, Form } from "../UI";
 import { useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "../../hooks/useAuth";
-import { getStoredAccessToken } from "../../../utils/api";
-
-const getAuthHeaders = () => {
-  const token = getStoredAccessToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
+import { useAuth } from "../../../contexts/AuthContext";
+import apiClient from "../../../utils/api";
 
 const RequestList = () => {
   const navigate = useNavigate();
@@ -41,17 +36,7 @@ const RequestList = () => {
 
   const fetchRequests = async () => {
     try {
-      const params = new URLSearchParams();
-      if (filters.status) params.append("status", filters.status);
-      if (filters.priority) params.append("priority", filters.priority);
-
-      const response = await fetch(
-        `/api/vaccine-supply/requests?${params.toString()}`,
-        {
-          headers: getAuthHeaders(),
-        },
-      );
-      const data = await response.json();
+      const data = await apiClient.getVaccineSupplyRequests(filters);
       if (data.success) {
         setRequests(data.requests);
       } else {
@@ -66,13 +51,7 @@ const RequestList = () => {
 
   const fetchRequestDetails = async (requestId) => {
     try {
-      const response = await fetch(
-        `/api/vaccine-supply/requests/${requestId}`,
-        {
-          headers: getAuthHeaders(),
-        },
-      );
-      const data = await response.json();
+      const data = await apiClient.getVaccineSupplyRequest(requestId);
       if (data.success) {
         setSelectedRequest(data.request);
       }
@@ -83,18 +62,10 @@ const RequestList = () => {
 
   const handleReview = async () => {
     try {
-      const response = await fetch(
-        `/api/vaccine-supply/requests/${selectedRequest.id}/review`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            ...getAuthHeaders(),
-          },
-          body: JSON.stringify(reviewData),
-        },
+      const data = await apiClient.reviewVaccineSupplyRequest(
+        selectedRequest.id,
+        reviewData,
       );
-      const data = await response.json();
       if (data.success) {
         setShowReviewModal(false);
         fetchRequests();

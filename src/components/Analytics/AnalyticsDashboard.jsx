@@ -805,6 +805,7 @@ const DashboardLegend = ({ payload = [], chartAppearance, justifyContent = "cent
 
 const mapDashboardPayload = (payload) => {
   const summary = normalizeObject(payload?.summary, payload?.kpis, payload?.overview);
+  const validatedMetricsSource = normalizeObject(payload?.validatedMetrics, payload?.adminMetrics);
   const vaccinationAnalytics = normalizeObject(
     payload?.vaccinationAnalytics,
     payload?.vaccinations,
@@ -1002,10 +1003,90 @@ const mapDashboardPayload = (payload) => {
 
   const normalizedGeneratedAt = metadata?.generatedAt || metadata?.generated_at || payload?.generatedAt || null;
 
+  const validatedMetrics = {
+    vaccination: {
+      total: safeNum(
+        validatedMetricsSource?.vaccination?.total ??
+          validatedMetricsSource?.vaccinations ??
+          payload?.vaccinations,
+      ),
+      completed: safeNum(
+        validatedMetricsSource?.vaccination?.completed ??
+          validatedMetricsSource?.completed_vaccinations,
+      ),
+    },
+    inventory: {
+      totalItems: safeNum(
+        validatedMetricsSource?.inventory?.total_items ??
+          validatedMetricsSource?.inventory_items ??
+          inventory.totalItems ??
+          inventory.count,
+      ),
+      lowStockItems: safeNum(
+        validatedMetricsSource?.inventory?.low_stock_items ??
+          validatedMetricsSource?.low_stock_items ??
+          validatedMetricsSource?.low_stock,
+      ),
+      expiredItems: safeNum(
+        validatedMetricsSource?.inventory?.expired_items ??
+          validatedMetricsSource?.expired_items ??
+          validatedMetricsSource?.expired_lots,
+      ),
+    },
+    appointments: {
+      total: safeNum(
+        validatedMetricsSource?.appointments?.total ??
+          validatedMetricsSource?.appointments_summary?.total ??
+          validatedMetricsSource?.appointments,
+      ),
+      completed: safeNum(
+        validatedMetricsSource?.appointments?.completed ??
+          validatedMetricsSource?.appointments_summary?.completed ??
+          validatedMetricsSource?.completed_appointments,
+      ),
+      noShow: safeNum(
+        validatedMetricsSource?.appointments?.no_show ??
+          validatedMetricsSource?.appointments_summary?.no_show ??
+          validatedMetricsSource?.no_show_appointments,
+      ),
+      missedFollowUpLoad: safeNum(
+        validatedMetricsSource?.appointments?.missed_follow_up_load ??
+          validatedMetricsSource?.appointments_summary?.missed_follow_up_load ??
+          validatedMetricsSource?.missed_follow_up_load,
+      ),
+    },
+    guardians: {
+      total: safeNum(
+        validatedMetricsSource?.guardians?.total ??
+          validatedMetricsSource?.guardians_summary?.total ??
+          validatedMetricsSource?.guardians,
+      ),
+      active: safeNum(
+        validatedMetricsSource?.guardians?.active ??
+          validatedMetricsSource?.guardians_summary?.active ??
+          validatedMetricsSource?.active_guardians,
+      ),
+    },
+    infants: {
+      total: safeNum(
+        validatedMetricsSource?.infants?.total ??
+          validatedMetricsSource?.infants_summary?.total ??
+          validatedMetricsSource?.infants ??
+          summaryTotalInfants,
+      ),
+      upToDate: safeNum(
+        validatedMetricsSource?.infants?.up_to_date ??
+          validatedMetricsSource?.infants_summary?.up_to_date ??
+          validatedMetricsSource?.up_to_date_infants,
+      ),
+    },
+  };
+
   return {
     raw: payload,
     scopeLabel: normalizedScope,
     generatedAt: normalizedGeneratedAt,
+    validatedMetrics,
     kpis,
     vaccineProgress,
     vaccinationStatusBreakdown,
@@ -1348,37 +1429,68 @@ const KpiCard = ({ title, value, subtitle, icon, color = "primary", loading, isD
 
 const KpiSummaryGrid = ({ data, loading, isDark }) => {
   const kpis = data?.kpis || {};
-  const reminders = data?.reminders || {};
+  const validated = data?.validatedMetrics || {};
+  const hasValidatedMetrics =
+    Boolean(data?.raw?.validatedMetrics) || Boolean(data?.raw?.adminMetrics);
+
+  if (!hasValidatedMetrics) {
+    return (
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <KpiCard
+            title="Total Registered Infants"
+            value={kpis.totalInfants}
+            subtitle="Summary data"
+            icon={People}
+            color="primary"
+            loading={loading}
+            isDark={isDark}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <KpiCard
+            title="Total Guardians"
+            value={kpis.totalGuardians}
+            subtitle="Summary data"
+            icon={People}
+            color="secondary"
+            loading={loading}
+            isDark={isDark}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <KpiCard
+            title="Vaccinations Completed Today"
+            value={kpis.vaccinationsToday}
+            subtitle="Summary data"
+            icon={LocalHospital}
+            color="success"
+            loading={loading}
+            isDark={isDark}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <KpiCard
+            title="Infants Due for Vaccination"
+            value={kpis.dueForVaccination}
+            subtitle={`${safeNum(kpis.overdueVaccinations)} overdue`}
+            icon={Assessment}
+            color="warning"
+            loading={loading}
+            isDark={isDark}
+          />
+        </Grid>
+      </Grid>
+    );
+  }
 
   return (
     <Grid container spacing={2} sx={{ mb: 3 }}>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <KpiCard
-          title="Total Registered Infants"
-          value={kpis.totalInfants}
-          subtitle="Barangay scope"
-          icon={People}
-          color="primary"
-          loading={loading}
-          isDark={isDark}
-        />
-      </Grid>
-      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-        <KpiCard
-          title="Total Guardians"
-          value={kpis.totalGuardians}
-          subtitle="Linked guardian accounts"
-          icon={People}
-          color="info"
-          loading={loading}
-          isDark={isDark}
-        />
-      </Grid>
-      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-        <KpiCard
-          title="Vaccinations Completed Today"
-          value={kpis.vaccinationsToday}
-          subtitle="Completed or attended"
+          title="Vaccinations"
+          value={validated?.vaccination?.total}
+          subtitle={`Completed: ${safeNum(validated?.vaccination?.completed)}`}
           icon={LocalHospital}
           color="success"
           loading={loading}
@@ -1387,9 +1499,20 @@ const KpiSummaryGrid = ({ data, loading, isDark }) => {
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <KpiCard
-          title="Infants Due for Vaccination"
-          value={kpis.dueForVaccination}
-          subtitle={`${safeNum(kpis.overdueVaccinations)} overdue`}
+          title="Inventory Items"
+          value={validated?.inventory?.totalItems}
+          subtitle={`Low Stock: ${safeNum(validated?.inventory?.lowStockItems)}`}
+          icon={Inventory2}
+          color="primary"
+          loading={loading}
+          isDark={isDark}
+        />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <KpiCard
+          title="Expired Lots"
+          value={validated?.inventory?.expiredItems}
+          subtitle="Database-verified expiry count"
           icon={Warning}
           color="warning"
           loading={loading}
@@ -1398,9 +1521,9 @@ const KpiSummaryGrid = ({ data, loading, isDark }) => {
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <KpiCard
-          title="Pending Appointments"
-          value={kpis.pendingAppointments}
-          subtitle="Scheduled / confirmed / rescheduled"
+          title="Appointments"
+          value={validated?.appointments?.total}
+          subtitle={`Completed: ${safeNum(validated?.appointments?.completed)}`}
           icon={CalendarToday}
           color="info"
           loading={loading}
@@ -1409,10 +1532,10 @@ const KpiSummaryGrid = ({ data, loading, isDark }) => {
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <KpiCard
-          title="Low-stock Vaccines"
-          value={kpis.lowStockVaccines}
-          subtitle="Needs replenishment"
-          icon={Inventory2}
+          title="No Shows"
+          value={validated?.appointments?.noShow}
+          subtitle={`Missed Follow-up Load: ${safeNum(validated?.appointments?.missedFollowUpLoad)}`}
+          icon={Warning}
           color="error"
           loading={loading}
           isDark={isDark}
@@ -1420,22 +1543,33 @@ const KpiSummaryGrid = ({ data, loading, isDark }) => {
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <KpiCard
-          title="Available Vaccine Doses"
-          value={kpis.availableDoses}
-          subtitle="Current stock on hand"
-          icon={Inventory2}
-          color="success"
+          title="Guardians"
+          value={validated?.guardians?.total}
+          subtitle={`Active: ${safeNum(validated?.guardians?.active)}`}
+          icon={People}
+          color="secondary"
           loading={loading}
           isDark={isDark}
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <KpiCard
-          title="SMS Reminder Delivery Rate"
-          value={`${safeNum(reminders.deliveryRate).toFixed(1)}%`}
-          subtitle={`${safeNum(reminders.smsDelivered)} delivered / ${safeNum(reminders.smsSent)} sent`}
-          icon={Assessment}
+          title="Infants"
+          value={validated?.infants?.total}
+          subtitle={`Up to Date: ${safeNum(validated?.infants?.upToDate)}`}
+          icon={People}
           color="primary"
+          loading={loading}
+          isDark={isDark}
+        />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <KpiCard
+          title="Due for Vaccination"
+          value={kpis.dueForVaccination}
+          subtitle={`${safeNum(kpis.overdueVaccinations)} overdue`}
+          icon={Assessment}
+          color="warning"
           loading={loading}
           isDark={isDark}
         />

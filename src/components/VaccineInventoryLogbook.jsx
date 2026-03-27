@@ -1,10 +1,32 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import apiClient from "../utils/api";
 import { Button, Input, Modal, Card } from "./UI";
 import { useAuth } from "../contexts/AuthContext";
+import PrintDateRangeControls from "./PrintDateRangeControls";
+import usePrintDateRange from "../hooks/usePrintDateRange";
+import {
+  formatPrintDateRangeLabel,
+  formatPrintDateTimeValue,
+} from "../utils/printDateRange";
+import {
+  downloadPdfFromNode,
+  downloadWordDocument,
+  PRINT_PAGE_PRESETS,
+} from "../utils/printDocumentExport";
 
 export default function VaccineInventoryLogbook() {
   const { isAdmin } = useAuth();
+  const defaultPeriodStart = useMemo(
+    () =>
+      new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+        .toISOString()
+        .split("T")[0],
+    [],
+  );
+  const defaultPeriodEnd = useMemo(
+    () => new Date().toISOString().split("T")[0],
+    [],
+  );
   const [inventory, setInventory] = useState([]);
   const [vaccines, setVaccines] = useState([]);
   const [alerts, setAlerts] = useState([]);
@@ -12,11 +34,11 @@ export default function VaccineInventoryLogbook() {
   const [error, setError] = useState(null);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [showAlertModal, setShowAlertModal] = useState(false);
-  const [periodFilter, setPeriodFilter] = useState({
-    start: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-      .toISOString()
-      .split("T")[0],
-    end: new Date().toISOString().split("T")[0],
+  const printDateRange = usePrintDateRange({
+    initialStartDate: defaultPeriodStart,
+    initialEndDate: defaultPeriodEnd,
+    headerPrefix: "Period",
+    fallbackLabel: "All available inventory records",
   });
   const [transactionForm, setTransactionForm] = useState({
     vaccine_id: "",
@@ -30,16 +52,26 @@ export default function VaccineInventoryLogbook() {
     notes: "",
   });
 
+  const periodFilter = useMemo(
+    () => ({
+      start: printDateRange.appliedStartDate,
+      end: printDateRange.appliedEndDate,
+    }),
+    [printDateRange.appliedEndDate, printDateRange.appliedStartDate],
+  );
+
   const fetchAllData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
+      const inventoryParams = {
+        ...(periodFilter.start ? { period_start: periodFilter.start } : {}),
+        ...(periodFilter.end ? { period_end: periodFilter.end } : {}),
+      };
+
       const [inventoryData, vaccinesData, alertsData] = await Promise.all([
-        apiClient.getVaccineInventory({
-          period_start: periodFilter.start,
-          period_end: periodFilter.end,
-        }),
+        apiClient.getVaccineInventory(inventoryParams),
         apiClient.getVaccines(),
         apiClient.getVaccineStockAlerts({
           status: "ACTIVE",
@@ -62,6 +94,18 @@ export default function VaccineInventoryLogbook() {
       fetchAllData();
     }
   }, [fetchAllData, isAdmin]);
+
+  useEffect(() => {
+    const handleSync = () => { if (isAdmin) fetchAllData(); };
+
+    window.addEventListener("vaccination-update", handleSync);
+    window.addEventListener("inventory-update", handleSync);
+
+    return () => {
+      window.removeEventListener("vaccination-update", handleSync);
+      window.removeEventListener("inventory-update", handleSync);
+    };
+  }, [isAdmin, fetchAllData]);
 
   const calculateTotals = () => {
     return inventory.reduce(
@@ -88,6 +132,25 @@ export default function VaccineInventoryLogbook() {
       },
     );
   };
+
+  const totals = useMemo(() => calculateTotals(), [inventory]);
+  const activePeriodLabel = useMemo(
+    () =>
+      formatPrintDateRangeLabel({
+        startDate: printDateRange.appliedStartDate,
+        endDate: printDateRange.appliedEndDate,
+        locale: printDateRange.locale,
+        timeZone: printDateRange.timeZone,
+        prefix: "Period",
+        fallbackLabel: "All available inventory records",
+      }),
+    [
+      printDateRange.appliedEndDate,
+      printDateRange.appliedStartDate,
+      printDateRange.locale,
+      printDateRange.timeZone,
+    ],
+  );
 
   const getStockStatus = (stockOnHand, criticalThreshold, lowThreshold) => {
     if (stockOnHand <= criticalThreshold) {
@@ -183,16 +246,144 @@ export default function VaccineInventoryLogbook() {
     );
   }
 
-  const handleDownload = () => {
-    // Create a printable/downloadable version
+  const buildPrintableDocument = useCallback(() => {
     const printContent = document.getElementById("vaccine-inventory-print");
-    const originalContents = document.body.innerHTML;
+    if (!printContent) {
+      return "";
+    }
 
-    document.body.innerHTML = printContent.outerHTML;
-    window.print();
-    document.body.innerHTML = originalContents;
-    window.location.reload();
-  };
+    return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vaccine Inventory Logbook</title>
+    <style>
+      @page {
+        size: legal landscape;
+        margin: 10mm;
+      }
+
+      body {
+        margin: 0;
+        padding: 16px;
+        font-family: Arial, sans-serif;
+        background: #ffffff;
+        color: #111827;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+
+      th,
+      td {
+        border: 1px solid #111827;
+        padding: 6px 8px;
+        font-size: 11px;
+        line-height: 1.25;
+        vertical-align: middle;
+      }
+
+      th {
+        background: #f3f4f6;
+        font-weight: 700;
+        text-align: center;
+      }
+
+      td {
+        text-align: center;
+      }
+
+      td:first-child,
+      th:first-child {
+        text-align: left;
+      }
+    </style>
+  </head>
+  <body>
+    ${printContent.outerHTML}
+  </body>
+</html>`;
+  }, []);
+
+  const handlePrint = useCallback(() => {
+    if (!printDateRange.ensureReadyForPrint()) {
+      return;
+    }
+
+    const printableHtml = buildPrintableDocument();
+    if (!printableHtml) {
+      return;
+    }
+
+    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+    if (!printWindow) {
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(printableHtml);
+    printWindow.document.close();
+    printWindow.focus();
+
+    window.setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  }, [buildPrintableDocument, printDateRange]);
+
+  const handleDownload = useCallback(async () => {
+    if (!printDateRange.ensureReadyForPrint()) {
+      return;
+    }
+
+    const printableNode =
+      document.querySelector("#vaccine-inventory-print > div") ||
+      document.getElementById("vaccine-inventory-print");
+    if (!printableNode) {
+      return;
+    }
+
+    try {
+      await downloadPdfFromNode({
+        node: printableNode,
+        filename: "Vaccine_Inventory_Logbook.pdf",
+        title: "Vaccine Inventory Logbook",
+        headerText: "Vaccine Inventory Logbook",
+        footerText: activePeriodLabel,
+        page: PRINT_PAGE_PRESETS.legalLandscape,
+        scale: 0.7,
+      });
+    } catch (downloadError) {
+      console.error("Error generating vaccine inventory logbook PDF:", downloadError);
+      setError(
+        downloadError.message ||
+          "Failed to generate the vaccine inventory logbook PDF.",
+      );
+    }
+  }, [activePeriodLabel, printDateRange]);
+
+  const handleDownloadWord = useCallback(() => {
+    if (!printDateRange.ensureReadyForPrint()) {
+      return;
+    }
+
+    const printableHtml = buildPrintableDocument();
+    if (!printableHtml) {
+      return;
+    }
+
+    downloadWordDocument({
+      html: printableHtml,
+      filename: "Vaccine_Inventory_Logbook.docx",
+      title: "Vaccine Inventory Logbook",
+      headerText: "Vaccine Inventory Logbook",
+      footerText: activePeriodLabel,
+      page: PRINT_PAGE_PRESETS.legalLandscape,
+    });
+  }, [activePeriodLabel, buildPrintableDocument, printDateRange]);
 
   if (loading) {
     return (
@@ -226,11 +417,14 @@ export default function VaccineInventoryLogbook() {
               Stock monitoring for Barangay San Nicolas Health Center
             </p>
             <div className="mt-4 text-sm">
-              <span className="font-medium">Period:</span>
-              <span className="ml-2">
-                {new Date(periodFilter.start).toLocaleDateString()} -{" "}
-                {new Date(periodFilter.end).toLocaleDateString()}
-              </span>
+              <span className="font-medium">{activePeriodLabel}</span>
+            </div>
+            <div className="mt-2 text-sm text-gray-600">
+              Generated on{" "}
+              {formatPrintDateTimeValue(new Date(), {
+                locale: printDateRange.locale,
+                timeZone: printDateRange.timeZone,
+              })}
             </div>
           </div>
 
@@ -358,7 +552,7 @@ export default function VaccineInventoryLogbook() {
 
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div>
               <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
                 Vaccine Inventory Logbook
@@ -367,44 +561,23 @@ export default function VaccineInventoryLogbook() {
                 Stock monitoring for Barangay San Nicolas Health Center
               </p>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <label className="text-sm text-gray-600 dark:text-gray-400">
-                  Period:
-                </label>
-                <Input
-                  type="date"
-                  value={periodFilter.start}
-                  onChange={(e) =>
-                    setPeriodFilter((prev) => ({
-                      ...prev,
-                      start: e.target.value,
-                    }))
-                  }
-                  className="w-32"
-                />
-                <span className="text-gray-500">to</span>
-                <Input
-                  type="date"
-                  value={periodFilter.end}
-                  onChange={(e) =>
-                    setPeriodFilter((prev) => ({
-                      ...prev,
-                      end: e.target.value,
-                    }))
-                  }
-                  className="w-32"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={handleDownload} variant="secondary">
+            <div className="flex w-full flex-col gap-4 xl:max-w-[540px]">
+              <PrintDateRangeControls
+                controller={printDateRange}
+                label="Print and Report Date Range"
+              />
+              <div className="flex flex-wrap gap-2 xl:justify-end">
+                <Button onClick={handleDownload} variant="secondary" data-print-action="inventory-logbook-download">
                   📄 Download PDF
                 </Button>
-                <Button onClick={handleDownload}>🖨️ Print</Button>
+                <Button onClick={handleDownloadWord} variant="secondary" data-print-action="inventory-logbook-download-word">
+                  Download Word
+                </Button>
+                <Button onClick={handlePrint} data-print-action="inventory-logbook-print">🖨️ Print</Button>
+                <Button onClick={() => setShowTransactionModal(true)}>
+                  Add Transaction
+                </Button>
               </div>
-              <Button onClick={() => setShowTransactionModal(true)}>
-                Add Transaction
-              </Button>
             </div>
           </div>
         </div>
@@ -568,12 +741,12 @@ export default function VaccineInventoryLogbook() {
                 </td>
                 <td className="px-4 py-4 text-center">
                   <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                    {calculateTotals().beginning_balance}
+                    {totals.beginning_balance}
                   </div>
                 </td>
                 <td className="px-4 py-4 text-center">
                   <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                    {calculateTotals().received_during_period}
+                    {totals.received_during_period}
                   </div>
                 </td>
                 <td className="px-4 py-4 text-center">
@@ -583,38 +756,38 @@ export default function VaccineInventoryLogbook() {
                 </td>
                 <td className="px-4 py-4 text-center">
                   <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                    <div>{calculateTotals().transferred_in}</div>
+                    <div>{totals.transferred_in}</div>
                     <div className="border-t border-gray-300 dark:border-gray-600">
-                      {calculateTotals().transferred_out}
+                      {totals.transferred_out}
                     </div>
                   </div>
                 </td>
                 <td className="px-4 py-4 text-center">
                   <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                    {calculateTotals().expired_wasted}
+                    {totals.expired_wasted}
                   </div>
                 </td>
                 <td className="px-4 py-4 text-center">
                   <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                    {calculateTotals().total_available}
+                    {totals.total_available}
                   </div>
                 </td>
                 <td className="px-4 py-4 text-center">
                   <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                    {calculateTotals().issuance}
+                    {totals.issuance}
                   </div>
                 </td>
                 <td className="px-4 py-4 text-center">
                   <div
                     className={`text-sm font-bold ${
-                      calculateTotals().stock_on_hand < 500
+                      totals.stock_on_hand < 500
                         ? "text-red-600"
-                        : calculateTotals().stock_on_hand < 1000
+                        : totals.stock_on_hand < 1000
                           ? "text-yellow-600"
                           : "text-green-600"
                     }`}
                   >
-                    {calculateTotals().stock_on_hand}
+                    {totals.stock_on_hand}
                   </div>
                 </td>
               </tr>
@@ -660,11 +833,7 @@ export default function VaccineInventoryLogbook() {
         <div className="p-6 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600">
           <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
             <div>
-              <span className="font-medium">Period:</span>
-              <span className="ml-2">
-                {new Date(periodFilter.start).toLocaleDateString()} -{" "}
-                {new Date(periodFilter.end).toLocaleDateString()}
-              </span>
+              <span className="font-medium">{activePeriodLabel}</span>
             </div>
             <div className="flex items-center space-x-4">
               <div className="flex items-center">

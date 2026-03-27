@@ -232,13 +232,13 @@ describe("Infant module loading stability under StrictMode lifecycle", () => {
     });
 
     expect(screen.getByRole("button", { name: /print \/ pdf/i })).toBeInTheDocument();
-    expect(screen.getByText(/^6 weeks$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^10 weeks$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^14 weeks$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^6 months$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^9 months$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^12 months$/i)).toBeInTheDocument();
-    expect(screen.getByText(/mother one/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/^6 weeks$/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/^10 weeks$/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/^14 weeks$/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/^6 months$/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/^9 months$/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/^12 months$/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/mother one/i).length).toBeGreaterThanOrEqual(1);
   });
 
   test("ImmunizationChart prints through a prepared iframe document instead of a blank popup", async () => {

@@ -1,12 +1,20 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import apiClient from "../utils/api";
 import { Button, Alert, LoadingSpinner } from "./UI";
+import PrintDateRangeControls from "./PrintDateRangeControls";
+import usePrintDateRange from "../hooks/usePrintDateRange";
 import {
   normalizeInfantResponse,
   normalizeVaccinationRecordsResponse,
   normalizeVaccinationSchedulesResponse,
   buildVaccinationScheduleTimeline,
 } from "../utils/adminDataAdapters";
+import { filterItemsByPrintDateRange } from "../utils/printDateRange";
+import {
+  downloadPdfFromNode,
+  downloadWordDocument,
+  PRINT_PAGE_PRESETS,
+} from "../utils/printDocumentExport";
 
 const DATE_ONLY_VALUE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const DUE_SOON_WINDOW_DAYS = 14;
@@ -1051,6 +1059,10 @@ export default function ImmunizationRecordBooklet({ infantId }) {
   const [vaccinationSchedules, setVaccinationSchedules] = useState([]);
   const [loading, setLoading] = useState(Boolean(infantId));
   const [error, setError] = useState(null);
+  const printDateRange = usePrintDateRange({
+    headerPrefix: "Date Range",
+    fallbackLabel: "All immunization records",
+  });
 
   const isMountedRef = useRef(true);
   const requestIdRef = useRef(0);
@@ -1165,24 +1177,41 @@ export default function ImmunizationRecordBooklet({ infantId }) {
     };
   }, [fetchData, infantId]);
 
+  const printableVaccinationRecords = useMemo(() => {
+    if (!printDateRange.hasAppliedDateRange) {
+      return vaccinationRecords;
+    }
+
+    return filterItemsByPrintDateRange(vaccinationRecords, {
+      startDate: printDateRange.appliedStartDate,
+      endDate: printDateRange.appliedEndDate,
+      getItemDates: (record) => [record?.admin_date],
+    });
+  }, [
+    printDateRange.appliedEndDate,
+    printDateRange.appliedStartDate,
+    printDateRange.hasAppliedDateRange,
+    vaccinationRecords,
+  ]);
+
   const vaccinationTimeline = useMemo(
     () =>
       buildVaccinationScheduleTimeline({
         schedules: vaccinationSchedules,
-        records: vaccinationRecords,
+        records: printableVaccinationRecords,
         infantDob: infant?.dob,
       }),
-    [infant?.dob, vaccinationRecords, vaccinationSchedules],
+    [infant?.dob, printableVaccinationRecords, vaccinationSchedules],
   );
 
   const bookletRows = useMemo(
     () =>
       buildBookletRows({
-        records: vaccinationRecords,
+        records: printableVaccinationRecords,
         timeline: vaccinationTimeline,
         infantDob: infant?.dob,
       }),
-    [infant?.dob, vaccinationRecords, vaccinationTimeline],
+    [infant?.dob, printableVaccinationRecords, vaccinationTimeline],
   );
 
   const childName = useMemo(() => buildChildFullName(infant), [infant]);
@@ -1246,6 +1275,10 @@ export default function ImmunizationRecordBooklet({ infantId }) {
   }, [childName]);
 
   const handlePrint = useCallback(() => {
+    if (!printDateRange.ensureReadyForPrint()) {
+      return;
+    }
+
     const printableHtml = buildPrintableDocument();
     if (!printableHtml) {
       return;
@@ -1264,7 +1297,57 @@ export default function ImmunizationRecordBooklet({ infantId }) {
     window.setTimeout(() => {
       printWindow.print();
     }, 250);
-  }, [buildPrintableDocument]);
+  }, [buildPrintableDocument, printDateRange]);
+
+  const handleDownload = useCallback(async () => {
+    if (!printDateRange.ensureReadyForPrint()) {
+      return;
+    }
+
+    const printableNode =
+      printAreaRef.current?.querySelector(".record-booklet-print");
+    if (!printableNode) {
+      return;
+    }
+
+    try {
+      await downloadPdfFromNode({
+        node: printableNode,
+        filename: `Immunization_Record_${infantId || "child"}.pdf`,
+        title: "Child Immunization Record Booklet",
+        headerText: "Child Immunization Record Booklet",
+        footerText: printDateRange.activeDateRangeLabel,
+        page: PRINT_PAGE_PRESETS.a4Landscape,
+        scale: 0.65,
+      });
+    } catch (downloadError) {
+      console.error("Error generating immunization record PDF:", downloadError);
+      setError(
+        downloadError.message ||
+          "Failed to generate the immunization record PDF.",
+      );
+    }
+  }, [infantId, printDateRange]);
+
+  const handleDownloadWord = useCallback(() => {
+    if (!printDateRange.ensureReadyForPrint()) {
+      return;
+    }
+
+    const printableHtml = buildPrintableDocument();
+    if (!printableHtml) {
+      return;
+    }
+
+    downloadWordDocument({
+      html: printableHtml,
+      filename: `Immunization_Record_${infantId || "child"}.docx`,
+      title: "Child Immunization Record Booklet",
+      headerText: "Child Immunization Record Booklet",
+      footerText: printDateRange.activeDateRangeLabel,
+      page: PRINT_PAGE_PRESETS.a4Landscape,
+    });
+  }, [buildPrintableDocument, infantId, printDateRange]);
 
   if (loading) {
     return (
@@ -1332,15 +1415,27 @@ export default function ImmunizationRecordBooklet({ infantId }) {
             </div>
 
             <div className="flex w-full flex-col gap-2 self-start min-[480px]:w-auto min-[480px]:flex-row">
-              <Button onClick={handlePrint} variant="secondary" className="w-full min-[480px]:w-auto">
+              <Button onClick={handleDownload} variant="secondary" className="w-full min-[480px]:w-auto" data-print-action="immunization-record-download">
                 📄 Download PDF
               </Button>
-              <Button onClick={handlePrint} className="w-full min-[480px]:w-auto">🖨️ Print</Button>
+              <Button
+                onClick={handleDownloadWord}
+                variant="secondary"
+                className="w-full min-[480px]:w-auto"
+                data-print-action="immunization-record-download-word"
+              >
+                Download Word
+              </Button>
+              <Button onClick={handlePrint} className="w-full min-[480px]:w-auto" data-print-action="immunization-record-print">🖨️ Print</Button>
             </div>
+          </div>
+
+          <div className="mt-4">
+            <PrintDateRangeControls controller={printDateRange} />
           </div>
         </div>
 
-        <div className="guardian-table-card-list p-4 min-[768px]:hidden">
+        <div className="guardian-table-card-list p-4 md:hidden">
           {bookletRows.map((row) => {
             const noteEntries = row.slots.filter((slot) => hasDisplayValue(slot.notes));
 
@@ -1396,7 +1491,7 @@ export default function ImmunizationRecordBooklet({ infantId }) {
           })}
         </div>
 
-        <div className="guardian-table-scroll-shell hidden min-[768px]:block">
+        <div className="guardian-table-scroll-shell hidden md:block">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
@@ -1514,6 +1609,17 @@ export default function ImmunizationRecordBooklet({ infantId }) {
       <div ref={printAreaRef} className="hidden">
         <div className="record-booklet-print">
           <h1 className="record-booklet-print__title">Child Immunization Record</h1>
+          <p
+            style={{
+              margin: "0 0 16px",
+              fontSize: "13px",
+              fontWeight: 600,
+              textAlign: "center",
+              color: "#374151",
+            }}
+          >
+            {printDateRange.activeDateRangeLabel}
+          </p>
 
           <section className="record-booklet-print__details">
             <div className="record-booklet-print__detail-column">

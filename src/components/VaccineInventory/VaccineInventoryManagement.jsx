@@ -38,13 +38,9 @@ export const VaccineInventoryManagement = () => {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      let url = "/api/inventory/vaccine-inventory";
-
-      if (filterClinic) {
-        url += `/clinic/${filterClinic}`;
-      }
-
-      const data = await apiClient.getVaccineInventory(url);
+      const data = filterClinic
+        ? await apiClient.getVaccineInventoryByClinic(filterClinic)
+        : await apiClient.getVaccineInventory();
       setInventory(data);
     } catch (err) {
       setError(err.message);

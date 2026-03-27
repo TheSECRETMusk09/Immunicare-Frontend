@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import apiClient from "../utils/api";
 import infantService from "../services/infantService";
 import { Button, Input, Modal, Select, Alert, AdminModalActions } from "./UI";
+import { useDebounce } from "../hooks/usePerformance";
 
 const createInitialFormData = () => ({
   first_name: "",
@@ -47,22 +48,75 @@ export default function AddInfantModal({
 }) {
   const [formData, setFormData] = useState(createInitialFormData);
   const [guardians, setGuardians] = useState([]);
+  const [guardianSearchQuery, setGuardianSearchQuery] = useState("");
+  const [guardianLookupLoading, setGuardianLookupLoading] = useState(false);
+  const [guardianLookupError, setGuardianLookupError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
+  const debouncedGuardianSearchQuery = useDebounce(guardianSearchQuery, 350);
+
+  const normalizeGuardiansResponse = (response) =>
+    Array.isArray(response)
+      ? response
+      : Array.isArray(response?.data)
+        ? response.data
+        : Array.isArray(response?.guardians)
+          ? response.guardians
+          : Array.isArray(response?.data?.guardians)
+            ? response.data.guardians
+            : [];
+
+  const buildGuardianLabel = (guardian = {}) =>
+    guardian.name ||
+    guardian.full_name ||
+    guardian.guardian_name ||
+    [guardian.first_name, guardian.last_name].filter(Boolean).join(" ") ||
+    `Guardian #${guardian.id}`;
+
+  const initialGuardianFallback = useMemo(() => {
+    if (!editingInfant?.guardian_id) {
+      return null;
+    }
+
+    return {
+      id: editingInfant.guardian_id,
+      name:
+        editingInfant?.guardian_name ||
+        editingInfant?.guardian?.name ||
+        editingInfant?.guardian_full_name ||
+        `Guardian #${editingInfant.guardian_id}`,
+    };
+  }, [editingInfant]);
+
+  const selectedGuardianRecord = useMemo(() => {
+    if (!formData.guardian_id) {
+      return initialGuardianFallback;
+    }
+
+    return (
+      guardians.find(
+        (guardian) => String(guardian.id) === String(formData.guardian_id),
+      ) || initialGuardianFallback
+    );
+  }, [formData.guardian_id, guardians, initialGuardianFallback]);
 
   useEffect(() => {
     if (isOpen) {
-      fetchGuardians();
       if (editingInfant) {
         setFormData(mapEditingInfantToFormData(editingInfant));
+        setGuardians(initialGuardianFallback ? [initialGuardianFallback] : []);
       } else {
         resetForm();
+        setGuardians([]);
       }
+      setGuardianSearchQuery("");
+      setGuardianLookupError(null);
+      setGuardianLookupLoading(false);
     }
-  }, [isOpen, editingInfant]);
+  }, [editingInfant, initialGuardianFallback, isOpen]);
 
   const resetForm = () => {
     setFormData(createInitialFormData());
@@ -70,36 +124,108 @@ export default function AddInfantModal({
     setTouched({});
   };
 
-  const fetchGuardians = async () => {
-    try {
-      const response = await apiClient.getGuardians();
-      const normalizedGuardians = Array.isArray(response)
-        ? response
-        : Array.isArray(response?.data)
-          ? response.data
-          : Array.isArray(response?.guardians)
-            ? response.guardians
-            : Array.isArray(response?.data?.guardians)
-              ? response.data.guardians
-              : [];
-      setGuardians(normalizedGuardians);
-    } catch (err) {
-      console.error("Error fetching guardians:", err);
-      setGuardians([]);
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
     }
-  };
+
+    const trimmedQuery = String(debouncedGuardianSearchQuery || "").trim();
+
+    if (trimmedQuery.length < 2) {
+      setGuardianLookupLoading(false);
+      setGuardianLookupError(null);
+      setGuardians(selectedGuardianRecord ? [selectedGuardianRecord] : []);
+      return undefined;
+    }
+
+    const abortController = new AbortController();
+    let isMounted = true;
+
+    const searchGuardians = async () => {
+      setGuardianLookupLoading(true);
+      setGuardianLookupError(null);
+
+      try {
+        const response = await apiClient.getGuardians(
+          {
+            search: trimmedQuery,
+            limit: 20,
+            view: "lookup",
+          },
+          {
+            signal: abortController.signal,
+            disableRetry: true,
+            timeout: 15000,
+          },
+        );
+
+        if (!isMounted) {
+          return;
+        }
+
+        const normalizedGuardians = normalizeGuardiansResponse(response);
+        const mergedGuardians = [...normalizedGuardians];
+
+        if (
+          selectedGuardianRecord &&
+          !mergedGuardians.some(
+            (guardian) =>
+              String(guardian.id) === String(selectedGuardianRecord.id),
+          )
+        ) {
+          mergedGuardians.unshift(selectedGuardianRecord);
+        }
+
+        setGuardians(mergedGuardians);
+      } catch (err) {
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        console.error("Error fetching guardians:", err);
+        if (!isMounted) {
+          return;
+        }
+
+        setGuardianLookupError(
+          err.message || "Failed to search guardians. Please try again.",
+        );
+        setGuardians(selectedGuardianRecord ? [selectedGuardianRecord] : []);
+      } finally {
+        if (isMounted && !abortController.signal.aborted) {
+          setGuardianLookupLoading(false);
+        }
+      }
+    };
+
+    searchGuardians();
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
+  }, [
+    debouncedGuardianSearchQuery,
+    isOpen,
+    selectedGuardianRecord?.id,
+    selectedGuardianRecord?.name,
+  ]);
 
   const guardianOptions = [
     { value: "", label: "Select Guardian" },
     ...(Array.isArray(guardians) ? guardians : []).map((guardian) => ({
       value: guardian.id,
-      label:
-        guardian.name ||
-        guardian.full_name ||
-        [guardian.first_name, guardian.last_name].filter(Boolean).join(" ") ||
-        `Guardian #${guardian.id}`,
+      label: buildGuardianLabel(guardian),
     })),
   ];
+
+  const guardianSearchHelpText = guardianLookupLoading
+    ? "Searching guardians..."
+    : guardianSearchQuery.trim().length < 2
+      ? "Type at least 2 characters to search the guardian directory."
+      : guardians.length > 0
+        ? `${guardians.length} guardian option${guardians.length === 1 ? "" : "s"} available.`
+        : "No guardians matched your search.";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -347,6 +473,16 @@ export default function AddInfantModal({
         <div className="admin-form-section">
           <h4 className="admin-form-section-title">Guardian & Location</h4>
           <div className="admin-form-row-2">
+            <Input
+              label="Search Guardian"
+              value={guardianSearchQuery}
+              onChange={(e) => setGuardianSearchQuery(e.target.value)}
+              helpText={guardianSearchHelpText}
+              error={guardianLookupError || undefined}
+              placeholder="Type guardian name, phone, or username"
+            />
+          </div>
+          <div className="admin-form-row-2">
             <Select
               label="Assign Guardian"
               name="guardian_id"
@@ -355,6 +491,7 @@ export default function AddInfantModal({
               onBlur={handleBlur}
               error={touched.guardian_id ? errors.guardian_id : undefined}
               options={guardianOptions}
+              helpText="Pick a guardian from the current search results."
               required
             />
             <Input

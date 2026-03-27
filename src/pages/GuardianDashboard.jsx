@@ -454,11 +454,14 @@ const GuardianDashboard = () => {
   const [dueVaccines, setDueVaccines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const hasTracked = React.useRef(false);
 
   // Fetch data from API
-  const fetchDashboardData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const fetchDashboardData = useCallback(async (isSilentRefresh = false) => {
+    if (!isSilentRefresh) {
+      setLoading(true);
+      setError(null);
+    }
 
     try {
       // Fetch all data in parallel
@@ -476,7 +479,7 @@ const GuardianDashboard = () => {
         !guardianId
           ? Promise.resolve({ data: [] })
           : typeof apiClient.getGuardianNotifications === 'function'
-            ? apiClient.getGuardianNotifications({ limit: 10 })
+            ? apiClient.getGuardianNotifications({ limit: 5 })
             : Promise.resolve({ data: [] }),
         guardianId ? apiClient.getGuardianStats(guardianId) : Promise.resolve({ data: {} }),
       ]);
@@ -560,11 +563,11 @@ const GuardianDashboard = () => {
       // Calculate stats locally if not available from API
       const today = new Date();
 
-      const vaccinatedCount = childrenData.reduce((acc, child) => {
+      const vaccinatedCount = apiStats.completedVaccinations ?? childrenData.reduce((acc, child) => {
         return acc + Number(child.completed_vaccinations || 0);
       }, 0);
 
-      const pendingCount = childrenData.reduce((acc, child) => {
+      const pendingCount = apiStats.pendingVaccinations ?? childrenData.reduce((acc, child) => {
         return acc + Number(child.pending_vaccinations || 0);
       }, 0);
 
@@ -640,15 +643,17 @@ const GuardianDashboard = () => {
        setStats({
          childrenCount: apiStats.childrenCount || childrenData.length,
          nextAppointment: nextAppointmentDate,
-         vaccinatedCount: apiStats.completedVaccinations || vaccinatedCount,
-         pendingCount: apiStats.pendingVaccinations || pendingCount,
+         vaccinatedCount: vaccinatedCount,
+         pendingCount: pendingCount,
          overdueCount: dueVaccinesList.filter(v => v.status === 'overdue').length,
          upcomingVaccines: dueVaccinesList.filter(v => v.status === 'due_soon').length,
        });
 
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
-      setError('Failed to load dashboard data. Please try again.');
+      if (!isSilentRefresh) {
+        setError('Failed to load dashboard data. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -656,13 +661,13 @@ const GuardianDashboard = () => {
 
   // Fetch data on mount
   useEffect(() => {
-    fetchDashboardData();
+    fetchDashboardData(false);
   }, [fetchDashboardData]);
 
   // Auto-refresh dashboard data every 60 seconds
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      fetchDashboardData();
+      fetchDashboardData(true);
     }, 60000);
     return () => window.clearInterval(intervalId);
   }, [fetchDashboardData]);
@@ -677,8 +682,9 @@ const GuardianDashboard = () => {
 
   // Telemetry: track dashboard view and general stats
   useEffect(() => {
-    if (!loading && !error) {
+    if (!loading && !error && !hasTracked.current) {
       trackEvent("dashboard_first_view", { childrenCount: stats.childrenCount, overdueCount: stats.overdueCount });
+      hasTracked.current = true;
     }
   }, [loading, error, stats.childrenCount, stats.overdueCount]);
 
@@ -695,7 +701,7 @@ const GuardianDashboard = () => {
 
   // Handle retry
   const handleRetry = () => {
-    fetchDashboardData();
+    fetchDashboardData(false);
   };
 
   // Handle notification dismiss

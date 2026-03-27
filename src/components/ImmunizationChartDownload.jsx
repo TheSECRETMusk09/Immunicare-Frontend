@@ -1,8 +1,14 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import apiClient from "../utils/api";
 import { Button, Card, PageHeader, Alert, LoadingSpinner } from "./UI";
 import { Download, Printer, FileText } from "lucide-react";
 import { isApprovedVaccineName } from "../constants/approvedVaccines";
+import PrintDateRangeControls from "./PrintDateRangeControls";
+import usePrintDateRange from "../hooks/usePrintDateRange";
+import {
+  filterItemsByPrintDateRange,
+  formatPrintDateValue,
+} from "../utils/printDateRange";
 
 /**
  * ImmunizationChartDownload Component
@@ -29,6 +35,10 @@ export default function ImmunizationChartDownload({
   const [error, setError] = useState(null);
   const [selectedChild, setSelectedChild] = useState(null);
   const [children, setChildren] = useState([]);
+  const printDateRange = usePrintDateRange({
+    headerPrefix: "Date Range",
+    fallbackLabel: "All immunization chart records",
+  });
 
   const { guardianId } = require("../contexts/AuthContext").useAuth();
 
@@ -165,7 +175,7 @@ export default function ImmunizationChartDownload({
 
   const formatDate = (dateString) => {
     if (!dateString) return "__________";
-    return new Date(dateString).toLocaleDateString("en-US", {
+    return formatPrintDateValue(dateString, {
       month: "2-digit",
       day: "2-digit",
       year: "numeric",
@@ -181,11 +191,66 @@ export default function ImmunizationChartDownload({
     return Math.floor(diffDays / 7);
   };
 
+  const printableVaccinations = useMemo(() => {
+    if (!printDateRange.hasAppliedDateRange) {
+      return vaccinations;
+    }
+
+    return filterItemsByPrintDateRange(vaccinations, {
+      startDate: printDateRange.appliedStartDate,
+      endDate: printDateRange.appliedEndDate,
+      getItemDates: (entry) => [entry?.admin_date, entry?.next_due_date],
+    });
+  }, [
+    printDateRange.appliedEndDate,
+    printDateRange.appliedStartDate,
+    printDateRange.hasAppliedDateRange,
+    vaccinations,
+  ]);
+
+  const printableGrowthRecords = useMemo(() => {
+    if (!printDateRange.hasAppliedDateRange) {
+      return growthRecords;
+    }
+
+    return filterItemsByPrintDateRange(growthRecords, {
+      startDate: printDateRange.appliedStartDate,
+      endDate: printDateRange.appliedEndDate,
+      getItemDates: (entry) => [entry?.measurement_date, entry?.date],
+    });
+  }, [
+    growthRecords,
+    printDateRange.appliedEndDate,
+    printDateRange.appliedStartDate,
+    printDateRange.hasAppliedDateRange,
+  ]);
+
+  const printableAppointments = useMemo(() => {
+    if (!printDateRange.hasAppliedDateRange) {
+      return appointments;
+    }
+
+    return filterItemsByPrintDateRange(appointments, {
+      startDate: printDateRange.appliedStartDate,
+      endDate: printDateRange.appliedEndDate,
+      getItemDates: (entry) => [
+        entry?.scheduled_date,
+        entry?.appointment_date,
+        entry?.date,
+      ],
+    });
+  }, [
+    appointments,
+    printDateRange.appliedEndDate,
+    printDateRange.appliedStartDate,
+    printDateRange.hasAppliedDateRange,
+  ]);
+
   const getVisitDate = (visitAge) => {
     const infantDob = infant?.dob;
     if (!infantDob) return null;
 
-    const appointment = appointments.find((apt) => {
+    const appointment = printableAppointments.find((apt) => {
       if (!apt?.scheduled_date) return false;
       const ageInWeeks = calculateAgeInWeeks(infantDob, apt.scheduled_date);
       const template = visitTemplates.find((t) => t.age === visitAge);
@@ -206,7 +271,7 @@ export default function ImmunizationChartDownload({
     const visitVaccines = visitTemplates.find((t) => t.age === visitAge);
     if (!visitVaccines) return [];
 
-    return vaccinations.filter((v) => {
+    return printableVaccinations.filter((v) => {
       if (!v?.admin_date) return false;
       const ageInWeeks = calculateAgeInWeeks(infantDob, v.admin_date);
       return (
@@ -223,7 +288,7 @@ export default function ImmunizationChartDownload({
     const template = visitTemplates.find((t) => t.age === visitAge);
     if (!template) return null;
 
-    return growthRecords.find((g) => {
+    return printableGrowthRecords.find((g) => {
       if (!g?.measurement_date) return false;
       const ageInWeeks = calculateAgeInWeeks(infantDob, g.measurement_date);
       return (
@@ -234,17 +299,25 @@ export default function ImmunizationChartDownload({
   };
 
   const isVaccineAdministered = (vaccineName) => {
-    return vaccinations.some((v) => {
+    return printableVaccinations.some((v) => {
       if (!isApprovedVaccineName(v?.vaccine_name)) return false;
       return v.vaccine_name === vaccineName;
     });
   };
 
   const handlePrint = () => {
+    if (!printDateRange.ensureReadyForPrint()) {
+      return;
+    }
+
     window.print();
   };
 
   const handleDownload = () => {
+    if (!printDateRange.ensureReadyForPrint()) {
+      return;
+    }
+
     // Create a printable version
     const printContent = document.getElementById("immunization-chart-print");
     if (!printContent) {
@@ -367,32 +440,37 @@ export default function ImmunizationChartDownload({
     <div className="space-y-6">
       {/* Header */}
       {showViewMode && (
-        <PageHeader
-          title="Immunization Chart"
-          subtitle={`Official vaccination record for ${displayInfant?.first_name} ${displayInfant?.last_name}`}
-          icon={<FileText className="w-8 h-8 text-white" />}
-        />
+        <div className="no-print">
+          <PageHeader
+            title="Immunization Chart"
+            subtitle={`Official vaccination record for ${displayInfant?.first_name} ${displayInfant?.last_name}`}
+            icon={<FileText className="w-8 h-8 text-white" />}
+          />
+        </div>
       )}
 
       {/* Child Selector */}
-      {showViewMode && childSelector}
+      {showViewMode && <div className="no-print">{childSelector}</div>}
 
       {/* Action Buttons */}
       {showViewMode && (
-        <div className="flex gap-4 justify-end">
-          <Button
-            onClick={handlePrint}
-            variant="secondary"
-            icon={<Printer className="w-4 h-4" />}
-          >
-            Print
-          </Button>
-          <Button
-            onClick={handleDownload}
-            icon={<Download className="w-4 h-4" />}
-          >
-            Download
-          </Button>
+        <div className="no-print space-y-4">
+          <div className="flex gap-4 justify-end">
+            <Button
+              onClick={handlePrint}
+              variant="secondary"
+              icon={<Printer className="w-4 h-4" />}
+            >
+              Print
+            </Button>
+            <Button
+              onClick={handleDownload}
+              icon={<Download className="w-4 h-4" />}
+            >
+              Download
+            </Button>
+          </div>
+          <PrintDateRangeControls controller={printDateRange} />
         </div>
       )}
 
@@ -408,6 +486,9 @@ export default function ImmunizationChartDownload({
           </h1>
           <p className="text-sm text-gray-600">
             Department of Health - Republic of the Philippines
+          </p>
+          <p className="text-sm font-medium text-gray-700 mt-2">
+            {printDateRange.activeDateRangeLabel}
           </p>
         </div>
 
@@ -693,7 +774,7 @@ export default function ImmunizationChartDownload({
             <p>Generated by Immunicare Vaccination Management System</p>
             <p>
               Generated on:{" "}
-              {new Date().toLocaleDateString("en-US", { dateStyle: "full" })}
+              {formatPrintDateValue(new Date(), { dateStyle: "full" })}
             </p>
           </div>
         </div>

@@ -1,6 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, Bell, CalendarClock, ShieldAlert, Syringe } from "lucide-react";
+import {
+  AlertTriangle,
+  Bell,
+  CalendarClock,
+  Package,
+  ShieldAlert,
+  Syringe,
+  UserCheck,
+  Users,
+} from "lucide-react";
 import { Card, Button, PageHeader, Alert } from "../UI";
 import {
   SkeletonCard,
@@ -190,23 +199,51 @@ export default function DashboardOverview() {
 
   const keyMetrics = [
     {
-      label: "Registered Infants",
-      value: stats?.infants || infants?.length || 0,
+      label: "Vaccinations",
+      value: stats?.vaccination?.total ?? stats?.vaccinations ?? 0,
+      subtitle: `Completed: ${stats?.vaccination?.completed ?? stats?.completed_vaccinations ?? 0}`,
       icon: Syringe,
+    },
+    {
+      label: "Inventory Items",
+      value: stats?.inventory?.total_items ?? stats?.inventory_items ?? 0,
+      subtitle: `Low Stock: ${stats?.inventory?.low_stock_items ?? stats?.low_stock_items ?? stats?.low_stock ?? 0}`,
+      icon: Package,
+    },
+    {
+      label: "Appointments",
+      value: stats?.appointments_summary?.total ?? stats?.appointments ?? 0,
+      subtitle: `Completed: ${stats?.appointments_summary?.completed ?? stats?.completed_appointments ?? 0}`,
+      icon: CalendarClock,
+    },
+    {
+      label: "No Shows",
+      value: stats?.appointments_summary?.no_show ?? stats?.no_show_appointments ?? 0,
+      subtitle: `Missed Follow-up Load: ${stats?.appointments_summary?.missed_follow_up_load ?? stats?.missed_follow_up_load ?? 0}`,
+      icon: ShieldAlert,
+    },
+    {
+      label: "Guardians",
+      value: stats?.guardians_summary?.total ?? stats?.guardians ?? 0,
+      subtitle: `Active: ${stats?.guardians_summary?.active ?? stats?.active_guardians ?? 0}`,
+      icon: Users,
+    },
+    {
+      label: "Infants",
+      value: stats?.infants_summary?.total ?? stats?.infants ?? infants?.length ?? 0,
+      subtitle: `Up to Date: ${stats?.infants_summary?.up_to_date ?? stats?.up_to_date_infants ?? 0}`,
+      icon: UserCheck,
     },
     {
       label: "Overdue Next Dose",
       value: monitoringSummary.overdueInfants || 0,
-      icon: ShieldAlert,
-    },
-    {
-      label: "Due Soon (7 days)",
-      value: monitoringSummary.dueSoonInfants || 0,
-      icon: CalendarClock,
+      subtitle: "Vaccination monitoring",
+      icon: AlertTriangle,
     },
     {
       label: "Critical Stock Items",
       value: criticalInventoryCount,
+      subtitle: `Expired Lots: ${stats?.inventory?.expired_items ?? stats?.expired_items ?? stats?.expired_lots ?? 0}`,
       icon: AlertTriangle,
     },
   ];
@@ -242,7 +279,14 @@ export default function DashboardOverview() {
         {keyMetrics.map((item) => (
           <Card key={item.label} title={<span className="font-bold">{item.label}</span>}>
             <div className="flex items-center justify-between">
-              <p className="text-3xl font-bold">{item.value}</p>
+              <div>
+                <p className="text-3xl font-bold">{item.value}</p>
+                {item.subtitle ? (
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {item.subtitle}
+                  </p>
+                ) : null}
+              </div>
               <item.icon className="w-6 h-6 text-primary-600" />
             </div>
           </Card>

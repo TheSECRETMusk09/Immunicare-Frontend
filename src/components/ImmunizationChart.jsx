@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { FileText, Printer } from "lucide-react";
 import apiClient from "../utils/api";
 import { Button, Modal, Select } from "./UI";
+import PrintDateRangeControls from "./PrintDateRangeControls";
 import VisitRecordingForm from "./VisitRecordingForm";
 import {
   normalizeInfantResponse,
@@ -9,6 +10,22 @@ import {
   toArrayPayload,
 } from "../utils/adminDataAdapters";
 import { useAuth } from "../contexts/AuthContext";
+import usePrintDateRange from "../hooks/usePrintDateRange";
+import {
+  filterItemsByPrintDateRange,
+  formatPrintDateValue,
+} from "../utils/printDateRange";
+import {
+  downloadPdfFromNode,
+  downloadWordDocument,
+  PRINT_PAGE_PRESETS,
+} from "../utils/printDocumentExport";
+
+const sanitizeFileSegment = (value) =>
+  String(value || "document")
+    .trim()
+    .replace(/[^a-z0-9]+/gi, "_")
+    .replace(/^_+|_+$/g, "") || "document";
 
 const toFiniteNumber = (value, fallback = null) => {
   const parsed = Number(value);
@@ -221,6 +238,11 @@ const PRINT_PAPER_CONFIGS = {
 const getPrintPaperConfig = (paperSize = DEFAULT_PRINT_PAPER_SIZE) =>
   PRINT_PAPER_CONFIGS[paperSize] || PRINT_PAPER_CONFIGS[DEFAULT_PRINT_PAPER_SIZE];
 
+const getPrintPagePreset = (paperSize = DEFAULT_PRINT_PAPER_SIZE) =>
+  paperSize === "long"
+    ? PRINT_PAGE_PRESETS.folioPortrait
+    : PRINT_PAGE_PRESETS.a4Portrait;
+
 const buildPrintPaperStyles = (paperSize = DEFAULT_PRINT_PAPER_SIZE) => {
   const config = getPrintPaperConfig(paperSize);
 
@@ -283,16 +305,26 @@ const buildPrintDocumentStyles = (paperSize = DEFAULT_PRINT_PAPER_SIZE) => {
     .immunization-chart-print__logo {
       width: 22mm;
       height: 22mm;
-      object-fit: contain;
+      object-fit: cover;
       display: block;
+      border-radius: 50%;
+      clip-path: circle(50% at 50% 50%);
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      mix-blend-mode: multiply;
     }
 
     .immunization-chart-print__logo--circle {
       width: 23.5mm;
       height: 23.5mm;
       border-radius: 50%;
-      background: #ffffff;
       object-fit: cover;
+      clip-path: circle(50% at 50% 50%);
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      mix-blend-mode: multiply;
     }
 
     .immunization-chart-print__title-wrap {
@@ -307,6 +339,14 @@ const buildPrintDocumentStyles = (paperSize = DEFAULT_PRINT_PAPER_SIZE) => {
       font-weight: 700;
       letter-spacing: 0.02em;
       line-height: 1.05;
+    }
+
+    .immunization-chart-print__title-meta {
+      margin-top: 1.5mm;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 8.5pt;
+      font-weight: 600;
+      line-height: 1.3;
     }
 
     .immunization-chart-print__section-title {
@@ -636,16 +676,26 @@ const PRINTABLE_STYLES = `
   .immunization-chart__logo {
     width: 25mm;
     height: 25mm;
-    object-fit: contain;
+    object-fit: cover;
     display: block;
+    border-radius: 50%;
+    clip-path: circle(50% at 50% 50%);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    mix-blend-mode: multiply;
   }
 
   .immunization-chart__logo--circle {
     width: 27mm;
     height: 27mm;
     border-radius: 50%;
-    background-color: #ffffff;
     object-fit: cover;
+    clip-path: circle(50% at 50% 50%);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    mix-blend-mode: multiply;
   }
 
   .immunization-chart__title-wrap {
@@ -661,6 +711,15 @@ const PRINTABLE_STYLES = `
     font-weight: 700;
     letter-spacing: 0.03em;
     line-height: 1.1;
+  }
+
+  .immunization-chart__title-meta {
+    margin-top: 6px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: #334155;
   }
 
   .immunization-chart__identity-grid {
@@ -1075,8 +1134,6 @@ const PRINTABLE_STYLES = `
       box-shadow: none !important;
       padding: 0 !important;
       margin: 0 !important;
-      orphans: 3;
-      widows: 3;
     }
 
     .immunization-chart__screen-only {
@@ -1256,9 +1313,11 @@ const formatDate = (value) => {
     return "";
   }
 
-  return [parsed.getMonth() + 1, parsed.getDate(), parsed.getFullYear()]
-    .map((part, index) => (index < 2 ? String(part).padStart(2, "0") : String(part)))
-    .join("/");
+  return formatPrintDateValue(parsed, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
 };
 
 const formatTimeOfDelivery = (value) => {
@@ -1976,6 +2035,10 @@ export default function ImmunizationChart({ infantId }) {
   const [saveError, setSaveError] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [printPaperSize, setPrintPaperSize] = useState(DEFAULT_PRINT_PAPER_SIZE);
+  const printDateRange = usePrintDateRange({
+    headerPrefix: "Date Range",
+    fallbackLabel: "All immunization chart records",
+  });
 
   const isMountedRef = useRef(true);
   const requestIdRef = useRef(0);
@@ -2084,10 +2147,94 @@ export default function ImmunizationChart({ infantId }) {
     void fetchData();
   }, [fetchData]);
 
+  // Real-time synchronization listeners
+  useEffect(() => {
+    if (!infantId) {
+      return undefined;
+    }
+
+    const normalizedInfantId = Number(infantId);
+    const shouldRefreshForInfant = (detail = {}) => {
+      const detailInfantId = Number(
+        detail?.patient_id ?? detail?.infant_id ?? detail?.child_id ?? detail?.id,
+      );
+      return !detailInfantId || detailInfantId === normalizedInfantId;
+    };
+
+    const handleUpdate = (event) => {
+      if (shouldRefreshForInfant(event?.detail)) {
+        void fetchData();
+      }
+    };
+
+    window.addEventListener("vaccination-update", handleUpdate);
+    window.addEventListener("appointment-update", handleUpdate);
+    window.addEventListener("child-data-update", handleUpdate);
+    window.addEventListener("vaccination-readiness-update", handleUpdate);
+
+    return () => {
+      window.removeEventListener("vaccination-update", handleUpdate);
+      window.removeEventListener("appointment-update", handleUpdate);
+      window.removeEventListener("child-data-update", handleUpdate);
+      window.removeEventListener("vaccination-readiness-update", handleUpdate);
+    };
+  }, [fetchData, infantId]);
+
+  const printableAppointments = useMemo(() => {
+    if (!printDateRange.hasAppliedDateRange) {
+      return appointments;
+    }
+
+    return filterItemsByPrintDateRange(appointments, {
+      startDate: printDateRange.appliedStartDate,
+      endDate: printDateRange.appliedEndDate,
+      getItemDates: (entry) => [entry?.scheduled_date],
+    });
+  }, [
+    appointments,
+    printDateRange.appliedEndDate,
+    printDateRange.appliedStartDate,
+    printDateRange.hasAppliedDateRange,
+  ]);
+
+  const printableGrowthRecords = useMemo(() => {
+    if (!printDateRange.hasAppliedDateRange) {
+      return growthRecords;
+    }
+
+    return filterItemsByPrintDateRange(growthRecords, {
+      startDate: printDateRange.appliedStartDate,
+      endDate: printDateRange.appliedEndDate,
+      getItemDates: (entry) => [entry?.measurement_date, entry?.date],
+    });
+  }, [
+    growthRecords,
+    printDateRange.appliedEndDate,
+    printDateRange.appliedStartDate,
+    printDateRange.hasAppliedDateRange,
+  ]);
+
+  const printableVaccinations = useMemo(() => {
+    if (!printDateRange.hasAppliedDateRange) {
+      return vaccinations;
+    }
+
+    return filterItemsByPrintDateRange(vaccinations, {
+      startDate: printDateRange.appliedStartDate,
+      endDate: printDateRange.appliedEndDate,
+      getItemDates: (entry) => [entry?.admin_date, entry?.next_due_date],
+    });
+  }, [
+    printDateRange.appliedEndDate,
+    printDateRange.appliedStartDate,
+    printDateRange.hasAppliedDateRange,
+    vaccinations,
+  ]);
+
   const visitSummaries = useMemo(() => {
     return VISIT_TEMPLATES.map((template) => {
       const targetDate = getTargetVisitDate(infant?.dob, template.window);
-      const appointmentCandidates = appointments.filter((entry) =>
+      const appointmentCandidates = printableAppointments.filter((entry) =>
         isWeeksWithinWindow(getWeeksFromDate(infant?.dob, entry?.scheduled_date), template.window),
       );
       const appointment = pickClosestRecord(
@@ -2097,7 +2244,7 @@ export default function ImmunizationChart({ infantId }) {
       );
 
       const vaccineRows = template.vaccines.map((vaccineDefinition) => {
-        const matches = vaccinations.filter((record) =>
+        const matches = printableVaccinations.filter((record) =>
           isMatchingVaccineRecord(record, vaccineDefinition),
         );
         const inWindowMatches = matches.filter((record) =>
@@ -2118,7 +2265,7 @@ export default function ImmunizationChart({ infantId }) {
         };
       });
 
-      const growthInWindow = growthRecords.filter((record) =>
+      const growthInWindow = printableGrowthRecords.filter((record) =>
         isWeeksWithinWindow(getGrowthAgeInWeeks(record, infant?.dob), template.window),
       );
 
@@ -2160,7 +2307,7 @@ export default function ImmunizationChart({ infantId }) {
           hasDisplayValue(remarks),
       };
     });
-  }, [appointments, growthRecords, infant?.dob, vaccinations]);
+  }, [infant?.dob, printableAppointments, printableGrowthRecords, printableVaccinations]);
 
   const leftColumnVisits = useMemo(
     () => visitSummaries.filter((summary) => summary.template.column === "left"),
@@ -2193,7 +2340,7 @@ export default function ImmunizationChart({ infantId }) {
         .filter((value) => Number.isFinite(Number(value))),
     );
 
-    const catchUpVaccinations = vaccinations.filter((record) => {
+    const catchUpVaccinations = printableVaccinations.filter((record) => {
       if (!record) return false;
 
       if (
@@ -2242,7 +2389,7 @@ export default function ImmunizationChart({ infantId }) {
       })
       .slice(0, 5);
 
-    const catchUpGrowth = [...growthRecords]
+    const catchUpGrowth = [...printableGrowthRecords]
       .filter((record) => {
         const recordId = Number(record?.id);
         return !Number.isFinite(recordId) || !matchedGrowthIds.has(recordId);
@@ -2253,7 +2400,7 @@ export default function ImmunizationChart({ infantId }) {
         return rightDate - leftDate;
       })[0] || null;
 
-    const catchUpAppointment = [...appointments]
+    const catchUpAppointment = [...printableAppointments]
       .filter((record) => {
         const recordId = Number(record?.id);
         return !Number.isFinite(recordId) || !matchedAppointmentIds.has(recordId);
@@ -2275,7 +2422,13 @@ export default function ImmunizationChart({ infantId }) {
       height: formatMeasurement(catchUpGrowth?.length_cm),
       temperature: formatMeasurement(catchUpGrowth?.temperature_celsius),
     };
-  }, [appointments, growthRecords, infant?.dob, vaccinations, visitSummaries]);
+  }, [
+    infant?.dob,
+    printableAppointments,
+    printableGrowthRecords,
+    printableVaccinations,
+    visitSummaries,
+  ]);
 
   const fullName = buildFullName(infant);
   const address = buildAddress(infant);
@@ -2291,19 +2444,19 @@ export default function ImmunizationChart({ infantId }) {
 
   const bcgRecord = useMemo(
     () =>
-      vaccinations.find(
+      printableVaccinations.find(
         (record) => normalizeNameToken(record?.vaccine_name) === normalizeNameToken("BCG"),
       ) || null,
-    [vaccinations],
+    [printableVaccinations],
   );
 
   const hepaBRecord = useMemo(
     () =>
-      vaccinations.find(
+      printableVaccinations.find(
         (record) =>
           normalizeNameToken(record?.vaccine_name) === normalizeNameToken("Hepa B"),
       ) || null,
-    [vaccinations],
+    [printableVaccinations],
   );
 
   const buildPrintableDocument = useCallback(async () => {
@@ -2366,6 +2519,10 @@ export default function ImmunizationChart({ infantId }) {
   }, [fullName, leftLogoSrc, printPaperSize, rightLogoSrc]);
 
   const handlePrintPdf = useCallback(async () => {
+    if (!printDateRange.ensureReadyForPrint()) {
+      return;
+    }
+
     const printableHtml = await buildPrintableDocument();
     if (!printableHtml || typeof window === "undefined" || typeof document === "undefined") {
       return;
@@ -2382,7 +2539,62 @@ export default function ImmunizationChart({ infantId }) {
     window.setTimeout(cleanup, 2000);
     frameWindow.focus();
     frameWindow.print();
-  }, [buildPrintableDocument]);
+  }, [buildPrintableDocument, printDateRange]);
+
+  const handleDownloadPdf = useCallback(async () => {
+    if (!printDateRange.ensureReadyForPrint()) {
+      return;
+    }
+
+    if (!printAreaRef.current) {
+      return;
+    }
+
+    try {
+      await downloadPdfFromNode({
+        node: printAreaRef.current,
+        filename: `Immunization_Chart_${sanitizeFileSegment(fullName || infantId || "child")}.pdf`,
+        title: "Immunization Chart",
+        headerText: "Immunization Chart",
+        footerText: printDateRange.activeDateRangeLabel,
+        page: getPrintPagePreset(printPaperSize),
+        scale: 0.72,
+      });
+    } catch (downloadError) {
+      console.error("Error generating immunization chart PDF:", downloadError);
+      setLoadError(
+        downloadError.message || "Failed to generate the immunization chart PDF.",
+      );
+    }
+  }, [fullName, infantId, printDateRange, printPaperSize]);
+
+  const handleDownloadWord = useCallback(async () => {
+    if (!printDateRange.ensureReadyForPrint()) {
+      return;
+    }
+
+    try {
+      const printableHtml = await buildPrintableDocument();
+      if (!printableHtml) {
+        return;
+      }
+
+      downloadWordDocument({
+        html: printableHtml,
+        filename: `Immunization_Chart_${sanitizeFileSegment(fullName || infantId || "child")}.docx`,
+        title: "Immunization Chart",
+        headerText: "Immunization Chart",
+        footerText: printDateRange.activeDateRangeLabel,
+        page: getPrintPagePreset(printPaperSize),
+      });
+    } catch (downloadError) {
+      console.error("Error generating immunization chart Word document:", downloadError);
+      setLoadError(
+        downloadError.message ||
+          "Failed to generate the immunization chart Word document.",
+      );
+    }
+  }, [buildPrintableDocument, fullName, infantId, printDateRange, printPaperSize]);
 
   const openVisitModal = (visit) => {
     setSelectedVisit(visit);
@@ -2549,10 +2761,31 @@ export default function ImmunizationChart({ infantId }) {
                   variant="secondary"
                   leftIcon={<Printer className="w-4 h-4" />}
                   onClick={handlePrintPdf}
+                  data-print-action="immunization-chart-print"
                 >
-                  Print / PDF
+                  Print
+                </Button>
+                <Button
+                  variant="secondary"
+                  leftIcon={<FileText className="w-4 h-4" />}
+                  onClick={handleDownloadPdf}
+                  data-print-action="immunization-chart-download"
+                >
+                  Download PDF
+                </Button>
+                <Button
+                  variant="secondary"
+                  leftIcon={<FileText className="w-4 h-4" />}
+                  onClick={handleDownloadWord}
+                  data-print-action="immunization-chart-download-word"
+                >
+                  Download Word
                 </Button>
               </div>
+            </div>
+
+            <div className="mt-4">
+              <PrintDateRangeControls controller={printDateRange} />
             </div>
 
             {saveSuccess && (
@@ -2591,6 +2824,9 @@ export default function ImmunizationChart({ infantId }) {
 
                 <div className="immunization-chart__title-wrap">
                   <div className="immunization-chart__title">IMMUNIZATION CHART</div>
+                  <div className="immunization-chart__title-meta">
+                    {printDateRange.activeDateRangeLabel}
+                  </div>
                 </div>
 
                 <div className="immunization-chart__logo-wrap">
@@ -2809,6 +3045,9 @@ export default function ImmunizationChart({ infantId }) {
 
             <div className="immunization-chart-print__title-wrap">
               <div className="immunization-chart-print__title">IMMUNIZATION CHART</div>
+              <div className="immunization-chart-print__title-meta">
+                {printDateRange.activeDateRangeLabel}
+              </div>
             </div>
 
             <div className="immunization-chart-print__logo-wrap">

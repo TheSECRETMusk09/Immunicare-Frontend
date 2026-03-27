@@ -18,6 +18,7 @@ import {
 } from "../utils/vaccinationFormOptions";
 
 const ADMINISTERED_BY_ROLE_OPTIONS = [
+  { value: "physician", label: "Physician" },
   { value: "nurse", label: "Nurse" },
   { value: "midwife", label: "Midwife" },
 ];
@@ -26,9 +27,13 @@ const normalizeRoleName = (value) => String(value || "").trim().toLowerCase();
 
 const resolveAdministeredByRole = (user = {}) => {
   const normalizedRole = normalizeRoleName(user.role_name || user.role);
-  return normalizedRole === "nurse" || normalizedRole === "midwife"
-    ? normalizedRole
-    : "";
+  if (["physician", "doctor", "health_worker", "system_admin", "super_admin", "admin"].includes(normalizedRole)) {
+    return "physician";
+  }
+  if (["nurse", "midwife"].includes(normalizedRole)) {
+    return normalizedRole;
+  }
+  return "";
 };
 
 const buildAdministeredByDisplayName = (user = {}) => {
@@ -196,14 +201,14 @@ export default function InjectVaccineModal({
       const [vaccinesResponse, infantsResponse, inventoryResponse, systemUsersResponse] =
         await Promise.all([
           apiClient.getVaccines(),
-          apiClient.getInfants(),
+          apiClient.getInfants({ limit: 1500 }),
           apiClient.getVaccineInventory(
             scopedClinicId ? { clinic_id: scopedClinicId } : {}
           ),
           apiClient
             .getSystemUsers({
               limit: 200,
-              roles: "nurse,midwife",
+              roles: "physician,doctor,nurse,midwife,health_worker,system_admin,admin,super_admin",
               is_active: true,
             })
             .catch(() => ({ data: [] })),
@@ -232,12 +237,13 @@ export default function InjectVaccineModal({
 
           if (!Number.isFinite(id) || id <= 0) return null;
           if (!role || !isActive || isGuardianAccount) return null;
-          if (scopedClinicId && scopedUserClinicId !== Number(scopedClinicId)) {
+          // Only filter out if the user has a specific clinic assigned that doesn't match the current scope
+          if (scopedClinicId && scopedUserClinicId && scopedUserClinicId !== Number(scopedClinicId)) {
             return null;
           }
 
           const displayName = buildAdministeredByDisplayName(rawUser);
-          const roleLabel = role === "midwife" ? "Midwife" : "Nurse";
+          const roleLabel = role === "midwife" ? "Midwife" : role === "nurse" ? "Nurse" : "Physician";
 
           return {
             ...rawUser,
@@ -479,20 +485,20 @@ export default function InjectVaccineModal({
     const roleCount = healthWorkerUsers.reduce(
       (accumulator, entry) => {
         const role = normalizeRoleName(entry.role);
-        if (role === "nurse" || role === "midwife") {
-          accumulator[role] += 1;
+        if (["physician", "nurse", "midwife"].includes(role)) {
+          accumulator[role] = (accumulator[role] || 0) + 1;
         }
         return accumulator;
       },
-      { nurse: 0, midwife: 0 },
+      { physician: 0, nurse: 0, midwife: 0 },
     );
 
     return [
       {
         value: "",
         label: healthWorkerUsers.length
-          ? "Select Nurse or Midwife role"
-          : "No Nurse or Midwife users available",
+          ? "Select Physician, Nurse, or Midwife"
+          : "No Healthcare providers available",
       },
       ...ADMINISTERED_BY_ROLE_OPTIONS.map((option) => ({
         value: option.value,
@@ -777,7 +783,7 @@ export default function InjectVaccineModal({
 
     if (!administeredBy) {
       setError(
-        "Please select a Nurse or Midwife using the Administered By role and name fields.",
+        "Please select a Physician, Nurse, or Midwife using the Administered By role and name fields.",
       );
       setLoading(false);
       return;
@@ -858,6 +864,15 @@ export default function InjectVaccineModal({
       }
 
       setSuccess("Vaccination recorded and inventory updated successfully.");
+
+      // Dispatch synchronization event to update charts and booklets across the UI
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("vaccination-update", {
+            detail: { patient_id: recordPayload.patient_id },
+          })
+        );
+      }
 
       setTimeout(() => {
         setSuccess(null);
@@ -1260,7 +1275,7 @@ export default function InjectVaccineModal({
               onBlur={handleAdministeredBySearchBlur}
               placeholder={
                 formData.administered_by_role
-                  ? "Type to search Nurse or Midwife name"
+                  ? `Type to search ${formData.administered_by_role.charAt(0).toUpperCase() + formData.administered_by_role.slice(1)} name`
                   : "Select role first"
               }
               disabled={
@@ -1302,7 +1317,7 @@ export default function InjectVaccineModal({
 
           {!healthWorkerUsers.length && (
             <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
-              No active Nurse or Midwife users were found for this facility.
+              No active Physician, Nurse, or Midwife users were found for this facility.
             </p>
           )}
 
@@ -1310,7 +1325,7 @@ export default function InjectVaccineModal({
             healthWorkerUsers.length > 0 &&
             administeredByUsersByRole.length === 0 && (
               <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
-                No active {formData.administered_by_role === "midwife" ? "Midwife" : "Nurse"} users are available for this facility.
+                No active {formData.administered_by_role.charAt(0).toUpperCase() + formData.administered_by_role.slice(1)} users are available for this facility.
               </p>
             )}
 

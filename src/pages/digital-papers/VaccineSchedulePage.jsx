@@ -10,6 +10,7 @@ import {
 import VaccineScheduleBooklet from "../../components/VaccineScheduleBooklet";
 import apiClient from "../../utils/api";
 import { Syringe, FileText, Printer } from "lucide-react";
+import { downloadWordDocument, PRINT_PAGE_PRESETS } from "../../utils/printDocumentExport";
 
 const sanitizeFileSegment = (value) =>
   String(value || "document")
@@ -75,23 +76,68 @@ export default function VaccineSchedulePage() {
     fetchInfant();
   }, [fetchInfant]);
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleDownload = () => {
-    const printableNode = document.getElementById("vaccine-schedule-print");
-    if (!printableNode) {
-      setError("Printable vaccine schedule content is not available yet.");
+  const triggerEmbeddedAction = (actionSelector, missingMessage, fallbackAction) => {
+    const actionButton = document.querySelector(actionSelector);
+    if (!actionButton && typeof fallbackAction === "function") {
+      fallbackAction();
       return;
     }
 
-    downloadHtmlDocument({
-      title: `Vaccine Schedule - ${infant?.first_name || "Child"} ${infant?.last_name || "Schedule"}`,
-      filename: `Vaccine_Schedule_${sanitizeFileSegment(infant?.last_name)}_${sanitizeFileSegment(infant?.first_name)}.html`,
-      markup: printableNode.outerHTML,
-    });
+    if (!actionButton) {
+      setError(missingMessage);
+      return;
+    }
+
+    actionButton.click();
   };
+
+  const handlePrint = () =>
+    triggerEmbeddedAction(
+      '[data-print-action="vaccine-schedule-print"]',
+      "Printable vaccine schedule content is not available yet.",
+      () => window.print(),
+    );
+
+  const handleDownload = () =>
+    triggerEmbeddedAction(
+      '[data-print-action="vaccine-schedule-download"]',
+      "Printable vaccine schedule content is not available yet.",
+      () => {
+        const printableNode = document.getElementById("vaccine-schedule-print");
+        if (!printableNode) {
+          setError("Printable vaccine schedule content is not available yet.");
+          return;
+        }
+
+        downloadHtmlDocument({
+          title: `Vaccine Schedule - ${infant?.first_name || "Child"} ${infant?.last_name || "Schedule"}`,
+          filename: `Vaccine_Schedule_${sanitizeFileSegment(infant?.last_name)}_${sanitizeFileSegment(infant?.first_name)}.html`,
+          markup: printableNode.outerHTML,
+        });
+      },
+    );
+
+  const handleDownloadWord = () =>
+    triggerEmbeddedAction(
+      '[data-print-action="vaccine-schedule-download-word"]',
+      "Printable vaccine schedule content is not available yet.",
+      () => {
+        const printableNode = document.getElementById("vaccine-schedule-print");
+        if (!printableNode) {
+          setError("Printable vaccine schedule content is not available yet.");
+          return;
+        }
+
+        downloadWordDocument({
+          html: `<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Vaccine Schedule</title></head><body>${printableNode.outerHTML}</body></html>`,
+          filename: `Vaccine_Schedule_${sanitizeFileSegment(infant?.last_name)}_${sanitizeFileSegment(infant?.first_name)}.docx`,
+          title: `Vaccine Schedule - ${infant?.first_name || "Child"} ${infant?.last_name || "Schedule"}`,
+          headerText: "Vaccine Schedule Booklet",
+          footerText: "Immunicare vaccine schedule",
+          page: PRINT_PAGE_PRESETS.legalLandscape,
+        });
+      },
+    );
 
   if (loading) {
     return (
@@ -129,6 +175,9 @@ export default function VaccineSchedulePage() {
           <div className="flex gap-2">
             <Button onClick={handleDownload} variant="secondary">
               <FileText className="w-4 h-4 mr-2" /> Download PDF
+            </Button>
+            <Button onClick={handleDownloadWord} variant="secondary">
+              <FileText className="w-4 h-4 mr-2" /> Download Word
             </Button>
             <Button onClick={handlePrint}><Printer className="w-4 h-4 mr-2" /> Print</Button>
           </div>

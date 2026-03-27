@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../utils/api";
+import { queryKeys } from "./useCachedData";
 
 /**
  * Normalizes API response data to ensure it's always an array.
@@ -64,6 +66,114 @@ export const normalizeToArray = (data, wrapperKey = null) => {
   return [];
 };
 
+const extractPaginationMeta = (data) => {
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+
+  if (data.meta?.pagination) {
+    return data.meta.pagination;
+  }
+
+  if (data.pagination) {
+    return data.pagination;
+  }
+
+  return null;
+};
+
+const extractCollectionResponse = (data, wrapperKey = null) => ({
+  items: normalizeToArray(data, wrapperKey),
+  pagination: extractPaginationMeta(data),
+});
+
+const DIRECTORY_DEFAULT_LIMIT = 10;
+
+const buildDirectoryParams = (params = {}) => {
+  const page = Math.max(1, Number.parseInt(params.page, 10) || 1);
+  const limit = Math.max(1, Number.parseInt(params.limit, 10) || DIRECTORY_DEFAULT_LIMIT);
+
+  return Object.entries({
+    ...params,
+    page,
+    limit,
+  }).reduce((accumulator, [key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      accumulator[key] = value;
+    }
+    return accumulator;
+  }, {});
+};
+
+const buildDefaultPagination = (limit = DIRECTORY_DEFAULT_LIMIT) => ({
+  page: 1,
+  limit,
+  total: 0,
+  totalPages: 0,
+  hasNext: false,
+  hasPrev: false,
+});
+
+const normalizeDirectoryCollection = (
+  data,
+  wrapperKey = null,
+  fallbackLimit = DIRECTORY_DEFAULT_LIMIT,
+) => {
+  const collection = extractCollectionResponse(data, wrapperKey);
+  const pagination = {
+    ...buildDefaultPagination(fallbackLimit),
+    ...(collection.pagination || {}),
+  };
+
+  pagination.page = Number.parseInt(pagination.page, 10) || 1;
+  pagination.limit = Number.parseInt(pagination.limit, 10) || fallbackLimit;
+  pagination.total = Number.parseInt(pagination.total, 10) || collection.items.length;
+  pagination.totalPages =
+    Number.parseInt(pagination.totalPages, 10) ||
+    (pagination.total > 0 ? Math.ceil(pagination.total / pagination.limit) : 0);
+  pagination.hasNext =
+    typeof collection.pagination?.hasNext === "boolean"
+      ? collection.pagination.hasNext
+      : pagination.page < pagination.totalPages;
+  pagination.hasPrev =
+    typeof collection.pagination?.hasPrev === "boolean"
+      ? collection.pagination.hasPrev
+      : pagination.page > 1;
+
+  return {
+    items: collection.items,
+    pagination,
+    total: pagination.total,
+  };
+};
+
+const usePrefetchNextDirectoryPage = ({
+  enabled,
+  data,
+  params,
+  queryKeyFactory,
+  fetchPage,
+}) => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!enabled || !data?.pagination?.hasNext) {
+      return;
+    }
+
+    const nextParams = {
+      ...params,
+      page: Number(data.pagination.page || 1) + 1,
+    };
+
+    queryClient.prefetchQuery({
+      queryKey: queryKeyFactory(nextParams),
+      queryFn: ({ signal }) => fetchPage(nextParams, signal),
+      staleTime: 60 * 1000,
+    });
+  }, [data?.pagination?.hasNext, data?.pagination?.page, enabled, fetchPage, params, queryClient, queryKeyFactory]);
+};
+
 export const useDashboardStats = () => {
   const [stats, setStats] = useState({
     infants: 0,
@@ -116,32 +226,47 @@ export const useInfants = () => {
   return { infants, loading, error };
 };
 
-export const useGuardians = () => {
-  const [guardians, setGuardians] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+export const useGuardians = (params = {}, options = {}) => {
+  const normalizedParams = buildDirectoryParams(params);
+  const enabled = options.enabled ?? true;
 
-  const fetchGuardians = async () => {
-    try {
-      const data = await apiClient.getDashboardGuardians();
-      setGuardians(normalizeToArray(data));
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+  const fetchGuardiansPage = useCallback(
+    (requestParams, signal) =>
+      apiClient.getGuardians(requestParams, {
+        signal,
+        disableRetry: true,
+        timeout: options.timeout ?? 20000,
+      }),
+    [options.timeout],
+  );
+
+  const query = useQuery({
+    queryKey: queryKeys.users.guardiansList(normalizedParams),
+    enabled,
+    retry: options.retry ?? 1,
+    queryFn: ({ signal }) => fetchGuardiansPage(normalizedParams, signal),
+    select: (response) =>
+      normalizeDirectoryCollection(response, "data", normalizedParams.limit),
+    placeholderData: (previousData) => previousData,
+  });
+
+  usePrefetchNextDirectoryPage({
+    enabled,
+    data: query.data,
+    params: normalizedParams,
+    queryKeyFactory: queryKeys.users.guardiansList,
+    fetchPage: fetchGuardiansPage,
+  });
+
+  return {
+    guardians: query.data?.items || [],
+    totalCount: query.data?.total || 0,
+    pagination: query.data?.pagination || buildDefaultPagination(normalizedParams.limit),
+    loading: query.isLoading,
+    isFetching: query.isFetching,
+    error: query.error?.message || null,
+    refreshGuardians: query.refetch,
   };
-
-  useEffect(() => {
-    fetchGuardians();
-  }, []);
-
-  const refreshGuardians = () => {
-    setLoading(true);
-    return fetchGuardians();
-  };
-
-  return { guardians, loading, error, refreshGuardians };
 };
 
 export const useAppointments = () => {
@@ -214,30 +339,39 @@ export const useAppointmentAnalytics = () => {
 };
 
 // System Users Management Hook
-export const useSystemUsers = () => {
-  const [systemUsers, setSystemUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+export const useSystemUsers = (params = {}, options = {}) => {
+  const normalizedParams = buildDirectoryParams(params);
+  const enabled = options.enabled ?? true;
 
-  const fetchSystemUsers = async () => {
-    try {
-      const data = await apiClient.getSystemUsers();
-      setSystemUsers(normalizeToArray(data));
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchSystemUsersPage = useCallback(
+    (requestParams, signal) =>
+      apiClient.getSystemUsers(requestParams, {
+        signal,
+        disableRetry: true,
+        timeout: options.timeout ?? 20000,
+      }),
+    [options.timeout],
+  );
 
-  useEffect(() => {
-    fetchSystemUsers();
-  }, []);
+  const query = useQuery({
+    queryKey: queryKeys.users.systemUsersList(normalizedParams),
+    enabled,
+    retry: options.retry ?? 1,
+    queryFn: ({ signal }) => fetchSystemUsersPage(normalizedParams, signal),
+    select: (response) =>
+      normalizeDirectoryCollection(response, "data", normalizedParams.limit),
+    placeholderData: (previousData) => previousData,
+  });
 
-  const refreshSystemUsers = () => {
-    setLoading(true);
-    return fetchSystemUsers();
-  };
+  usePrefetchNextDirectoryPage({
+    enabled,
+    data: query.data,
+    params: normalizedParams,
+    queryKeyFactory: queryKeys.users.systemUsersList,
+    fetchPage: fetchSystemUsersPage,
+  });
+
+  const refreshSystemUsers = () => query.refetch();
 
   const createUser = async (userData) => {
     try {
@@ -252,7 +386,6 @@ export const useSystemUsers = () => {
         };
       }
 
-      setSystemUsers((prev) => [createdUser, ...prev]);
       return {
         success: true,
         user: createdUser,
@@ -276,11 +409,6 @@ export const useSystemUsers = () => {
         };
       }
 
-      setSystemUsers((prev) =>
-        prev.map((user) =>
-          user.id === id ? { ...user, ...updatedUser } : user,
-        ),
-      );
       return {
         success: true,
         user: updatedUser,
@@ -294,7 +422,6 @@ export const useSystemUsers = () => {
   const deleteUser = async (id) => {
     try {
       const response = await apiClient.deleteSystemUser(id);
-      setSystemUsers((prev) => prev.filter((user) => user.id !== id));
       return {
         success: true,
         message: response?.message || "System user deleted successfully",
@@ -317,11 +444,6 @@ export const useSystemUsers = () => {
         };
       }
 
-      setSystemUsers((prev) =>
-        prev.map((user) =>
-          user.id === id ? { ...user, ...updatedUser } : user,
-        ),
-      );
       return {
         success: true,
         user: updatedUser,
@@ -337,9 +459,12 @@ export const useSystemUsers = () => {
   };
 
   return {
-    systemUsers,
-    loading,
-    error,
+    systemUsers: query.data?.items || [],
+    totalCount: query.data?.total || 0,
+    pagination: query.data?.pagination || buildDefaultPagination(normalizedParams.limit),
+    loading: query.isLoading,
+    isFetching: query.isFetching,
+    error: query.error?.message || null,
     createUser,
     updateUser,
     deleteUser,
@@ -611,8 +736,12 @@ export const useRoles = () => {
   useEffect(() => {
     const fetchRoles = async () => {
       try {
-        const data = await apiClient.getRoles();
-        setRoles(normalizeToArray(data));
+        const data = await apiClient.getRoles({ exclude: "guardian" });
+        setRoles(
+          normalizeToArray(data).filter(
+            (role) => String(role?.name || "").trim().toLowerCase() !== "guardian",
+          ),
+        );
       } catch (err) {
         setError(err.message);
       } finally {

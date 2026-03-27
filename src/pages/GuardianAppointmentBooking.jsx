@@ -431,6 +431,15 @@ export default function GuardianAppointmentBooking() {
         hasControlNumber: !!selectedChild?.control_number
       });
 
+      // Dispatch synchronization event to update charts and components
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("appointment-update", {
+            detail: { infant_id: appointmentData.infant_id },
+          })
+        );
+      }
+
       // Send SMS confirmation (backend should handle this)
     } catch (err) {
       console.error("Error creating appointment:", err);

@@ -401,7 +401,7 @@ export default function HealthInformation() {
               {/* Health Records Table */}
               <PageContainer title="Health Checkup Records">
                 {/* Mobile Card View */}
-                <div className="guardian-table-card-list min-[768px]:hidden">
+                <div className="guardian-table-card-list md:hidden">
                   {healthRecords.map((record) => {
                     const bmi =
                       record.weight && record.height
@@ -443,7 +443,7 @@ export default function HealthInformation() {
                 </div>
 
                 {/* Desktop Table View */}
-                <div className="guardian-table-scroll-shell hidden min-[768px]:block">
+                <div className="guardian-table-scroll-shell hidden md:block">
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead className="bg-gray-50 dark:bg-gray-700">

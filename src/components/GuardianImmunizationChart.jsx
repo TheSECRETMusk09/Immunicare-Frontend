@@ -197,6 +197,25 @@ const EnhancedGuardianImmunizationChart = ({
     fetchScheduleData();
   }, [fetchScheduleData, forceRefresh]);
 
+  // Listen for background updates to refresh the chart instantly
+  useEffect(() => {
+    if (!childId) return;
+
+    const handleUpdate = (e) => {
+      const detailId = Number(e?.detail?.patient_id || e?.detail?.infant_id || e?.detail?.child_id);
+      if (!detailId || detailId === Number(childId)) {
+        fetchScheduleData();
+      }
+    };
+
+    window.addEventListener("vaccination-update", handleUpdate);
+    window.addEventListener("vaccination-readiness-update", handleUpdate);
+    return () => {
+      window.removeEventListener("vaccination-update", handleUpdate);
+      window.removeEventListener("vaccination-readiness-update", handleUpdate);
+    };
+  }, [childId, fetchScheduleData]);
+
   // Viewport detection
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {

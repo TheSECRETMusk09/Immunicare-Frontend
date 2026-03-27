@@ -87,6 +87,25 @@ export default function ImmunizationStatusSummary({ infantId, compact = false, s
     void fetchStatus();
   }, [infantId, fetchStatus]);
 
+  // Listen for background updates to refresh status numbers instantly
+  useEffect(() => {
+    if (!infantId) return;
+
+    const handleUpdate = (e) => {
+      const detailId = Number(e?.detail?.patient_id || e?.detail?.infant_id || e?.detail?.child_id);
+      if (!detailId || detailId === Number(infantId)) {
+        void fetchStatus();
+      }
+    };
+
+    window.addEventListener("vaccination-update", handleUpdate);
+    window.addEventListener("vaccination-readiness-update", handleUpdate);
+    return () => {
+      window.removeEventListener("vaccination-update", handleUpdate);
+      window.removeEventListener("vaccination-readiness-update", handleUpdate);
+    };
+  }, [infantId, fetchStatus]);
+
   if (loading) {
     if (compact) {
       return (

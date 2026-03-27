@@ -39,13 +39,6 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ProtectedRoute from "./components/ProtectedRoute";
 import UserVaccinationRecords from "./pages/UserVaccinationRecords";
 
-// Dashboard components - lazy loaded
-const Dashboard = lazy(() =>
-  import("./components/Dashboard/DashboardOverview").then((module) => ({
-    default: module.default,
-  })),
-);
-
 const GuardianDashboard = lazy(() =>
   import("./pages/GuardianDashboard").then((module) => ({
     default: module.default,
@@ -351,15 +344,13 @@ function AppContent() {
             path="/dashboard"
             element={
               <ProtectedRoute>
-                <AdminLayout>
-                  {isAdmin ? (
-                    <Dashboard />
-                  ) : isGuardian ? (
-                    <Navigate to="/guardian/dashboard" replace />
-                  ) : (
-                    <Navigate to="/login" replace />
-                  )}
-                </AdminLayout>
+                {isAdmin ? (
+                  <Navigate to="/analytics" replace />
+                ) : isGuardian ? (
+                  <Navigate to="/guardian/dashboard" replace />
+                ) : (
+                  <Navigate to="/login" replace />
+                )}
               </ProtectedRoute>
             }
           />
@@ -614,7 +605,7 @@ function AppContent() {
             path="/admin/*"
             element={
               <ProtectedRoute adminOnly>
-                <Dashboard />
+                <Navigate to="/analytics" replace />
               </ProtectedRoute>
             }
           />

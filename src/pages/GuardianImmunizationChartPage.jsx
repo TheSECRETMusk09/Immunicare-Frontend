@@ -357,7 +357,7 @@ export default function GuardianImmunizationChartPage() {
                 No growth records yet for this child.
               </div>
             ) : (
-              <div className="guardian-table-card-list min-[768px]:hidden">
+              <div className="guardian-table-card-list md:hidden">
                 {growthRecords.map((record) => (
                   <article
                     key={record.id || `${record.measurement_date}-${record.weight_kg}`}
@@ -394,7 +394,7 @@ export default function GuardianImmunizationChartPage() {
             )}
 
             {!loadingGrowth && growthRecords.length > 0 && (
-              <div className="guardian-table-scroll-shell hidden min-[768px]:block">
+              <div className="guardian-table-scroll-shell hidden md:block">
                 <table className="w-full min-w-[700px]">
                   <thead>
                     <tr className="border-b border-theme-border-primary">

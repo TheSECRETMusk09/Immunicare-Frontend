@@ -1,12 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, Button, Badge, Table, Alert } from "../UI";
 import { useNavigate } from "react-router-dom";
-import { getStoredAccessToken } from "../../../utils/api";
-
-const getAuthHeaders = () => {
-  const token = getStoredAccessToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
+import apiClient from "../../../utils/api";
 
 const CityDashboard = () => {
   const navigate = useNavigate();
@@ -22,10 +17,7 @@ const CityDashboard = () => {
 
   const fetchDashboard = async () => {
     try {
-      const response = await fetch("/api/vaccine-supply/dashboard/city", {
-        headers: getAuthHeaders(),
-      });
-      const data = await response.json();
+      const data = await apiClient.getVaccineSupplyCityDashboard();
       if (data.success) {
         setDashboard(data.dashboard);
       } else {
@@ -40,10 +32,7 @@ const CityDashboard = () => {
 
   const fetchAlerts = async () => {
     try {
-      const response = await fetch("/api/vaccine-supply/dashboard/alerts", {
-        headers: getAuthHeaders(),
-      });
-      const data = await response.json();
+      const data = await apiClient.getVaccineSupplyDashboardAlerts();
       if (data.success) {
         setAlerts(data.alerts);
       }

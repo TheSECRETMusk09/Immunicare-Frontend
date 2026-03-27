@@ -94,7 +94,7 @@ export default function DownloadCenter({ onRefresh }) {
       setLoading(true);
       const [downloadsData, infantsData, templatesData] = await Promise.all([
         apiClient.getDownloadHistory({ limit: 50 }),
-        apiClient.getInfants(),
+        apiClient.getInfants({ limit: 1500 }),
         apiClient.getPaperTemplates(),
       ]);
 

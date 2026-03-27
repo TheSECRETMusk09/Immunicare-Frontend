@@ -164,6 +164,15 @@ export default function InfantPersonalRecord({
       // Refresh the infant data from server to get the updated values
       await fetchInfant();
 
+      // Dispatch event to synchronize charts and dashboards
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("child-data-update", {
+            detail: { id: infantId },
+          })
+        );
+      }
+
       if (!isMountedRef.current) {
         return;
       }

@@ -25,7 +25,7 @@ export default function VaccineReadinessManager({ infantId, infantName, isOpen, 
   // Fetch infants list
   const fetchInfants = useCallback(async () => {
     try {
-      const response = await apiClient.getInfants();
+      const response = await apiClient.getInfants({ limit: 1500 });
       const infantsData = Array.isArray(response) ? response : response?.data || [];
       setInfants(infantsData);
     } catch (err) {
@@ -97,6 +97,11 @@ export default function VaccineReadinessManager({ infantId, infantName, isOpen, 
       // Refresh schedule data
       await fetchScheduleData(selectedInfantId);
 
+      // Dispatch event to immediately update charts, status summary, and tables
+      window.dispatchEvent(new CustomEvent("vaccination-readiness-update", {
+        detail: { infant_id: selectedInfantId }
+      }));
+
       if (onSuccess) {
         onSuccess();
       }
@@ -127,6 +132,11 @@ export default function VaccineReadinessManager({ infantId, infantName, isOpen, 
       // Refresh schedule data
       await fetchScheduleData(selectedInfantId);
 
+      // Dispatch event to immediately update charts, status summary, and tables
+      window.dispatchEvent(new CustomEvent("vaccination-readiness-update", {
+        detail: { infant_id: selectedInfantId }
+      }));
+
       if (onSuccess) {
         onSuccess();
       }
@@ -145,8 +155,6 @@ export default function VaccineReadinessManager({ infantId, infantName, isOpen, 
 
   // Group vaccines by status
   const getVaccinesByStatus = () => {
-    if (!scheduleData?.schedules) return {};
-
     const grouped = {
       completed: [],
       ready: [],
@@ -154,6 +162,8 @@ export default function VaccineReadinessManager({ infantId, infantName, isOpen, 
       upcoming: [],
       overdue: []
     };
+
+    if (!scheduleData?.schedules) return grouped;
 
     scheduleData.schedules.forEach(schedule => {
       const status = schedule.status;
@@ -169,8 +179,8 @@ export default function VaccineReadinessManager({ infantId, infantName, isOpen, 
 
   // Get pending vaccines that can be confirmed
   const pendingVaccines = [
-    ...vaccinesByStatus.pending_confirmation,
-    ...vaccinesByStatus.ready
+    ...(vaccinesByStatus.pending_confirmation || []),
+    ...(vaccinesByStatus.ready || [])
   ];
 
   const getStatusBadge = (status) => {
@@ -208,8 +218,10 @@ export default function VaccineReadinessManager({ infantId, infantName, isOpen, 
       onClose={onClose}
       title="Vaccine Readiness Manager"
       size="lg"
+      transition={false}
+      animation={false}
     >
-      <div className="space-y-4">
+      <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-2">
         {/* Error/Success Messages */}
         {error && (
           <Alert variant="error" dismissible onDismiss={() => setError(null)}>
@@ -260,12 +272,12 @@ export default function VaccineReadinessManager({ infantId, infantName, isOpen, 
         ) : selectedInfantId && scheduleData ? (
           <div className="space-y-4">
             {/* Summary */}
-            <div className="flex flex-wrap gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div className="flex flex-col gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
               <div className="text-sm">
                 <span className="font-medium">Age:</span>{" "}
                 {scheduleData.ageInDays} days
               </div>
-              <div className="text-sm ml-4">
+              <div className="text-sm">
                 <span className="font-medium">Total Vaccines:</span>{" "}
                 {scheduleData.schedules?.length || 0}
               </div>
@@ -297,7 +309,7 @@ export default function VaccineReadinessManager({ infantId, infantName, isOpen, 
             )}
 
             {/* Vaccine List */}
-            <div className="space-y-3 max-h-96 overflow-y-auto">
+            <div className="space-y-3">
               {scheduleData.schedules?.map((schedule) => (
                 <div
                   key={`${schedule.vaccineId}-${schedule.doseNumber}`}

@@ -1,13 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Card, Button, Badge, Alert } from "../UI";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../hooks/useAuth";
-import { getStoredAccessToken } from "../../../utils/api";
-
-const getAuthHeaders = () => {
-  const token = getStoredAccessToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
+import { useAuth } from "../../../contexts/AuthContext";
+import apiClient from "../../../utils/api";
 
 const BarangayDashboard = () => {
   const navigate = useNavigate();
@@ -28,13 +23,7 @@ const BarangayDashboard = () => {
 
   const fetchDashboard = async () => {
     try {
-      const response = await fetch(
-        `/api/vaccine-supply/dashboard/barangay/${facilityId}`,
-        {
-          headers: getAuthHeaders(),
-        },
-      );
-      const data = await response.json();
+      const data = await apiClient.getVaccineSupplyBarangayDashboard(facilityId);
       if (data.success) {
         setDashboard(data.dashboard);
       } else {
@@ -49,10 +38,7 @@ const BarangayDashboard = () => {
 
   const fetchAlerts = async () => {
     try {
-      const response = await fetch(`/api/vaccine-supply/dashboard/alerts`, {
-        headers: getAuthHeaders(),
-      });
-      const data = await response.json();
+      const data = await apiClient.getVaccineSupplyDashboardAlerts();
       if (data.success) {
         setAlerts(data.alerts);
       }

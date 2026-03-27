@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useGuardians,
   useSystemUsers,
@@ -41,6 +42,7 @@ import {
 } from "lucide-react";
 import useUserManagementSocket from "../hooks/useUserManagementSocket";
 import ErrorBoundary from "../components/ErrorBoundary";
+import { useDebounce } from "../hooks/usePerformance";
 
 const isSameEntityId = (left, right) => String(left) === String(right);
 
@@ -56,38 +58,6 @@ const toComparableTimestamp = (value) => {
 
   return parsed.toISOString();
 };
-
-const sortByCreatedAtDesc = (items = []) =>
-  [...items].sort((left, right) => {
-    const leftTime = new Date(left?.created_at || 0).getTime();
-    const rightTime = new Date(right?.created_at || 0).getTime();
-    return rightTime - leftTime;
-  });
-
-const upsertById = (items = [], entity, { prependOnInsert = false } = {}) => {
-  if (!entity || entity.id === undefined || entity.id === null) {
-    return items;
-  }
-
-  const existingIndex = items.findIndex((item) =>
-    isSameEntityId(item?.id, entity.id),
-  );
-
-  if (existingIndex === -1) {
-    const nextItems = prependOnInsert ? [entity, ...items] : [...items, entity];
-    return sortByCreatedAtDesc(nextItems);
-  }
-
-  const nextItems = [...items];
-  nextItems[existingIndex] = {
-    ...nextItems[existingIndex],
-    ...entity,
-  };
-  return sortByCreatedAtDesc(nextItems);
-};
-
-const removeById = (items = [], id) =>
-  sortByCreatedAtDesc(items.filter((item) => !isSameEntityId(item?.id, id)));
 
 const hasOnlyAsciiCharacters = (value = "") =>
   String(value)
@@ -119,22 +89,7 @@ const resolveUserManagementTab = (value) => {
 
 export default function UserManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const {
-    guardians,
-    loading: guardiansLoading,
-    error: guardiansError,
-    refreshGuardians,
-  } = useGuardians();
-  const {
-    systemUsers,
-    loading: systemUsersLoading,
-    error: systemUsersError,
-    createUser,
-    updateUser,
-    deleteUser,
-    toggleUserActive,
-    refreshSystemUsers,
-  } = useSystemUsers();
+  const queryClient = useQueryClient();
   const { roles } = useRoles();
   const { clinics } = useClinics();
   const {
@@ -217,172 +172,12 @@ export default function UserManagement() {
   // Toggle user active state
   const [isTogglingActive, setIsTogglingActive] = useState(false);
 
-  // Password visibility states for different modals
-  // Password visibility is managed per field by PasswordInput
-  const [localGuardians, setLocalGuardians] = useState([]);
-  const [localSystemUsers, setLocalSystemUsers] = useState([]);
-  const [isHydrated, setIsHydrated] = useState(false);
-
-  // Debounce search query to prevent lag on massive datasets
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 350);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  useEffect(() => {
-    if (!guardiansLoading && Array.isArray(guardians)) {
-      setLocalGuardians(sortByCreatedAtDesc(guardians));
-    }
-  }, [guardians, guardiansLoading]);
-
-  useEffect(() => {
-    if (!systemUsersLoading && Array.isArray(systemUsers)) {
-      setLocalSystemUsers(sortByCreatedAtDesc(systemUsers));
-    }
-  }, [systemUsers, systemUsersLoading]);
-
-  useEffect(() => {
-    if (!guardiansLoading && !systemUsersLoading) {
-      setIsHydrated(true);
-    }
-  }, [guardiansLoading, systemUsersLoading]);
+  const debouncedSearchQuery = useDebounce(searchQuery, 350);
 
   useEffect(() => {
     const requestedTab = resolveUserManagementTab(searchParams.get("tab"));
     setActiveTab((prev) => (prev === requestedTab ? prev : requestedTab));
   }, [searchParams]);
-
-  const upsertGuardianAcrossStores = useCallback((guardian, options = {}) => {
-    if (!guardian || guardian.id === undefined || guardian.id === null) {
-      return;
-    }
-
-    setLocalGuardians((prev) =>
-      upsertById(prev, guardian, {
-        prependOnInsert: Boolean(options.prependOnInsert),
-      }),
-    );
-  }, []);
-
-  const removeGuardianAcrossStores = useCallback((guardianId) => {
-    setLocalGuardians((prev) => removeById(prev, guardianId));
-  }, []);
-
-  const upsertSystemUserAcrossStores = useCallback(
-    (systemUser, options = {}) => {
-      if (!systemUser || systemUser.id === undefined || systemUser.id === null) {
-        return;
-      }
-
-      setLocalSystemUsers((prev) =>
-        upsertById(prev, systemUser, {
-          prependOnInsert: Boolean(options.prependOnInsert),
-        }),
-      );
-    },
-    [],
-  );
-
-  const removeSystemUserAcrossStores = useCallback((systemUserId) => {
-    setLocalSystemUsers((prev) => removeById(prev, systemUserId));
-  }, []);
-
-  useUserManagementSocket({
-    onGuardianCreated: (guardian) => {
-      if (!isHydrated) return;
-      upsertGuardianAcrossStores(guardian, { prependOnInsert: true });
-    },
-    onGuardianUpdated: (guardian) => {
-      if (!isHydrated) return;
-      upsertGuardianAcrossStores(guardian);
-    },
-    onGuardianDeleted: ({ id }) => {
-      if (!isHydrated) return;
-      removeGuardianAcrossStores(id);
-    },
-    onSystemUserCreated: (systemUser) => {
-      if (!isHydrated) return;
-      upsertSystemUserAcrossStores(systemUser, { prependOnInsert: true });
-    },
-    onSystemUserUpdated: (systemUser) => {
-      if (!isHydrated) return;
-      upsertSystemUserAcrossStores(systemUser);
-    },
-    onSystemUserDeleted: ({ id }) => {
-      if (!isHydrated) return;
-      removeSystemUserAcrossStores(id);
-    },
-  });
-
-  // Handle sorting
-  const handleSort = useCallback(
-    (field) => {
-      if (sortField === field) {
-        setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-      } else {
-        setSortField(field);
-        setSortDirection("asc");
-      }
-      setCurrentPage(1); // Reset to first page on sort
-    },
-    [sortField, sortDirection],
-  );
-
-  // Handle toggle user active - with self-protection
-  const handleToggleUserActive = async (user) => {
-    // Self-protection: prevent disabling own account
-    if (String(user.id) === String(currentUserId)) {
-      notifyError("You cannot disable your own account.");
-      return;
-    }
-
-    const newStatus = !user.is_active;
-    if (
-      !window.confirm(
-        `Are you sure you want to ${newStatus ? "enable" : "disable"} this user?`,
-      )
-    ) {
-      return;
-    }
-
-    setIsTogglingActive(true);
-
-    const previousSystemUser = localSystemUsers.find((item) =>
-      isSameEntityId(item?.id, user.id),
-    );
-    const optimisticPayload = {
-      ...user,
-      is_active: newStatus,
-    };
-
-    upsertSystemUserAcrossStores(optimisticPayload);
-
-    try {
-      const result = await toggleUserActive(user.id, newStatus);
-      if (result.success) {
-        success(`User ${newStatus ? "enabled" : "disabled"} successfully!`);
-        const resolvedUser = result.user || optimisticPayload;
-        upsertSystemUserAcrossStores(resolvedUser);
-      } else {
-        if (previousSystemUser) {
-          upsertSystemUserAcrossStores(previousSystemUser);
-        }
-
-        notifyError(result.error || "Error toggling user status");
-      }
-    } catch (error) {
-      console.error("Error toggling user status:", error);
-
-      if (previousSystemUser) {
-        upsertSystemUserAcrossStores(previousSystemUser);
-      }
-
-      notifyError(error.message || "Error toggling user status");
-    } finally {
-      setIsTogglingActive(false);
-    }
-  };
 
   // Loading states for CRUD operations
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -414,12 +209,151 @@ export default function UserManagement() {
     { value: "other", label: "Other" },
   ];
 
+  const ADMIN_ROLE_NAMES = useMemo(
+    () => new Set(["super_admin", "system_admin", "admin", "administrator"]),
+    [],
+  );
+
+  const staffRoles = useMemo(
+    () =>
+      (Array.isArray(roles) ? roles : []).filter(
+        (role) => String(role?.name || "").trim().toLowerCase() !== "guardian",
+      ),
+    [roles],
+  );
+
+  const staffRoleNameById = useMemo(() => {
+    const roleMap = new Map();
+    staffRoles.forEach((role) => {
+      roleMap.set(String(role.id), String(role.name || "").trim().toLowerCase());
+    });
+    return roleMap;
+  }, [staffRoles]);
+
+  const selectedRoleName = useMemo(
+    () => staffRoleNameById.get(String(roleFilter)) || "",
+    [roleFilter, staffRoleNameById],
+  );
+
+  const adminRoleCsv = useMemo(
+    () => Array.from(ADMIN_ROLE_NAMES).join(","),
+    [ADMIN_ROLE_NAMES],
+  );
+
+  const guardianQueryParams = useMemo(
+    () => ({
+      page: guardianCurrentPage,
+      limit: itemsPerPage,
+      search: debouncedSearchQuery || undefined,
+      created_from: startDate || undefined,
+      created_to: endDate || undefined,
+    }),
+    [debouncedSearchQuery, endDate, guardianCurrentPage, itemsPerPage, startDate],
+  );
+
+  const systemUserQueryParams = useMemo(() => {
+    const isAdminTab = activeTab === "admins";
+    const isSystemTab = activeTab === "system";
+    const queryPage = isAdminTab ? currentPage : systemCurrentPage;
+    const params = {
+      page: queryPage,
+      limit: itemsPerPage,
+      include_guardians: false,
+      search: debouncedSearchQuery || undefined,
+      created_from: startDate || undefined,
+      created_to: endDate || undefined,
+      is_active: statusFilter ? String(statusFilter === "active") : undefined,
+    };
+
+    if (isAdminTab) {
+      params.roles = selectedRoleName || adminRoleCsv;
+      params.sort_field = sortField;
+      params.sort_direction = sortDirection;
+    } else if (isSystemTab && selectedRoleName) {
+      params.roles = selectedRoleName;
+    }
+
+    return params;
+  }, [
+    activeTab,
+    adminRoleCsv,
+    currentPage,
+    debouncedSearchQuery,
+    endDate,
+    itemsPerPage,
+    selectedRoleName,
+    sortDirection,
+    sortField,
+    startDate,
+    statusFilter,
+    systemCurrentPage,
+  ]);
+
+  const {
+    guardians,
+    totalCount: guardianTotalCount,
+    pagination: guardianPagination,
+    loading: guardiansLoading,
+    isFetching: guardiansIsFetching,
+    error: guardiansError,
+    refreshGuardians,
+  } = useGuardians(guardianQueryParams, {
+    enabled: canManageUsers && activeTab === "guardians",
+  });
+
+  const {
+    systemUsers,
+    totalCount: systemUserTotalCount,
+    pagination: systemUserPagination,
+    loading: systemUsersLoading,
+    isFetching: systemUsersIsFetching,
+    error: systemUsersError,
+    createUser,
+    updateUser,
+    deleteUser,
+    toggleUserActive,
+    refreshSystemUsers,
+  } = useSystemUsers(systemUserQueryParams, {
+    enabled: canManageUsers && (activeTab === "system" || activeTab === "admins"),
+  });
+
+  const invalidateGuardianQueries = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ["users", "guardians"] }),
+    [queryClient],
+  );
+
+  const invalidateSystemUserQueries = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ["users", "system-users"] }),
+    [queryClient],
+  );
+
+  useUserManagementSocket({
+    onGuardianCreated: () => {
+      void invalidateGuardianQueries();
+    },
+    onGuardianUpdated: () => {
+      void invalidateGuardianQueries();
+    },
+    onGuardianDeleted: () => {
+      void invalidateGuardianQueries();
+    },
+    onSystemUserCreated: () => {
+      void invalidateSystemUserQueries();
+    },
+    onSystemUserUpdated: () => {
+      void invalidateSystemUserQueries();
+    },
+    onSystemUserDeleted: () => {
+      void invalidateSystemUserQueries();
+    },
+  });
+
   const normalizedSystemUsers = useMemo(() => {
-    if (!Array.isArray(localSystemUsers)) {
+    if (!Array.isArray(systemUsers)) {
       return [];
     }
 
-    return localSystemUsers.map((user) => {
+    return systemUsers.map((user) => {
       const isGuardianAccount =
         Boolean(user?.guardian_id) ||
         Boolean(user?.is_guardian_account) ||
@@ -431,22 +365,48 @@ export default function UserManagement() {
         username: isGuardianAccount
           ? normalizeGuardianUsernameForDisplay(user?.username)
           : user?.username || "",
+        normalized_role_name: String(user?.role_name || "").trim().toLowerCase(),
       };
     });
-  }, [localSystemUsers]);
+  }, [systemUsers]);
 
-  // Filter admins from system users - use role names for proper filtering
-  // Includes: super_admin, system_admin, admin, doctor, nurse, midwife
-  const ADMIN_ROLE_NAMES = ['super_admin', 'system_admin', 'admin', 'doctor', 'nurse', 'midwife'];
-  const admins = normalizedSystemUsers.filter(
-    (user) => ADMIN_ROLE_NAMES.includes((user.role_name || '').toLowerCase())
+  const roleFilterOptions = useMemo(() => {
+    const sourceRoles =
+      activeTab === "admins"
+        ? staffRoles.filter((role) =>
+            ADMIN_ROLE_NAMES.has(String(role?.name || "").trim().toLowerCase()),
+          )
+        : staffRoles;
+
+    return sourceRoles.map((role) => ({
+      value: String(role.id),
+      label: role.display_name || role.name,
+    }));
+  }, [ADMIN_ROLE_NAMES, activeTab, staffRoles]);
+
+  const addStaffRoleOptions = useMemo(
+    () =>
+      staffRoles
+        .filter((role) => !["guardian", "super_admin", "admin"].includes(String(role?.name || "").trim().toLowerCase()))
+        .map((role) => ({
+          value: String(role.id),
+          label: role.display_name || role.name,
+        })),
+    [staffRoles],
   );
-  const normalizedGuardians = useMemo(() => {
-    if (!Array.isArray(localGuardians)) {
+
+  const admins = normalizedSystemUsers;
+  const filteredAdmins = normalizedSystemUsers;
+  const filteredSystemUsers = normalizedSystemUsers;
+  const paginatedAdmins = normalizedSystemUsers;
+  const paginatedSystemUsers = normalizedSystemUsers;
+
+  const filteredGuardians = useMemo(() => {
+    if (!Array.isArray(guardians)) {
       return [];
     }
 
-    return localGuardians.map((guardian) => {
+    return guardians.map((guardian) => {
       const phone =
         guardian.phone ||
         guardian.contact_number ||
@@ -478,178 +438,80 @@ export default function UserManagement() {
         infant_count: infantCount,
       };
     });
-  }, [localGuardians]);
+  }, [guardians]);
 
-  const filteredSystemUsers = useMemo(() => {
-    let result = [...normalizedSystemUsers];
-    if (debouncedSearchQuery) {
-      const query = debouncedSearchQuery.toLowerCase();
-      result = result.filter(
-        (user) =>
-          user.username?.toLowerCase().includes(query) ||
-          user.role_name?.toLowerCase().includes(query) ||
-          user.clinic_name?.toLowerCase().includes(query) ||
-          user.contact?.toLowerCase().includes(query),
-      );
-    }
-    if (roleFilter) {
-      const roleFilterNum = parseInt(roleFilter);
-      const roleIdToName = {
-        1: 'super_admin',
-        2: 'admin',
-        3: 'system_admin',
-        4: 'doctor',
-        5: 'nurse',
-        6: 'midwife'
-      };
-      const roleName = roleIdToName[roleFilterNum];
-      if (roleName) {
-        result = result.filter((user) =>
-          (user.role_name || '').toLowerCase() === roleName.toLowerCase()
-        );
+  const paginatedGuardians = filteredGuardians;
+  const totalGuardianPages = guardianPagination?.totalPages || 0;
+  const totalAdminPages = systemUserPagination?.totalPages || 0;
+  const totalSystemPages = systemUserPagination?.totalPages || 0;
+
+  const activeListLoading =
+    activeTab === "guardians" ? guardiansLoading : systemUsersLoading;
+  const activeListFetching =
+    activeTab === "guardians" ? guardiansIsFetching : systemUsersIsFetching;
+  const activeListError =
+    activeTab === "guardians" ? guardiansError : systemUsersError;
+
+  // Handle sorting
+  const handleSort = useCallback(
+    (field) => {
+      if (sortField === field) {
+        setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+      } else {
+        setSortField(field);
+        setSortDirection("asc");
       }
-    }
-    if (statusFilter) {
-      const isActive = statusFilter === "active";
-      result = result.filter((user) => user.is_active === isActive);
-    }
-    if (startDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      result = result.filter(u => u.created_at && new Date(u.created_at) >= start);
-    }
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      result = result.filter(u => u.created_at && new Date(u.created_at) <= end);
-    }
-    return result;
-  }, [normalizedSystemUsers, debouncedSearchQuery, roleFilter, statusFilter, startDate, endDate]);
+      setCurrentPage(1);
+    },
+    [sortField, sortDirection],
+  );
 
-  const paginatedSystemUsers = useMemo(() => {
-    const startIndex = (systemCurrentPage - 1) * itemsPerPage;
-    return filteredSystemUsers.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredSystemUsers, systemCurrentPage]);
-
-  // Filter, sort, and paginate admins
-  const filteredAdmins = useMemo(() => {
-    let result = [...admins];
-
-    // Apply search filter
-    if (debouncedSearchQuery) {
-      const query = debouncedSearchQuery.toLowerCase();
-      result = result.filter(
-        (user) =>
-          user.username?.toLowerCase().includes(query) ||
-          user.role_name?.toLowerCase().includes(query) ||
-          user.clinic_name?.toLowerCase().includes(query) ||
-          user.contact?.toLowerCase().includes(query),
-      );
+  // Handle toggle user active - with self-protection
+  const handleToggleUserActive = async (user) => {
+    if (String(user.id) === String(currentUserId)) {
+      notifyError("You cannot disable your own account.");
+      return;
     }
 
-    // Apply role filter - use role names for filtering
-    if (roleFilter) {
-      const roleFilterNum = parseInt(roleFilter);
-      // Map role IDs to role names for filtering
-      const roleIdToName = {
-        1: 'super_admin',
-        2: 'admin',
-        3: 'system_admin',
-        4: 'doctor',
-        5: 'nurse',
-        6: 'midwife'
-      };
-      const roleName = roleIdToName[roleFilterNum];
-      if (roleName) {
-        result = result.filter((user) =>
-          (user.role_name || '').toLowerCase() === roleName.toLowerCase()
-        );
-      }
+    const newStatus = !user.is_active;
+    if (
+      !window.confirm(
+        `Are you sure you want to ${newStatus ? "enable" : "disable"} this user?`,
+      )
+    ) {
+      return;
     }
 
-    // Apply status filter
-    if (statusFilter) {
-      const isActive = statusFilter === "active";
-      result = result.filter((user) => user.is_active === isActive);
-    }
-    if (startDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      result = result.filter(u => u.created_at && new Date(u.created_at) >= start);
-    }
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      result = result.filter(u => u.created_at && new Date(u.created_at) <= end);
-    }
+    setIsTogglingActive(true);
 
-    // Apply sorting
-    result.sort((a, b) => {
-      let aVal = a[sortField];
-      let bVal = b[sortField];
-
-      // Handle dates
-      if (sortField === "created_at") {
-        aVal = new Date(aVal || 0).getTime();
-        bVal = new Date(bVal || 0).getTime();
+    try {
+      const result = await toggleUserActive(user.id, newStatus);
+      if (!result.success) {
+        throw new Error(result.error || "Error toggling user status");
       }
 
-      // Handle null/undefined
-      if (aVal == null) aVal = "";
-      if (bVal == null) bVal = "";
-
-      if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
-      return 0;
-    });
-
-    return result;
-  }, [admins, debouncedSearchQuery, roleFilter, statusFilter, startDate, endDate, sortField, sortDirection]);
-
-  const filteredGuardians = useMemo(() => {
-    let result = [...normalizedGuardians];
-    if (debouncedSearchQuery) {
-      const query = debouncedSearchQuery.toLowerCase();
-      result = result.filter(
-        (g) =>
-          g.username?.toLowerCase().includes(query) ||
-          g.name?.toLowerCase().includes(query) ||
-          g.email?.toLowerCase().includes(query) ||
-          g.phone?.toLowerCase().includes(query) ||
-          g.address?.toLowerCase().includes(query)
-      );
+      success(`User ${newStatus ? "enabled" : "disabled"} successfully!`);
+      await invalidateSystemUserQueries();
+    } catch (error) {
+      console.error("Error toggling user status:", error);
+      notifyError(error.message || "Error toggling user status");
+    } finally {
+      setIsTogglingActive(false);
     }
-    if (startDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      result = result.filter(u => u.created_at && new Date(u.created_at) >= start);
-    }
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      result = result.filter(u => u.created_at && new Date(u.created_at) <= end);
-    }
-    return result;
-  }, [normalizedGuardians, debouncedSearchQuery, startDate, endDate]);
-
-  const paginatedGuardians = useMemo(() => {
-    const startIndex = (guardianCurrentPage - 1) * itemsPerPage;
-    return filteredGuardians.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredGuardians, guardianCurrentPage]);
-  const totalGuardianPages = Math.ceil(filteredGuardians.length / itemsPerPage);
-
-  // Paginate filtered admins
-  const paginatedAdmins = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredAdmins.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredAdmins, currentPage]);
-
-  const totalAdminPages = Math.ceil(filteredAdmins.length / itemsPerPage);
+  };
 
   // Tab change handler - preserves tab state
   const handleTabChange = useCallback((tab) => {
     const nextTab = resolveUserManagementTab(tab);
     setActiveTab(nextTab);
+    setSearchQuery("");
+    setRoleFilter("");
+    setStatusFilter("");
+    setStartDate("");
+    setEndDate("");
+    setCurrentPage(1);
+    setSystemCurrentPage(1);
+    setGuardianCurrentPage(1);
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set("tab", nextTab);
@@ -708,10 +570,7 @@ export default function UserManagement() {
         password: "",
       });
     } else {
-      const guardianRecord =
-        localGuardians.find((guardian) => isSameEntityId(guardian?.id, user?.id)) ||
-        user ||
-        {};
+      const guardianRecord = user || {};
 
       setFormData({
         name: guardianRecord.name || "",
@@ -740,7 +599,7 @@ export default function UserManagement() {
       });
     }
     setShowModal(true);
-  }, [localGuardians]);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -761,37 +620,13 @@ export default function UserManagement() {
         };
 
         if (editingUser) {
-          const optimisticPreviousGuardian = localGuardians.find((guardian) =>
-            isSameEntityId(guardian?.id, editingUser.id),
-          );
-
-          const optimisticGuardian = {
-            ...(optimisticPreviousGuardian || editingUser || {}),
-            ...guardianData,
-            id: editingUser.id,
-            updated_at: new Date().toISOString(),
-          };
-
-          upsertGuardianAcrossStores(optimisticGuardian);
-
           const result = await userService.updateGuardian(editingUser.id, guardianData, {
-            expected_updated_at:
-              toComparableTimestamp(editingUser?.updated_at) ||
-              toComparableTimestamp(optimisticPreviousGuardian?.updated_at),
+            expected_updated_at: toComparableTimestamp(editingUser?.updated_at),
           });
 
           if (!result.success) {
-            if (optimisticPreviousGuardian) {
-              upsertGuardianAcrossStores(optimisticPreviousGuardian);
-            }
-
             if (result.status === 409 && result.details?.code === "CONFLICT_STALE_WRITE") {
-              const latestServerRecord = result.details?.current;
-
-              if (latestServerRecord) {
-                upsertGuardianAcrossStores(latestServerRecord);
-              }
-
+              await invalidateGuardianQueries();
               warning(
                 result.details?.message ||
                   "This guardian record was updated elsewhere. Latest server data has been loaded. Please review and retry.",
@@ -802,37 +637,15 @@ export default function UserManagement() {
             throw new Error(result.error || "Failed to update guardian");
           }
 
-          if (result.data) {
-            upsertGuardianAcrossStores(result.data);
-          }
-
+          await invalidateGuardianQueries();
           success("Guardian updated successfully!");
         } else {
-          const tempGuardianId = `temp-guardian-${Date.now()}`;
-          const optimisticGuardian = {
-            ...guardianData,
-            id: tempGuardianId,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            is_active: true,
-            is_password_set: false,
-          };
-
-          upsertGuardianAcrossStores(optimisticGuardian, { prependOnInsert: true });
-
           const result = await userService.createGuardian(guardianData);
           if (!result.success) {
-            removeGuardianAcrossStores(tempGuardianId);
             throw new Error(result.error || "Failed to create guardian");
           }
 
-          removeGuardianAcrossStores(tempGuardianId);
-
           const guardian = result.data;
-
-          if (guardian) {
-            upsertGuardianAcrossStores(guardian, { prependOnInsert: true });
-          }
 
           // Create infant if infant data is provided
           if (formData.infant_first_name && formData.infant_last_name) {
@@ -860,6 +673,9 @@ export default function UserManagement() {
           } else {
             success("Guardian created successfully!");
           }
+
+          setGuardianCurrentPage(1);
+          await invalidateGuardianQueries();
         }
       } else if (
         (activeTab === "system" || activeTab === "admins") &&
@@ -877,65 +693,27 @@ export default function UserManagement() {
         };
 
         if (editingUser) {
-          const previousSystemUser = localSystemUsers.find((user) =>
-            isSameEntityId(user?.id, editingUser.id),
-          );
-
-          const optimisticSystemUser = {
-            ...(previousSystemUser || editingUser || {}),
-            ...userData,
-            id: editingUser.id,
-            updated_at: new Date().toISOString(),
-          };
-
-          upsertSystemUserAcrossStores(optimisticSystemUser);
-
           const updateResult = await updateUser(editingUser.id, userData);
 
           if (!updateResult.success) {
-            if (previousSystemUser) {
-              upsertSystemUserAcrossStores(previousSystemUser);
-            }
             throw new Error(updateResult.error || "Failed to update user");
           }
 
-          if (updateResult.user) {
-            upsertSystemUserAcrossStores(updateResult.user);
-          }
-
+          await invalidateSystemUserQueries();
           success("User updated successfully!");
         } else {
-          const tempSystemUserId = `temp-system-${Date.now()}`;
-          const optimisticSystemUser = {
-            ...userData,
-            id: tempSystemUserId,
-            role_name: "system",
-            display_name: "System User",
-            user_type: "system",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            is_active: true,
-          };
-
-          upsertSystemUserAcrossStores(optimisticSystemUser, {
-            prependOnInsert: true,
-          });
-
           const createResult = await createUser(userData);
 
           if (!createResult.success) {
-            removeSystemUserAcrossStores(tempSystemUserId);
             throw new Error(createResult.error || "Failed to create user");
           }
 
-          removeSystemUserAcrossStores(tempSystemUserId);
-
-          if (createResult.user) {
-            upsertSystemUserAcrossStores(createResult.user, {
-              prependOnInsert: true,
-            });
+          if (activeTab === "admins") {
+            setCurrentPage(1);
+          } else {
+            setSystemCurrentPage(1);
           }
-
+          await invalidateSystemUserQueries();
           success("User created successfully!");
         }
       }
@@ -966,45 +744,32 @@ export default function UserManagement() {
 
     try {
       if (userType === "system" || userType === "admin") {
-        const previousSystemUser = localSystemUsers.find((item) =>
-          isSameEntityId(item?.id, user.id),
-        );
-
-        removeSystemUserAcrossStores(user.id);
-
         const deleteResult = await deleteUser(user.id);
 
         if (!deleteResult.success) {
-          if (previousSystemUser) {
-            upsertSystemUserAcrossStores(previousSystemUser);
-          }
-
           throw new Error(deleteResult.error || "Failed to delete user");
         }
 
+        if (userType === "admin" && paginatedAdmins.length === 1 && currentPage > 1) {
+          setCurrentPage((page) => Math.max(1, page - 1));
+        } else if (
+          userType === "system" &&
+          paginatedSystemUsers.length === 1 &&
+          systemCurrentPage > 1
+        ) {
+          setSystemCurrentPage((page) => Math.max(1, page - 1));
+        }
+
+        await invalidateSystemUserQueries();
         success("User deleted successfully!");
       } else {
-        const previousGuardian = localGuardians.find((item) =>
-          isSameEntityId(item?.id, user.id),
-        );
-
-        removeGuardianAcrossStores(user.id);
-
         const result = await userService.deleteGuardian(user.id, {
           expected_updated_at: toComparableTimestamp(user?.updated_at),
         });
 
         if (!result.success) {
-          if (previousGuardian) {
-            upsertGuardianAcrossStores(previousGuardian);
-          }
-
           if (result.status === 409 && result.details?.code === "CONFLICT_STALE_WRITE") {
-            const latestServerRecord = result.details?.current;
-            if (latestServerRecord) {
-              upsertGuardianAcrossStores(latestServerRecord);
-            }
-
+            await invalidateGuardianQueries();
             warning(
               result.details?.message ||
                 "This guardian record changed remotely before deletion. Latest data has been restored.",
@@ -1014,6 +779,11 @@ export default function UserManagement() {
 
           throw new Error(result.error || "Failed to delete guardian");
         }
+
+        if (paginatedGuardians.length === 1 && guardianCurrentPage > 1) {
+          setGuardianCurrentPage((page) => Math.max(1, page - 1));
+        }
+        await invalidateGuardianQueries();
         success("Guardian deleted successfully!");
       }
       // Tab state is preserved - no navigation happens
@@ -1202,32 +972,13 @@ export default function UserManagement() {
         password: adminFormData.password,
       };
 
-      const tempAdminId = `temp-admin-${Date.now()}`;
-      const optimisticAdmin = {
-        ...userData,
-        id: tempAdminId,
-        role_name: "admin",
-        display_name: "Admin",
-        user_type: "system",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        is_active: true,
-      };
-
-      upsertSystemUserAcrossStores(optimisticAdmin, { prependOnInsert: true });
-
       const result = await createUser(userData);
       if (result.success) {
-        removeSystemUserAcrossStores(tempAdminId);
-
-        if (result.user) {
-          upsertSystemUserAcrossStores(result.user, { prependOnInsert: true });
-        }
-
+        setCurrentPage(1);
+        await invalidateSystemUserQueries();
         success("Admin account created successfully!");
         setShowAddAdminModal(false);
       } else {
-        removeSystemUserAcrossStores(tempAdminId);
         notifyError(result.error || "Error creating admin account");
       }
     } catch (error) {
@@ -1255,7 +1006,13 @@ export default function UserManagement() {
       label: "Admin Role",
       sortable: true,
       render: (val, row) => (
-        <Badge variant={row.role_id === 1 ? "danger" : "warning"}>
+        <Badge
+          variant={
+            String(row.role_name || "").trim().toLowerCase() === "super_admin"
+              ? "danger"
+              : "warning"
+          }
+        >
           {row.display_name || val}
         </Badge>
       ),
@@ -1513,7 +1270,7 @@ export default function UserManagement() {
     </div>
   );
 
-  if (guardiansLoading || systemUsersLoading) {
+  if (activeListLoading) {
     return (
       <div className="space-y-8 p-6">
         <div className="h-20 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse mb-8" />
@@ -1523,16 +1280,19 @@ export default function UserManagement() {
     );
   }
 
-  if (guardiansError || systemUsersError) {
+  if (activeListError) {
     return (
       <PageContainer>
         <Alert variant="error" title="Error loading users">
-          {guardiansError || systemUsersError}
+          {activeListError}
           <div className="mt-4">
             <Button
               onClick={() => {
-                refreshGuardians();
-                refreshSystemUsers();
+                if (activeTab === "guardians") {
+                  refreshGuardians();
+                } else {
+                  refreshSystemUsers();
+                }
               }}
               size="sm"
             >
@@ -1629,7 +1389,10 @@ export default function UserManagement() {
             }`}
           >
             <span className="text-lg">🛡️</span>
-            <span>System Users ({normalizedSystemUsers ? normalizedSystemUsers.length : 0})</span>
+            <span>
+              System Users
+              {activeTab === "system" ? ` (${systemUserTotalCount || 0})` : ""}
+            </span>
           </button>
             <button
             onClick={() => handleTabChange("admins")}
@@ -1640,7 +1403,10 @@ export default function UserManagement() {
             }`}
           >
             <ShieldAlert className="w-4 h-4" />
-            <span>Admins ({admins.length})</span>
+            <span>
+              Admins
+              {activeTab === "admins" ? ` (${systemUserTotalCount || 0})` : ""}
+            </span>
           </button>
 
           <button
@@ -1652,12 +1418,21 @@ export default function UserManagement() {
             }`}
           >
             <span className="text-lg">👥</span>
-            <span>Guardians ({normalizedGuardians.length})</span>
+            <span>
+              Guardians
+              {activeTab === "guardians" ? ` (${guardianTotalCount || 0})` : ""}
+            </span>
           </button>
           </nav>
 
           {/* Global Search and Filters */}
           <div className="flex flex-col md:flex-row md:flex-wrap items-stretch md:items-center gap-3 pb-3 xl:pb-0 mt-3 xl:mt-0 w-full xl:w-auto">
+            {activeListFetching ? (
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                <LoadingSpinner size="sm" />
+                <span>Refreshing...</span>
+              </div>
+            ) : null}
             <div className="relative w-full md:w-56 flex-shrink-0">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -1678,7 +1453,12 @@ export default function UserManagement() {
               <input
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setCurrentPage(1);
+                  setSystemCurrentPage(1);
+                  setGuardianCurrentPage(1);
+                }}
                 className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-32"
                 title="Start Date"
               />
@@ -1686,7 +1466,12 @@ export default function UserManagement() {
               <input
                 type="date"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setCurrentPage(1);
+                  setSystemCurrentPage(1);
+                  setGuardianCurrentPage(1);
+                }}
                 className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-32"
                 title="End Date"
               />
@@ -1699,16 +1484,16 @@ export default function UserManagement() {
                   onChange={(e) => {
                     setRoleFilter(e.target.value);
                     setCurrentPage(1);
+                    setSystemCurrentPage(1);
                   }}
                   className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-32"
                 >
                   <option value="">All Roles</option>
-                  <option value="1">Super Admin</option>
-                  <option value="2">Admin</option>
-                  <option value="3">System Admin</option>
-                  <option value="4">Doctor</option>
-                  <option value="5">Nurse</option>
-                  <option value="6">Midwife</option>
+                  {roleFilterOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
 
                 <select
@@ -1716,6 +1501,7 @@ export default function UserManagement() {
                   onChange={(e) => {
                     setStatusFilter(e.target.value);
                     setCurrentPage(1);
+                    setSystemCurrentPage(1);
                   }}
                   className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-32"
                 >
@@ -1727,6 +1513,15 @@ export default function UserManagement() {
             )}
           </div>
         </div>
+        {activeTab === "system" && roleFilterOptions.length > 0 ? (
+          <div className="px-4 pb-3 flex flex-wrap gap-2">
+            {roleFilterOptions.map((option) => (
+              <Badge key={option.value} variant="secondary">
+                {option.label}
+              </Badge>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {/* Content based on active tab */}
@@ -1822,9 +1617,9 @@ export default function UserManagement() {
                         Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
                         {Math.min(
                           currentPage * itemsPerPage,
-                          filteredAdmins.length,
+                          systemUserTotalCount,
                         )}{" "}
-                        of {filteredAdmins.length} admins
+                        of {systemUserTotalCount} admins
                       </div>
                       <div className="flex gap-2">
                         <Button
@@ -1992,6 +1787,42 @@ export default function UserManagement() {
                     </tbody>
                   </table>
                 </div>
+                {totalSystemPages > 1 && (
+                  <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-900">
+                    <div className="text-sm text-gray-500">
+                      Showing {(systemCurrentPage - 1) * itemsPerPage + 1} to{" "}
+                      {Math.min(systemCurrentPage * itemsPerPage, systemUserTotalCount)} of{" "}
+                      {systemUserTotalCount} users
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() =>
+                          setSystemCurrentPage((page) => Math.max(1, page - 1))
+                        }
+                        disabled={systemCurrentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <span className="flex items-center px-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Page {systemCurrentPage} of {totalSystemPages}
+                      </span>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() =>
+                          setSystemCurrentPage((page) =>
+                            Math.min(totalSystemPages, page + 1),
+                          )
+                        }
+                        disabled={systemCurrentPage === totalSystemPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <EmptyState
@@ -2075,8 +1906,8 @@ export default function UserManagement() {
               <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-900">
                 <div className="text-sm text-gray-500">
                   Showing {(guardianCurrentPage - 1) * itemsPerPage + 1} to{" "}
-                  {Math.min(guardianCurrentPage * itemsPerPage, filteredGuardians.length)}{" "}
-                  of {filteredGuardians.length} guardians
+                  {Math.min(guardianCurrentPage * itemsPerPage, guardianTotalCount)}{" "}
+                  of {guardianTotalCount} guardians
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -2363,24 +2194,7 @@ export default function UserManagement() {
                         required
                         options={[
                           { value: "", label: "Select a role" },
-                        ...roles
-                          .filter((role) => {
-                            const excludedRoles = [
-                              "inventory_manager",
-                              "dentist",
-                              "nutritionist",
-                              "system_admin",
-                              "super_admin",
-                              "admin",
-                              "administrator",
-                              "healthcare_worker"
-                            ];
-                            return !excludedRoles.includes(role.name.toLowerCase());
-                          })
-                          .map((role) => ({
-                            value: role.id.toString(),
-                            label: role.display_name || role.name,
-                          })),
+                          ...addStaffRoleOptions,
                         ]}
                       />
                     </div>

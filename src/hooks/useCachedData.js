@@ -36,12 +36,14 @@ export const queryKeys = {
   users: {
     all: ["users", "all"],
     byId: (id) => ["users", id],
+    guardiansList: (params = {}) => ["users", "guardians", params],
+    systemUsersList: (params = {}) => ["users", "system-users", params],
   },
 };
 
 /**
  * Hook for fetching dashboard statistics
- * Cached for 5 minutes to prevent excessive API calls
+ * Cached briefly to keep admin metrics responsive after mutations
  */
 export const useDashboardStats = () => {
   return useQuery({
@@ -50,8 +52,10 @@ export const useDashboardStats = () => {
       const response = await apiClient.getDashboardStats();
       return response;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 60 * 1000, // 1 minute
     gcTime: 30 * 60 * 1000, // 30 minutes
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 };
 

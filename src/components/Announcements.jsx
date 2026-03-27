@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { Megaphone } from "lucide-react";
 import apiClient from "../utils/api";
-import { Button, Input, Card, Modal, Select, Tabs, Tab } from "./UI";
+import { Button, Input, Card, Modal, Select, Tabs, Tab, PageHeader } from "./UI";
 import { useAuth } from "../contexts/AuthContext";
 
 /**
@@ -85,18 +86,18 @@ export default function Announcements() {
 
       const [
         announcementsData,
-        myAnnouncementsData,
         categoriesData,
         statsData,
       ] = await Promise.all([
         apiClient.getAnnouncements(params),
-        apiClient.getMyAnnouncements(),
         apiClient.getAnnouncementCategories(),
         apiClient.getAnnouncementStats(),
       ]);
 
-      setAnnouncements(announcementsData || []);
-      setMyAnnouncements(myAnnouncementsData || []);
+      const allAnns = announcementsData || [];
+      setAnnouncements(allAnns);
+      // Filter locally to avoid missing backend /my route errors
+      setMyAnnouncements(allAnns.filter((a) => a.created_by === user?.id));
       setCategories(categoriesData || []);
       setStats(statsData || {});
     } catch (err) {
@@ -391,18 +392,15 @@ export default function Announcements() {
 
   if (!isAdmin) {
     return (
-      <div className="space-y-6">
-        {/* Header for non-admin users */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100">
-              Announcements
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Stay updated with the latest news and announcements
-            </p>
-          </div>
+      <div className="flex flex-col h-screen overflow-hidden">
+        <div className="sticky top-0 z-30 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6">
+          <PageHeader
+            title="Announcements"
+            subtitle="Stay updated with the latest news and announcements"
+            icon={<Megaphone className="w-8 h-8 text-white" />}
+          />
         </div>
+        <div className="flex-1 flex flex-col p-4 sm:px-6 sm:pb-6 pt-3 overflow-y-auto space-y-4">
 
         {/* Stats for non-admin */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -493,7 +491,7 @@ export default function Announcements() {
         </div>
       </div>
     );
-  }
+
 
   return (
     <div className="space-y-6">
@@ -876,6 +874,7 @@ export default function Announcements() {
           </div>
         </Tab>
       </Tabs>
+      </div>
 
       {/* Create Announcement Modal */}
       <Modal
@@ -1297,4 +1296,6 @@ export default function Announcements() {
       </Modal>
     </div>
   );
-}
+};
+
+export default Announcements;

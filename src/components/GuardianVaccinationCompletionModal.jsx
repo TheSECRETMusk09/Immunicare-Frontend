@@ -101,7 +101,15 @@ export default function GuardianVaccinationCompletionModal({
       let uploadedCardUrl = null;
 
       if (formData.vaccination_card) {
-        const uploadResponse = await apiClient.uploadFile(formData.vaccination_card);
+        const fileData = new FormData();
+        fileData.append("file", formData.vaccination_card);
+
+        // Bypass uploadFile to prevent header/boundary destruction
+        const uploadResponse = await apiClient.customRequest("/uploads/upload", {
+          method: "POST",
+          data: fileData,
+          headers: { "Content-Type": undefined } // Forces browser to append the multipart boundary
+        });
         uploadedCardUrl = resolveUploadUrl(uploadResponse);
       }
 

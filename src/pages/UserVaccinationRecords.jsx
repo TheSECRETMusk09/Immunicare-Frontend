@@ -57,7 +57,7 @@ const VaccinationRecordCard = ({
   actionLabel,
   onAction,
 }) => (
-  <article className="guardian-table-card">
+  <article className="guardian-table-card md:hidden">
     <div className="guardian-table-card__header">
       <div className="min-w-0">
         <h3 className="guardian-table-card__title">{vaccine.vaccine_name}</h3>
@@ -825,7 +825,7 @@ export default function UserVaccinationRecords() {
               </button>
               <button
                 onClick={() => setViewMode("schedule")}
-                className={`guardian-tab-bar__item flex items-center gap-2 text-sm font-medium transition-all ${
+                className={`guardian-tab-bar__item hidden md:flex items-center gap-2 text-sm font-medium transition-all ${
                   viewMode === "schedule"
                     ? "bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border-b-2 border-primary-500"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -835,7 +835,7 @@ export default function UserVaccinationRecords() {
               </button>
               <button
                 onClick={() => setViewMode("upcoming")}
-                className={`guardian-tab-bar__item flex items-center gap-2 text-sm font-medium transition-all ${
+                className={`guardian-tab-bar__item hidden md:flex items-center gap-2 text-sm font-medium transition-all ${
                   viewMode === "upcoming"
                     ? "bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border-b-2 border-primary-500"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -865,7 +865,7 @@ export default function UserVaccinationRecords() {
                 <ImmunizationRecordBooklet infantId={selectedChild.id} />
               ) : (
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
-                  <div className="guardian-table-card-list p-4 min-[768px]:hidden">
+                  <div className="guardian-table-card-list p-4 md:hidden">
                     {filteredRecords.map((vaccine) => {
                       const status = getVaccineStatus(vaccine);
                       return (
@@ -881,7 +881,7 @@ export default function UserVaccinationRecords() {
                     })}
                   </div>
                   {/* Tablet/Desktop table */}
-                  <div className="guardian-table-scroll-shell hidden min-[768px]:block">
+                  <div className="guardian-table-scroll-shell hidden md:block">
                     <table className="w-full">
                       <thead className="bg-gray-50 dark:bg-gray-700">
                         <tr>
