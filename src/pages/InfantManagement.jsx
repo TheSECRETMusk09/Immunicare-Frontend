@@ -288,7 +288,7 @@ export default function InfantManagement() {
       (infant) => infant.workflow_status === "needs_review",
     ).length,
     withImportedHistory: filteredInfants.filter(
-      (infant) => Number(infant.imported_vaccinations || 0) > 0,
+      (infant) => infant.latest_transfer_case_id != null,
     ).length,
     pendingVaccinations: filteredInfants.reduce(
       (total, infant) => total + Number(infant.pending_vaccinations || 0),
@@ -775,7 +775,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
             <p className="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">{infantSummary.needsReview}</p>
           </div>
           <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Imported History</p>
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Transfer-In Cases</p>
             <p className="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-400">{infantSummary.withImportedHistory}</p>
           </div>
           <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">

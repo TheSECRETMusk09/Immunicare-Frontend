@@ -110,18 +110,11 @@ export default function HealthInformation() {
     }
   }, [guardianId, isAdmin]);
 
-  const fetchHealthRecords = useCallback(async (childId) => {
-    try {
-      const response = await apiClient.getHealthRecordsByInfant(childId);
-      setHealthRecords(response.data || []);
-    } catch (err) {
-      console.error("Error fetching health records:", err);
-    }
-  }, []);
-
   const fetchGrowthData = useCallback(async (childId) => {
     try {
       const response = await apiClient.getGrowthRecordsByInfant(childId);
+      // Use growth data for both health records and growth data (they're the same)
+      setHealthRecords(response.data || []);
       setGrowthData(response.data || []);
     } catch (err) {
       console.error("Error fetching growth data:", err);
@@ -137,10 +130,9 @@ export default function HealthInformation() {
 
   useEffect(() => {
     if (selectedChild) {
-      fetchHealthRecords(selectedChild.id);
       fetchGrowthData(selectedChild.id);
     }
-  }, [selectedChild, fetchHealthRecords, fetchGrowthData]);
+  }, [selectedChild, fetchGrowthData]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "";

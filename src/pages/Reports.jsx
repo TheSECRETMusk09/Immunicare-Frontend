@@ -184,7 +184,7 @@ const Reports = () => {
       }
       if (mergedSummary.vaccination) {
         mergedSummary.vaccination.total = absoluteStats.total_vaccinations || absoluteStats.vaccinations || mergedSummary.vaccination.total || 0;
-        mergedSummary.vaccination.completed = absoluteStats.total_vaccinations || absoluteStats.vaccinations || mergedSummary.vaccination.completed || 0;
+        mergedSummary.vaccination.completed = absoluteStats.completed_vaccinations || mergedSummary.vaccination.completed || 0;
       }
 
       setAdminSummary(mergedSummary);

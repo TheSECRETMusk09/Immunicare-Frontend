@@ -3848,24 +3848,44 @@ export default function InventoryManagement() {
         return;
       }
 
-      // Check if inventory record exists in database (required for transactions)
+      // Check if inventory record exists in database
       const dbInventoryId = resolveInventorySaveRowId(matchedInventory._apiId);
-      if (!dbInventoryId) {
+      const matchedVaccineId = resolveInventorySaveRowId(matchedInventory._vaccineId);
+      
+      // For RECEIVE transactions, we can auto-create the inventory record if it doesn't exist
+      // For other transaction types, the inventory record must exist first
+      if (!dbInventoryId && modalType !== 'receive') {
         setError("Please save the inventory record first before creating transactions. Click on the Save Inventory button to save your current inventory data to the database.");
         return;
       }
+      
+      if (!matchedVaccineId) {
+        setError("Vaccine ID not found. Please ensure the vaccine is properly configured.");
+        return;
+      }
+
+      // Ensure clinic_id is always set
+      const matchedFacilityId = resolveInventorySaveRowId(matchedInventory._facilityId);
+      const clinicId = matchedFacilityId || Number(fallbackClinicId) || 1;
+
+      console.log('🔍 Transaction Debug Info:');
+      console.log('- modalType:', modalType);
+      console.log('- dbInventoryId:', dbInventoryId);
+      console.log('- matchedVaccineId:', matchedVaccineId);
+      console.log('- matchedFacilityId:', matchedFacilityId);
+      console.log('- fallbackClinicId:', fallbackClinicId);
+      console.log('- clinicId:', clinicId);
+      console.log('- formData:', formData);
 
       const payload = {
-        vaccine_inventory_id: Number(dbInventoryId),
+        // For RECEIVE transactions without existing inventory, use a placeholder ID (backend will auto-create)
+        vaccine_inventory_id: dbInventoryId || 0,
         transaction_type: mapModalTypeToApiType(modalType),
         quantity: Number(qty),
         transaction_date: formData.date,
+        vaccine_id: matchedVaccineId,
+        clinic_id: clinicId,
       };
-
-      const matchedVaccineId = resolveInventorySaveRowId(matchedInventory._vaccineId);
-      if (matchedVaccineId) {
-        payload.vaccine_id = matchedVaccineId;
-      }
 
       if (lotNumber) {
         payload.lot_number = lotNumber;
@@ -3877,12 +3897,8 @@ export default function InventoryManagement() {
       if (formData.expiry_date) {
         payload.expiry_date = formData.expiry_date;
       }
-      const matchedFacilityId = resolveInventorySaveRowId(matchedInventory._facilityId);
-      if (matchedFacilityId) {
-        payload.clinic_id = matchedFacilityId;
-      } else if (fallbackClinicId) {
-        payload.clinic_id = Number(fallbackClinicId);
-      }
+
+      console.log('📤 Sending transaction payload:', JSON.stringify(payload, null, 2));
 
       await apiClient.createVaccineInventoryTransaction(payload);
 

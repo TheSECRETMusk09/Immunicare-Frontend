@@ -192,8 +192,7 @@ export const normalizeInfant = (row = {}) => {
     imported_vaccinations: importedVaccinations,
     latest_transfer_case_id: toNumber(row.latest_transfer_case_id),
     latest_transfer_case_status: normalizeStatus(row.latest_transfer_case_status, ""),
-    latest_transfer_source_facility:
-      row.latest_transfer_source_facility ?? row.transfer_in_source ?? null,
+    latest_transfer_source_facility: row.latest_transfer_source_facility ?? null,
     latest_transfer_case_updated_at: row.latest_transfer_case_updated_at ?? null,
     validation_status: validationStatus,
     workflow_status: workflowStatus,

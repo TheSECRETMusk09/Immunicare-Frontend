@@ -112,6 +112,12 @@ const GuardianAppointmentBooking = lazy(() =>
   })),
 );
 
+const GuardianGrowthChartPage = lazy(() =>
+  import("./pages/GuardianGrowthChartPage").then((module) => ({
+    default: module.default,
+  })),
+);
+
 // Missing page components - lazy loaded
 const Reports = lazy(() => import("./pages/Reports"));
 const Announcements = lazy(() => import("./pages/Announcements"));
@@ -663,6 +669,10 @@ function AppContent() {
             />
             <Route path="profile" element={<Profile />} />
             <Route path="health-information" element={<HealthInformation />} />
+            <Route
+              path="health-charts/:childId"
+              element={<GuardianGrowthChartPage />}
+            />
             <Route
               path="settings"
               element={<Navigate to="/guardian/profile" replace />}

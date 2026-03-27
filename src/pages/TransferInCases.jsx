@@ -82,6 +82,8 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
   const [showVaccineImportModal, setShowVaccineImportModal] = useState(false);
   const [validationNotes, setValidationNotes] = useState("");
   const [validationStatus, setValidationStatus] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   // State for vaccine approval
   const [selectedVaccines, setSelectedVaccines] = useState({});
@@ -148,6 +150,7 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
     }
 
     setFilteredCases(result);
+    setCurrentPage(1);
   }, [cases, searchQuery, statusFilter, priorityFilter, triageFilter]);
 
   useEffect(() => {
@@ -534,13 +537,41 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
 
       <div className="animate-fade-in px-6 -mx-6">
         <DataTable
-          data={filteredCases}
+          data={filteredCases.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
           columns={columns}
           actions={tableActions}
           emptyMessage="No transfer-in cases found."
           emptyIcon={<span>📄</span>}
           title="Transfer-In Cases - Click to View Details"
         />
+        {filteredCases.length > itemsPerPage && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-b-xl">
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredCases.length)} of {filteredCases.length} cases
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <div className="text-sm text-gray-600 dark:text-gray-400 self-center px-3">
+                Page {currentPage} of {Math.ceil(filteredCases.length / itemsPerPage)}
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredCases.length / itemsPerPage), p + 1))}
+                disabled={currentPage >= Math.ceil(filteredCases.length / itemsPerPage)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Details Modal */}
