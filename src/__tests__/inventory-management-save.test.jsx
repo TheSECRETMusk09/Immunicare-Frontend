@@ -178,8 +178,88 @@ describe("Inventory Management save behavior", () => {
           clinic_id: 7,
           transaction_type: "RECEIVE",
           quantity: 3,
+          transaction_date: expect.any(String),
+          lot_number: "HEPB-LOT-002",
+          lot_batch_number: "HEPB-LOT-002",
+          expiry_date: "2026-12-31",
         }),
       );
     });
+  });
+
+  test("reuses the inventory row lot data for issue transactions", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    apiClient.createVaccineInventoryTransaction.mockResolvedValueOnce({
+      id: 902,
+    });
+
+    renderInventoryRoute();
+
+    const bcgRow = await screen.findByText("BCG");
+    fireEvent.click(
+      within(bcgRow.closest("tr")).getByRole("button", { name: /issue/i }),
+    );
+
+    fireEvent.change(screen.getByLabelText(/^quantity$/i), {
+      target: { value: "2" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^issue$/i }));
+
+    await waitFor(() => {
+      expect(apiClient.createVaccineInventoryTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          vaccine_inventory_id: 1,
+          vaccine_id: 1,
+          clinic_id: 7,
+          transaction_type: "ISSUE",
+          quantity: 2,
+          transaction_date: today,
+          lot_number: "LOT-BCG-001",
+          lot_batch_number: "LOT-BCG-001",
+        }),
+      );
+    });
+  });
+
+  test("keeps backend validation errors inside the transaction modal instead of replacing the page", async () => {
+    apiClient.createVaccineInventoryTransaction.mockRejectedValueOnce({
+      response: {
+        data: {
+          error: "Validation failed",
+          fields: {
+            transaction_type:
+              "transaction_type must be one of RECEIVE, TRANSFER_IN, TRANSFER_OUT, ISSUE, EXPIRE, WASTE, ADJUST",
+          },
+        },
+      },
+      message: "Validation failed",
+    });
+
+    renderInventoryRoute();
+
+    const bcgRow = await screen.findByText("BCG");
+    fireEvent.click(
+      within(bcgRow.closest("tr")).getByRole("button", { name: /receive/i }),
+    );
+
+    fireEvent.change(screen.getByLabelText(/^quantity$/i), {
+      target: { value: "4" },
+    });
+    fireEvent.change(screen.getByLabelText(/lot\/batch #/i), {
+      target: { value: "LOT-BCG-002" },
+    });
+    fireEvent.change(screen.getByLabelText(/expiry date/i), {
+      target: { value: "2026-12-31" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^receive$/i }));
+
+    expect(
+      await screen.findByText(
+        /transaction_type must be one of receive, transfer_in, transfer_out, issue, expire, waste, adjust/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^retry$/i })).not.toBeInTheDocument();
   });
 });

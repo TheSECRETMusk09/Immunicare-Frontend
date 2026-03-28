@@ -592,7 +592,7 @@ function AppContent() {
           {/* Redirect old inventory routes to main inventory with tab parameter */}
           <Route
             path="/inventory/transactions"
-            element={<Navigate to="/inventory?tab=transactions" replace />}
+            element={<Navigate to="/inventory?tab=stock_movements" replace />}
           />
           <Route
             path="/inventory/alerts"

@@ -613,12 +613,15 @@ export const useUserPasswords = () => {
         result = await apiClient.resetSystemUserPassword(userId, newPassword);
       }
 
-      // Check for success in the response - API returns { success: true, user: {...} }
-      if (result?.success) {
+      const didResetSucceed =
+        result?.success === true ||
+        (!result?.error && Boolean(result?.user || result?.guardian || result?.message));
+
+      if (didResetSucceed) {
         // Return the updated user for UI synchronization
         return {
           success: true,
-          user: result.user || null,
+          user: result.user || result.guardian || null,
           message: result.message || "Password reset successfully",
         };
       }

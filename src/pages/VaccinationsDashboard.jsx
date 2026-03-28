@@ -160,11 +160,14 @@ const VaccinationsDashboard = () => {
   const [vaccinationForm, setVaccinationForm] = useState(DEFAULT_FORM);
   const [trackingStartDate, setTrackingStartDate] = useState("");
   const [trackingEndDate, setTrackingEndDate] = useState("");
-  const [trackingSearchQuery, setTrackingSearchQuery] = useState("");
 
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [scheduleCurrentPage, setScheduleCurrentPage] = useState(1);
+  const [trackingCurrentPage, setTrackingCurrentPage] = useState(1);
   const itemsPerPage = 20;
+  const scheduleItemsPerPage = 20;
+  const trackingItemsPerPage = 9;
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 350);
@@ -523,8 +526,8 @@ const VaccinationsDashboard = () => {
           if (trackingEndDate && infantDate > trackingEndDate) return false;
         }
 
-        if (trackingSearchQuery) {
-          const query = trackingSearchQuery.toLowerCase();
+        if (debouncedSearchQuery) {
+          const query = debouncedSearchQuery.toLowerCase();
           const firstName = (infant.first_name || "").toLowerCase();
           const lastName = (infant.last_name || "").toLowerCase();
           if (!firstName.includes(query) && !lastName.includes(query)) return false;
@@ -548,7 +551,15 @@ const VaccinationsDashboard = () => {
           ...summary,
         };
       });
-  }, [infants, vaccinationRecords, approvedVaccinationSchedules, trackingStartDate, trackingEndDate, trackingSearchQuery]);
+  }, [infants, vaccinationRecords, approvedVaccinationSchedules, trackingStartDate, trackingEndDate, debouncedSearchQuery]);
+
+  useEffect(() => {
+    setScheduleCurrentPage(1);
+  }, [debouncedSearchQuery]);
+
+  useEffect(() => {
+    setTrackingCurrentPage(1);
+  }, [debouncedSearchQuery, trackingStartDate, trackingEndDate]);
 
   const scheduleOverviewRows = useMemo(() => {
     if (!approvedVaccinationSchedules.length || !infants.length) {
@@ -673,6 +684,18 @@ const VaccinationsDashboard = () => {
       ),
     [healthWorkerUsers],
   );
+
+  const paginatedScheduleRows = useMemo(() => {
+    const startIndex = (scheduleCurrentPage - 1) * scheduleItemsPerPage;
+    return scheduleOverviewRows.slice(startIndex, startIndex + scheduleItemsPerPage);
+  }, [scheduleOverviewRows, scheduleCurrentPage]);
+  const scheduleTotalPages = Math.ceil(scheduleOverviewRows.length / scheduleItemsPerPage);
+
+  const paginatedComplianceRows = useMemo(() => {
+    const startIndex = (trackingCurrentPage - 1) * trackingItemsPerPage;
+    return complianceRows.slice(startIndex, startIndex + trackingItemsPerPage);
+  }, [complianceRows, trackingCurrentPage]);
+  const trackingTotalPages = Math.ceil(complianceRows.length / trackingItemsPerPage);
 
   if (loading && vaccinationRecords.length === 0) {
     return (
@@ -885,7 +908,7 @@ const VaccinationsDashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {scheduleOverviewRows.map((scheduleRow) => (
+                  {paginatedScheduleRows.map((scheduleRow) => (
                     <tr key={scheduleRow.row_id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                         <div>{scheduleRow.infant_name}</div>
@@ -950,6 +973,37 @@ const VaccinationsDashboard = () => {
                 </tbody>
               </table>
             </div>
+
+            {scheduleTotalPages > 1 && (
+              <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
+                <div className="text-sm text-gray-500">
+                  Showing {(scheduleCurrentPage - 1) * scheduleItemsPerPage + 1} to{" "}
+                  {Math.min(scheduleCurrentPage * scheduleItemsPerPage, scheduleOverviewRows.length)}{" "}
+                  of {scheduleOverviewRows.length} schedule rows
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setScheduleCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={scheduleCurrentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="flex items-center px-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Page {scheduleCurrentPage} of {scheduleTotalPages}
+                  </span>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setScheduleCurrentPage((p) => Math.min(scheduleTotalPages, p + 1))}
+                    disabled={scheduleCurrentPage === scheduleTotalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
             </>
           )}
         </div>
@@ -1127,19 +1181,8 @@ const VaccinationsDashboard = () => {
               className="border-none shadow-none py-12"
             />
           ) : (
-            <div className="flex-1 min-h-0 flex flex-col">
+            <>
               <div className="mb-4 flex flex-col sm:flex-row gap-4 items-start sm:items-end flex-shrink-0">
-                <div className="w-full sm:max-w-xs">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Search Infant
-                  </label>
-                  <Input
-                    placeholder="Search by name..."
-                    value={trackingSearchQuery}
-                    onChange={(e) => setTrackingSearchQuery(e.target.value)}
-                    icon={Search}
-                  />
-                </div>
                 <div className="w-full sm:max-w-md">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Focus by infant
@@ -1184,11 +1227,11 @@ const VaccinationsDashboard = () => {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto auto-hide-scrollbar pr-2 pb-2">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="flex-1 overflow-y-auto auto-hide-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-2">
                 {(selectedInfantId
-                  ? complianceRows.filter((entry) => entry.infant.id === selectedInfantId)
-                  : complianceRows
+                  ? paginatedComplianceRows.filter((entry) => entry.infant.id === selectedInfantId)
+                  : paginatedComplianceRows
                 ).map((entry) => {
                   const { infant, dueCount, completed, pending, overdue, completionRate } =
                     entry;
@@ -1273,6 +1316,38 @@ const VaccinationsDashboard = () => {
                   );
                 })}
               </div>
+              </div>
+
+              {!selectedInfantId && trackingTotalPages > 1 && (
+                <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
+                  <div className="text-sm text-gray-500">
+                    Showing {(trackingCurrentPage - 1) * trackingItemsPerPage + 1} to{" "}
+                    {Math.min(trackingCurrentPage * trackingItemsPerPage, complianceRows.length)}{" "}
+                    of {complianceRows.length} infants
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setTrackingCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={trackingCurrentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span className="flex items-center px-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Page {trackingCurrentPage} of {trackingTotalPages}
+                    </span>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setTrackingCurrentPage((p) => Math.min(trackingTotalPages, p + 1))}
+                      disabled={trackingCurrentPage === trackingTotalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {selectedInfantId && selectedInfantRecords.length === 0 && (
                 <div className="mt-6">
@@ -1284,8 +1359,7 @@ const VaccinationsDashboard = () => {
                   />
                 </div>
               )}
-              </div>
-            </div>
+            </>
           )}
         </div>
       )}

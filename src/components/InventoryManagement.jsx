@@ -6,6 +6,7 @@ import React, {
   useRef,
 } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import apiClient from "../utils/api";
 import { safeLocalStorage, safeSessionStorage } from "../utils/safeStorage";
@@ -54,8 +55,8 @@ import {
 
 const INVENTORY_TAB_CONFIG = [
   { key: "inventory_sheet", label: "Inventory Sheet" },
-  { key: "stock_alerts", label: "Stock Management" },
-  { key: "vaccine_monitoring", label: "Vaccine Monitoring" }
+  { key: "inventory_summary", label: "Inventory Summary" },
+  { key: "stock_movements", label: "Stock Movements" }
 ];
 
 const INVENTORY_DEFAULT_TAB_KEY = INVENTORY_TAB_CONFIG[0].key;
@@ -64,14 +65,26 @@ const INVENTORY_TAB_STORAGE_KEY = "admin.inventory.activeTab";
 const INVENTORY_TAB_ALIASES = {
   inventory_sheet: "inventory_sheet",
   "inventory-sheet": "inventory_sheet",
-  transactions: "inventory_sheet",
+  stock_movements: "stock_movements",
+  "stock-movements": "stock_movements",
+  movements: "stock_movements",
+  transactions: "stock_movements",
   suppliers: "inventory_sheet",
-  stock_alerts: "stock_alerts",
-  "stock-alerts": "stock_alerts",
-  alerts: "stock_alerts",
-  vaccine_monitoring: "vaccine_monitoring",
-  "vaccine-monitoring": "vaccine_monitoring",
-  monitoring: "vaccine_monitoring",
+  inventory_summary: "inventory_summary",
+  "inventory-summary": "inventory_summary",
+  summary: "inventory_summary",
+  stock_alerts: "inventory_summary",
+  "stock-alerts": "inventory_summary",
+  alerts: "inventory_summary",
+  vaccine_monitoring: "inventory_summary",
+  "vaccine-monitoring": "inventory_summary",
+  monitoring: "inventory_summary",
+};
+
+const INVENTORY_TAB_PANEL_IDS = {
+  inventory_sheet: "inventory-panel-inventory-sheet",
+  inventory_summary: "inventory-panel-inventory-summary",
+  stock_movements: "inventory-panel-stock-movements",
 };
 
 const normalizeInventoryTabKey = (value) => {
@@ -129,15 +142,7 @@ const INVENTORY_VACCINE_MATCH_ALIASES = Object.freeze({
     "bopv",
     "bivalent oral polio vaccine",
   ],
-  "PCV 13": ["pcv 13", "pcv13"],
-  "PCV 10": ["pcv 10", "pcv10"],
-  "Measles & Rubella (MR)": [
-    "measles rubella",
-    "measles and rubella",
-    "measles & rubella mr",
-    "measles & rubella p",
-    "mr",
-  ],
+  "PCV 13/PCV 10": ["pcv 13", "pcv13", "pcv 10", "pcv10", "pcv 13/pcv 10", "pcv"],
   MMR: ["mmr", "measles mumps rubella"],
   "IPV multi dose": ["ipv multi dose", "inactivated polio vaccine", "ipv"],
 });
@@ -189,6 +194,12 @@ const RIS_EXPORT_PAGE = Object.freeze({
   printPageSize: "legal portrait",
 });
 
+const INVENTORY_PRINT_PAGE_SIZES = {
+  [PRINT_REPORT_TYPES.INVENTORY_SHEET]: "legal portrait",
+  [PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM]: "legal landscape",
+  [PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP]: RIS_EXPORT_PAGE.printPageSize,
+};
+
 const getInventoryReportOrientation = (reportType) =>
   INVENTORY_REPORT_ORIENTATIONS[reportType] ||
   INVENTORY_REPORT_ORIENTATIONS[PRINT_REPORT_TYPES.INVENTORY_SHEET];
@@ -199,9 +210,8 @@ const getInventoryReportWordPagePreset = (reportType) =>
     : PRINT_PAGE_PRESETS.legalLandscape;
 
 const getInventoryPrintPageSize = (reportType) =>
-  reportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP
-    ? RIS_EXPORT_PAGE.printPageSize
-    : `legal ${getInventoryReportOrientation(reportType)}`;
+  INVENTORY_PRINT_PAGE_SIZES[reportType] ||
+  INVENTORY_PRINT_PAGE_SIZES[PRINT_REPORT_TYPES.INVENTORY_SHEET];
 
 export const getInventoryReportPdfConfig = (reportType) => ({
   orientation:
@@ -343,6 +353,12 @@ const DOH_LGU_REPORT_RIGHT_SEAL_SRC = "/stock-form-pasig-seal.png";
 const DOH_LGU_REPORT_FILENAME_PREFIX = "doh-lgu-stock-inventory-report";
 const PASIG_REPORT_SEAL_SRC = "/pasig-logo.png";
 const DOH_REPORT_SEAL_SRC = "/doh-logo.png";
+const INVENTORY_SHEET_LEFT_LOGO_SRC = DOH_REPORT_SEAL_SRC;
+const INVENTORY_SHEET_RIGHT_LOGO_SRC = "/san-nicolas-logo.jpg";
+const INVENTORY_SHEET_ROWS_PER_PAGE = 18;
+const INVENTORY_SHEET_COLUMN_WIDTH_PERCENTAGES = Object.freeze([
+  4, 20, 9, 9, 14, 7, 7, 8, 9, 7, 6,
+]);
 const RIS_REPORT_FILENAME_PREFIX = "requisition-and-issue-slip";
 const RIS_PRIVATE_CLINIC_VALUE = "(leave blank)";
 const DOH_LGU_REPORT_ITEMS = [
@@ -374,24 +390,21 @@ const DOH_LGU_REPORT_ITEMS = [
   },
   {
     rowNumber: "6",
-    label: "Pneumococcal Conjugate Vaccine (PCV10)",
+    label: "Pneumococcal Conjugate Vaccine (PCV 13/PCV 10)",
     aliases: [
       "pneumococcal conjugate vaccine",
       "pcv 10",
       "pcv10",
       "pcv 13",
       "pcv13",
+      "pcv 13/pcv 10",
+      "pcv",
     ],
   },
   {
     rowNumber: "7",
     label: "Measles, Mumps and Rubella (MMR)",
     aliases: ["measles mumps and rubella", "mmr"],
-  },
-  {
-    rowNumber: "8",
-    label: "Measles-Rubella (MR)",
-    aliases: ["measles rubella mr", "measles rubella"],
   },
   {
     rowNumber: "9",
@@ -466,19 +479,7 @@ const RIS_PRIMARY_REPORT_ITEMS = [
     key: "pcv",
     label: "PCV 13 / PCV 10",
     unit: "VIAL",
-    aliases: ["pcv 13", "pcv 10", "pcv13", "pcv10", "pcv 13 / pcv 10", "pcv"],
-  },
-  {
-    key: "mr",
-    label: "Measles & Rubella (MR) 10-doses / 0.5 ml",
-    unit: "VIAL",
-    aliases: ["measles rubella mr", "measles rubella", "mr"],
-  },
-  {
-    key: "mr-diluent",
-    label: "Measles & Rubella (MR) diluent, 5ml",
-    unit: "VIAL",
-    aliases: ["mr diluent", "measles rubella diluent", "diluent 5ml"],
+    aliases: ["pcv 13", "pcv 10", "pcv13", "pcv10", "pcv 13 / pcv 10", "pcv", "pcv 13/pcv 10"],
   },
   {
     key: "mmr",
@@ -593,6 +594,422 @@ const normalizeInventoryNumber = (value, fallback = 0) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
 };
+
+const getInventoryActorDisplayName = (user = {}) => {
+  const fullName = [user.first_name, user.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  if (fullName) {
+    return fullName;
+  }
+
+  return (
+    String(
+      user.display_name ||
+        user.role_display_name ||
+        user.name ||
+        user.username ||
+        "",
+    ).trim() || null
+  );
+};
+
+const decodeInventoryHtmlEntities = (value, maxPasses = 3) => {
+  if (value === undefined || value === null) {
+    return "";
+  }
+
+  let decodedValue = String(value);
+  const safeMaxPasses =
+    Number.isInteger(maxPasses) && maxPasses > 0 ? maxPasses : 1;
+
+  const decodeCodePoint = (rawValue, radix, fallbackMatch) => {
+    const parsedValue = Number.parseInt(rawValue, radix);
+    if (!Number.isInteger(parsedValue) || parsedValue < 0 || parsedValue > 0x10ffff) {
+      return fallbackMatch;
+    }
+
+    try {
+      return String.fromCodePoint(parsedValue);
+    } catch (_error) {
+      return fallbackMatch;
+    }
+  };
+
+  for (let passIndex = 0; passIndex < safeMaxPasses; passIndex += 1) {
+    const previousValue = decodedValue;
+
+    decodedValue = decodedValue
+      .replace(/&#(\d+);/g, (match, numericValue) =>
+        decodeCodePoint(numericValue, 10, match),
+      )
+      .replace(/&#x([0-9a-f]+);/gi, (match, numericValue) =>
+        decodeCodePoint(numericValue, 16, match),
+      )
+      .replace(/&(amp|apos|gt|lt|quot);/gi, (match, entityName) => {
+        switch (entityName.toLowerCase()) {
+          case "amp":
+            return "&";
+          case "apos":
+            return "'";
+          case "gt":
+            return ">";
+          case "lt":
+            return "<";
+          case "quot":
+            return '"';
+          default:
+            return match;
+        }
+      });
+
+    if (decodedValue === previousValue) {
+      break;
+    }
+  }
+
+  return decodedValue;
+};
+
+const normalizeInventoryMovementType = (value) => {
+  const normalized = String(value || "").trim().toUpperCase();
+  return normalized || "UNKNOWN";
+};
+
+const INVENTORY_MOVEMENT_TYPE_META = Object.freeze({
+  RECEIVE: { label: "Receive", badgeVariant: "success", accentClass: "text-green-700 dark:text-green-300", quantityPrefix: "+" },
+  RECEIPT: { label: "Receipt", badgeVariant: "success", accentClass: "text-green-700 dark:text-green-300", quantityPrefix: "+" },
+  ISSUE: { label: "Issue", badgeVariant: "info", accentClass: "text-blue-700 dark:text-blue-300", quantityPrefix: "-" },
+  WASTE: { label: "Waste", badgeVariant: "danger", accentClass: "text-red-700 dark:text-red-300", quantityPrefix: "-" },
+  EXPIRE: { label: "Expired", badgeVariant: "danger", accentClass: "text-red-700 dark:text-red-300", quantityPrefix: "-" },
+  TRANSFER_IN: { label: "Transfer In", badgeVariant: "primary", accentClass: "text-purple-700 dark:text-purple-300", quantityPrefix: "+" },
+  TRANSFER_OUT: { label: "Transfer Out", badgeVariant: "warning", accentClass: "text-orange-700 dark:text-orange-300", quantityPrefix: "-" },
+  ADJUST: { label: "Adjustment", badgeVariant: "secondary", accentClass: "text-gray-700 dark:text-gray-300", quantityPrefix: "" },
+  ADJUSTMENT: { label: "Adjustment", badgeVariant: "secondary", accentClass: "text-gray-700 dark:text-gray-300", quantityPrefix: "" },
+});
+
+const getInventoryMovementTypeMeta = (type) => {
+  const normalizedType = normalizeInventoryMovementType(type);
+  return (
+    INVENTORY_MOVEMENT_TYPE_META[normalizedType] || {
+      label: normalizedType.replace(/_/g, " "),
+      badgeVariant: "secondary",
+      accentClass: "text-gray-700 dark:text-gray-300",
+      quantityPrefix: "",
+    }
+  );
+};
+
+const normalizeInventoryMovementRecord = (row = {}) => {
+  const quantity = normalizeInventoryNumber(row.quantity ?? row.qty, 0);
+  const previousBalance = normalizeInventoryNumber(row.previous_balance, 0);
+  const newBalance = normalizeInventoryNumber(
+    row.new_balance,
+    previousBalance,
+  );
+  const referenceNumber = decodeInventoryHtmlEntities(
+    row.reference_number ?? row.reference ?? row.transaction_number ?? null,
+  ).trim();
+  const notes = decodeInventoryHtmlEntities(row.notes ?? null).trim();
+  const performedByName = decodeInventoryHtmlEntities(
+    row.performed_by_name ?? row.user_name ?? row.username ?? null,
+  ).trim();
+
+  return {
+    ...row,
+    id:
+      row.id ??
+      row.transaction_id ??
+      row.reference_number ??
+      `${row.vaccine_id || row.vaccine_name || "movement"}-${row.created_at || row.transaction_date || ""}-${row.transaction_type || row.txn_type || row.type || ""}`,
+    transaction_type: normalizeInventoryMovementType(
+      row.transaction_type ?? row.txn_type ?? row.type,
+    ),
+    quantity,
+    previous_balance: previousBalance,
+    new_balance: newBalance,
+    vaccine_name:
+      row.vaccine_name ?? row.product_name ?? row.name ?? "Unknown vaccine",
+    lot_batch_number:
+      row.lot_batch_number ??
+      row.batch_number ??
+      row.lot_number ??
+      row.lot_no ??
+      null,
+    reference_number: referenceNumber || null,
+    notes: notes || null,
+    created_at: row.created_at ?? row.transaction_date ?? row.date ?? null,
+    performed_by_name: performedByName || null,
+  };
+};
+
+const formatInventoryMovementDate = (value) => {
+  if (!value) {
+    return "-";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "-";
+  }
+
+  return parsed.toLocaleString();
+};
+
+function StockMovementsPanel({
+  movements,
+  loading,
+  error,
+  onRetry,
+}) {
+  const summary = useMemo(
+    () =>
+      movements.reduce(
+        (result, movement) => {
+          const type = normalizeInventoryMovementType(movement.transaction_type);
+          const quantity = Math.abs(normalizeInventoryNumber(movement.quantity, 0));
+
+          result.totalRecords += 1;
+
+          switch (type) {
+            case "RECEIVE":
+            case "RECEIPT":
+            case "TRANSFER_IN":
+              result.stockIn += quantity;
+              break;
+            case "ISSUE":
+            case "TRANSFER_OUT":
+              result.stockOut += quantity;
+              break;
+            case "WASTE":
+            case "EXPIRE":
+              result.wasted += quantity;
+              break;
+            default:
+              break;
+          }
+
+          return result;
+        },
+        {
+          totalRecords: 0,
+          stockIn: 0,
+          stockOut: 0,
+          wasted: 0,
+        },
+      ),
+    [movements],
+  );
+
+  if (loading && movements.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 print:hidden">
+        <LoadingSpinner size="large" />
+        <p className="mt-4 text-sm font-medium text-gray-600 dark:text-gray-400">
+          Loading stock movement history...
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 print:hidden">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <Card className="border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/70">
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+            Movement Records
+          </p>
+          <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">
+            {summary.totalRecords.toLocaleString()}
+          </p>
+        </Card>
+        <Card className="border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
+          <p className="text-sm font-medium text-green-700 dark:text-green-300">
+            Stock In
+          </p>
+          <p className="mt-2 text-2xl font-bold text-green-900 dark:text-green-200">
+            {summary.stockIn.toLocaleString()}
+          </p>
+        </Card>
+        <Card className="border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+          <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+            Stock Out
+          </p>
+          <p className="mt-2 text-2xl font-bold text-blue-900 dark:text-blue-200">
+            {summary.stockOut.toLocaleString()}
+          </p>
+        </Card>
+        <Card className="border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
+          <p className="text-sm font-medium text-red-700 dark:text-red-300">
+            Wasted / Expired
+          </p>
+          <p className="mt-2 text-2xl font-bold text-red-900 dark:text-red-200">
+            {summary.wasted.toLocaleString()}
+          </p>
+        </Card>
+      </div>
+
+      {error && (
+        <Alert variant="warning" title="Stock movement history unavailable">
+          <div className="space-y-3">
+            <p>{error}</p>
+            <Button onClick={onRetry} size="sm" variant="outline">
+              Retry
+            </Button>
+          </div>
+        </Alert>
+      )}
+
+      <Card className="overflow-hidden">
+        <div className="border-b border-gray-200 bg-gray-50 px-4 py-4 dark:border-gray-700 dark:bg-gray-800/80">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Stock Movement History
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Stock in/out transactions recorded for vaccine inventory.
+              </p>
+            </div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              {loading ? "Refreshing..." : `${movements.length} entries`}
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-white dark:bg-gray-900">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Date
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Type
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Vaccine
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Quantity
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Balance
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Lot / Batch
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Reference / Notes
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Performed By
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+              {movements.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan="8"
+                    className="px-4 py-12 text-center text-sm text-gray-500 dark:text-gray-400"
+                  >
+                    No stock movement transactions found for the selected
+                    inventory records.
+                  </td>
+                </tr>
+              ) : (
+                movements.map((movement) => {
+                  const typeMeta = getInventoryMovementTypeMeta(
+                    movement.transaction_type,
+                  );
+                  const numericQuantity = normalizeInventoryNumber(
+                    movement.quantity,
+                    0,
+                  );
+                  const quantityLabel = typeMeta.quantityPrefix
+                    ? `${typeMeta.quantityPrefix}${Math.abs(numericQuantity).toLocaleString()}`
+                    : `${numericQuantity > 0 ? "+" : ""}${numericQuantity.toLocaleString()}`;
+
+                  return (
+                    <tr
+                      key={movement.id}
+                      className="align-top hover:bg-gray-50 dark:hover:bg-gray-800/80"
+                    >
+                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                        {formatInventoryMovementDate(movement.created_at)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant={typeMeta.badgeVariant}>
+                          {typeMeta.label}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {movement.vaccine_name}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-semibold">
+                        <span className={typeMeta.accentClass}>{quantityLabel}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                        {`${normalizeInventoryNumber(movement.previous_balance, 0).toLocaleString()} -> ${normalizeInventoryNumber(movement.new_balance, 0).toLocaleString()}`}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                        {movement.lot_batch_number || "-"}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                        <div className="space-y-1">
+                          <div>{movement.reference_number || "-"}</div>
+                          {movement.notes ? (
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {movement.notes}
+                            </div>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                        {movement.performed_by_name || "-"}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function InventoryPrintPortal({ children }) {
+  const [portalNode, setPortalNode] = useState(null);
+
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return undefined;
+    }
+
+    const existingNode = document.getElementById("inventory-print-root");
+    const node = existingNode || document.createElement("div");
+    node.id = "inventory-print-root";
+
+    if (!existingNode) {
+      document.body.appendChild(node);
+    }
+
+    setPortalNode(node);
+
+    return () => {
+      if (!existingNode && node.parentNode) {
+        node.parentNode.removeChild(node);
+      }
+    };
+  }, []);
+
+  return portalNode ? createPortal(children, portalNode) : null;
+}
 
 const resolveInventoryVaccineMatch = (item = {}, vaccine = {}) => {
   if (!item || !vaccine) {
@@ -2273,6 +2690,93 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
     background: #fae6e6;
   }
 
+  .inventory-sheet-summary-print-report {
+    width: 100%;
+  }
+
+  .inventory-sheet-summary-print-report__page {
+    width: 100%;
+    max-width: 13.1in;
+    min-height: 7.6in;
+    margin: 0 auto;
+    padding: 0 0 0.08in;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .inventory-sheet-summary-print-report__page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .inventory-sheet-summary-print-header {
+    margin: 0 0 0.18in 0;
+    padding: 0 0 0.14in;
+    border-bottom: 1.2px solid #cbd5e1;
+  }
+
+  .inventory-sheet-summary-print-header__branding {
+    display: grid;
+    grid-template-columns: 0.96in minmax(0, 1fr) 0.96in;
+    align-items: center;
+    gap: 0.18in;
+  }
+
+  .inventory-sheet-summary-print-header__branding-copy {
+    text-align: center;
+  }
+
+  .inventory-sheet-summary-print-header__logo-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .inventory-sheet-summary-print-header__logo {
+    width: 0.9in;
+    height: 0.9in;
+    object-fit: contain;
+  }
+
+  .inventory-sheet-summary-print-header__logo--circle {
+    border-radius: 9999px;
+  }
+
+  .inventory-sheet-summary-print-header__line--government {
+    margin-bottom: 0.04in;
+    font-size: 9.1px;
+  }
+
+  .inventory-sheet-summary-print-header__line--title {
+    margin-top: 0.02in;
+    font-size: 10px;
+    text-transform: none;
+  }
+
+  .inventory-sheet-summary-print-header__detail-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 0.16in;
+  }
+
+  .inventory-sheet-summary-print-header__detail--facility {
+    justify-self: center;
+    text-align: center;
+    font-size: 8.8px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .inventory-sheet-summary-print-header__detail--month {
+    justify-self: end;
+  }
+
+  .inventory-sheet-summary-print-table {
+    margin-top: 0;
+  }
+
   .doh-lgu-stock-print-header {
     padding: 0.16cm 0.2cm 0.13cm;
     border-bottom: 1.2px solid #111827;
@@ -2436,6 +2940,269 @@ const loadImageDataUrl = async (src) => {
   }
 };
 
+const resolveInventorySheetMonthLine = ({
+  reportDate,
+  dateRangeStart,
+  dateRangeEnd,
+  isFiltering,
+}) =>
+  `FOR THE MONTH: ${resolveInventoryReportPeriodLabel({
+    reportDate,
+    dateRangeStart,
+    dateRangeEnd,
+    isFiltering,
+  })}`;
+
+const resolveInventorySheetFacilityName = (facilityInfo = {}) =>
+  String(facilityInfo?.healthCenter || "").trim() ||
+  PRINT_REPORT_COPY.inventorySheetHealthCenterValue;
+
+const buildInventorySheetPages = (
+  printRows = [],
+  rowsPerPage = INVENTORY_SHEET_ROWS_PER_PAGE,
+) => {
+  const normalizedRows = Array.isArray(printRows) ? printRows : [];
+
+  if (normalizedRows.length === 0) {
+    return [[]];
+  }
+
+  const pages = [];
+  for (let index = 0; index < normalizedRows.length; index += rowsPerPage) {
+    pages.push(normalizedRows.slice(index, index + rowsPerPage));
+  }
+
+  return pages;
+};
+
+const buildInventorySheetHeaderContext = ({
+  facilityInfo,
+  reportDate,
+  dateRangeStart,
+  dateRangeEnd,
+  isFiltering,
+  leftLogoSrc = INVENTORY_SHEET_LEFT_LOGO_SRC,
+  rightLogoSrc = INVENTORY_SHEET_RIGHT_LOGO_SRC,
+}) => ({
+  facilityName: resolveInventorySheetFacilityName(facilityInfo),
+  monthLine: resolveInventorySheetMonthLine({
+    reportDate,
+    dateRangeStart,
+    dateRangeEnd,
+    isFiltering,
+  }),
+  leftLogoSrc,
+  rightLogoSrc,
+});
+
+const resolveImageDataUrlFormat = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized.startsWith("data:image/jpeg") ||
+    normalized.startsWith("data:image/jpg")
+    ? "JPEG"
+    : "PNG";
+};
+
+const getInventorySheetPdfColumnStyles = (availableWidth) => {
+  return INVENTORY_SHEET_COLUMN_WIDTH_PERCENTAGES.reduce(
+    (result, percentage, index) => {
+      result[index] = {
+        cellWidth: Number(((availableWidth * percentage) / 100).toFixed(2)),
+        halign: index === 1 ? "left" : "center",
+      };
+      return result;
+    },
+    {},
+  );
+};
+
+const getInventorySheetPdfFillColor = (columnIndex) => {
+  switch (columnIndex) {
+    case 2:
+      return [231, 238, 248];
+    case 3:
+    case 10:
+      return [229, 243, 233];
+    case 4:
+    case 5:
+    case 6:
+      return [247, 248, 250];
+    case 7:
+      return [250, 230, 230];
+    case 8:
+      return [227, 237, 249];
+    case 9:
+      return [251, 243, 216];
+    default:
+      return [255, 255, 255];
+  }
+};
+
+const buildInventorySheetPdfHeaderRows = () => [
+  [
+    { content: "A", rowSpan: 2 },
+    { content: "Items", rowSpan: 2 },
+    { content: "B\nBeginning Balance", rowSpan: 2 },
+    { content: "C\nReceived", rowSpan: 2 },
+    { content: "Lot / Batch Number", rowSpan: 2 },
+    { content: "Stock Movement In / Out", colSpan: 2 },
+    { content: "Expired / Wasted", rowSpan: 2 },
+    { content: "G\nTotal Available", rowSpan: 2 },
+    { content: "H\nIssued", rowSpan: 2 },
+    { content: "I+J\nStock On Hand", rowSpan: 2 },
+  ],
+  [{ content: "In" }, { content: "Out" }],
+];
+
+const buildInventorySheetPdfBodyRows = ({
+  rows,
+  printTotals,
+  showTotals,
+}) => {
+  const bodyRows = rows.map((row) => [
+    row.rowNumber,
+    row.itemName,
+    row.beginningBalance,
+    row.received,
+    row.lotBatchNumber,
+    row.transferredIn,
+    row.transferredOut,
+    row.expiredWasted,
+    row.totalAvailable,
+    row.issued,
+    row.stockOnHand,
+  ]);
+
+  if (showTotals) {
+    bodyRows.push([
+      {
+        content: "TOTAL",
+        colSpan: 2,
+        styles: {
+          halign: "right",
+          fontStyle: "bold",
+          fillColor: [229, 231, 235],
+        },
+      },
+      printTotals.beginningBalance,
+      printTotals.received,
+      "-",
+      printTotals.transferredIn,
+      printTotals.transferredOut,
+      printTotals.expiredWasted,
+      printTotals.totalAvailable,
+      printTotals.issued,
+      printTotals.stockOnHand,
+    ]);
+  }
+
+  return bodyRows;
+};
+
+const drawInventorySheetPdfHeader = ({
+  doc,
+  pageWidth,
+  margin,
+  headerContext,
+  leftLogoImage,
+  rightLogoImage,
+}) => {
+  const centerX = pageWidth / 2;
+  const logoSize = 18;
+  const logoY = margin.top + 1;
+  const leftLogoX = margin.left + 18;
+  const rightLogoX = pageWidth - margin.right - logoSize - 18;
+
+  if (leftLogoImage) {
+    doc.addImage(
+      leftLogoImage,
+      resolveImageDataUrlFormat(leftLogoImage),
+      leftLogoX,
+      logoY,
+      logoSize,
+      logoSize,
+    );
+  }
+
+  if (rightLogoImage) {
+    doc.addImage(
+      rightLogoImage,
+      resolveImageDataUrlFormat(rightLogoImage),
+      rightLogoX,
+      logoY,
+      logoSize,
+      logoSize,
+    );
+  }
+
+  let currentY = margin.top + 3;
+
+  doc.setTextColor(17, 24, 39);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.8);
+  doc.text("Republic of the Philippines", centerX, currentY, {
+    align: "center",
+  });
+
+  currentY += 5.4;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12.4);
+  doc.text(PRINT_REPORT_COPY.inventorySheetTitle, centerX, currentY, {
+    align: "center",
+  });
+
+  currentY += 4.7;
+  doc.setFontSize(10.6);
+  doc.text(PRINT_REPORT_COPY.inventorySheetDepartment, centerX, currentY, {
+    align: "center",
+  });
+
+  currentY += 4.1;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.2);
+  doc.text(PRINT_REPORT_COPY.inventorySheetProgram, centerX, currentY, {
+    align: "center",
+  });
+
+  currentY += 3.9;
+  doc.text(PRINT_REPORT_COPY.inventorySheetProcured, centerX, currentY, {
+    align: "center",
+  });
+
+  currentY += 4.3;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9.4);
+  doc.text(PRINT_REPORT_COPY.inventorySheetHealthCenterLabel, centerX, currentY, {
+    align: "center",
+  });
+
+  currentY += 4.3;
+  doc.setFontSize(10);
+  doc.text(PRINT_REPORT_COPY.inventorySheetInventoryLine, centerX, currentY, {
+    align: "center",
+  });
+
+  currentY += 4.8;
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.25);
+  doc.line(margin.left, currentY, pageWidth - margin.right, currentY);
+
+  currentY += 5.8;
+  doc.setTextColor(17, 24, 39);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.6);
+  doc.text(PRINT_REPORT_COPY.inventorySheetCodeLabel, margin.left, currentY);
+  doc.line(margin.left + 9.5, currentY + 0.3, margin.left + 45, currentY + 0.3);
+  doc.text(headerContext.facilityName, centerX, currentY, {
+    align: "center",
+  });
+  doc.text(headerContext.monthLine, pageWidth - margin.right, currentY, {
+    align: "right",
+  });
+
+  return currentY + 4.8;
+};
+
 const exportInventorySheetPdf = async ({
   facilityInfo,
   reportDate,
@@ -2460,182 +3227,134 @@ const exportInventorySheetPdf = async ({
   });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = { top: 8, right: 8, bottom: 8, left: 8 };
+  const availableWidth = pageWidth - margin.left - margin.right;
   const sanitizedReportDate =
     String(reportDate || "").trim() || new Date().toISOString().split("T")[0];
-  let headerY = 12;
-  const centeredHeaderLines = [
-    { text: PRINT_REPORT_COPY.inventorySheetTitle, fontSize: 13, style: "bold" },
-    {
-      text: PRINT_REPORT_COPY.inventorySheetDepartment,
-      fontSize: 10.4,
-      style: "bold",
-    },
-    {
-      text: PRINT_REPORT_COPY.inventorySheetProgram,
-      fontSize: 9.2,
-      style: "normal",
-    },
-    {
-      text: PRINT_REPORT_COPY.inventorySheetProcured,
-      fontSize: 9.2,
-      style: "normal",
-    },
-    {
-      text: PRINT_REPORT_COPY.inventorySheetHealthCenterLabel,
-      fontSize: 8.9,
-      style: "bold",
-    },
-    {
-      text: PRINT_REPORT_COPY.inventorySheetHealthCenterValue,
-      fontSize: 11,
-      style: "bold",
-    },
-    {
-      text: PRINT_REPORT_COPY.inventorySheetInventoryLine,
-      fontSize: 10,
-      style: "bold",
-    },
-  ];
+  const headerContext = buildInventorySheetHeaderContext({
+    facilityInfo,
+    reportDate,
+    dateRangeStart,
+    dateRangeEnd,
+    isFiltering,
+  });
+  const pageGroups = buildInventorySheetPages(printRows);
+  const [leftLogoImage, rightLogoImage] = await Promise.all([
+    loadImageDataUrl(INVENTORY_SHEET_LEFT_LOGO_SRC),
+    loadImageDataUrl(INVENTORY_SHEET_RIGHT_LOGO_SRC),
+  ]);
 
-  centeredHeaderLines.forEach((line, index) => {
-    doc.setFont("helvetica", line.style);
-    doc.setFontSize(line.fontSize);
-    doc.text(line.text, pageWidth / 2, headerY, {
-      align: "center",
+  pageGroups.forEach((pageRows, pageIndex) => {
+    if (pageIndex > 0) {
+      doc.addPage();
+    }
+
+    const tableStartY = drawInventorySheetPdfHeader({
+      doc,
+      pageWidth,
+      margin,
+      headerContext,
+      leftLogoImage,
+      rightLogoImage,
     });
-    headerY += index === 0 ? 5.3 : 4.3;
-  });
 
-  headerY += 1.4;
-  doc.setDrawColor(203, 213, 225);
-  doc.line(margin.left, headerY, pageWidth - margin.right, headerY);
+    doc.autoTable({
+      startY: tableStartY,
+      margin,
+      theme: "grid",
+      tableWidth: availableWidth,
+      head: buildInventorySheetPdfHeaderRows(),
+      body: buildInventorySheetPdfBodyRows({
+        rows: pageRows,
+        printTotals,
+        showTotals: pageIndex === pageGroups.length - 1,
+      }),
+      styles: {
+        font: "helvetica",
+        fontSize: 7.7,
+        cellPadding: 1.15,
+        textColor: [17, 24, 39],
+        lineColor: [17, 24, 39],
+        lineWidth: 0.26,
+        valign: "middle",
+        halign: "center",
+        overflow: "linebreak",
+      },
+      headStyles: {
+        fillColor: [255, 255, 255],
+        textColor: [17, 24, 39],
+        fontStyle: "bold",
+        halign: "center",
+        valign: "middle",
+      },
+      bodyStyles: {
+        fillColor: [255, 255, 255],
+      },
+      columnStyles: getInventorySheetPdfColumnStyles(availableWidth),
+      didParseCell: (hook) => {
+        if (hook.section === "head") {
+          hook.cell.styles.fillColor = getInventorySheetPdfFillColor(
+            hook.column.index,
+          );
+          hook.cell.styles.fontStyle = "bold";
+        }
 
-  headerY += 5.2;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.8);
-  doc.setTextColor(17, 24, 39);
-  doc.text(PRINT_REPORT_COPY.inventorySheetCodeLabel, margin.left, headerY);
-  doc.line(margin.left + 11, headerY + 0.2, margin.left + 44, headerY + 0.2);
-  doc.text(PRINT_REPORT_COPY.inventorySheetMonthLine, pageWidth - margin.right, headerY, {
-    align: "right",
-  });
+        if (hook.section === "body") {
+          const isTotalsRow =
+            pageIndex === pageGroups.length - 1 &&
+            hook.row.index === pageRows.length;
 
-  doc.autoTable({
-    startY: headerY + 7,
-    margin,
-    theme: "grid",
-    head: [
-      [
-        "A",
-        "Items",
-        "B\nBeginning Balance",
-        "C\nReceived",
-        "Lot / Batch Number",
-        "Movement In",
-        "Movement Out",
-        "Expired / Wasted",
-        "G\nTotal Available",
-        "H\nIssued",
-        "I+J\nStock On Hand",
-      ],
-    ],
-    body: [
-      ...printRows.map((row) => [
-        row.rowNumber,
-        row.itemName,
-        row.beginningBalance,
-        row.received,
-        row.lotBatchNumber,
-        row.transferredIn,
-        row.transferredOut,
-        row.expiredWasted,
-        row.totalAvailable,
-        row.issued,
-        row.stockOnHand,
-      ]),
-      [
-        "",
-        "TOTAL",
-        printTotals.beginningBalance,
-        printTotals.received,
-        "-",
-        printTotals.transferredIn,
-        printTotals.transferredOut,
-        printTotals.expiredWasted,
-        printTotals.totalAvailable,
-        printTotals.issued,
-        printTotals.stockOnHand,
-      ],
-    ],
-    styles: {
-      font: "helvetica",
-      fontSize: 7.2,
-      cellPadding: 0.9,
-      textColor: [0, 0, 0],
-      lineColor: [17, 24, 39],
-      lineWidth: 0.2,
-      valign: "middle",
-      halign: "center",
-      overflow: "linebreak",
-    },
-    headStyles: {
-      fillColor: [255, 255, 255],
-      textColor: [17, 24, 39],
-      fontStyle: "bold",
-    },
-    columnStyles: {
-      0: { cellWidth: 8 },
-      1: { cellWidth: 58, halign: "left" },
-      2: { cellWidth: 17 },
-      3: { cellWidth: 16 },
-      4: { cellWidth: 27, halign: "left" },
-      5: { cellWidth: 15 },
-      6: { cellWidth: 15 },
-      7: { cellWidth: 18 },
-      8: { cellWidth: 18 },
-      9: { cellWidth: 13 },
-      10: { cellWidth: 16 },
-    },
-    didParseCell: (hook) => {
-      if (hook.section === "body" && hook.column.index === 1) {
-        hook.cell.styles.fontStyle = "bold";
-      }
+          if (!(isTotalsRow && hook.column.index === 0)) {
+            hook.cell.styles.fillColor = getInventorySheetPdfFillColor(
+              hook.column.index,
+            );
+          }
 
-      if (
-        hook.section === "body" &&
-        hook.row.index === printRows.length
-      ) {
-        hook.cell.styles.fontStyle = "bold";
-        hook.cell.styles.fillColor = [243, 244, 246];
-      }
-    },
+          if (hook.column.index === 1 || isTotalsRow) {
+            hook.cell.styles.fontStyle = "bold";
+          }
+
+          if (hook.column.index === 1) {
+            hook.cell.styles.halign = "left";
+          }
+        }
+      },
+    });
   });
 
   doc.save(`inventory-sheet-${sanitizedReportDate}.pdf`);
 };
 
-const InventorySheetSummaryPrintReport = ({
-  facilityInfo,
-  reportDate,
-  printRows,
-  printTotals,
-  dateRangeStart,
-  dateRangeEnd,
-  isFiltering,
+const InventorySheetSummaryPrintHeader = ({
+  leftLogoSrc,
+  rightLogoSrc,
+  monthLine,
+  facilityName,
 }) => {
   return (
-    <section
-      className="inventory-sheet-summary-print-report"
-      data-testid="inventory-sheet-print-report"
+    <header
+      className="inventory-sheet-summary-print-header"
+      data-testid="inventory-sheet-print-header"
     >
-      <div className="inventory-sheet-summary-print-report__page">
-        <header
-          className="inventory-sheet-summary-print-header"
-          data-testid="inventory-sheet-print-header"
+      <div className="inventory-sheet-summary-print-header__branding">
+        <div className="inventory-sheet-summary-print-header__logo-wrap">
+          {leftLogoSrc ? (
+            <img
+              src={leftLogoSrc}
+              alt="Department of Health logo"
+              className="inventory-sheet-summary-print-header__logo"
+            />
+          ) : null}
+        </div>
+        <div
+          className="inventory-sheet-summary-print-header__branding-copy"
+          aria-label={`Inventory sheet header for ${facilityName}`}
         >
-          <p className="inventory-sheet-summary-print-header__line inventory-sheet-summary-print-header__line--primary">
-            {PRINT_REPORT_COPY.inventorySheetTitle}
+          <p className="inventory-sheet-summary-print-header__line inventory-sheet-summary-print-header__line--government">
+            Republic of the Philippines
           </p>
+          <h1 className="inventory-sheet-summary-print-header__line inventory-sheet-summary-print-header__line--primary">
+            {PRINT_REPORT_COPY.inventorySheetTitle}
+          </h1>
           <p className="inventory-sheet-summary-print-header__line inventory-sheet-summary-print-header__line--department">
             {PRINT_REPORT_COPY.inventorySheetDepartment}
           </p>
@@ -2648,163 +3367,217 @@ const InventorySheetSummaryPrintReport = ({
           <p className="inventory-sheet-summary-print-header__line inventory-sheet-summary-print-header__line--label">
             {PRINT_REPORT_COPY.inventorySheetHealthCenterLabel}
           </p>
-          <p className="inventory-sheet-summary-print-header__line inventory-sheet-summary-print-header__line--facility">
-            {PRINT_REPORT_COPY.inventorySheetHealthCenterValue}
-          </p>
           <h2 className="inventory-sheet-summary-print-header__line inventory-sheet-summary-print-header__line--title">
             {PRINT_REPORT_COPY.inventorySheetInventoryLine}
           </h2>
-          <div className="inventory-sheet-summary-print-header__detail-row">
-            <p className="inventory-sheet-summary-print-header__detail">
-              <span>{PRINT_REPORT_COPY.inventorySheetCodeLabel}</span>
-              <span
-                className="inventory-sheet-summary-print-header__detail-value"
-                aria-hidden="true"
-              />
-            </p>
-            <p
-              className="inventory-sheet-summary-print-header__detail inventory-sheet-summary-print-header__detail--month"
-              data-testid="inventory-sheet-print-month-year"
-            >
-              {PRINT_REPORT_COPY.inventorySheetMonthLine}
-            </p>
-          </div>
-        </header>
-
-        <table
-          className="inventory-sheet-summary-print-table"
-          data-testid="inventory-sheet-print-table"
-        >
-          <colgroup>
-            <col style={{ width: "4%" }} />
-            <col style={{ width: "20%" }} />
-            <col style={{ width: "9%" }} />
-            <col style={{ width: "9%" }} />
-            <col style={{ width: "14%" }} />
-            <col style={{ width: "7%" }} />
-            <col style={{ width: "7%" }} />
-            <col style={{ width: "8%" }} />
-            <col style={{ width: "9%" }} />
-            <col style={{ width: "7%" }} />
-            <col style={{ width: "6%" }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <th rowSpan={2} className="print-col-base">A</th>
-              <th rowSpan={2} className="print-col-base print-col-items">Items</th>
-              <th rowSpan={2} className="print-col-base print-col-beginning">
-                B
-                <br />
-                Beginning Balance
-              </th>
-              <th rowSpan={2} className="print-col-base print-col-received">
-                C
-                <br />
-                Received
-              </th>
-              <th rowSpan={2} className="print-col-base print-col-lot">
-                Lot / Batch Number
-              </th>
-              <th colSpan={2} className="print-col-base print-col-movement">
-                Stock Movement In / Out
-              </th>
-              <th rowSpan={2} className="print-col-base print-col-expired">
-                Expired / Wasted
-              </th>
-              <th rowSpan={2} className="print-col-base print-col-total">
-                G
-                <br />
-                Total Available
-              </th>
-              <th rowSpan={2} className="print-col-base print-col-issued">
-                H
-                <br />
-                Issued
-              </th>
-              <th rowSpan={2} className="print-col-base print-col-stock">
-                I+J
-                <br />
-                Stock On Hand
-              </th>
-            </tr>
-            <tr>
-              <th className="print-col-base print-col-movement">In</th>
-              <th className="print-col-base print-col-movement">Out</th>
-            </tr>
-          </thead>
-          <tbody>
-            {printRows.map((item) => (
-              <tr key={`inventory-sheet-print-${item.id}`}>
-                <td className="print-col-base print-col-center">{item.rowNumber}</td>
-                <td className="print-col-base print-col-items print-col-item-name">
-                  {item.itemName}
-                </td>
-                <td className="print-col-base print-col-beginning print-col-center">
-                  {item.beginningBalance}
-                </td>
-                <td className="print-col-base print-col-received print-col-center">
-                  {item.received}
-                </td>
-                <td className="print-col-base print-col-lot print-col-center">
-                  {item.lotBatchNumber}
-                </td>
-                <td className="print-col-base print-col-movement print-col-center">
-                  {item.transferredIn}
-                </td>
-                <td className="print-col-base print-col-movement print-col-center">
-                  {item.transferredOut}
-                </td>
-                <td className="print-col-base print-col-expired print-col-center">
-                  {item.expiredWasted}
-                </td>
-                <td className="print-col-base print-col-total print-col-center">
-                  {item.totalAvailable}
-                </td>
-                <td className="print-col-base print-col-issued print-col-center">
-                  {item.issued}
-                </td>
-                <td className="print-col-base print-col-stock print-col-center">
-                  {item.stockOnHand}
-                </td>
-              </tr>
-            ))}
-
-            <tr
-              className="inventory-sheet-summary-print-total-row"
-              data-testid="inventory-sheet-print-total-row"
-            >
-              <td className="print-col-base print-col-total-label" colSpan={2}>
-                TOTAL
-              </td>
-              <td className="print-col-base print-col-beginning print-col-center">
-                {printTotals.beginningBalance}
-              </td>
-              <td className="print-col-base print-col-received print-col-center">
-                {printTotals.received}
-              </td>
-              <td className="print-col-base print-col-lot print-col-center">-</td>
-              <td className="print-col-base print-col-movement print-col-center">
-                {printTotals.transferredIn}
-              </td>
-              <td className="print-col-base print-col-movement print-col-center">
-                {printTotals.transferredOut}
-              </td>
-              <td className="print-col-base print-col-expired print-col-center">
-                {printTotals.expiredWasted}
-              </td>
-              <td className="print-col-base print-col-total print-col-center">
-                {printTotals.totalAvailable}
-              </td>
-              <td className="print-col-base print-col-issued print-col-center">
-                {printTotals.issued}
-              </td>
-              <td className="print-col-base print-col-stock print-col-center">
-                {printTotals.stockOnHand}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        </div>
+        <div className="inventory-sheet-summary-print-header__logo-wrap">
+          {rightLogoSrc ? (
+            <img
+              src={rightLogoSrc}
+              alt="San Nicolas Health Center logo"
+              className="inventory-sheet-summary-print-header__logo inventory-sheet-summary-print-header__logo--circle"
+            />
+          ) : null}
+        </div>
       </div>
+      <div className="inventory-sheet-summary-print-header__detail-row">
+        <p className="inventory-sheet-summary-print-header__detail">
+          <span>{PRINT_REPORT_COPY.inventorySheetCodeLabel}</span>
+          <span
+            className="inventory-sheet-summary-print-header__detail-value"
+            aria-hidden="true"
+          />
+        </p>
+        <p className="inventory-sheet-summary-print-header__detail inventory-sheet-summary-print-header__detail--facility">
+          {facilityName}
+        </p>
+        <p
+          className="inventory-sheet-summary-print-header__detail inventory-sheet-summary-print-header__detail--month"
+          data-testid="inventory-sheet-print-month-year"
+        >
+          {monthLine}
+        </p>
+      </div>
+    </header>
+  );
+};
+
+const InventorySheetSummaryPrintReport = ({
+  facilityInfo,
+  reportDate,
+  printRows,
+  printTotals,
+  dateRangeStart,
+  dateRangeEnd,
+  isFiltering,
+  leftLogoSrc = INVENTORY_SHEET_LEFT_LOGO_SRC,
+  rightLogoSrc = INVENTORY_SHEET_RIGHT_LOGO_SRC,
+}) => {
+  const headerContext = buildInventorySheetHeaderContext({
+    facilityInfo,
+    reportDate,
+    dateRangeStart,
+    dateRangeEnd,
+    isFiltering,
+    leftLogoSrc,
+    rightLogoSrc,
+  });
+  const pageGroups = buildInventorySheetPages(printRows);
+
+  return (
+    <section
+      className="inventory-sheet-summary-print-report"
+      data-testid="inventory-sheet-print-report"
+    >
+      {pageGroups.map((pageRows, pageIndex) => (
+        <article
+          key={`inventory-sheet-print-page-${pageIndex + 1}`}
+          className="inventory-sheet-summary-print-report__page"
+          data-testid="inventory-sheet-print-page"
+        >
+          <InventorySheetSummaryPrintHeader {...headerContext} />
+
+          <table
+            className="inventory-sheet-summary-print-table"
+            data-testid="inventory-sheet-print-table"
+          >
+            <colgroup>
+              {INVENTORY_SHEET_COLUMN_WIDTH_PERCENTAGES.map((width, index) => (
+                <col
+                  key={`inventory-sheet-col-${index}`}
+                  style={{ width: `${width}%` }}
+                />
+              ))}
+            </colgroup>
+            <thead>
+              <tr>
+                <th rowSpan={2} className="print-col-base">
+                  A
+                </th>
+                <th rowSpan={2} className="print-col-base print-col-items">
+                  Items
+                </th>
+                <th rowSpan={2} className="print-col-base print-col-beginning">
+                  B
+                  <br />
+                  Beginning Balance
+                </th>
+                <th rowSpan={2} className="print-col-base print-col-received">
+                  C
+                  <br />
+                  Received
+                </th>
+                <th rowSpan={2} className="print-col-base print-col-lot">
+                  Lot / Batch Number
+                </th>
+                <th colSpan={2} className="print-col-base print-col-movement">
+                  Stock Movement In / Out
+                </th>
+                <th rowSpan={2} className="print-col-base print-col-expired">
+                  Expired / Wasted
+                </th>
+                <th rowSpan={2} className="print-col-base print-col-total">
+                  G
+                  <br />
+                  Total Available
+                </th>
+                <th rowSpan={2} className="print-col-base print-col-issued">
+                  H
+                  <br />
+                  Issued
+                </th>
+                <th rowSpan={2} className="print-col-base print-col-stock">
+                  I+J
+                  <br />
+                  Stock On Hand
+                </th>
+              </tr>
+              <tr>
+                <th className="print-col-base print-col-movement">In</th>
+                <th className="print-col-base print-col-movement">Out</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pageRows.map((item) => (
+                <tr key={`inventory-sheet-print-${pageIndex + 1}-${item.id}`}>
+                  <td className="print-col-base print-col-center">
+                    {item.rowNumber}
+                  </td>
+                  <td className="print-col-base print-col-items print-col-item-name">
+                    {item.itemName}
+                  </td>
+                  <td className="print-col-base print-col-beginning print-col-center">
+                    {item.beginningBalance}
+                  </td>
+                  <td className="print-col-base print-col-received print-col-center">
+                    {item.received}
+                  </td>
+                  <td className="print-col-base print-col-lot print-col-center">
+                    {item.lotBatchNumber}
+                  </td>
+                  <td className="print-col-base print-col-movement print-col-center">
+                    {item.transferredIn}
+                  </td>
+                  <td className="print-col-base print-col-movement print-col-center">
+                    {item.transferredOut}
+                  </td>
+                  <td className="print-col-base print-col-expired print-col-center">
+                    {item.expiredWasted}
+                  </td>
+                  <td className="print-col-base print-col-total print-col-center">
+                    {item.totalAvailable}
+                  </td>
+                  <td className="print-col-base print-col-issued print-col-center">
+                    {item.issued}
+                  </td>
+                  <td className="print-col-base print-col-stock print-col-center">
+                    {item.stockOnHand}
+                  </td>
+                </tr>
+              ))}
+
+              {pageIndex === pageGroups.length - 1 && (
+                <tr
+                  className="inventory-sheet-summary-print-total-row"
+                  data-testid="inventory-sheet-print-total-row"
+                >
+                  <td className="print-col-base print-col-total-label" colSpan={2}>
+                    TOTAL
+                  </td>
+                  <td className="print-col-base print-col-beginning print-col-center">
+                    {printTotals.beginningBalance}
+                  </td>
+                  <td className="print-col-base print-col-received print-col-center">
+                    {printTotals.received}
+                  </td>
+                  <td className="print-col-base print-col-lot print-col-center">
+                    -
+                  </td>
+                  <td className="print-col-base print-col-movement print-col-center">
+                    {printTotals.transferredIn}
+                  </td>
+                  <td className="print-col-base print-col-movement print-col-center">
+                    {printTotals.transferredOut}
+                  </td>
+                  <td className="print-col-base print-col-expired print-col-center">
+                    {printTotals.expiredWasted}
+                  </td>
+                  <td className="print-col-base print-col-total print-col-center">
+                    {printTotals.totalAvailable}
+                  </td>
+                  <td className="print-col-base print-col-issued print-col-center">
+                    {printTotals.issued}
+                  </td>
+                  <td className="print-col-base print-col-stock print-col-center">
+                    {printTotals.stockOnHand}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </article>
+      ))}
     </section>
   );
 };
@@ -3204,6 +3977,8 @@ export default function InventoryManagement() {
   const [activeTab, setActiveTab] = useState(
     () => tabFromUrl || getStoredInventoryTabKey() || INVENTORY_DEFAULT_TAB_KEY,
   );
+  const resolvedActiveTab =
+    normalizeInventoryTabKey(activeTab) || INVENTORY_DEFAULT_TAB_KEY;
 
   useEffect(() => {
     const resolvedTab =
@@ -3214,7 +3989,7 @@ export default function InventoryManagement() {
     );
     persistInventoryTabKey(resolvedTab);
 
-    if (!tabFromUrl) {
+    if (searchParams.get("tab") !== resolvedTab) {
       const nextSearchParams = new URLSearchParams(searchParams);
       nextSearchParams.set("tab", resolvedTab);
       setSearchParams(nextSearchParams, { replace: true });
@@ -3224,6 +3999,9 @@ export default function InventoryManagement() {
   // Data states
   const [inventory, setInventory] = useState([]);
   const [inventoryReportSource, setInventoryReportSource] = useState([]);
+  const [stockMovements, setStockMovements] = useState([]);
+  const [stockMovementsLoading, setStockMovementsLoading] = useState(false);
+  const [stockMovementsError, setStockMovementsError] = useState(null);
   const [persistedStockAlerts, setPersistedStockAlerts] = useState([]);
   const [stockAlertFeedback, setStockAlertFeedback] = useState(null);
   const [stockAlertLoadError, setStockAlertLoadError] = useState(null);
@@ -3239,6 +4017,7 @@ export default function InventoryManagement() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [formData, setFormData] = useState({});
   const [transactionErrors, setTransactionErrors] = useState({});
+  const [transactionSubmitError, setTransactionSubmitError] = useState(null);
   const [isPrintLayoutActive, setIsPrintLayoutActive] = useState(false);
   const [activePrintReportType, setActivePrintReportType] = useState(null);
   const [selectedExportReportType, setSelectedExportReportType] = useState(
@@ -3331,6 +4110,78 @@ export default function InventoryManagement() {
     }
   }, [canManageStockAlertActions, fallbackClinicId]);
 
+  const loadStockMovements = useCallback(async () => {
+    if (typeof apiClient.getVaccineInventoryTransactions !== "function") {
+      setStockMovements([]);
+      setStockMovementsError(null);
+      return [];
+    }
+
+    try {
+      setStockMovementsLoading(true);
+      setStockMovementsError(null);
+
+      const response = await apiClient.getVaccineInventoryTransactions(null, {
+        clinic_id: fallbackClinicId,
+        limit: 250,
+      });
+
+      let movementRows = [];
+      if (response && response.success !== undefined) {
+        if (Array.isArray(response.data)) {
+          movementRows = response.data;
+        } else if (Array.isArray(response.transactions)) {
+          movementRows = response.transactions;
+        } else if (Array.isArray(response.data?.transactions)) {
+          movementRows = response.data.transactions;
+        }
+      } else if (Array.isArray(response)) {
+        movementRows = response;
+      } else if (Array.isArray(response?.transactions)) {
+        movementRows = response.transactions;
+      }
+
+      const currentActorName = getInventoryActorDisplayName(user);
+      const normalizedMovements = movementRows
+        .map(normalizeInventoryMovementRecord)
+        .map((movement) => {
+          if (movement.performed_by_name || !currentActorName) {
+            return movement;
+          }
+
+          const rawPerformedBy =
+            movement.performed_by ??
+            movement.performed_by_id ??
+            movement.user_id ??
+            null;
+
+          if (
+            rawPerformedBy !== null &&
+            rawPerformedBy !== undefined &&
+            String(rawPerformedBy) === String(user?.id)
+          ) {
+            return {
+              ...movement,
+              performed_by_name: currentActorName,
+            };
+          }
+
+          return movement;
+        });
+      setStockMovements(normalizedMovements);
+      return normalizedMovements;
+    } catch (movementErr) {
+      console.error("Stock movement history load failed:", movementErr);
+      setStockMovements([]);
+      setStockMovementsError(
+        movementErr?.message || "Failed to load stock movement history.",
+      );
+      return [];
+    } finally {
+      setStockMovementsLoading(false);
+    }
+  }, [fallbackClinicId, user]);
+
   // Fetch data
   const fetchData = useCallback(async () => {
     try {
@@ -3401,7 +4252,10 @@ export default function InventoryManagement() {
         initializeInventory();
       }
 
-      await fetchPersistedStockAlerts();
+      await Promise.all([
+        loadStockMovements(),
+        fetchPersistedStockAlerts(),
+      ]);
 
       // Try to fetch facility info from API
       try {
@@ -3439,6 +4293,7 @@ export default function InventoryManagement() {
     fallbackClinicId,
     fetchPersistedStockAlerts,
     initializeInventory,
+    loadStockMovements,
     vaccineItems,
   ]);
 
@@ -3571,6 +4426,18 @@ export default function InventoryManagement() {
       ],
     });
   }, [inventoryReportSource, isFiltering, dateRangeStart, dateRangeEnd]);
+
+  const filteredStockMovements = useMemo(() => {
+    if (!isFiltering || !dateRangeStart || !dateRangeEnd) {
+      return stockMovements;
+    }
+
+    return filterItemsByPrintDateRange(stockMovements, {
+      startDate: dateRangeStart,
+      endDate: dateRangeEnd,
+      getItemDates: (item) => [item.created_at, item.transaction_date],
+    });
+  }, [stockMovements, isFiltering, dateRangeStart, dateRangeEnd]);
 
   const trackedInventory = useMemo(
     () => inventory.filter((item) => shouldPersistInventoryRow(item)),
@@ -3715,6 +4582,7 @@ export default function InventoryManagement() {
     setModalType(type);
     setSelectedItem(item);
     setTransactionErrors({});
+    setTransactionSubmitError(null);
     setFormData({
       quantity: "",
       lot_number: "",
@@ -3763,6 +4631,8 @@ export default function InventoryManagement() {
     event.preventDefault();
     if (!selectedItem) return;
 
+    setTransactionSubmitError(null);
+
     const nextErrors = {};
     const quantityCheck = validateNumberRange(formData.quantity, {
       label: "Quantity",
@@ -3793,13 +4663,24 @@ export default function InventoryManagement() {
     }
 
     const lotNumber = sanitizeText(formData.lot_number, { maxLength: 50 });
+    const expiryDateInput = sanitizeText(formData.expiry_date);
+    const expiryDateCheck = validateDate(expiryDateInput, {
+      label: "Expiry date",
+      required: modalType === "receive",
+    });
+    const expiryDate = expiryDateCheck.value;
     if (modalType === "receive") {
       if (!lotNumber) {
         nextErrors.lot_number = "Lot/Batch number is required for received stock.";
       }
-      if (!formData.expiry_date) {
-        nextErrors.expiry_date = "Expiry date is required for received stock.";
-      }
+    }
+
+    if ((modalType === "receive" || expiryDateInput) && (expiryDateCheck.error || !expiryDate)) {
+      nextErrors.expiry_date =
+        expiryDateCheck.error || "A valid expiry date is required.";
+    } else if (expiryDate && transactionDate && expiryDate < transactionDate) {
+      nextErrors.expiry_date =
+        "Expiry date must be on or after the transaction date.";
     }
 
     const lotNumberLengthError = validateLength(lotNumber, {
@@ -3839,12 +4720,12 @@ export default function InventoryManagement() {
     }
 
     try {
-      setError(null);
       setTransactionErrors({});
+      setTransactionSubmitError(null);
 
       const matchedInventory = inventory.find((item) => item.id === selectedItem.id);
       if (!matchedInventory) {
-        setError("Selected inventory item was not found.");
+        setTransactionSubmitError("Selected inventory item was not found.");
         return;
       }
 
@@ -3855,18 +4736,37 @@ export default function InventoryManagement() {
       // For RECEIVE transactions, we can auto-create the inventory record if it doesn't exist
       // For other transaction types, the inventory record must exist first
       if (!dbInventoryId && modalType !== 'receive') {
-        setError("Please save the inventory record first before creating transactions. Click on the Save Inventory button to save your current inventory data to the database.");
+        setTransactionSubmitError("Please save the inventory record first before creating transactions. Click on the Save Inventory button to save your current inventory data to the database.");
         return;
       }
       
       if (!matchedVaccineId) {
-        setError("Vaccine ID not found. Please ensure the vaccine is properly configured.");
+        setTransactionSubmitError("Vaccine ID not found. Please ensure the vaccine is properly configured.");
         return;
       }
 
       // Ensure clinic_id is always set
-      const matchedFacilityId = resolveInventorySaveRowId(matchedInventory._facilityId);
+      const matchedFacilityId =
+        resolveInventorySaveRowId(matchedInventory._facilityId) ||
+        resolveInventorySaveRowId(matchedInventory.clinic_id) ||
+        resolveInventorySaveRowId(matchedInventory.facility_id);
       const clinicId = matchedFacilityId || Number(fallbackClinicId) || 1;
+      const effectiveLotNumber =
+        lotNumber ||
+        sanitizeText(
+          matchedInventory.lot_batch_number || matchedInventory.lot_number,
+          { maxLength: 50 },
+        );
+      const effectiveExpiryDate =
+        expiryDateInput ||
+        sanitizeText(matchedInventory.expiry_date, { maxLength: 10 });
+
+      if (!Number.isInteger(Number(clinicId)) || Number(clinicId) < 1) {
+        setTransactionSubmitError(
+          "Clinic ID not found. Please refresh the page and try again.",
+        );
+        return;
+      }
 
       console.log('🔍 Transaction Debug Info:');
       console.log('- modalType:', modalType);
@@ -3884,18 +4784,18 @@ export default function InventoryManagement() {
         quantity: Number(qty),
         transaction_date: formData.date,
         vaccine_id: matchedVaccineId,
-        clinic_id: clinicId,
+        clinic_id: Number(clinicId),
       };
 
-      if (lotNumber) {
-        payload.lot_number = lotNumber;
-        payload.lot_batch_number = lotNumber;
+      if (effectiveLotNumber) {
+        payload.lot_number = effectiveLotNumber;
+        payload.lot_batch_number = effectiveLotNumber;
       }
       if (normalizedNotes) {
         payload.notes = normalizedNotes;
       }
-      if (formData.expiry_date) {
-        payload.expiry_date = formData.expiry_date;
+      if (effectiveExpiryDate) {
+        payload.expiry_date = effectiveExpiryDate;
       }
 
       console.log('📤 Sending transaction payload:', JSON.stringify(payload, null, 2));
@@ -3958,6 +4858,7 @@ export default function InventoryManagement() {
 
       setShowModal(false);
       setTransactionErrors({});
+      setTransactionSubmitError(null);
 
       // Broadcast event so other charts and dashboards update their inventory figures instantly
       window.dispatchEvent(new CustomEvent("inventory-update"));
@@ -3969,7 +4870,16 @@ export default function InventoryManagement() {
           ...backendFields,
         }));
       }
-      setError(err.response?.data?.error || err.message || "Failed to save inventory transaction.");
+      const firstBackendFieldError = Object.values(backendFields).find(
+        (value) => typeof value === "string" && value.trim(),
+      );
+      setTransactionSubmitError(
+        firstBackendFieldError ||
+          err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          err.message ||
+          "Failed to save inventory transaction.",
+      );
     }
   };
 
@@ -3981,7 +4891,7 @@ export default function InventoryManagement() {
     const normalizedReportType = normalizeInventoryReportType(reportType);
 
     // Ensure we're on the inventory sheet tab
-    if (activeTab !== INVENTORY_DEFAULT_TAB_KEY) {
+    if (resolvedActiveTab !== INVENTORY_DEFAULT_TAB_KEY) {
       handleTabChange(INVENTORY_DEFAULT_TAB_KEY);
     }
 
@@ -4425,7 +5335,7 @@ export default function InventoryManagement() {
     }
   };
 
-  const downloadSelectedWord = useCallback((reportTypeOverride) => {
+  const downloadSelectedWord = useCallback(async (reportTypeOverride) => {
     if (!printDateRange.ensureReadyForPrint()) {
       return;
     }
@@ -4446,16 +5356,23 @@ export default function InventoryManagement() {
       };
 
       if (reportType === PRINT_REPORT_TYPES.INVENTORY_SHEET) {
+        const [embeddedLeftLogoSrc, embeddedRightLogoSrc] = await Promise.all([
+          loadImageDataUrl(INVENTORY_SHEET_LEFT_LOGO_SRC),
+          loadImageDataUrl(INVENTORY_SHEET_RIGHT_LOGO_SRC),
+        ]);
+
         downloadWordDocument({
           html: buildInventorySheetWordHtml({
             ...commonProps,
             printRows,
             printTotals,
+            leftLogoSrc: embeddedLeftLogoSrc || INVENTORY_SHEET_LEFT_LOGO_SRC,
+            rightLogoSrc: embeddedRightLogoSrc || INVENTORY_SHEET_RIGHT_LOGO_SRC,
           }),
           filename: `inventory-sheet-${reportDate || "report"}.docx`,
           title: PRINT_REPORT_COPY.inventorySheetTitle,
-          headerText: PRINT_REPORT_COPY.inventorySheetTitle,
-          footerText: "Immunicare inventory sheet",
+          headerText: "",
+          footerText: "",
           page: getInventoryReportWordPagePreset(reportType),
         });
         return;
@@ -4519,6 +5436,38 @@ export default function InventoryManagement() {
 
   const downloadPDF = () => downloadSelectedPdf(PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM);
   const downloadRisPdf = () => downloadSelectedPdf(PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP);
+  const activePrintReportMarkup =
+    isPrintLayoutActive &&
+    (activePrintReportType === PRINT_REPORT_TYPES.INVENTORY_SHEET ? (
+      <InventorySheetSummaryPrintReport
+        facilityInfo={facilityInfo}
+        reportDate={reportDate}
+        printRows={printRows}
+        printTotals={printTotals}
+        dateRangeStart={dateRangeStart}
+        dateRangeEnd={dateRangeEnd}
+        isFiltering={isFiltering}
+      />
+    ) : activePrintReportType === PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM ? (
+      <DohLguStockInventoryPrintReport
+        facilityInfo={facilityInfo}
+        reportDate={reportDate}
+        reportRows={reportRows}
+        dateRangeStart={dateRangeStart}
+        dateRangeEnd={dateRangeEnd}
+        isFiltering={isFiltering}
+      />
+    ) : activePrintReportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP ? (
+      <RequisitionIssueSlipPrintReport
+        facilityInfo={facilityInfo}
+        reportDate={reportDate}
+        reportRows={risReportRows}
+        controlNumber={risControlNumber}
+        dateRangeStart={dateRangeStart}
+        dateRangeEnd={dateRangeEnd}
+        isFiltering={isFiltering}
+      />
+    ) : null);
 
   if (loading) {
     return (
@@ -4544,7 +5493,10 @@ export default function InventoryManagement() {
   const totals = calculateTotals();
 
   return (
-    <div className="inventory-management flex h-full min-h-0 flex-col gap-4 overflow-y-auto modern-scrollbar p-4">
+    <div
+      className="inventory-management flex h-full min-h-0 flex-col gap-4 overflow-y-auto modern-scrollbar p-4"
+      data-active-tab={resolvedActiveTab}
+    >
       {/* Header - Hidden on Print */}
       <div className="print:hidden">
         <PageHeader
@@ -4563,8 +5515,11 @@ export default function InventoryManagement() {
         <div className="mt-4 flex space-x-2 overflow-x-auto bg-gray-100 dark:bg-gray-800 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700">
           <button
             onClick={() => handleTabChange("inventory_sheet")}
+            aria-controls={INVENTORY_TAB_PANEL_IDS.inventory_sheet}
+            aria-pressed={resolvedActiveTab === "inventory_sheet"}
+            data-tab-key="inventory_sheet"
             className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
-              activeTab === "inventory_sheet"
+              resolvedActiveTab === "inventory_sheet"
                 ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
                 : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
             }`}
@@ -4573,15 +5528,18 @@ export default function InventoryManagement() {
             <span>Inventory Sheet</span>
           </button>
           <button
-            onClick={() => handleTabChange("stock_alerts")}
+            onClick={() => handleTabChange("inventory_summary")}
+            aria-controls={INVENTORY_TAB_PANEL_IDS.inventory_summary}
+            aria-pressed={resolvedActiveTab === "inventory_summary"}
+            data-tab-key="inventory_summary"
             className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap relative ${
-              activeTab === "stock_alerts"
+              resolvedActiveTab === "inventory_summary"
                 ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
                 : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
             }`}
           >
-            <span>⚠️</span>
-            <span>Stock Alerts</span>
+            <span>📊</span>
+            <span>Inventory Summary</span>
             {stockAlerts.critical.length > 0 && (
               <span className="ml-2 px-2 py-0.5 text-xs bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 rounded-full">
                 {stockAlerts.critical.length}
@@ -4589,61 +5547,33 @@ export default function InventoryManagement() {
             )}
           </button>
           <button
-            onClick={() => handleTabChange("vaccine_monitoring")}
+            onClick={() => handleTabChange("stock_movements")}
+            aria-controls={INVENTORY_TAB_PANEL_IDS.stock_movements}
+            aria-pressed={resolvedActiveTab === "stock_movements"}
+            data-tab-key="stock_movements"
             className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
-              activeTab === "vaccine_monitoring"
+              resolvedActiveTab === "stock_movements"
                 ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
                 : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
             }`}
           >
-            <span>📈</span>
-            <span>Vaccine Monitoring</span>
+            <span>📦</span>
+            <span>Stock Movements</span>
           </button>
         </div>
       </div>
 
-      {isPrintLayoutActive &&
-        activePrintReportType === PRINT_REPORT_TYPES.INVENTORY_SHEET && (
-          <InventorySheetSummaryPrintReport
-            facilityInfo={facilityInfo}
-            reportDate={reportDate}
-            printRows={printRows}
-            printTotals={printTotals}
-            dateRangeStart={dateRangeStart}
-            dateRangeEnd={dateRangeEnd}
-            isFiltering={isFiltering}
-          />
-        )}
-
-      {isPrintLayoutActive &&
-        activePrintReportType === PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM && (
-          <DohLguStockInventoryPrintReport
-            facilityInfo={facilityInfo}
-            reportDate={reportDate}
-            reportRows={reportRows}
-            dateRangeStart={dateRangeStart}
-            dateRangeEnd={dateRangeEnd}
-            isFiltering={isFiltering}
-          />
-        )}
-
-      {isPrintLayoutActive &&
-        activePrintReportType ===
-          PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP && (
-          <RequisitionIssueSlipPrintReport
-            facilityInfo={facilityInfo}
-            reportDate={reportDate}
-            reportRows={risReportRows}
-            controlNumber={risControlNumber}
-            dateRangeStart={dateRangeStart}
-            dateRangeEnd={dateRangeEnd}
-            isFiltering={isFiltering}
-          />
-        )}
+      {activePrintReportMarkup ? (
+        <InventoryPrintPortal>{activePrintReportMarkup}</InventoryPrintPortal>
+      ) : null}
 
       {/* Inventory Sheet Tab - This is the ONLY content that will print */}
-      {activeTab === "inventory_sheet" && (
-        <div className="inventory-sheet-print-area space-y-3 print:space-y-1">
+      {resolvedActiveTab === "inventory_sheet" && (
+        <section
+          id={INVENTORY_TAB_PANEL_IDS.inventory_sheet}
+          data-testid="inventory-sheet-panel"
+          className="inventory-sheet-print-area space-y-3 print:space-y-1"
+        >
           <div className="print:hidden">
             <div className="rounded-2xl border border-gray-200 bg-white/90 p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/90">
               <div className="flex flex-wrap items-end gap-3 xl:flex-nowrap xl:gap-2.5">
@@ -4797,41 +5727,6 @@ export default function InventoryManagement() {
                   {printDateRange.activeDateRangeLabel}
                 </div>
               )}
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-              <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
-                <p className="text-xs font-medium uppercase tracking-wide text-blue-700 dark:text-blue-300">
-                  Inventory Items
-                </p>
-                <p className="mt-1 text-2xl font-bold text-blue-900 dark:text-blue-100">
-                  {inventorySummaryStats.total_items}
-                </p>
-              </div>
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
-                <p className="text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
-                  Low Stock
-                </p>
-                <p className="mt-1 text-2xl font-bold text-amber-900 dark:text-amber-100">
-                  {inventorySummaryStats.low_stock_items}
-                </p>
-              </div>
-              <div className="rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20">
-                <p className="text-xs font-medium uppercase tracking-wide text-red-700 dark:text-red-300">
-                  Expired Lots
-                </p>
-                <p className="mt-1 text-2xl font-bold text-red-900 dark:text-red-100">
-                  {inventorySummaryStats.expired_items}
-                </p>
-              </div>
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-800 dark:bg-emerald-900/20">
-                <p className="text-xs font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                  Stock On Hand
-                </p>
-                <p className="mt-1 text-2xl font-bold text-emerald-900 dark:text-emerald-100">
-                  {totals.stock_on_hand}
-                </p>
-              </div>
             </div>
           </div>
 
@@ -5214,12 +6109,16 @@ export default function InventoryManagement() {
               </div>
             </div>
           </div>
-        </div>
+        </section>
       )}
 
       {/* Stock Alerts Tab - NOT printed */}
-      {activeTab === "stock_alerts" && (
-        <div className="space-y-4">
+      {resolvedActiveTab === "stock_alerts" && (
+        <section
+          id={INVENTORY_TAB_PANEL_IDS.stock_alerts}
+          data-testid="inventory-stock-alerts-panel"
+          className="space-y-4"
+        >
           {/* Inventory Summary */}
           <Card className="p-4 dark:bg-gray-800 dark:border-gray-700">
             <h3 className="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-200">
@@ -5598,15 +6497,22 @@ export default function InventoryManagement() {
                 </div>
               </Card>
             )}
-        </div>
+        </section>
       )}
 
-      {/* Vaccine Monitoring Tab - NOT printed */}
-      {activeTab === "vaccine_monitoring" && (
-        <div className="space-y-4 print:hidden">
-          <InventoryMonitoringDashboard />
-          {renderAlertWorkflowCard()}
-        </div>
+      {/* Stock Movements Tab - NOT printed */}
+      {resolvedActiveTab === "stock_movements" && (
+        <section
+          id={INVENTORY_TAB_PANEL_IDS.stock_movements}
+          data-testid="inventory-stock-movements-panel"
+        >
+          <StockMovementsPanel
+            movements={filteredStockMovements}
+            loading={stockMovementsLoading}
+            error={stockMovementsError}
+            onRetry={loadStockMovements}
+          />
+        </section>
       )}
 
       <Modal
@@ -5660,6 +6566,7 @@ export default function InventoryManagement() {
         onClose={() => {
           setShowModal(false);
           setTransactionErrors({});
+          setTransactionSubmitError(null);
         }}
         title={
           modalType === "receive"
@@ -5679,6 +6586,7 @@ export default function InventoryManagement() {
               onClick={() => {
                 setShowModal(false);
                 setTransactionErrors({});
+                setTransactionSubmitError(null);
               }}
             >
               Cancel
@@ -5713,6 +6621,12 @@ export default function InventoryManagement() {
                 </p>
               </div>
             </div>
+          )}
+
+          {transactionSubmitError && (
+            <Alert variant="error" className="mb-3">
+              {transactionSubmitError}
+            </Alert>
           )}
 
           {hasFieldErrors(transactionErrors) && (
@@ -5861,6 +6775,10 @@ export default function InventoryManagement() {
           display: none;
         }
 
+        #inventory-print-root {
+          display: none;
+        }
+
         .doh-lgu-stock-print-header__seal {
           display: none;
         }
@@ -5872,6 +6790,11 @@ export default function InventoryManagement() {
           }
 
           body.printing-inventory.printing-report-requisition-issue-slip {
+            --inventory-print-page-width: calc(8.5in - 0.7cm);
+            --inventory-print-page-height: calc(14in - 0.7cm);
+          }
+
+          body.printing-inventory.printing-report-inventory-sheet {
             --inventory-print-page-width: calc(8.5in - 0.7cm);
             --inventory-print-page-height: calc(14in - 0.7cm);
           }
@@ -5889,37 +6812,28 @@ export default function InventoryManagement() {
             background: #ffffff !important;
           }
 
-          body.printing-inventory * {
-            visibility: hidden !important;
+          body.printing-inventory #root {
+            display: none !important;
           }
 
-          body.printing-inventory.printing-report-inventory-sheet .inventory-sheet-summary-print-report,
-          body.printing-inventory.printing-report-inventory-sheet .inventory-sheet-summary-print-report *,
-          body.printing-inventory.printing-report-doh-lgu-stock-form .doh-lgu-stock-print-report,
-          body.printing-inventory.printing-report-doh-lgu-stock-form .doh-lgu-stock-print-report *,
-          body.printing-inventory.printing-report-requisition-issue-slip .ris-print-report,
-          body.printing-inventory.printing-report-requisition-issue-slip .ris-print-report * {
-            visibility: visible !important;
+          body.printing-inventory #inventory-print-root {
+            display: block !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0.16in !important;
+            background: #ffffff !important;
           }
 
           body.printing-inventory.printing-report-inventory-sheet .inventory-sheet-summary-print-report,
           body.printing-inventory.printing-report-doh-lgu-stock-form .doh-lgu-stock-print-report,
           body.printing-inventory.printing-report-requisition-issue-slip .ris-print-report {
-            display: flex !important;
-            position: fixed !important;
-            inset: 0 !important;
-            width: auto !important;
+            display: block !important;
+            width: 100% !important;
             max-width: none !important;
-            min-height: var(--inventory-print-page-height) !important;
-            margin: 0 !important;
+            margin: 0 auto !important;
             padding: 0 !important;
             background: #ffffff !important;
             box-shadow: none !important;
-            z-index: 9999 !important;
-            page-break-inside: avoid !important;
-            justify-content: center !important;
-            align-items: center !important;
-            overflow: hidden !important;
             box-sizing: border-box !important;
           }
 
@@ -5927,7 +6841,7 @@ export default function InventoryManagement() {
           .doh-lgu-stock-print-report__page,
           .ris-print-report__page {
             display: block !important;
-            margin: auto !important;
+            margin: 0 auto !important;
             padding: 0 !important;
             background: #ffffff !important;
             overflow: visible !important;
@@ -5938,9 +6852,16 @@ export default function InventoryManagement() {
           }
 
           .inventory-sheet-summary-print-report__page {
-            width: min(calc(100% - 0.8cm), 13.1in) !important;
-            max-width: 13.1in !important;
-            max-height: var(--inventory-print-page-height) !important;
+            width: min(calc(100% - 0.8cm), var(--inventory-print-page-width)) !important;
+            max-width: var(--inventory-print-page-width) !important;
+            min-height: var(--inventory-print-page-height) !important;
+            page-break-after: always !important;
+            break-after: page !important;
+          }
+
+          .inventory-sheet-summary-print-report__page:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
           }
 
           .doh-lgu-stock-print-report__page {
@@ -6180,6 +7101,73 @@ export default function InventoryManagement() {
 
           .inventory-sheet-summary-print-table .print-col-expired {
             background-color: #fae6e6 !important;
+          }
+
+          .inventory-sheet-summary-print-header {
+            margin: 0 0 0.18in 0 !important;
+            padding: 0 0 0.14in !important;
+          }
+
+          .inventory-sheet-summary-print-header__branding {
+            display: grid !important;
+            grid-template-columns: 0.96in minmax(0, 1fr) 0.96in !important;
+            align-items: center !important;
+            gap: 0.18in !important;
+          }
+
+          .inventory-sheet-summary-print-header__branding-copy {
+            text-align: center !important;
+          }
+
+          .inventory-sheet-summary-print-header__logo-wrap {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+          }
+
+          .inventory-sheet-summary-print-header__logo {
+            width: 0.9in !important;
+            height: 0.9in !important;
+            object-fit: contain !important;
+          }
+
+          .inventory-sheet-summary-print-header__logo--circle {
+            border-radius: 9999px !important;
+          }
+
+          .inventory-sheet-summary-print-header__line--government {
+            margin-bottom: 0.04in !important;
+            font-size: 9.1px !important;
+          }
+
+          .inventory-sheet-summary-print-header__line--title {
+            margin-top: 0.02in !important;
+            font-size: 10px !important;
+            text-transform: none !important;
+          }
+
+          .inventory-sheet-summary-print-header__detail-row {
+            display: grid !important;
+            grid-template-columns: auto minmax(0, 1fr) auto !important;
+            align-items: end !important;
+            gap: 0.16in !important;
+          }
+
+          .inventory-sheet-summary-print-header__detail--facility {
+            justify-self: center !important;
+            text-align: center !important;
+            font-size: 8.8px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.06em !important;
+            text-transform: uppercase !important;
+          }
+
+          .inventory-sheet-summary-print-header__detail--month {
+            justify-self: end !important;
+          }
+
+          .inventory-sheet-summary-print-table {
+            margin-top: 0 !important;
           }
 
           .doh-lgu-stock-print-header {

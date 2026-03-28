@@ -139,6 +139,75 @@ const formatTimeSlotLabel = (value) => {
   });
 };
 
+const normalizeAppointmentStatus = (value) => {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, "_");
+
+  if (!normalized) {
+    return "pending";
+  }
+
+  if (normalized === "completed") {
+    return "attended";
+  }
+
+  if (normalized === "confirmed" || normalized === "rescheduled") {
+    return "scheduled";
+  }
+
+  return normalized;
+};
+
+const normalizeAppointmentRecord = (appointment) => {
+  if (!appointment || typeof appointment !== "object") {
+    return appointment;
+  }
+
+  const normalizedStatus = normalizeAppointmentStatus(appointment.status);
+  return {
+    ...appointment,
+    raw_status: appointment.status,
+    status: normalizedStatus,
+  };
+};
+
+const normalizeAppointmentCollection = (records) =>
+  Array.isArray(records)
+    ? records
+        .map((record) => normalizeAppointmentRecord(record))
+        .filter(Boolean)
+    : [];
+
+const getAppointmentStatusVariant = (status) => {
+  switch (normalizeAppointmentStatus(status)) {
+    case "scheduled":
+      return "info";
+    case "attended":
+      return "success";
+    case "cancelled":
+      return "danger";
+    case "pending":
+    default:
+      return "warning";
+  }
+};
+
+const canApproveAppointment = (status) =>
+  normalizeAppointmentStatus(status) === "pending";
+
+const canCompleteAppointment = (status) =>
+  normalizeAppointmentStatus(status) === "scheduled";
+
+const canEditAppointment = (status) =>
+  ["pending", "scheduled", "attended"].includes(
+    normalizeAppointmentStatus(status),
+  );
+
+const canCancelAppointment = (status) =>
+  ["pending", "scheduled"].includes(normalizeAppointmentStatus(status));
+
 export default function Appointments() {
   // Use local state for appointments to enable CRUD operations
   const {
@@ -231,7 +300,9 @@ export default function Appointments() {
 
     // Status filter
     if (statusFilter !== 'all') {
-      result = result.filter(apt => apt.status === statusFilter);
+      result = result.filter(
+        (apt) => normalizeAppointmentStatus(apt.status) === statusFilter,
+      );
     }
 
     // Date range filtering
@@ -497,7 +568,7 @@ export default function Appointments() {
   // Sync initial appointments when they load
   useEffect(() => {
     if (!isRefreshing && initialAppointmentsSignature !== lastAppliedAppointmentsSignatureRef.current) {
-      setAppointments(initialAppointments || []);
+      setAppointments(normalizeAppointmentCollection(initialAppointments));
       lastAppliedAppointmentsSignatureRef.current = initialAppointmentsSignature;
     }
   }, [initialAppointments, initialAppointmentsSignature, isRefreshing]);
@@ -509,7 +580,7 @@ export default function Appointments() {
       // Fetch all appointments for reliable client-side filtering, sorting, and pagination
       const response = await apiClient.getAppointments();
       const data = Array.isArray(response) ? response : response?.data || [];
-      setAppointments(Array.isArray(data) ? data : []);
+      setAppointments(normalizeAppointmentCollection(data));
     } catch (err) {
       console.error('Failed to refresh appointments:', err);
     } finally {
@@ -545,13 +616,11 @@ export default function Appointments() {
       key: "status",
       label: "Status",
       render: (val) => {
-        let variant = "default";
-        if (val === "scheduled") variant = "info";
-        if (val === "attended") variant = "success";
-        if (val === "cancelled") variant = "danger";
-        if (val === "pending") variant = "warning";
         return (
-          <Badge variant={variant} className="capitalize">
+          <Badge
+            variant={getAppointmentStatusVariant(val)}
+            className="capitalize"
+          >
             {val}
           </Badge>
         );
@@ -578,7 +647,7 @@ export default function Appointments() {
       >
         View
       </Button>
-      {row.status === "pending" && (
+      {canApproveAppointment(row.status) && (
         <Button
           variant="success"
           size="sm"
@@ -589,7 +658,7 @@ export default function Appointments() {
           Approve
         </Button>
       )}
-      {row.status === "scheduled" && (
+      {canCompleteAppointment(row.status) && (
         <Button
           variant="success"
           size="sm"
@@ -600,25 +669,25 @@ export default function Appointments() {
           Complete
         </Button>
       )}
-      {row.status !== "cancelled" && row.status !== "attended" && (
-        <>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => handleEditAppointment(row)}
-            className="gap-1.5"
-          >
-            Edit
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => handleCancelAppointmentClick(row)}
-            className="gap-1.5"
-          >
-            Cancel
-          </Button>
-        </>
+      {canEditAppointment(row.status) && (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => handleEditAppointment(row)}
+          className="gap-1.5"
+        >
+          Edit
+        </Button>
+      )}
+      {canCancelAppointment(row.status) && (
+        <Button
+          variant="danger"
+          size="sm"
+          onClick={() => handleCancelAppointmentClick(row)}
+          className="gap-1.5"
+        >
+          Cancel
+        </Button>
       )}
     </div>
   );
@@ -680,7 +749,7 @@ export default function Appointments() {
     }
 
     // Prevent cancellation if already completed
-    if (selectedAppointment.status === "attended") {
+    if (!canCancelAppointment(selectedAppointment.status)) {
       setCancelModalError(
         "Cannot cancel an appointment that has already been attended",
       );
@@ -1344,15 +1413,7 @@ export default function Appointments() {
                           </p>
                         </div>
                         <Badge
-                          variant={
-                            apt.status === "scheduled"
-                              ? "info"
-                              : apt.status === "attended"
-                                ? "success"
-                                : apt.status === "cancelled"
-                                  ? "danger"
-                                  : "warning"
-                          }
+                          variant={getAppointmentStatusVariant(apt.status)}
                         >
                           {apt.status}
                         </Badge>
@@ -1718,15 +1779,7 @@ export default function Appointments() {
                       {(appointment.first_name || "Infant") + " " + (appointment.last_name || "")}
                     </p>
                     <Badge
-                      variant={
-                        appointment.status === "scheduled"
-                          ? "info"
-                          : appointment.status === "attended"
-                            ? "success"
-                          : appointment.status === "cancelled"
-                            ? "danger"
-                            : "warning"
-                      }
+                      variant={getAppointmentStatusVariant(appointment.status)}
                       className="text-[11px]"
                     >
                       {appointment.status}
@@ -2060,15 +2113,9 @@ export default function Appointments() {
                   Status
                 </label>
                 <Badge
-                  variant={
-                    selectedAppointment.status === "scheduled"
-                      ? "info"
-                      : selectedAppointment.status === "attended"
-                        ? "success"
-                        : selectedAppointment.status === "cancelled"
-                          ? "danger"
-                          : "warning"
-                  }
+                  variant={getAppointmentStatusVariant(
+                    selectedAppointment.status,
+                  )}
                   className="capitalize mt-1"
                 >
                   {selectedAppointment.status || "Pending"}

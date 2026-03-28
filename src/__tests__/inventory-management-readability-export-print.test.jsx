@@ -40,6 +40,7 @@ jest.mock("jspdf", () => {
     setLineWidth = jest.fn();
     rect = jest.fn();
     addImage = jest.fn();
+    addPage = jest.fn(() => this);
     setFont = jest.fn();
     setFontSize = jest.fn();
     text = jest.fn();
@@ -231,6 +232,9 @@ describe("Inventory Management print and export behavior", () => {
     renderInventoryRoute("/inventory?tab=inventory_sheet");
 
     await waitForInventoryModuleReady();
+    fireEvent.change(document.getElementById("inventory-report-date-toolbar"), {
+      target: { value: "2026-11-15" },
+    });
 
     jest.useFakeTimers();
 
@@ -239,10 +243,13 @@ describe("Inventory Management print and export behavior", () => {
     expect(document.body).toHaveClass("printing-inventory");
     expect(
       document.getElementById("inventory-print-page-style"),
-    ).toHaveTextContent("size: legal landscape");
+    ).toHaveTextContent("size: legal portrait");
     expect(
       screen.getByTestId("inventory-sheet-print-report"),
     ).toBeInTheDocument();
+    expect(screen.getByTestId("inventory-sheet-print-header")).toHaveTextContent(
+      "Republic of the Philippines",
+    );
     expect(screen.getByTestId("inventory-sheet-print-header")).toHaveTextContent(
       "EPI VACCINE AND OTHER LOGISTICS INVENTORY FORM",
     );
@@ -259,16 +266,26 @@ describe("Inventory Management print and export behavior", () => {
       "HEALTH CENTER:",
     );
     expect(screen.getByTestId("inventory-sheet-print-header")).toHaveTextContent(
-      "SAN NICOLAS HC",
+      "San Nicolas Health Center",
     );
     expect(screen.getByTestId("inventory-sheet-print-header")).toHaveTextContent(
       "Inventory of Vaccines and Other Logistics",
     );
+    expect(
+      within(screen.getByTestId("inventory-sheet-print-header")).getByAltText(
+        /department of health logo/i,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("inventory-sheet-print-header")).getByAltText(
+        /san nicolas health center logo/i,
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("inventory-sheet-print-header")).toHaveTextContent(
       "Code",
     );
     expect(screen.getByTestId("inventory-sheet-print-month-year")).toHaveTextContent(
-      "For the Month: JANUARY",
+      "FOR THE MONTH: NOVEMBER 2026",
     );
 
     act(() => {
@@ -306,6 +323,10 @@ describe("Inventory Management print and export behavior", () => {
     const printHeader = within(printReport).getByTestId("inventory-print-header");
     const printMonthYear = within(printReport).getByTestId("inventory-print-month-year");
     const printTable = within(printReport).getByTestId("inventory-print-table");
+
+    expect(
+      document.getElementById("inventory-print-page-style"),
+    ).toHaveTextContent("size: legal landscape");
 
     expect(printHeader).toHaveTextContent("Republic of the Philippines");
     expect(printHeader).toHaveTextContent(
@@ -536,12 +557,19 @@ describe("Inventory Management print and export behavior", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /download word/i }));
 
-    expect(downloadWordDocument).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        title: "EPI VACCINE AND OTHER LOGISTICS INVENTORY FORM",
-        page: PRINT_PAGE_PRESETS.legalLandscape,
-      }),
-    );
+    await waitFor(() => {
+      expect(downloadWordDocument).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          title: "EPI VACCINE AND OTHER LOGISTICS INVENTORY FORM",
+          page: PRINT_PAGE_PRESETS.legalLandscape,
+          headerText: "",
+          footerText: "",
+          html: expect.stringContaining(
+            "inventory-sheet-summary-print-header__branding",
+          ),
+        }),
+      );
+    });
   });
 
   test("locks RIS PDF export to legal portrait without changing other inventory report templates", async () => {
@@ -587,6 +615,26 @@ describe("Inventory Management print and export behavior", () => {
     });
     expect(mockPdfConfigs.at(-1)).toEqual(
       expect.objectContaining({ orientation: "portrait", format: "legal" }),
+    );
+  });
+
+  test("inventory sheet PDF download stays legal landscape and uses the inventory-sheet filename", async () => {
+    renderInventoryRoute();
+
+    await waitForInventoryModuleReady();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /download inventory sheet pdf/i }),
+    );
+
+    await waitFor(() => {
+      expect(mockPdfSave).toHaveBeenCalledWith(
+        expect.stringMatching(/^inventory-sheet-/i),
+      );
+    });
+
+    expect(mockPdfConfigs.at(-1)).toEqual(
+      expect.objectContaining({ orientation: "landscape", format: "legal" }),
     );
   });
 });

@@ -161,7 +161,7 @@ NotificationItem.propTypes = {
 const NotificationContainer = ({ notifications, onRemove }) => {
   return createPortal(
     <div
-      className="fixed top-4 right-4 z-50 space-y-2"
+      className="fixed top-4 right-4 z-[1100] space-y-2"
       aria-label="Notifications"
     >
       {notifications.map((notification) => (

@@ -25,6 +25,7 @@ jest.mock("../utils/api", () => ({
     getAnalyticsDashboard: jest.fn(),
     getFacilityInfo: jest.fn(),
     getVaccineInventory: jest.fn(),
+    getVaccineInventoryTransactions: jest.fn(),
     getVaccines: jest.fn(),
     createVaccineInventoryTransaction: jest.fn(),
   },
@@ -154,6 +155,7 @@ describe("Admin module URL state persistence", () => {
       barangay: "Test Barangay",
     });
     apiClient.getVaccineInventory.mockResolvedValue([]);
+    apiClient.getVaccineInventoryTransactions.mockResolvedValue([]);
     apiClient.getVaccines.mockResolvedValue([]);
   });
 
@@ -371,5 +373,104 @@ describe("Admin module URL state persistence", () => {
         "tab=inventory_sheet",
       );
     });
+  });
+
+  test("Inventory tab switching replaces the inventory sheet panel with stock movement history", async () => {
+    apiClient.getVaccineInventory.mockResolvedValue([
+      {
+        id: 301,
+        clinic_id: 7,
+        vaccine_id: 1,
+        vaccine_name: "BCG",
+        beginning_balance: 42,
+        received_during_period: 10,
+        lot_batch_number: "BCG-INV-001",
+        transferred_in: 2,
+        transferred_out: 4,
+        expired_wasted: 0,
+        issuance: 8,
+      },
+    ]);
+    apiClient.getVaccineInventoryTransactions.mockResolvedValue([
+      {
+        id: 777,
+        transaction_type: "RECEIVE",
+        quantity: 10,
+        previous_balance: 42,
+        new_balance: 52,
+        vaccine_name: "BCG",
+        lot_batch_number: "BCG-LOT-002",
+        reference_number: "PO-777",
+        notes: "&#x2F;PO-777&#x2F; &amp; checked",
+        created_at: "2026-03-21T08:30:00.000Z",
+        performed_by_name: "Sam Orin",
+      },
+    ]);
+
+    renderInventoryRoute("/inventory?tab=inventory_sheet");
+
+    expect(
+      await screen.findByTestId("inventory-sheet-panel"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /save inventory/i })).toBeInTheDocument();
+    expect(apiClient.getVaccineInventoryTransactions).toHaveBeenCalledWith(
+      null,
+      expect.objectContaining({
+        clinic_id: 7,
+        limit: 250,
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /stock movements/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location-search")).toHaveTextContent(
+        "tab=stock_movements",
+      );
+    });
+
+    expect(
+      await screen.findByTestId("inventory-stock-movements-panel"),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/stock movement history/i)).toBeInTheDocument();
+    expect(screen.getByText("PO-777")).toBeInTheDocument();
+    expect(screen.getByText("/PO-777/ & checked")).toBeInTheDocument();
+    expect(screen.getByText("Sam Orin")).toBeInTheDocument();
+    expect(screen.queryByTestId("inventory-sheet-panel")).not.toBeInTheDocument();
+    expect(screen.queryByText(/beginning balance/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /save inventory/i })).not.toBeInTheDocument();
+  });
+
+  test("Inventory transaction deep links resolve to Stock Movements and render transaction history", async () => {
+    apiClient.getVaccineInventoryTransactions.mockResolvedValue([
+      {
+        id: 501,
+        transaction_type: "ISSUE",
+        quantity: 12,
+        previous_balance: 88,
+        new_balance: 76,
+        vaccine_name: "BCG",
+        lot_batch_number: "BCG-LOT-001",
+        created_at: "2026-03-20T09:15:00.000Z",
+        performed_by_name: "system-admin",
+      },
+    ]);
+
+    renderInventoryRoute("/inventory?tab=transactions");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location-search")).toHaveTextContent(
+        "tab=stock_movements",
+      );
+    });
+
+    await screen.findByText(/stock movement history/i);
+
+    expect(
+      screen.getByRole("button", { name: /stock movements/i }),
+    ).toHaveClass("bg-white");
+    expect(screen.getByText(/stock movement history/i)).toBeInTheDocument();
+    expect(screen.getByText("BCG")).toBeInTheDocument();
+    expect(screen.queryByText(/save inventory/i)).not.toBeInTheDocument();
   });
 });

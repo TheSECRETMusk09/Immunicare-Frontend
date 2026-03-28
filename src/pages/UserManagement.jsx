@@ -80,6 +80,28 @@ const calculatePasswordStrength = (password) => {
   return checks.filter(Boolean).length;
 };
 
+const validatePasswordResetForm = ({
+  password = "",
+  confirmPassword = "",
+}) => {
+  const errors = {};
+
+  if (!password) {
+    errors.password = "New password is required.";
+  } else if (calculatePasswordStrength(password) < 4) {
+    errors.password =
+      "Password must be at least 8 characters and include uppercase, lowercase, a number, and a symbol.";
+  }
+
+  if (!confirmPassword) {
+    errors.confirmPassword = "Please confirm the new password.";
+  } else if (password && password !== confirmPassword) {
+    errors.confirmPassword = "Passwords do not match.";
+  }
+
+  return errors;
+};
+
 const USER_MANAGEMENT_TABS = new Set(["admins", "system", "guardians"]);
 
 const resolveUserManagementTab = (value) => {
@@ -120,6 +142,8 @@ export default function UserManagement() {
     password: "",
     confirmPassword: "",
   });
+  const [passwordResetErrors, setPasswordResetErrors] = useState({});
+  const [passwordResetFormError, setPasswordResetFormError] = useState("");
   const [adminFormData, setAdminFormData] = useState({
     username: "",
     email: "",
@@ -173,6 +197,42 @@ export default function UserManagement() {
   const [isTogglingActive, setIsTogglingActive] = useState(false);
 
   const debouncedSearchQuery = useDebounce(searchQuery, 350);
+
+  const closePasswordResetModal = useCallback(() => {
+    setShowPasswordModal(false);
+    setSelectedUserForPassword(null);
+    setPasswordFormData({ password: "", confirmPassword: "" });
+    setPasswordResetErrors({});
+    setPasswordResetFormError("");
+  }, []);
+
+  const openPasswordResetModal = useCallback((selectedUser) => {
+    setSelectedUserForPassword(selectedUser);
+    setPasswordFormData({ password: "", confirmPassword: "" });
+    setPasswordResetErrors({});
+    setPasswordResetFormError("");
+    setShowPasswordModal(true);
+  }, []);
+
+  const handlePasswordResetFieldChange = useCallback(
+    (field, value) => {
+      const nextPasswordFormData = {
+        ...passwordFormData,
+        [field]: value,
+      };
+
+      setPasswordFormData(nextPasswordFormData);
+
+      if (passwordResetFormError) {
+        setPasswordResetFormError("");
+      }
+
+      if (Object.keys(passwordResetErrors).length > 0) {
+        setPasswordResetErrors(validatePasswordResetForm(nextPasswordFormData));
+      }
+    },
+    [passwordFormData, passwordResetErrors, passwordResetFormError],
+  );
 
   useEffect(() => {
     const requestedTab = resolveUserManagementTab(searchParams.get("tab"));
@@ -798,13 +858,15 @@ export default function UserManagement() {
   const handlePasswordReset = async (e) => {
     e.preventDefault();
 
-    if (passwordFormData.password !== passwordFormData.confirmPassword) {
-      warning("Passwords do not match");
-      return;
-    }
-
-    if (calculatePasswordStrength(passwordFormData.password) < 4) {
-      warning("Password must be at least 8 characters and include a mix of case, numbers, and symbols.");
+    const validationErrors = validatePasswordResetForm(passwordFormData);
+    if (Object.keys(validationErrors).length > 0) {
+      const firstErrorMessage =
+        validationErrors.password || validationErrors.confirmPassword;
+      setPasswordResetErrors(validationErrors);
+      setPasswordResetFormError(
+        "Please resolve the highlighted password requirements before submitting.",
+      );
+      warning(firstErrorMessage);
       return;
     }
 
@@ -814,6 +876,8 @@ export default function UserManagement() {
         ? "guardian"
         : "system";
 
+    setPasswordResetErrors({});
+    setPasswordResetFormError("");
     setIsResettingPassword(true);
 
     try {
@@ -824,16 +888,18 @@ export default function UserManagement() {
       );
       if (result.success) {
         success("Password reset successfully!");
-        setShowPasswordModal(false);
-        setPasswordFormData({ password: "", confirmPassword: "" });
-        setSelectedUserForPassword(null);
+        closePasswordResetModal();
         // Tab state is preserved - no navigation
       } else {
-        notifyError(result.error || "Error resetting password");
+        const errorMessage = result.error || "Error resetting password";
+        setPasswordResetFormError(errorMessage);
+        notifyError(errorMessage);
       }
     } catch (error) {
       console.error("Error resetting password:", error);
-      notifyError(error.message || "Error resetting password");
+      const errorMessage = error.message || "Error resetting password";
+      setPasswordResetFormError(errorMessage);
+      notifyError(errorMessage);
     } finally {
       setIsResettingPassword(false);
     }
@@ -1076,10 +1142,7 @@ export default function UserManagement() {
       <Button
         variant="info"
         size="xs"
-        onClick={() => {
-          setSelectedUserForPassword(row);
-          setShowPasswordModal(true);
-        }}
+        onClick={() => openPasswordResetModal(row)}
         className="p-1.5"
         title="Reset Password"
         aria-label="Reset password"
@@ -1235,10 +1298,7 @@ export default function UserManagement() {
       <Button
         variant="info"
         size="xs"
-        onClick={() => {
-          setSelectedUserForPassword(row);
-          setShowPasswordModal(true);
-        }}
+        onClick={() => openPasswordResetModal(row)}
         className="p-1.5"
         title="Reset Password"
         aria-label="Reset password"
@@ -1746,10 +1806,7 @@ export default function UserManagement() {
                               <Button
                                 variant="info"
                                 size="xs"
-                                onClick={() => {
-                                  setSelectedUserForPassword(row);
-                                  setShowPasswordModal(true);
-                                }}
+                                onClick={() => openPasswordResetModal(row)}
                                 className="p-1.5"
                                 title="Reset Password"
                                 aria-label="Reset password"
@@ -2254,7 +2311,7 @@ export default function UserManagement() {
       {/* Password Reset Modal */}
       <Modal
         isOpen={showPasswordModal}
-        onClose={() => setShowPasswordModal(false)}
+        onClose={closePasswordResetModal}
         title={`Reset Password`}
         size="md"
         footer={
@@ -2262,7 +2319,7 @@ export default function UserManagement() {
             <Button
               variant="cancel"
               type="button"
-              onClick={() => setShowPasswordModal(false)}
+              onClick={closePasswordResetModal}
               disabled={isResettingPassword}
             >
               Cancel
@@ -2312,31 +2369,32 @@ export default function UserManagement() {
             <p className="whitespace-normal">
               This will{" "}
               {selectedUserForPassword?.password_hash ? "reset" : "set"} the
-              user's password.{" "}
-              {selectedUserForPassword?.password_hash
-                ? "Make sure to inform the user of their new password."
-                : "A temporary password will be generated."}
+              user's password. Enter a strong password that meets the policy
+              below, then share it securely with the user if needed.
             </p>
           </Alert>
 
           {/* Password Fields */}
           <div className="admin-form-card">
             <div className="admin-form-card-body">
+              {passwordResetFormError && (
+                <Alert variant="error" className="mb-4">
+                  {passwordResetFormError}
+                </Alert>
+              )}
               <div className="admin-field-group">
                 <PasswordInput
                   label="New Password"
                   name="password"
                   value={passwordFormData.password}
                   onChange={(e) =>
-                    setPasswordFormData({
-                      ...passwordFormData,
-                      password: e.target.value,
-                    })
+                    handlePasswordResetFieldChange("password", e.target.value)
                   }
                   showPasswordAriaLabel="Show reset password"
                   hidePasswordAriaLabel="Hide reset password"
                   required
-                  placeholder="Enter new password (min 6 characters)"
+                  placeholder="Use 8+ chars with upper/lowercase, number, and symbol"
+                  error={passwordResetErrors.password}
                 />
               </div>
               <div className="admin-field-group">
@@ -2345,17 +2403,21 @@ export default function UserManagement() {
                   name="confirmPassword"
                   value={passwordFormData.confirmPassword}
                   onChange={(e) =>
-                    setPasswordFormData({
-                      ...passwordFormData,
-                      confirmPassword: e.target.value,
-                    })
+                    handlePasswordResetFieldChange(
+                      "confirmPassword",
+                      e.target.value,
+                    )
                   }
                   showPasswordAriaLabel="Show reset confirm password"
                   hidePasswordAriaLabel="Hide reset confirm password"
                   required
                   placeholder="Confirm new password"
+                  error={passwordResetErrors.confirmPassword}
                 />
               </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Passwords must be at least 8 characters and include uppercase, lowercase, a number, and a symbol.
+              </p>
             </div>
           </div>
         </form>

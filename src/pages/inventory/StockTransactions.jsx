@@ -252,7 +252,7 @@ const StockTransactions = () => {
         actions={
           <Button
             variant="secondary"
-            onClick={() => navigate("/inventory?tab=transactions")}
+            onClick={() => navigate("/inventory?tab=stock_movements")}
             className="flex items-center gap-2"
           >
             <RefreshCw className="w-4 h-4" /> Refresh
