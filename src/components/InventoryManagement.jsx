@@ -616,6 +616,20 @@ const getInventoryActorDisplayName = (user = {}) => {
   );
 };
 
+const formatInventoryActorRole = (value) => {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 const decodeInventoryHtmlEntities = (value, maxPasses = 3) => {
   if (value === undefined || value === null) {
     return "";
@@ -714,7 +728,13 @@ const normalizeInventoryMovementRecord = (row = {}) => {
   ).trim();
   const notes = decodeInventoryHtmlEntities(row.notes ?? null).trim();
   const performedByName = decodeInventoryHtmlEntities(
-    row.performed_by_name ?? row.user_name ?? row.username ?? null,
+    row.performed_by_name ?? null,
+  ).trim();
+  const performedByUsername = decodeInventoryHtmlEntities(
+    row.performed_by_username ?? row.user_name ?? row.username ?? null,
+  ).trim();
+  const performedByRole = decodeInventoryHtmlEntities(
+    row.performed_by_role ?? row.role_name ?? row.user_role ?? null,
   ).trim();
 
   return {
@@ -742,6 +762,8 @@ const normalizeInventoryMovementRecord = (row = {}) => {
     notes: notes || null,
     created_at: row.created_at ?? row.transaction_date ?? row.date ?? null,
     performed_by_name: performedByName || null,
+    performed_by_username: performedByUsername || null,
+    performed_by_role: performedByRole || null,
   };
 };
 
@@ -815,7 +837,7 @@ function StockMovementsPanel({
   }
 
   return (
-    <div className="space-y-4 print:hidden">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 print:hidden">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card className="border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/70">
           <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
@@ -862,7 +884,7 @@ function StockMovementsPanel({
         </Alert>
       )}
 
-      <Card className="overflow-hidden">
+      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="border-b border-gray-200 bg-gray-50 px-4 py-4 dark:border-gray-700 dark:bg-gray-800/80">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -879,104 +901,127 @@ function StockMovementsPanel({
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-white dark:bg-gray-900">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Date
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Type
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Vaccine
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Quantity
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Balance
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Lot / Batch
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Reference / Notes
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Performed By
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
-              {movements.length === 0 ? (
+        <div
+          className="overflow-x-auto"
+        >
+          <div
+            className="modern-scrollbar min-h-0 max-h-[min(62vh,36rem)] overflow-y-auto"
+            data-testid="stock-movements-scroll-region"
+          >
+            <table className="min-w-full">
+              <thead className="sticky top-0 z-10 bg-white shadow-sm dark:bg-gray-900">
                 <tr>
-                  <td
-                    colSpan="8"
-                    className="px-4 py-12 text-center text-sm text-gray-500 dark:text-gray-400"
-                  >
-                    No stock movement transactions found for the selected
-                    inventory records.
-                  </td>
+                  <th className="bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+                    Date
+                  </th>
+                  <th className="bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+                    Type
+                  </th>
+                  <th className="bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+                    Vaccine
+                  </th>
+                  <th className="bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+                    Quantity
+                  </th>
+                  <th className="bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+                    Balance
+                  </th>
+                  <th className="bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+                    Lot / Batch
+                  </th>
+                  <th className="bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+                    Reference / Notes
+                  </th>
+                  <th className="bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+                    Performed By
+                  </th>
                 </tr>
-              ) : (
-                movements.map((movement) => {
-                  const typeMeta = getInventoryMovementTypeMeta(
-                    movement.transaction_type,
-                  );
-                  const numericQuantity = normalizeInventoryNumber(
-                    movement.quantity,
-                    0,
-                  );
-                  const quantityLabel = typeMeta.quantityPrefix
-                    ? `${typeMeta.quantityPrefix}${Math.abs(numericQuantity).toLocaleString()}`
-                    : `${numericQuantity > 0 ? "+" : ""}${numericQuantity.toLocaleString()}`;
-
-                  return (
-                    <tr
-                      key={movement.id}
-                      className="align-top hover:bg-gray-50 dark:hover:bg-gray-800/80"
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+                {movements.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan="8"
+                      className="px-4 py-12 text-center text-sm text-gray-500 dark:text-gray-400"
                     >
-                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                        {formatInventoryMovementDate(movement.created_at)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant={typeMeta.badgeVariant}>
-                          {typeMeta.label}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {movement.vaccine_name}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-semibold">
-                        <span className={typeMeta.accentClass}>{quantityLabel}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                        {`${normalizeInventoryNumber(movement.previous_balance, 0).toLocaleString()} -> ${normalizeInventoryNumber(movement.new_balance, 0).toLocaleString()}`}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                        {movement.lot_batch_number || "-"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                        <div className="space-y-1">
-                          <div>{movement.reference_number || "-"}</div>
-                          {movement.notes ? (
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              {movement.notes}
+                      No stock movement transactions found for the selected
+                      inventory records.
+                    </td>
+                  </tr>
+                ) : (
+                  movements.map((movement) => {
+                    const typeMeta = getInventoryMovementTypeMeta(
+                      movement.transaction_type,
+                    );
+                    const numericQuantity = normalizeInventoryNumber(
+                      movement.quantity,
+                      0,
+                    );
+                    const quantityLabel = typeMeta.quantityPrefix
+                      ? `${typeMeta.quantityPrefix}${Math.abs(numericQuantity).toLocaleString()}`
+                      : `${numericQuantity > 0 ? "+" : ""}${numericQuantity.toLocaleString()}`;
+                    const performerPrimaryLabel =
+                      movement.performed_by_username ||
+                      movement.performed_by_name ||
+                      "-";
+                    const performerRoleLabel = formatInventoryActorRole(
+                      movement.performed_by_role,
+                    );
+
+                    return (
+                      <tr
+                        key={movement.id}
+                        className="align-top hover:bg-gray-50 dark:hover:bg-gray-800/80"
+                      >
+                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                          {formatInventoryMovementDate(movement.created_at)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge variant={typeMeta.badgeVariant}>
+                            {typeMeta.label}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {movement.vaccine_name}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-semibold">
+                          <span className={typeMeta.accentClass}>{quantityLabel}</span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                          {`${normalizeInventoryNumber(movement.previous_balance, 0).toLocaleString()} -> ${normalizeInventoryNumber(movement.new_balance, 0).toLocaleString()}`}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                          {movement.lot_batch_number || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                          <div className="space-y-1">
+                            <div>{movement.reference_number || "-"}</div>
+                            {movement.notes ? (
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {movement.notes}
+                              </div>
+                            ) : null}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                          <div className="space-y-1">
+                            <div className="font-medium text-gray-900 dark:text-gray-100">
+                              {performerPrimaryLabel}
                             </div>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                        {movement.performed_by_name || "-"}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                            {performerRoleLabel ? (
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {performerRoleLabel}
+                              </div>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </Card>
     </div>
@@ -1929,6 +1974,25 @@ const buildDohLguPdfHeaderRows = () => [
   ["DOH", "LGU", "DOH", "LGU", "DOH", "LGU", "DOH", "LGU", "DOH", "LGU"],
 ];
 
+const resolvePdfAutoTableRunner = ({ doc, autoTableModule }) => {
+  const moduleAutoTable =
+    typeof autoTableModule?.default === "function"
+      ? autoTableModule.default
+      : typeof autoTableModule?.autoTable === "function"
+        ? autoTableModule.autoTable
+        : null;
+
+  if (moduleAutoTable) {
+    return (options) => moduleAutoTable(doc, options);
+  }
+
+  if (typeof doc?.autoTable === "function") {
+    return (options) => doc.autoTable(options);
+  }
+
+  throw new Error("Unable to initialize the PDF table generator.");
+};
+
 const exportDohLguInventoryPdf = async ({
   facilityInfo,
   reportDate,
@@ -1937,7 +2001,7 @@ const exportDohLguInventoryPdf = async ({
   dateRangeEnd,
   isFiltering,
 }) => {
-  const [{ default: jsPDF }, , leftSealImage, rightSealImage] = await Promise.all([
+  const [{ default: jsPDF }, autoTableModule, leftSealImage, rightSealImage] = await Promise.all([
     import("jspdf"),
     import("jspdf-autotable"),
     loadImageDataUrl(DOH_LGU_REPORT_LEFT_SEAL_SRC),
@@ -1951,6 +2015,7 @@ const exportDohLguInventoryPdf = async ({
     unit: "mm",
     format: pdfConfig.format,
   });
+  const runAutoTable = resolvePdfAutoTableRunner({ doc, autoTableModule });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = { top: 6, right: 6, bottom: 6, left: 6 };
@@ -2013,7 +2078,7 @@ const exportDohLguInventoryPdf = async ({
     align: "center",
   });
 
-  doc.autoTable({
+  runAutoTable({
     startY: 30,
     margin,
     theme: "grid",
@@ -2056,8 +2121,8 @@ const exportDohLguInventoryPdf = async ({
     tableWidth: pageWidth - margin.left - margin.right,
   });
 
-  doc.autoTable({
-    startY: doc.lastAutoTable.finalY,
+  runAutoTable({
+    startY: doc.lastAutoTable?.finalY || 30,
     margin,
     theme: "grid",
     head: buildDohLguPdfHeaderRows(),
@@ -2173,7 +2238,7 @@ const exportRisPdf = async ({
   dateRangeEnd,
   isFiltering,
 }) => {
-  const [{ default: jsPDF }] = await Promise.all([
+  const [{ default: jsPDF }, autoTableModule] = await Promise.all([
     import("jspdf"),
     import("jspdf-autotable"),
   ]);
@@ -2186,6 +2251,7 @@ const exportRisPdf = async ({
     unit: "mm",
     format: pdfConfig.format,
   });
+  const runAutoTable = resolvePdfAutoTableRunner({ doc, autoTableModule });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = { top: 10, right: 10, bottom: 10, left: 10 };
@@ -2244,7 +2310,7 @@ const exportRisPdf = async ({
     align: "center",
   });
 
-  doc.autoTable({
+  runAutoTable({
     startY: 38,
     margin,
     theme: "plain",
@@ -2302,8 +2368,8 @@ const exportRisPdf = async ({
     },
   });
 
-  doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 2,
+  runAutoTable({
+    startY: (doc.lastAutoTable?.finalY || 38) + 2,
     margin,
     theme: "grid",
     head: buildRisPdfHeaderRows(),
@@ -3212,7 +3278,7 @@ const exportInventorySheetPdf = async ({
   dateRangeEnd,
   isFiltering,
 }) => {
-  const [{ default: jsPDF }] = await Promise.all([
+  const [{ default: jsPDF }, autoTableModule] = await Promise.all([
     import("jspdf"),
     import("jspdf-autotable"),
   ]);
@@ -3225,6 +3291,7 @@ const exportInventorySheetPdf = async ({
     unit: "mm",
     format: pdfConfig.format,
   });
+  const runAutoTable = resolvePdfAutoTableRunner({ doc, autoTableModule });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = { top: 8, right: 8, bottom: 8, left: 8 };
   const availableWidth = pageWidth - margin.left - margin.right;
@@ -3257,7 +3324,7 @@ const exportInventorySheetPdf = async ({
       rightLogoImage,
     });
 
-    doc.autoTable({
+    runAutoTable({
       startY: tableStartY,
       margin,
       theme: "grid",
@@ -4142,10 +4209,17 @@ export default function InventoryManagement() {
       }
 
       const currentActorName = getInventoryActorDisplayName(user);
+      const currentActorUsername =
+        String(user?.username || "").trim() || null;
+      const currentActorRole =
+        String(user?.role_type || user?.role || "").trim() || null;
       const normalizedMovements = movementRows
         .map(normalizeInventoryMovementRecord)
         .map((movement) => {
-          if (movement.performed_by_name || !currentActorName) {
+          if (
+            (movement.performed_by_name || movement.performed_by_username) ||
+            (!currentActorName && !currentActorUsername)
+          ) {
             return movement;
           }
 
@@ -4163,6 +4237,9 @@ export default function InventoryManagement() {
             return {
               ...movement,
               performed_by_name: currentActorName,
+              performed_by_username:
+                movement.performed_by_username || currentActorUsername,
+              performed_by_role: movement.performed_by_role || currentActorRole,
             };
           }
 
@@ -5076,7 +5153,7 @@ export default function InventoryManagement() {
     }
 
     return (
-      <Card className="p-4 dark:bg-gray-800 dark:border-gray-700">
+      <Card className="flex flex-col overflow-hidden p-4 dark:bg-gray-800 dark:border-gray-700">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <div>
@@ -5144,29 +5221,32 @@ export default function InventoryManagement() {
           </Alert>
         )}
 
-        <div className="mt-4 overflow-x-auto">
+        <div
+          className="modern-scrollbar mt-4 max-h-[min(58vh,32rem)] overflow-auto"
+          data-testid="inventory-summary-workflow-scroll-region"
+        >
           <table className="w-full text-xs">
-            <thead className="bg-gray-50 dark:bg-gray-700/40">
+            <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/40">
               <tr>
-                <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">
+                <th className="bg-gray-50 px-3 py-2 text-left text-gray-700 dark:bg-gray-700/40 dark:text-gray-300">
                   Vaccine
                 </th>
-                <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">
+                <th className="bg-gray-50 px-3 py-2 text-left text-gray-700 dark:bg-gray-700/40 dark:text-gray-300">
                   Alert
                 </th>
-                <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">
+                <th className="bg-gray-50 px-3 py-2 text-left text-gray-700 dark:bg-gray-700/40 dark:text-gray-300">
                   Priority
                 </th>
-                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">
+                <th className="bg-gray-50 px-3 py-2 text-center text-gray-700 dark:bg-gray-700/40 dark:text-gray-300">
                   Current
                 </th>
-                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">
+                <th className="bg-gray-50 px-3 py-2 text-center text-gray-700 dark:bg-gray-700/40 dark:text-gray-300">
                   Threshold
                 </th>
-                <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">
+                <th className="bg-gray-50 px-3 py-2 text-left text-gray-700 dark:bg-gray-700/40 dark:text-gray-300">
                   Status
                 </th>
-                <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">
+                <th className="bg-gray-50 px-3 py-2 text-left text-gray-700 dark:bg-gray-700/40 dark:text-gray-300">
                   Last Updated
                 </th>
               </tr>
@@ -5498,7 +5578,10 @@ export default function InventoryManagement() {
       data-active-tab={resolvedActiveTab}
     >
       {/* Header - Hidden on Print */}
-      <div className="print:hidden">
+      <div
+        className="sticky top-0 z-20 space-y-4 bg-gray-50/95 pb-2 backdrop-blur dark:bg-gray-900/95 print:hidden"
+        data-testid="inventory-sticky-shell"
+      >
         <PageHeader
           title="Vaccine Inventory Management"
           subtitle="Paper-based inventory tracking system for vaccinations"
@@ -6112,15 +6195,15 @@ export default function InventoryManagement() {
         </section>
       )}
 
-      {/* Stock Alerts Tab - NOT printed */}
-      {resolvedActiveTab === "stock_alerts" && (
+      {/* Inventory Summary Tab - NOT printed */}
+      {resolvedActiveTab === "inventory_summary" && (
         <section
-          id={INVENTORY_TAB_PANEL_IDS.stock_alerts}
-          data-testid="inventory-stock-alerts-panel"
-          className="space-y-4"
+          id={INVENTORY_TAB_PANEL_IDS.inventory_summary}
+          data-testid="inventory-summary-panel"
+          className="flex min-h-0 flex-1 flex-col gap-4"
         >
           {/* Inventory Summary */}
-          <Card className="p-4 dark:bg-gray-800 dark:border-gray-700">
+          <Card className="shrink-0 p-4 dark:bg-gray-800 dark:border-gray-700">
             <h3 className="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-200">
               Inventory Summary
             </h3>
@@ -6176,10 +6259,18 @@ export default function InventoryManagement() {
             </div>
           </Card>
 
-          {/* Alert Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {/* Critical Stock Alert */}
-            <Card className="p-3 border-l-4 border-red-500 dark:bg-gray-800 dark:border-gray-700">
+          <div
+            className="modern-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto pr-1"
+            data-testid="inventory-summary-scroll-region"
+          >
+            {/* Alert Summary Cards */}
+            <div
+              className="sticky top-0 z-10 bg-gray-50/95 pb-4 backdrop-blur dark:bg-gray-900/95"
+              data-testid="inventory-summary-alert-cards-sticky"
+            >
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                {/* Critical Stock Alert */}
+              <Card className="p-3 border-l-4 border-red-500 dark:bg-gray-800 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
@@ -6208,10 +6299,10 @@ export default function InventoryManagement() {
                   </svg>
                 </div>
               </div>
-            </Card>
+              </Card>
 
-            {/* Low Stock Alert */}
-            <Card className="p-3 border-l-4 border-yellow-500 dark:bg-gray-800 dark:border-gray-700">
+                {/* Low Stock Alert */}
+              <Card className="p-3 border-l-4 border-yellow-500 dark:bg-gray-800 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
@@ -6240,10 +6331,10 @@ export default function InventoryManagement() {
                   </svg>
                 </div>
               </div>
-            </Card>
+              </Card>
 
-            {/* Unused Vaccines */}
-            <Card className="p-3 border-l-4 border-gray-400 dark:bg-gray-800 dark:border-gray-700">
+                {/* Unused Vaccines */}
+              <Card className="p-3 border-l-4 border-gray-400 dark:bg-gray-800 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
@@ -6269,10 +6360,10 @@ export default function InventoryManagement() {
                   </svg>
                 </div>
               </div>
-            </Card>
+              </Card>
 
-            {/* Wasted Vaccines */}
-            <Card className="p-3 border-l-4 border-orange-500 dark:bg-gray-800 dark:border-gray-700">
+                {/* Wasted Vaccines */}
+              <Card className="p-3 border-l-4 border-orange-500 dark:bg-gray-800 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
@@ -6301,14 +6392,17 @@ export default function InventoryManagement() {
                   </svg>
                 </div>
               </div>
-            </Card>
-          </div>
+              </Card>
+              </div>
+            </div>
 
-          {/* Alerts Tables */}
-          {(stockAlerts.critical.length > 0 ||
-            stockAlerts.low.length > 0 ||
-            stockAlerts.wasted.length > 0) && (
-            <Card className="overflow-hidden dark:bg-gray-800 dark:border-gray-700">
+            {renderAlertWorkflowCard()}
+
+            {/* Alerts Tables */}
+            {(stockAlerts.critical.length > 0 ||
+              stockAlerts.low.length > 0 ||
+              stockAlerts.wasted.length > 0) && (
+              <Card className="overflow-hidden dark:bg-gray-800 dark:border-gray-700">
               {stockAlerts.critical.length > 0 && (
                 <div className="mb-4">
                   <h3 className="text-sm font-semibold px-3 py-2 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-l-4 border-red-500">
@@ -6466,14 +6560,14 @@ export default function InventoryManagement() {
                   </div>
                 </div>
               )}
-            </Card>
-          )}
+              </Card>
+            )}
 
-          {/* No Alerts Message */}
-          {stockAlerts.critical.length === 0 &&
-            stockAlerts.low.length === 0 &&
-            stockAlerts.wasted.length === 0 && (
-              <Card className="p-6 text-center dark:bg-gray-800 dark:border-gray-700">
+            {/* No Alerts Message */}
+            {stockAlerts.critical.length === 0 &&
+              stockAlerts.low.length === 0 &&
+              stockAlerts.wasted.length === 0 && (
+                <Card className="p-6 text-center dark:bg-gray-800 dark:border-gray-700">
                 <div className="flex flex-col items-center">
                   <svg
                     className="w-12 h-12 text-green-500 dark:text-green-400 mb-3"
@@ -6495,8 +6589,9 @@ export default function InventoryManagement() {
                     No stock alerts at this time.
                   </p>
                 </div>
-              </Card>
-            )}
+                </Card>
+              )}
+          </div>
         </section>
       )}
 
@@ -6505,6 +6600,7 @@ export default function InventoryManagement() {
         <section
           id={INVENTORY_TAB_PANEL_IDS.stock_movements}
           data-testid="inventory-stock-movements-panel"
+          className="flex min-h-0 flex-1 flex-col"
         >
           <StockMovementsPanel
             movements={filteredStockMovements}

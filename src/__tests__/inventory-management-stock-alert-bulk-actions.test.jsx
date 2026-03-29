@@ -272,18 +272,16 @@ describe("Inventory Management stock-alert bulk actions", () => {
     ).toBeInTheDocument();
   });
 
-  test("renders alert workflow under vaccine monitoring instead of stock alerts", async () => {
+  test("renders the alert workflow for legacy stock-alert aliases mapped to inventory summary", async () => {
     const stockAlertsView = renderInventoryRoute("/inventory?tab=stock_alerts");
 
-    await waitFor(() => {
-      expect(apiClient.getVaccineInventory).toHaveBeenCalledWith({
-        clinic_id: 7,
-      });
-    });
-
     expect(
-      screen.queryByRole("button", { name: /acknowledge all/i }),
-    ).not.toBeInTheDocument();
+      await screen.findByRole("button", { name: /acknowledge all/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /resolve all/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("inventory-summary-panel")).toBeInTheDocument();
 
     stockAlertsView.unmount();
     renderInventoryRoute("/inventory?tab=vaccine_monitoring");
@@ -291,6 +289,9 @@ describe("Inventory Management stock-alert bulk actions", () => {
     expect(
       await screen.findByRole("button", { name: /acknowledge all/i }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/inventory monitoring dashboard/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /resolve all/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("inventory-summary-panel")).toBeInTheDocument();
   });
 });

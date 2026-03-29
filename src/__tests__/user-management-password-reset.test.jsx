@@ -135,6 +135,24 @@ describe("UserManagement guardian password reset modal", () => {
 
     const dialog = await screen.findByRole("dialog", { name: /reset password/i });
 
+    expect(
+      within(dialog).getByRole("button", { name: /^reset password$/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: /^reset password$/i }),
+    ).toHaveClass("user-password-reset-submit-btn");
+    expect(
+      within(dialog).getByRole("button", { name: /^cancel$/i }),
+    ).toHaveClass("user-password-reset-cancel-btn");
+    expect(within(dialog).getByLabelText(/^new password/i)).toHaveClass(
+      "user-password-reset-input",
+    );
+    expect(dialog.querySelector(".user-password-reset-requirements")).toBeInTheDocument();
+    expect(within(dialog).getByText(/password requirements/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/at least 8 characters/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/one uppercase letter/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/one number/i)).toBeInTheDocument();
+
     fireEvent.change(screen.getByLabelText(/^new password/i), {
       target: { value: "Guardian2026!" },
     });
@@ -191,5 +209,41 @@ describe("UserManagement guardian password reset modal", () => {
     expect(mockNotifyWarning).toHaveBeenCalledWith(
       "Password must be at least 8 characters and include uppercase, lowercase, a number, and a symbol.",
     );
+  });
+
+  test("keeps the Reset Password action visible in the system users tab", async () => {
+    mockUseSystemUsers.mockReturnValue({
+      systemUsers: [
+        {
+          id: 91,
+          username: "factor.123",
+          role_name: "nurse",
+          display_name: "Nurse",
+          is_active: true,
+          is_password_set: true,
+          clinic_name: "San Nicolas Health Center",
+        },
+      ],
+      totalCount: 1,
+      pagination: { page: 1, limit: 10, total: 1, totalPages: 1, hasNext: false, hasPrev: false },
+      loading: false,
+      isFetching: false,
+      error: null,
+      createUser: jest.fn(),
+      updateUser: jest.fn(),
+      deleteUser: jest.fn(),
+      toggleUserActive: jest.fn(),
+      refreshSystemUsers: jest.fn(),
+    });
+
+    renderPage("/users?tab=system");
+
+    fireEvent.click(screen.getByRole("button", { name: /reset password/i }));
+
+    const dialog = await screen.findByRole("dialog", { name: /reset password/i });
+    expect(
+      within(dialog).getByRole("button", { name: /^reset password$/i }),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText(/password requirements/i)).toBeInTheDocument();
   });
 });

@@ -30,6 +30,7 @@ import {
 } from "../utils/vaccinationFormOptions";
 
 const pollingIntervalMs = 60000;
+const vaccinationRecordsPageSize = 5000;
 
 const normalizeRoleName = (value) => String(value || "").trim().toLowerCase();
 
@@ -83,6 +84,14 @@ const formatAgeLabel = (ageInMonths) => {
   const normalizedAge = Number(ageInMonths || 0);
   if (!normalizedAge) return "At Birth";
   return `${normalizedAge} month${normalizedAge > 1 ? "s" : ""}`;
+};
+
+const normalizeDateToStartOfDay = (value) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  parsed.setHours(0, 0, 0, 0);
+  return parsed;
 };
 
 const classifyScheduleDoseStatus = (entry = {}) => {
@@ -187,6 +196,28 @@ const VaccinationsDashboard = () => {
     [infants, vaccines],
   );
 
+  const fetchAllVaccinationRecords = useCallback(async () => {
+    const allRecords = [];
+    let offset = 0;
+
+    while (true) {
+      const pageData = await apiClient.getVaccinationRecords({
+        limit: vaccinationRecordsPageSize,
+        offset,
+      });
+      const normalizedPage = normalizeVaccinationRecordsResponse(pageData);
+      allRecords.push(...normalizedPage);
+
+      if (normalizedPage.length < vaccinationRecordsPageSize) {
+        break;
+      }
+
+      offset += vaccinationRecordsPageSize;
+    }
+
+    return allRecords;
+  }, []);
+
   const fetchData = useCallback(
     async ({ silent = false } = {}) => {
       try {
@@ -198,9 +229,11 @@ const VaccinationsDashboard = () => {
 
         setError(null);
 
+        const recordsPromise = fetchAllVaccinationRecords();
+
         const [recordsData, schedulesData, infantsData, vaccinesData, systemUsersData] =
           await Promise.all([
-            apiClient.getVaccinationRecords(),
+            recordsPromise,
             apiClient.getVaccinationSchedules(),
             apiClient.getInfants(),
             apiClient.getVaccines(),
@@ -213,7 +246,9 @@ const VaccinationsDashboard = () => {
               .catch(() => ({ data: [] })),
           ]);
 
-        const normalizedRecords = normalizeVaccinationRecordsResponse(recordsData);
+        const normalizedRecords = Array.isArray(recordsData)
+          ? recordsData
+          : normalizeVaccinationRecordsResponse(recordsData);
         const normalizedSchedules =
           normalizeVaccinationSchedulesResponse(schedulesData);
         const normalizedInfants = normalizeInfantsResponse(infantsData);
@@ -289,7 +324,7 @@ const VaccinationsDashboard = () => {
         setRefreshing(false);
       }
     },
-    [selectedInfantId, scopedClinicId],
+    [fetchAllVaccinationRecords, selectedInfantId, scopedClinicId],
   );
 
   useEffect(() => {
@@ -468,17 +503,34 @@ const VaccinationsDashboard = () => {
   }, [filteredRecords, currentPage]);
   const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
 
+  const vaccinationRecordsByInfantId = useMemo(() => {
+    const groupedRecords = new Map();
+
+    vaccinationRecords.forEach((record) => {
+      const infantId = Number(record.infant_id || record.patient_id || 0);
+      if (!infantId) {
+        return;
+      }
+
+      const existingRecords = groupedRecords.get(infantId) || [];
+      existingRecords.push(record);
+      groupedRecords.set(infantId, existingRecords);
+    });
+
+    return groupedRecords;
+  }, [vaccinationRecords]);
+
   const selectedInfantRecords = useMemo(() => {
     if (!selectedInfantId) return [];
-    return vaccinationRecords.filter((record) => record.infant_id === selectedInfantId);
-  }, [selectedInfantId, vaccinationRecords]);
+    return vaccinationRecordsByInfantId.get(selectedInfantId) || [];
+  }, [selectedInfantId, vaccinationRecordsByInfantId]);
 
   const approvedVaccinationSchedules = useMemo(
     () => vaccinationSchedules.filter((schedule) => isApprovedVaccineName(schedule.vaccine_name)),
     [vaccinationSchedules],
   );
 
-  const dashboardStats = useMemo(() => {
+  const fallbackDashboardStats = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -536,9 +588,7 @@ const VaccinationsDashboard = () => {
         return true;
       })
       .map((infant) => {
-        const infantRecords = vaccinationRecords.filter(
-          (record) => record.infant_id === infant.id,
-        );
+        const infantRecords = vaccinationRecordsByInfantId.get(infant.id) || [];
 
         const summary = computeVaccinationComplianceSummary({
           schedules: approvedVaccinationSchedules,
@@ -551,7 +601,14 @@ const VaccinationsDashboard = () => {
           ...summary,
         };
       });
-  }, [infants, vaccinationRecords, approvedVaccinationSchedules, trackingStartDate, trackingEndDate, debouncedSearchQuery]);
+  }, [
+    infants,
+    vaccinationRecordsByInfantId,
+    approvedVaccinationSchedules,
+    trackingStartDate,
+    trackingEndDate,
+    debouncedSearchQuery,
+  ]);
 
   useEffect(() => {
     setScheduleCurrentPage(1);
@@ -561,12 +618,10 @@ const VaccinationsDashboard = () => {
     setTrackingCurrentPage(1);
   }, [debouncedSearchQuery, trackingStartDate, trackingEndDate]);
 
-  const scheduleOverviewRows = useMemo(() => {
+  const allScheduleOverviewRows = useMemo(() => {
     if (!approvedVaccinationSchedules.length || !infants.length) {
       return [];
     }
-
-    const normalizedQuery = normalizeSearchValue(debouncedSearchQuery);
     const statusPriority = {
       overdue: 0,
       due: 1,
@@ -575,9 +630,7 @@ const VaccinationsDashboard = () => {
     };
 
     const rows = infants.flatMap((infant) => {
-      const infantRecords = vaccinationRecords.filter(
-        (record) => record.infant_id === infant.id,
-      );
+      const infantRecords = vaccinationRecordsByInfantId.get(infant.id) || [];
 
       const timeline = computeVaccinationComplianceSummary({
         schedules: approvedVaccinationSchedules,
@@ -611,24 +664,7 @@ const VaccinationsDashboard = () => {
       });
     });
 
-    const queryFilteredRows = !normalizedQuery
-      ? rows
-      : rows.filter((row) => {
-          const searchableText = [
-            row.infant_name,
-            row.vaccine_name,
-            row.disease_prevented,
-            row.status_label,
-            row.age_label,
-            row.dose_number,
-          ]
-            .join(" ")
-            .toLowerCase();
-
-          return searchableText.includes(normalizedQuery);
-        });
-
-    return queryFilteredRows.sort((left, right) => {
+    return rows.sort((left, right) => {
       const statusSort =
         Number(statusPriority[left.status_key] ?? 99) -
         Number(statusPriority[right.status_key] ?? 99);
@@ -653,10 +689,71 @@ const VaccinationsDashboard = () => {
     });
   }, [
     approvedVaccinationSchedules,
-    debouncedSearchQuery,
     infants,
-    vaccinationRecords,
+    vaccinationRecordsByInfantId,
   ]);
+
+  const scheduleOverviewRows = useMemo(() => {
+    const normalizedQuery = normalizeSearchValue(debouncedSearchQuery);
+
+    if (!normalizedQuery) {
+      return allScheduleOverviewRows;
+    }
+
+    return allScheduleOverviewRows.filter((row) => {
+      const searchableText = [
+        row.infant_name,
+        row.vaccine_name,
+        row.disease_prevented,
+        row.status_label,
+        row.age_label,
+        row.dose_number,
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(normalizedQuery);
+    });
+  }, [allScheduleOverviewRows, debouncedSearchQuery]);
+
+  const dashboardStats = useMemo(() => {
+    if (!allScheduleOverviewRows.length) {
+      return fallbackDashboardStats;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const completed = allScheduleOverviewRows.filter(
+      (row) => row.status_key === "completed",
+    ).length;
+    const overdue = allScheduleOverviewRows.filter(
+      (row) => row.status_key === "overdue",
+    ).length;
+    const dueSoon = allScheduleOverviewRows.filter((row) => {
+      if (row.status_key === "completed" || !row.due_date) {
+        return false;
+      }
+
+      const dueDate = normalizeDateToStartOfDay(row.due_date);
+      if (!dueDate) {
+        return false;
+      }
+
+      const diffDays = Math.ceil(
+        (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+      );
+
+      return diffDays >= 0 && diffDays <= 7;
+    }).length;
+
+    return {
+      completed,
+      dueSoon,
+      overdue,
+      trackedInfants: infants.length,
+    };
+  }, [allScheduleOverviewRows, fallbackDashboardStats, infants.length]);
 
   const scheduleStatusSummary = useMemo(
     () =>

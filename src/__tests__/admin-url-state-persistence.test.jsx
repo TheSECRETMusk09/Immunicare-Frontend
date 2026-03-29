@@ -349,22 +349,23 @@ describe("Admin module URL state persistence", () => {
     ).toHaveAttribute("aria-selected", "true");
   });
 
-  test("Inventory module preserves active tab via URL and storage fallback", async () => {
+  test("Inventory module preserves the Inventory Summary tab via URL and storage fallback", async () => {
     localStorage.setItem("admin.inventory.activeTab", "stock_alerts");
 
     renderInventoryRoute("/inventory");
 
-    const stockAlertsTabButton = await screen.findByRole("button", {
-      name: /stock alerts/i,
+    const inventorySummaryTabButton = await screen.findByRole("button", {
+      name: /inventory summary/i,
     });
 
     await waitFor(() => {
       expect(screen.getByTestId("location-search")).toHaveTextContent(
-        "tab=stock_alerts",
+        "tab=inventory_summary",
       );
     });
 
-    expect(stockAlertsTabButton).toHaveClass("bg-white");
+    expect(inventorySummaryTabButton).toHaveClass("bg-white");
+    expect(screen.getByTestId("inventory-summary-panel")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /inventory sheet/i }));
 
@@ -404,6 +405,8 @@ describe("Admin module URL state persistence", () => {
         notes: "&#x2F;PO-777&#x2F; &amp; checked",
         created_at: "2026-03-21T08:30:00.000Z",
         performed_by_name: "Sam Orin",
+        performed_by_username: "samorin123",
+        performed_by_role: "SYSTEM_ADMIN",
       },
     ]);
 
@@ -435,7 +438,8 @@ describe("Admin module URL state persistence", () => {
     expect(screen.getByText(/stock movement history/i)).toBeInTheDocument();
     expect(screen.getByText("PO-777")).toBeInTheDocument();
     expect(screen.getByText("/PO-777/ & checked")).toBeInTheDocument();
-    expect(screen.getByText("Sam Orin")).toBeInTheDocument();
+    expect(screen.getByText("samorin123")).toBeInTheDocument();
+    expect(screen.getByText("System Admin")).toBeInTheDocument();
     expect(screen.queryByTestId("inventory-sheet-panel")).not.toBeInTheDocument();
     expect(screen.queryByText(/beginning balance/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /save inventory/i })).not.toBeInTheDocument();
@@ -453,6 +457,8 @@ describe("Admin module URL state persistence", () => {
         lot_batch_number: "BCG-LOT-001",
         created_at: "2026-03-20T09:15:00.000Z",
         performed_by_name: "system-admin",
+        performed_by_username: "system-admin",
+        performed_by_role: "STAFF_NURSE",
       },
     ]);
 
@@ -471,6 +477,8 @@ describe("Admin module URL state persistence", () => {
     ).toHaveClass("bg-white");
     expect(screen.getByText(/stock movement history/i)).toBeInTheDocument();
     expect(screen.getByText("BCG")).toBeInTheDocument();
+    expect(screen.getByText("system-admin")).toBeInTheDocument();
+    expect(screen.getByText("Staff Nurse")).toBeInTheDocument();
     expect(screen.queryByText(/save inventory/i)).not.toBeInTheDocument();
   });
 });

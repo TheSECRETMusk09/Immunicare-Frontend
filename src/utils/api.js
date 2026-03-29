@@ -1054,8 +1054,9 @@ class ApiClient {
     return this.request("/vaccinations/records");
   }
 
-  async getVaccinationRecords() {
-    return this.request("/vaccinations/records");
+  async getVaccinationRecords(params = {}) {
+    const suffix = this.buildQuerySuffix(params);
+    return this.request(`/vaccinations/records${suffix}`);
   }
 
   async getVaccinationRecordsByInfant(infantId) {

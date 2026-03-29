@@ -214,6 +214,7 @@ export default function Appointments() {
     appointments: initialAppointments,
     loading,
     error: hookError,
+    refreshAppointments: refreshAppointmentsFromSource,
   } = useAppointments();
   const { infants } = useInfants();
 
@@ -577,16 +578,24 @@ export default function Appointments() {
   const refreshAppointments = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      // Fetch all appointments for reliable client-side filtering, sorting, and pagination
-      const response = await apiClient.getAppointments();
-      const data = Array.isArray(response) ? response : response?.data || [];
-      setAppointments(normalizeAppointmentCollection(data));
+      let refreshedAppointments;
+
+      if (typeof refreshAppointmentsFromSource === "function") {
+        refreshedAppointments = await refreshAppointmentsFromSource({ silent: true });
+      } else {
+        const response = await apiClient.getAppointments();
+        refreshedAppointments = Array.isArray(response) ? response : response?.data || [];
+      }
+
+      setAppointments(normalizeAppointmentCollection(refreshedAppointments));
+      setError(null);
     } catch (err) {
       console.error('Failed to refresh appointments:', err);
+      setError(err.response?.data?.error || err.message || "Failed to refresh appointments");
     } finally {
       setIsRefreshing(false);
     }
-  }, []);
+  }, [refreshAppointmentsFromSource]);
 
   const columns = [
     {

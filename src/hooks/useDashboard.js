@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../utils/api";
 import { queryKeys } from "./useCachedData";
+import { useAuth } from "../contexts/AuthContext";
 
 /**
  * Normalizes API response data to ensure it's always an array.
@@ -273,23 +274,71 @@ export const useAppointments = () => {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { user } = useAuth();
+  const hasLoadedAppointmentsRef = useRef(false);
 
-  useEffect(() => {
-    const fetchAppointments = async () => {
+  const refreshAppointments = useCallback(
+    async ({ silent = false } = {}) => {
+      const scopeIds = Array.from(
+        new Set(
+          [user?.clinic_id, user?.facility_id]
+            .map((value) => Number.parseInt(value, 10))
+            .filter((value) => Number.isInteger(value) && value > 0),
+        ),
+      );
+
+      const scopedFilters = {
+        ...(scopeIds[0] ? { clinic_id: scopeIds[0] } : {}),
+        ...(scopeIds[1] ? { facility_id: scopeIds[1] } : {}),
+      };
+
+      const shouldManageInitialLoading =
+        !silent && !hasLoadedAppointmentsRef.current;
+
+      if (shouldManageInitialLoading) {
+        setLoading(true);
+      }
+
       try {
-        const data = await apiClient.getDashboardAppointments();
-        setAppointments(normalizeToArray(data));
+        let page = 1;
+        let hasNext = true;
+        const allAppointments = [];
+
+        while (hasNext) {
+          const response = await apiClient.getAppointments({
+            ...scopedFilters,
+            page,
+            limit: 200,
+          });
+
+          const pageAppointments = normalizeToArray(response);
+          allAppointments.push(...pageAppointments);
+
+          hasNext = Boolean(response?.metadata?.hasNext) && pageAppointments.length > 0;
+          page += 1;
+        }
+
+        setAppointments(allAppointments);
+        setError(null);
+        return allAppointments;
       } catch (err) {
         setError(err.message);
+        throw err;
       } finally {
-        setLoading(false);
+        hasLoadedAppointmentsRef.current = true;
+        if (shouldManageInitialLoading) {
+          setLoading(false);
+        }
       }
-    };
+    },
+    [user?.clinic_id, user?.facility_id],
+  );
 
-    fetchAppointments();
-  }, []);
+  useEffect(() => {
+    refreshAppointments().catch(() => undefined);
+  }, [refreshAppointments]);
 
-  return { appointments, loading, error };
+  return { appointments, loading, error, refreshAppointments };
 };
 
 export const useVaccinationAnalytics = () => {

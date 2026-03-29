@@ -103,10 +103,92 @@ const validatePasswordResetForm = ({
 };
 
 const USER_MANAGEMENT_TABS = new Set(["admins", "system", "guardians"]);
+const PASSWORD_REQUIREMENT_DEFINITIONS = [
+  {
+    id: "length",
+    label: "At least 8 characters",
+    test: (password = "") => password.length >= 8,
+  },
+  {
+    id: "lowercase",
+    label: "One lowercase letter",
+    test: (password = "") => /[a-z]/.test(password),
+  },
+  {
+    id: "special",
+    label: "One special character",
+    test: (password = "") => /[^A-Za-z0-9]/.test(password),
+  },
+  {
+    id: "uppercase",
+    label: "One uppercase letter",
+    test: (password = "") => /[A-Z]/.test(password),
+  },
+  {
+    id: "number",
+    label: "One number",
+    test: (password = "") => /[0-9]/.test(password),
+  },
+];
 
 const resolveUserManagementTab = (value) => {
   const normalized = String(value || "").trim().toLowerCase();
   return USER_MANAGEMENT_TABS.has(normalized) ? normalized : "admins";
+};
+
+const USER_FORM_INITIAL_STATE = {
+  name: "",
+  phone: "",
+  email: "",
+  relationship: "",
+  address: "",
+  infant_first_name: "",
+  infant_last_name: "",
+  infant_dob: "",
+  infant_sex: "",
+  infant_national_id: "",
+  infant_address: "",
+  infant_contact: "",
+  username: "",
+  role_id: "",
+  clinic_id: "",
+  contact: "",
+  password: "",
+};
+
+const ADMIN_FORM_INITIAL_STATE = {
+  username: "",
+  email: "",
+  contact: "",
+  role_id: "",
+  clinic_id: "",
+  password: "",
+  confirmPassword: "",
+};
+
+const GUARDIAN_PHONE_REGEX = /^(\+63|0)\d{10}$/;
+
+const toPositiveInteger = (value) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+};
+
+const resolveClinicId = (...values) => {
+  for (const value of values) {
+    const parsed = toPositiveInteger(value);
+    if (parsed) {
+      return parsed;
+    }
+  }
+  return null;
+};
+
+const isValidOptionalEmail = (value = "") => {
+  if (!String(value || "").trim()) {
+    return true;
+  }
+
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).trim());
 };
 
 export default function UserManagement() {
@@ -145,35 +227,10 @@ export default function UserManagement() {
   const [passwordResetErrors, setPasswordResetErrors] = useState({});
   const [passwordResetFormError, setPasswordResetFormError] = useState("");
   const [adminFormData, setAdminFormData] = useState({
-    username: "",
-    email: "",
-    contact: "",
-    role_id: "",
-    clinic_id: "",
-    password: "",
-    confirmPassword: "",
+    ...ADMIN_FORM_INITIAL_STATE,
   });
   const [formData, setFormData] = useState({
-    // Guardian fields
-    name: "",
-    phone: "",
-    email: "",
-    relationship: "",
-    address: "",
-    // Infant fields
-    infant_first_name: "",
-    infant_last_name: "",
-    infant_dob: "",
-    infant_sex: "",
-    infant_national_id: "",
-    infant_address: "",
-    infant_contact: "",
-    // System user fields
-    username: "",
-    role_id: "",
-    clinic_id: "",
-    contact: "",
-    password: "",
+    ...USER_FORM_INITIAL_STATE,
   });
 
   // Sorting state
@@ -247,6 +304,84 @@ export default function UserManagement() {
   const [formTouched, setFormTouched] = useState({});
   const [adminFormErrors, setAdminFormErrors] = useState({});
   const [adminFormTouched, setAdminFormTouched] = useState({});
+
+  const currentClinicId = useMemo(
+    () => resolveClinicId(user?.clinic_id, user?.facility_id, clinics?.[0]?.id),
+    [clinics, user?.clinic_id, user?.facility_id],
+  );
+
+  const resolveClinicName = useCallback(
+    (clinicId, fallbackName = "San Nicolas Health Center, Pasig City") => {
+      const normalizedClinicId = resolveClinicId(clinicId);
+      const matchingClinic = Array.isArray(clinics)
+        ? clinics.find(
+            (clinic) => resolveClinicId(clinic?.id) === normalizedClinicId,
+          )
+        : null;
+
+      return (
+        matchingClinic?.name ||
+        fallbackName ||
+        clinics?.[0]?.name ||
+        "San Nicolas Health Center, Pasig City"
+      );
+    },
+    [clinics],
+  );
+
+  const resolvedUserFormClinicId = useMemo(
+    () =>
+      resolveClinicId(formData.clinic_id, editingUser?.clinic_id, currentClinicId),
+    [currentClinicId, editingUser?.clinic_id, formData.clinic_id],
+  );
+
+  const resolvedUserFormClinicName = useMemo(
+    () =>
+      resolveClinicName(
+        resolvedUserFormClinicId,
+        editingUser?.clinic_name || user?.clinic_name,
+      ),
+    [
+      editingUser?.clinic_name,
+      resolveClinicName,
+      resolvedUserFormClinicId,
+      user?.clinic_name,
+    ],
+  );
+
+  const resolvedAdminFormClinicId = useMemo(
+    () => resolveClinicId(adminFormData.clinic_id, currentClinicId),
+    [adminFormData.clinic_id, currentClinicId],
+  );
+
+  const resolvedAdminFormClinicName = useMemo(
+    () => resolveClinicName(resolvedAdminFormClinicId, user?.clinic_name),
+    [resolveClinicName, resolvedAdminFormClinicId, user?.clinic_name],
+  );
+
+  const passwordRequirementItems = useMemo(
+    () =>
+      PASSWORD_REQUIREMENT_DEFINITIONS.map((requirement) => ({
+        ...requirement,
+        met: requirement.test(passwordFormData.password || ""),
+      })),
+    [passwordFormData.password],
+  );
+
+  const closeUserModal = useCallback(() => {
+    setShowModal(false);
+    setEditingUser(null);
+    setFormData({ ...USER_FORM_INITIAL_STATE });
+    setFormErrors({});
+    setFormTouched({});
+  }, []);
+
+  const closeAdminModal = useCallback(() => {
+    setShowAddAdminModal(false);
+    setAdminFormData({ ...ADMIN_FORM_INITIAL_STATE });
+    setAdminFormErrors({});
+    setAdminFormTouched({});
+  }, []);
 
   // Guardian relationship options
   const relationshipOptions = [
@@ -582,28 +717,16 @@ export default function UserManagement() {
   const handleAddUser = useCallback((userType) => {
     setEditingUser(null);
     setFormData({
-      name: "",
-      phone: "",
-      email: "",
-      relationship: "",
-      address: "",
-      // Infant fields
-      infant_first_name: "",
-      infant_last_name: "",
-      infant_dob: "",
-      infant_sex: "",
-      infant_national_id: "",
-      infant_address: "",
-      infant_contact: "",
-      // System user fields
-      username: "",
-      role_id: "",
-      clinic_id: "",
-      contact: "",
-      password: "",
+      ...USER_FORM_INITIAL_STATE,
+      clinic_id:
+        userType === "guardians" || !currentClinicId
+          ? ""
+          : String(currentClinicId),
     });
+    setFormErrors({});
+    setFormTouched({});
     setShowModal(true);
-  }, []);
+  }, [currentClinicId]);
 
   const handleEditUser = useCallback((user, userType) => {
     setEditingUser(user);
@@ -658,23 +781,93 @@ export default function UserManagement() {
         password: "",
       });
     }
+    setFormErrors({});
+    setFormTouched({});
     setShowModal(true);
   }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const shouldHandleGuardianMutation =
+      activeTab === "guardians" ||
+      (activeTab === "system" && editingUser?.user_type === "guardian");
+
+    const nextErrors = {};
+
+    if (shouldHandleGuardianMutation) {
+      const trimmedName = String(formData.name || "").trim();
+      const compactPhone = String(formData.phone || "").replace(/[\s\-()]/g, "");
+
+      if (!trimmedName) {
+        nextErrors.name = "Name is required";
+      } else if (trimmedName.length < 2) {
+        nextErrors.name = "Must be at least 2 characters";
+      }
+
+      if (!compactPhone) {
+        nextErrors.phone = "Phone number is required";
+      } else if (!hasOnlyAsciiCharacters(compactPhone)) {
+        nextErrors.phone = "Please enter a valid phone number";
+      } else if (!GUARDIAN_PHONE_REGEX.test(compactPhone)) {
+        nextErrors.phone = "Phone must use 09XXXXXXXXX or +63XXXXXXXXXX format";
+      }
+
+      if (!formData.relationship) {
+        nextErrors.relationship = "Please select a relationship";
+      }
+
+      if (!isValidOptionalEmail(formData.email)) {
+        nextErrors.email = "Please enter a valid email address";
+      }
+    } else if ((activeTab === "system" || activeTab === "admins") && isAdmin) {
+      const trimmedUsername = String(formData.username || "").trim();
+
+      if (!trimmedUsername) {
+        nextErrors.username = "Username is required";
+      } else if (trimmedUsername.length < 3) {
+        nextErrors.username = "Must be at least 3 characters";
+      }
+
+      if (!formData.role_id) {
+        nextErrors.role_id = "Please select a role";
+      }
+
+      if (!editingUser && !String(formData.password || "").trim()) {
+        nextErrors.password = "Password is required";
+      } else if (
+        String(formData.password || "").trim() &&
+        String(formData.password || "").trim().length < 6
+      ) {
+        nextErrors.password = "Password must be at least 6 characters";
+      }
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFormErrors(nextErrors);
+      setFormTouched((prev) => ({
+        ...prev,
+        ...Object.keys(nextErrors).reduce((acc, key) => {
+          acc[key] = true;
+          return acc;
+        }, {}),
+      }));
+      warning(
+        shouldHandleGuardianMutation
+          ? "Please complete the required guardian fields before submitting."
+          : "Please complete the required user fields before submitting.",
+      );
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      const shouldHandleGuardianMutation =
-        activeTab === "guardians" ||
-        (activeTab === "system" && editingUser?.user_type === "guardian");
-
       if (shouldHandleGuardianMutation) {
         const guardianData = {
-          name: formData.name,
-          phone: formData.phone,
-          email: formData.email,
+          name: String(formData.name || "").trim(),
+          phone: String(formData.phone || "").replace(/[\s\-()]/g, ""),
+          email: String(formData.email || "").trim(),
           address: formData.address,
           relationship: formData.relationship,
         };
@@ -741,14 +934,21 @@ export default function UserManagement() {
         (activeTab === "system" || activeTab === "admins") &&
         isAdmin
       ) {
-        const targetClinic = clinics?.find(c => c.name.toLowerCase().includes("san nicolas")) || clinics?.[0];
-        const resolvedClinicId = targetClinic ? targetClinic.id : 1;
+        const resolvedClinicId = resolveClinicId(
+          formData.clinic_id,
+          editingUser?.clinic_id,
+          currentClinicId,
+        );
+
+        if (!resolvedClinicId) {
+          throw new Error("Unable to resolve a clinic for this user.");
+        }
 
         const userData = {
-          username: formData.username,
-          role_id: parseInt(formData.role_id),
+          username: String(formData.username || "").trim(),
+          role_id: parseInt(formData.role_id, 10),
           clinic_id: resolvedClinicId,
-          contact: formData.contact,
+          contact: String(formData.contact || "").trim(),
           ...(formData.password && { password: formData.password }),
         };
 
@@ -778,7 +978,7 @@ export default function UserManagement() {
         }
       }
 
-      setShowModal(false);
+      closeUserModal();
     } catch (error) {
       console.error("Error saving user:", error);
       notifyError(error.message || "Error saving user");
@@ -887,6 +1087,11 @@ export default function UserManagement() {
         userType,
       );
       if (result.success) {
+        if (userType === "guardian") {
+          await invalidateGuardianQueries();
+        } else {
+          await invalidateSystemUserQueries();
+        }
         success("Password reset successfully!");
         closePasswordResetModal();
         // Tab state is preserved - no navigation
@@ -908,16 +1113,16 @@ export default function UserManagement() {
   const handleChange = useCallback(
     (e) => {
       const { name, value } = e.target;
-      setFormData({
-        ...formData,
+      setFormData((prev) => ({
+        ...prev,
         [name]: value,
-      });
+      }));
       // Clear error when user starts typing
       if (formErrors[name]) {
         setFormErrors((prev) => ({ ...prev, [name]: null }));
       }
     },
-    [formData, formErrors],
+    [formErrors],
   );
 
   // Validate individual field
@@ -931,6 +1136,13 @@ export default function UserManagement() {
         if (!value || value.trim() === "") return "Phone number is required";
         if (!hasOnlyAsciiCharacters(value))
           return "Please enter a valid phone number";
+        const compactPhone = value.replace(/[\s\-()]/g, "");
+        if (!GUARDIAN_PHONE_REGEX.test(compactPhone)) {
+          return "Phone must use 09XXXXXXXXX or +63XXXXXXXXXX format";
+        }
+      }
+      if (name === "email" && !isValidOptionalEmail(value)) {
+        return "Please enter a valid email address";
       }
       if (name === "relationship") {
         if (!value) return "Please select a relationship";
@@ -943,9 +1155,15 @@ export default function UserManagement() {
       if (name === "role_id") {
         if (!value) return "Please select a role";
       }
+      if (name === "password") {
+        if (!editingUser && !value) return "Password is required";
+        if (value && value.trim().length < 6) {
+          return "Password must be at least 6 characters";
+        }
+      }
     }
     return null;
-  }, [activeTab]);
+  }, [activeTab, editingUser]);
 
   // Handle blur for real-time validation
   const handleBlur = useCallback((e) => {
@@ -960,33 +1178,26 @@ export default function UserManagement() {
   const handleAdminChange = useCallback(
     (e) => {
       const { name, value } = e.target;
-      setAdminFormData({
-        ...adminFormData,
+      setAdminFormData((prev) => ({
+        ...prev,
         [name]: value,
-      });
+      }));
       // Clear error when user starts typing
       if (adminFormErrors[name]) {
         setAdminFormErrors((prev) => ({ ...prev, [name]: null }));
       }
     },
-    [adminFormData, adminFormErrors],
+    [adminFormErrors],
   );
 
-  // Handle blur for admin form real-time validation
-  const handleAdminBlur = useCallback((e) => {
-    const { name, value } = e.target;
-    setAdminFormTouched((prev) => ({ ...prev, [name]: true }));
-    const error = validateAdminField(name, value);
-    if (error) {
-      setAdminFormErrors((prev) => ({ ...prev, [name]: error }));
-    }
-  }, []);
-
   // Validate admin form field
-  const validateAdminField = (name, value) => {
+  const validateAdminField = useCallback((name, value) => {
     if (name === "username") {
       if (!value || value.trim() === "") return "Username is required";
       if (value.trim().length < 3) return "Must be at least 3 characters";
+    }
+    if (name === "email" && !isValidOptionalEmail(value)) {
+      return "Please enter a valid email address";
     }
     if (name === "role_id") {
       if (!value) return "Please select a role";
@@ -995,46 +1206,93 @@ export default function UserManagement() {
       if (!value) return "Password is required";
       if (calculatePasswordStrength(value) < 4) return "Password must meet strength requirements (8+ chars, mixed case, numbers, symbols)";
     }
+    if (name === "confirmPassword") {
+      if (!value) return "Please confirm password";
+      if (value !== adminFormData.password) return "Passwords do not match";
+    }
     return null;
-  };
+  }, [adminFormData.password]);
+
+  // Handle blur for admin form real-time validation
+  const handleAdminBlur = useCallback((e) => {
+    const { name, value } = e.target;
+    setAdminFormTouched((prev) => ({ ...prev, [name]: true }));
+    const validationError = validateAdminField(name, value);
+    if (validationError) {
+      setAdminFormErrors((prev) => ({ ...prev, [name]: validationError }));
+    }
+  }, [validateAdminField]);
 
   const handleAddAdmin = useCallback(() => {
     setAdminFormData({
-      username: "",
-      email: "",
-      contact: "",
-      role_id: "",
-      clinic_id: "",
-      password: "",
-      confirmPassword: "",
+      ...ADMIN_FORM_INITIAL_STATE,
+      clinic_id: currentClinicId ? String(currentClinicId) : "",
     });
+    setAdminFormErrors({});
+    setAdminFormTouched({});
     setShowAddAdminModal(true);
-  }, []);
+  }, [currentClinicId]);
 
   const handleSubmitAdmin = async (e) => {
     e.preventDefault();
 
-    if (adminFormData.password !== adminFormData.confirmPassword) {
-      warning("Passwords do not match");
-      return;
-    }
+    const validationErrors = {
+      username: validateAdminField("username", adminFormData.username),
+      email: validateAdminField("email", adminFormData.email),
+      role_id: validateAdminField("role_id", adminFormData.role_id),
+      password: validateAdminField("password", adminFormData.password),
+      confirmPassword: validateAdminField(
+        "confirmPassword",
+        adminFormData.confirmPassword,
+      ),
+    };
 
-    if (calculatePasswordStrength(adminFormData.password) < 4) {
-      warning("Password must be at least 8 characters and include a mix of case, numbers, and symbols.");
+    const nextErrors = Object.entries(validationErrors).reduce(
+      (acc, [field, value]) => {
+        if (value) {
+          acc[field] = value;
+        }
+        return acc;
+      },
+      {},
+    );
+
+    if (Object.keys(nextErrors).length > 0) {
+      setAdminFormErrors(nextErrors);
+      setAdminFormTouched((prev) => ({
+        ...prev,
+        ...Object.keys(nextErrors).reduce((acc, key) => {
+          acc[key] = true;
+          return acc;
+        }, {}),
+      }));
+      warning(
+        nextErrors.confirmPassword ||
+          nextErrors.password ||
+          nextErrors.username ||
+          nextErrors.role_id ||
+          "Please review the admin account details before submitting.",
+      );
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const targetClinic = clinics?.find(c => c.name.toLowerCase().includes("san nicolas")) || clinics?.[0];
-      const resolvedClinicId = targetClinic ? targetClinic.id : 1;
+      const resolvedClinicId = resolveClinicId(
+        adminFormData.clinic_id,
+        currentClinicId,
+      );
+
+      if (!resolvedClinicId) {
+        throw new Error("Unable to resolve a clinic for this admin account.");
+      }
 
       const userData = {
-        username: adminFormData.username,
-        role_id: parseInt(adminFormData.role_id),
+        username: String(adminFormData.username || "").trim(),
+        role_id: parseInt(adminFormData.role_id, 10),
         clinic_id: resolvedClinicId,
-        contact: adminFormData.contact,
+        contact: String(adminFormData.contact || "").trim(),
         password: adminFormData.password,
       };
 
@@ -1043,7 +1301,7 @@ export default function UserManagement() {
         setCurrentPage(1);
         await invalidateSystemUserQueries();
         success("Admin account created successfully!");
-        setShowAddAdminModal(false);
+        closeAdminModal();
       } else {
         notifyError(result.error || "Error creating admin account");
       }
@@ -1129,8 +1387,14 @@ export default function UserManagement() {
         size="xs"
         onClick={() => handleToggleUserActive(row)}
         className="p-1.5"
-        title={row.is_active ? "Disable User" : "Enable User"}
-        disabled={isTogglingActive}
+        title={
+          String(row.id) === String(currentUserId)
+            ? "You cannot disable your own account"
+            : row.is_active
+              ? "Disable User"
+              : "Enable User"
+        }
+        disabled={isTogglingActive || String(row.id) === String(currentUserId)}
         aria-label={row.is_active ? "Disable user" : "Enable user"}
       >
         {row.is_active ? (
@@ -1167,8 +1431,13 @@ export default function UserManagement() {
           onClick={() => handleDeleteUser(row, "admin")}
           loading={isDeleting}
           className="p-1.5"
-          title="Delete User"
+          title={
+            String(row.id) === String(currentUserId)
+              ? "You cannot delete your own account"
+              : "Delete User"
+          }
           aria-label="Delete user"
+          disabled={String(row.id) === String(currentUserId)}
         >
           <Trash2 className="w-3.5 h-3.5" />
         </LoadingButton>
@@ -1797,8 +2066,17 @@ export default function UserManagement() {
                                 size="xs"
                                 onClick={() => handleToggleUserActive(row)}
                                 className="p-1.5"
-                                title={row.is_active ? "Disable User" : "Enable User"}
-                                disabled={isTogglingActive}
+                                title={
+                                  String(row.id) === String(currentUserId)
+                                    ? "You cannot disable your own account"
+                                    : row.is_active
+                                      ? "Disable User"
+                                      : "Enable User"
+                                }
+                                disabled={
+                                  isTogglingActive ||
+                                  String(row.id) === String(currentUserId)
+                                }
                                 aria-label={row.is_active ? "Disable user" : "Enable user"}
                               >
                                 {row.is_active ? <PowerOff className="w-3.5 h-3.5" /> : <Power className="w-3.5 h-3.5" />}
@@ -1998,7 +2276,7 @@ export default function UserManagement() {
       {/* User Add/Edit Modal */}
       <Modal
         isOpen={showModal}
-        onClose={() => setShowModal(false)}
+        onClose={closeUserModal}
         title={
           editingUser
             ? `Edit ${activeTab === "guardians" ? "Guardian" : "User"}`
@@ -2010,7 +2288,7 @@ export default function UserManagement() {
             <Button
               variant="cancel"
               type="button"
-              onClick={() => setShowModal(false)}
+              onClick={closeUserModal}
               disabled={isSubmitting}
             >
               Cancel
@@ -2259,7 +2537,7 @@ export default function UserManagement() {
                       <TextInput
                         label="Clinic"
                         name="clinic_name"
-                        value="San Nicolas Health Center, Pasig City"
+                        value={resolvedUserFormClinicName}
                         readOnly
                         disabled
                       />
@@ -2287,6 +2565,8 @@ export default function UserManagement() {
                       name="password"
                       value={formData.password}
                       onChange={handleChange}
+                      onBlur={handleBlur}
+                      error={formTouched.password ? formErrors.password : undefined}
                       showPasswordAriaLabel="Show user password"
                       hidePasswordAriaLabel="Hide user password"
                       required={!editingUser}
@@ -2315,12 +2595,13 @@ export default function UserManagement() {
         title={`Reset Password`}
         size="md"
         footer={
-          <AdminModalActions>
+          <AdminModalActions className="gap-3 sm:gap-4">
             <Button
               variant="cancel"
               type="button"
               onClick={closePasswordResetModal}
               disabled={isResettingPassword}
+              className="form-action--cancel ui-form-action-btn ui-form-action-btn--secondary user-password-reset-cancel-btn"
             >
               Cancel
             </Button>
@@ -2329,6 +2610,7 @@ export default function UserManagement() {
               variant="primary"
               form="passwordForm"
               disabled={isResettingPassword}
+              className="form-action--primary ui-form-action-btn ui-form-action-btn--primary min-w-[11rem] shadow-sm user-password-reset-submit-btn"
             >
               {isResettingPassword ? (
                 <span className="flex items-center gap-2">
@@ -2345,11 +2627,11 @@ export default function UserManagement() {
         <form
           id="passwordForm"
           onSubmit={handlePasswordReset}
-          className="admin-form"
+          className="admin-form user-password-reset-form"
         >
           {/* User Info Card */}
-          <div className="admin-user-info">
-            <div className="admin-user-info-avatar">
+          <div className="admin-user-info user-password-reset-info">
+            <div className="admin-user-info-avatar user-password-reset-info-avatar">
               <Key className="w-5 h-5" />
             </div>
             <div className="admin-user-info-details">
@@ -2365,6 +2647,7 @@ export default function UserManagement() {
             variant="warning"
             title="Security Warning"
             icon={<ShieldAlert className="h-5 w-5" />}
+            className="user-password-reset-warning"
           >
             <p className="whitespace-normal">
               This will{" "}
@@ -2375,10 +2658,10 @@ export default function UserManagement() {
           </Alert>
 
           {/* Password Fields */}
-          <div className="admin-form-card">
-            <div className="admin-form-card-body">
+          <div className="admin-form-card user-password-reset-card">
+            <div className="admin-form-card-body user-password-reset-card-body">
               {passwordResetFormError && (
-                <Alert variant="error" className="mb-4">
+                <Alert variant="error" className="mb-4 user-password-reset-error">
                   {passwordResetFormError}
                 </Alert>
               )}
@@ -2393,8 +2676,11 @@ export default function UserManagement() {
                   showPasswordAriaLabel="Show reset password"
                   hidePasswordAriaLabel="Hide reset password"
                   required
+                  disabled={isResettingPassword}
                   placeholder="Use 8+ chars with upper/lowercase, number, and symbol"
                   error={passwordResetErrors.password}
+                  containerClassName="user-password-reset-field"
+                  className="user-password-reset-input"
                 />
               </div>
               <div className="admin-field-group">
@@ -2411,13 +2697,41 @@ export default function UserManagement() {
                   showPasswordAriaLabel="Show reset confirm password"
                   hidePasswordAriaLabel="Hide reset confirm password"
                   required
+                  disabled={isResettingPassword}
                   placeholder="Confirm new password"
                   error={passwordResetErrors.confirmPassword}
+                  containerClassName="user-password-reset-field"
+                  className="user-password-reset-input"
                 />
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Passwords must be at least 8 characters and include uppercase, lowercase, a number, and a symbol.
-              </p>
+              <div className="user-password-reset-requirements">
+                <p className="user-password-reset-requirements-title">
+                  Password Requirements
+                </p>
+                <ul className="user-password-reset-requirements-list">
+                  {passwordRequirementItems.map((requirement) => (
+                    <li
+                      key={requirement.id}
+                      className="user-password-reset-requirement-item"
+                      data-met={requirement.met ? "true" : "false"}
+                      aria-label={`${requirement.label} ${requirement.met ? "complete" : "incomplete"}`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="user-password-reset-requirement-bullet"
+                        data-met={requirement.met ? "true" : "false"}
+                      >
+                        {requirement.met ? (
+                          <span className="user-password-reset-requirement-bullet-dot" />
+                        ) : null}
+                      </span>
+                      <span className="user-password-reset-requirement-label">
+                        {requirement.label}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
         </form>
@@ -2426,7 +2740,7 @@ export default function UserManagement() {
       {/* Add Admin Modal */}
       <Modal
         isOpen={showAddAdminModal}
-        onClose={() => setShowAddAdminModal(false)}
+        onClose={closeAdminModal}
         title="Create New Admin Account"
         size="lg"
         footer={
@@ -2434,7 +2748,7 @@ export default function UserManagement() {
             <Button
               variant="cancel"
               type="button"
-              onClick={() => setShowAddAdminModal(false)}
+              onClick={closeAdminModal}
               disabled={isSubmitting}
             >
               Cancel
@@ -2543,7 +2857,7 @@ export default function UserManagement() {
                 <TextInput
                   label="Clinic"
                   name="clinic_name"
-                  value="San Nicolas Health Center, Pasig City"
+                  value={resolvedAdminFormClinicName}
                   readOnly
                   disabled
                 />

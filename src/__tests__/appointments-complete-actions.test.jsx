@@ -13,12 +13,14 @@ import Appointments from "../pages/Appointments";
 import apiClient from "../utils/api";
 
 let mockDashboardAppointments = [];
+let mockRefreshAppointments;
 
 jest.mock("../hooks/useDashboard", () => ({
   useAppointments: () => ({
     appointments: mockDashboardAppointments,
     loading: false,
     error: null,
+    refreshAppointments: mockRefreshAppointments,
   }),
   useInfants: () => ({
     infants: [
@@ -68,6 +70,7 @@ const renderAppointmentsPage = () =>
 describe("Appointments completion action workflow", () => {
   beforeEach(() => {
     mockDashboardAppointments = [{ ...scheduledAppointment }];
+    mockRefreshAppointments = undefined;
 
     apiClient.getAppointmentCalendarAvailability.mockResolvedValue({ dates: [] });
     apiClient.getBlockedDates.mockResolvedValue({ blockedDates: {} });
@@ -179,5 +182,37 @@ describe("Appointments completion action workflow", () => {
     ).not.toBeInTheDocument();
 
     expect(within(completedRow).getByText(/attended/i)).toBeInTheDocument();
+  });
+
+  test("completion refresh uses the hook source when available", async () => {
+    mockRefreshAppointments = jest.fn().mockResolvedValue([
+      {
+        ...scheduledAppointment,
+        status: "attended",
+        completion_notes: "Completed by admin",
+      },
+    ]);
+
+    renderAppointmentsPage();
+
+    const scheduledRow = (await screen.findByText("Baby One")).closest("tr");
+    expect(scheduledRow).toBeInTheDocument();
+
+    fireEvent.click(
+      within(scheduledRow).getByRole("button", { name: /^complete$/i }),
+    );
+
+    await waitFor(() => {
+      expect(apiClient.completeAppointment).toHaveBeenCalledWith(
+        1,
+        "Completed by admin",
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockRefreshAppointments).toHaveBeenCalledWith({ silent: true });
+    });
+
+    expect(apiClient.getAppointments).not.toHaveBeenCalled();
   });
 });

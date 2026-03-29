@@ -396,7 +396,103 @@ const PIE_COLORS = [
   CHART_THEME.palette.lime,
 ];
 
-const SELECT_MENU_PROPS = {
+const ANALYTICS_DARK_UI = Object.freeze({
+  pageBg: "#0F172A",
+  filterBg: "linear-gradient(180deg, rgba(15,23,42,0.96) 0%, rgba(30,41,59,0.88) 100%)",
+  cardBg: "linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(17,24,39,0.94) 100%)",
+  baseSurface: "#0F172A",
+  panelSurface: "rgba(30,41,59,0.82)",
+  panelSurfaceStrong: "rgba(30,41,59,0.92)",
+  fieldBg: "rgba(15,23,42,0.86)",
+  border: "rgba(148,163,184,0.28)",
+  strongBorder: "rgba(148,163,184,0.4)",
+  divider: "rgba(71,85,105,0.74)",
+  textPrimary: "#F8FAFC",
+  textSecondary: "#CBD5E1",
+  textMuted: "#94A3B8",
+  buttonBorder: "rgba(96,165,250,0.58)",
+  buttonBg: "rgba(30,41,59,0.74)",
+  buttonBgHover: "rgba(30,58,138,0.45)",
+  buttonText: "#BFDBFE",
+  chipBg: "rgba(15,23,42,0.9)",
+  chipOutlinedBg: "rgba(30,41,59,0.68)",
+  successBg: "rgba(22,101,52,0.32)",
+  successBorder: "rgba(74,222,128,0.44)",
+  successText: "#BBF7D0",
+  iconHover: "rgba(59,130,246,0.14)",
+});
+
+const buildAnalyticsCardSx = ({
+  isDark,
+  background,
+  borderColor,
+  shadow,
+  height = "100%",
+  borderRadius = 2,
+}) => ({
+  height,
+  borderRadius,
+  overflow: "hidden",
+  border: "1px solid",
+  borderColor,
+  background,
+  backgroundColor: isDark ? ANALYTICS_DARK_UI.baseSurface : "#FFFFFF",
+  boxShadow: shadow,
+});
+
+const buildAnalyticsAlertSx = (isDark, severity = "info") => {
+  if (!isDark) {
+    return {};
+  }
+
+  const tones = {
+    success: {
+      backgroundColor: "rgba(6,95,70,0.24)",
+      borderColor: "rgba(52,211,153,0.36)",
+      textColor: "#D1FAE5",
+      iconColor: "#6EE7B7",
+    },
+    info: {
+      backgroundColor: "rgba(30,58,138,0.24)",
+      borderColor: "rgba(96,165,250,0.36)",
+      textColor: "#DBEAFE",
+      iconColor: "#93C5FD",
+    },
+    warning: {
+      backgroundColor: "rgba(146,64,14,0.28)",
+      borderColor: "rgba(251,191,36,0.38)",
+      textColor: "#FEF3C7",
+      iconColor: "#FCD34D",
+    },
+    error: {
+      backgroundColor: "rgba(127,29,29,0.3)",
+      borderColor: "rgba(248,113,113,0.38)",
+      textColor: "#FEE2E2",
+      iconColor: "#FCA5A5",
+    },
+  };
+
+  const tone = tones[severity] || tones.info;
+
+  return {
+    border: "1px solid",
+    backgroundColor: tone.backgroundColor,
+    borderColor: tone.borderColor,
+    color: tone.textColor,
+    "& .MuiAlert-icon": {
+      color: tone.iconColor,
+    },
+    "& .MuiAlert-action .MuiButton-root": {
+      color: tone.textColor,
+      fontWeight: 700,
+    },
+    "& .MuiAlert-message": {
+      fontWeight: 600,
+    },
+  };
+};
+
+const getSelectMenuProps = (isDark) => ({
   // Keep MUI Select menu in portal to preserve valid anchor positioning.
   // Backdrop is kept non-blocking so legacy global styles cannot mimic navigation overlays.
   disablePortal: false,
@@ -411,10 +507,28 @@ const SELECT_MENU_PROPS = {
     paper: {
       sx: (theme) => ({
         maxHeight: 320,
-        zIndex: (theme) => theme.zIndex.modal + 2,
-        bgcolor: theme.palette.mode === 'dark' ? 'rgba(15,23,42,0.95)' : 'background.paper',
-        border: '1px solid',
-        borderColor: theme.palette.mode === 'dark' ? 'rgba(148,163,184,0.3)' : 'divider',
+        zIndex: theme.zIndex.modal + 2,
+        background: isDark ? ANALYTICS_DARK_UI.filterBg : theme.palette.background.paper,
+        backgroundColor: isDark ? ANALYTICS_DARK_UI.baseSurface : theme.palette.background.paper,
+        border: "1px solid",
+        borderColor: isDark ? ANALYTICS_DARK_UI.strongBorder : "divider",
+        boxShadow: isDark ? "0 18px 38px rgba(2,6,23,0.46)" : "0 14px 30px rgba(15,23,42,0.12)",
+        "& .MuiMenuItem-root": {
+          mx: 0.75,
+          my: 0.25,
+          borderRadius: 1.5,
+          color: isDark ? ANALYTICS_DARK_UI.textSecondary : theme.palette.text.primary,
+          "&:hover": {
+            backgroundColor: isDark ? ANALYTICS_DARK_UI.panelSurface : theme.palette.action.hover,
+          },
+          "&.Mui-selected": {
+            backgroundColor: isDark ? "rgba(37,99,235,0.24)" : "rgba(219,234,254,0.86)",
+            color: isDark ? ANALYTICS_DARK_UI.textPrimary : theme.palette.text.primary,
+          },
+          "&.Mui-selected:hover": {
+            backgroundColor: isDark ? "rgba(37,99,235,0.34)" : "rgba(191,219,254,0.92)",
+          },
+        },
       }),
     },
   },
@@ -424,13 +538,15 @@ const SELECT_MENU_PROPS = {
   PaperProps: {
     sx: (theme) => ({
       maxHeight: 320,
-      zIndex: (theme) => theme.zIndex.modal + 2,
-      bgcolor: theme.palette.mode === 'dark' ? 'rgba(15,23,42,0.95)' : 'background.paper',
-      border: '1px solid',
-      borderColor: theme.palette.mode === 'dark' ? 'rgba(148,163,184,0.3)' : 'divider',
+      zIndex: theme.zIndex.modal + 2,
+      background: isDark ? ANALYTICS_DARK_UI.filterBg : theme.palette.background.paper,
+      backgroundColor: isDark ? ANALYTICS_DARK_UI.baseSurface : theme.palette.background.paper,
+      border: "1px solid",
+      borderColor: isDark ? ANALYTICS_DARK_UI.strongBorder : "divider",
+      boxShadow: isDark ? "0 18px 38px rgba(2,6,23,0.46)" : "0 14px 30px rgba(15,23,42,0.12)",
     }),
   },
-};
+});
 
 const blurActiveElementIfNeeded = () => {
   if (typeof document === "undefined") {
@@ -676,24 +792,26 @@ const resolveChartAppearance = (isDark) => {
   return {
     isDark,
     cardBackground: isDark
-      ? "linear-gradient(180deg, rgba(15,23,42,0.86) 0%, rgba(15,23,42,0.72) 100%)"
+      ? ANALYTICS_DARK_UI.cardBg
       : "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-    cardBorder: isDark ? "rgba(148,163,184,0.22)" : "rgba(148,163,184,0.24)",
-    cardShadow: isDark ? "0 14px 30px rgba(2,6,23,0.45)" : "0 14px 30px rgba(15,23,42,0.08)",
-    plotBackground: isDark ? "rgba(15,23,42,0.35)" : "rgba(248,250,252,0.82)",
-    plotBorder: isDark ? "rgba(148,163,184,0.20)" : "rgba(148,163,184,0.25)",
-    gridStroke: isDark ? "rgba(148,163,184,0.20)" : "rgba(100,116,139,0.20)",
-    axisLine: isDark ? "rgba(148,163,184,0.38)" : "rgba(100,116,139,0.30)",
-    axisTick: isDark ? "#CBD5E1" : "#475569",
-    tooltipBackground: isDark ? "rgba(15,23,42,0.96)" : "rgba(255,255,255,0.98)",
-    tooltipBorder: isDark ? "rgba(148,163,184,0.34)" : "rgba(148,163,184,0.35)",
-    tooltipTitle: isDark ? "#F8FAFC" : "#0F172A",
-    tooltipText: isDark ? "#E2E8F0" : "#334155",
-    legendBackground: isDark ? "rgba(30,41,59,0.70)" : "rgba(248,250,252,0.88)",
-    legendBorder: isDark ? "rgba(148,163,184,0.24)" : "rgba(148,163,184,0.34)",
-    legendText: isDark ? "#E2E8F0" : "#334155",
-    centerLabel: isDark ? "#94A3B8" : "#64748B",
-    centerValue: isDark ? "#F8FAFC" : "#0F172A",
+    cardBorder: isDark ? ANALYTICS_DARK_UI.border : "rgba(148,163,184,0.24)",
+    cardShadow: isDark ? "0 18px 38px rgba(2,6,23,0.46)" : "0 14px 30px rgba(15,23,42,0.08)",
+    plotBackground: isDark
+      ? "linear-gradient(180deg, rgba(15,23,42,0.78) 0%, rgba(17,24,39,0.72) 100%)"
+      : "rgba(248,250,252,0.82)",
+    plotBorder: isDark ? "rgba(148,163,184,0.24)" : "rgba(148,163,184,0.25)",
+    gridStroke: isDark ? "rgba(148,163,184,0.16)" : "rgba(100,116,139,0.20)",
+    axisLine: isDark ? "rgba(148,163,184,0.32)" : "rgba(100,116,139,0.30)",
+    axisTick: isDark ? ANALYTICS_DARK_UI.textSecondary : "#475569",
+    tooltipBackground: isDark ? "rgba(15,23,42,0.98)" : "rgba(255,255,255,0.98)",
+    tooltipBorder: isDark ? ANALYTICS_DARK_UI.strongBorder : "rgba(148,163,184,0.35)",
+    tooltipTitle: isDark ? ANALYTICS_DARK_UI.textPrimary : "#0F172A",
+    tooltipText: isDark ? ANALYTICS_DARK_UI.textSecondary : "#334155",
+    legendBackground: isDark ? "rgba(30,41,59,0.82)" : "rgba(248,250,252,0.88)",
+    legendBorder: isDark ? "rgba(148,163,184,0.28)" : "rgba(148,163,184,0.34)",
+    legendText: isDark ? ANALYTICS_DARK_UI.textSecondary : "#334155",
+    centerLabel: isDark ? ANALYTICS_DARK_UI.textMuted : "#64748B",
+    centerValue: isDark ? ANALYTICS_DARK_UI.textPrimary : "#0F172A",
   };
 };
 
@@ -1093,23 +1211,28 @@ const FilterBar = ({
   scopeLabel,
 }) => {
   const surfaceBg = isDark
-    ? "linear-gradient(180deg, rgba(15,23,42,0.9) 0%, rgba(15,23,42,0.74) 100%)"
+    ? ANALYTICS_DARK_UI.filterBg
     : "background.paper";
-  const surfaceBorder = isDark ? "rgba(148,163,184,0.3)" : "divider";
-  const labelColor = isDark ? "#CBD5E1" : "#475569";
-  const helperColor = isDark ? "#94A3B8" : "#64748B";
-  const fieldOutlineDefault = isDark ? "rgba(148,163,184,0.38)" : "rgba(148,163,184,0.35)";
+  const surfaceBorder = isDark ? ANALYTICS_DARK_UI.strongBorder : "divider";
+  const labelColor = isDark ? ANALYTICS_DARK_UI.textSecondary : "#475569";
+  const helperColor = isDark ? ANALYTICS_DARK_UI.textMuted : "#64748B";
+  const fieldOutlineDefault = isDark ? ANALYTICS_DARK_UI.strongBorder : "rgba(148,163,184,0.35)";
+  const selectMenuProps = useMemo(() => getSelectMenuProps(isDark), [isDark]);
 
   return (
     <Card
       sx={{
+        ...buildAnalyticsCardSx({
+          isDark,
+          background: surfaceBg,
+          borderColor: surfaceBorder,
+          shadow: isDark ? "0 16px 34px rgba(2,6,23,0.42)" : "0 8px 22px rgba(15,23,42,0.06)",
+          height: "auto",
+          borderRadius: 2,
+        }),
         mb: 0,
-        bgcolor: surfaceBg,
-        border: "1px solid",
-        borderColor: surfaceBorder,
-        boxShadow: isDark ? "0 12px 28px rgba(2,6,23,0.35)" : "0 8px 22px rgba(15,23,42,0.06)",
         '& .MuiCardContent-root': {
-          backgroundColor: isDark ? 'rgba(15,23,42,0.9)' : 'transparent',
+          backgroundColor: isDark ? "rgba(15,23,42,0.16)" : "transparent",
         },
         "& .MuiInputLabel-root": {
           color: helperColor,
@@ -1119,13 +1242,14 @@ const FilterBar = ({
           color: isDark ? "#93C5FD" : "primary.main",
         },
         "& .MuiOutlinedInput-root": {
-          color: isDark ? "#F8FAFC" : "text.primary",
-          backgroundColor: isDark ? "rgba(15,23,42,0.28)" : "transparent",
+          color: isDark ? ANALYTICS_DARK_UI.textPrimary : "text.primary",
+          backgroundColor: isDark ? ANALYTICS_DARK_UI.fieldBg : "transparent",
+          backdropFilter: isDark ? "blur(10px)" : "none",
           "& .MuiOutlinedInput-notchedOutline": {
             borderColor: fieldOutlineDefault,
           },
           "&:hover .MuiOutlinedInput-notchedOutline": {
-            borderColor: isDark ? "rgba(148,163,184,0.62)" : "rgba(100,116,139,0.56)",
+            borderColor: isDark ? "rgba(191,219,254,0.42)" : "rgba(100,116,139,0.56)",
           },
           "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
             borderColor: isDark ? "#60A5FA" : "primary.main",
@@ -1135,14 +1259,14 @@ const FilterBar = ({
           color: labelColor,
         },
         "& .MuiChip-outlined": {
-          borderColor: isDark ? "rgba(148,163,184,0.34)" : "divider",
+          borderColor: isDark ? ANALYTICS_DARK_UI.border : "divider",
           color: labelColor,
-          bgcolor: isDark ? "rgba(30,41,59,0.66)" : "transparent",
+          bgcolor: isDark ? ANALYTICS_DARK_UI.chipOutlinedBg : "transparent",
         },
         "& .MuiChip-colorSuccess": {
-          color: isDark ? "#BBF7D0" : undefined,
-          borderColor: isDark ? "rgba(74,222,128,0.44)" : undefined,
-          bgcolor: isDark ? "rgba(22,101,52,0.3)" : undefined,
+          color: isDark ? ANALYTICS_DARK_UI.successText : undefined,
+          borderColor: isDark ? ANALYTICS_DARK_UI.successBorder : undefined,
+          bgcolor: isDark ? ANALYTICS_DARK_UI.successBg : undefined,
         },
         "& .MuiFormControlLabel-label": {
           color: labelColor,
@@ -1161,7 +1285,7 @@ const FilterBar = ({
                     labelId="analytics-period-label"
                     value={filters.period}
                     label="Period"
-                    MenuProps={SELECT_MENU_PROPS}
+                    MenuProps={selectMenuProps}
                     onChange={(event) => onChange("period", event.target.value)}
                   >
                     {PERIOD_OPTIONS.map((option) => (
@@ -1180,7 +1304,7 @@ const FilterBar = ({
                     labelId="analytics-vaccine-label"
                     value={filters.vaccineType}
                     label="Vaccine"
-                    MenuProps={SELECT_MENU_PROPS}
+                    MenuProps={selectMenuProps}
                     onChange={(event) => onChange("vaccineType", event.target.value)}
                   >
                     {VACCINE_OPTIONS.map((option) => (
@@ -1199,7 +1323,7 @@ const FilterBar = ({
                     labelId="analytics-status-label"
                     value={filters.vaccinationStatus}
                     label="Vaccination Status"
-                    MenuProps={SELECT_MENU_PROPS}
+                    MenuProps={selectMenuProps}
                     onChange={(event) => onChange("vaccinationStatus", event.target.value)}
                   >
                     {STATUS_OPTIONS.map((option) => (
@@ -1244,7 +1368,19 @@ const FilterBar = ({
             <Box sx={{ display: "flex", justifyContent: { xs: "flex-start", lg: "flex-end" }, gap: 1 }}>
               <Tooltip title="Refresh analytics now">
                 <span>
-                  <IconButton onClick={onRefresh} disabled={loading} color="primary" aria-label="Refresh analytics">
+                  <IconButton
+                    onClick={onRefresh}
+                    disabled={loading}
+                    color="primary"
+                    aria-label="Refresh analytics"
+                    sx={isDark ? {
+                      color: "#60A5FA",
+                      border: "1px solid rgba(96,165,250,0.18)",
+                      "&:hover": {
+                        backgroundColor: ANALYTICS_DARK_UI.iconHover,
+                      },
+                    } : undefined}
+                  >
                     <Refresh />
                   </IconButton>
                 </span>
@@ -1255,6 +1391,15 @@ const FilterBar = ({
                 startIcon={<Download />}
                 onClick={onExport}
                 disabled={loading}
+                sx={isDark ? {
+                  borderColor: ANALYTICS_DARK_UI.buttonBorder,
+                  backgroundColor: ANALYTICS_DARK_UI.buttonBg,
+                  color: ANALYTICS_DARK_UI.buttonText,
+                  "&:hover": {
+                    borderColor: "#60A5FA",
+                    backgroundColor: ANALYTICS_DARK_UI.buttonBgHover,
+                  },
+                } : undefined}
               >
                 Export CSV
               </Button>
@@ -1276,8 +1421,25 @@ const FilterBar = ({
                   size="small"
                   color={liveSyncEnabled ? "success" : "default"}
                   label={liveSyncEnabled ? "Real-time updates active" : "Polling fallback active"}
+                  sx={isDark && !liveSyncEnabled ? {
+                    fontWeight: 700,
+                    color: ANALYTICS_DARK_UI.textSecondary,
+                    backgroundColor: ANALYTICS_DARK_UI.chipBg,
+                    border: "1px solid",
+                    borderColor: ANALYTICS_DARK_UI.border,
+                  } : isDark ? { fontWeight: 700 } : undefined}
                 />
-                <Chip size="small" variant="outlined" label={scopeLabel || "Current health center scope"} />
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={scopeLabel || "Current health center scope"}
+                  sx={isDark ? {
+                    fontWeight: 600,
+                    color: ANALYTICS_DARK_UI.textSecondary,
+                    borderColor: ANALYTICS_DARK_UI.border,
+                    backgroundColor: ANALYTICS_DARK_UI.chipOutlinedBg,
+                  } : undefined}
+                />
               </Box>
 
               <FormControlLabel
@@ -1286,6 +1448,19 @@ const FilterBar = ({
                     size="small"
                     checked={autoRefresh}
                     onChange={(event) => onAutoRefreshToggle(event.target.checked)}
+                    sx={isDark ? {
+                      "& .MuiSwitch-track": {
+                        backgroundColor: "rgba(71,85,105,0.9)",
+                        opacity: 1,
+                      },
+                      "& .MuiSwitch-thumb": {
+                        backgroundColor: "#E2E8F0",
+                      },
+                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
+                        backgroundColor: "#2563EB",
+                        opacity: 1,
+                      },
+                    } : undefined}
                   />
                 }
                 label="Auto-refresh"
@@ -1302,21 +1477,22 @@ const KpiCard = ({ title, value, subtitle, icon, color = "primary", loading, isD
   const Icon = icon;
   const displayValue = typeof value === "number" ? safeNum(value).toLocaleString() : String(value ?? "0");
   const surfaceBg = isDark
-    ? "linear-gradient(180deg, rgba(15,23,42,0.88) 0%, rgba(15,23,42,0.72) 100%)"
+    ? ANALYTICS_DARK_UI.cardBg
     : "background.paper";
-  const surfaceBorder = isDark ? "rgba(148,163,184,0.28)" : "divider";
-  const titleColor = isDark ? "#CBD5E1" : "text.secondary";
-  const subtitleColor = isDark ? "#94A3B8" : "text.secondary";
-  const valueColor = isDark ? "#F8FAFC" : "text.primary";
+  const surfaceBorder = isDark ? ANALYTICS_DARK_UI.border : "divider";
+  const titleColor = isDark ? ANALYTICS_DARK_UI.textSecondary : "text.secondary";
+  const subtitleColor = isDark ? ANALYTICS_DARK_UI.textMuted : "text.secondary";
+  const valueColor = isDark ? ANALYTICS_DARK_UI.textPrimary : "text.primary";
 
   return (
     <Card
       sx={{
-        height: "100%",
-        bgcolor: surfaceBg,
-        border: "1px solid",
-        borderColor: surfaceBorder,
-        boxShadow: isDark ? "0 10px 22px rgba(2,6,23,0.34)" : "0 6px 16px rgba(15,23,42,0.06)",
+        ...buildAnalyticsCardSx({
+          isDark,
+          background: surfaceBg,
+          borderColor: surfaceBorder,
+          shadow: isDark ? "0 14px 28px rgba(2,6,23,0.38)" : "0 6px 16px rgba(15,23,42,0.06)",
+        }),
         '& .MuiCardContent-root': {
           backgroundColor: isDark ? 'rgba(15,23,42,0.72)' : 'transparent',
         },
@@ -1663,22 +1839,23 @@ const AppointmentAndFollowupSection = ({ data, loading, chartAppearance }) => {
   const statusData = data?.appointmentStatusBreakdown || [];
   const appointmentTotal = statusData.reduce((total, entry) => total + safeNum(entry.count), 0);
   const surfaceBg = chartAppearance.isDark
-    ? "linear-gradient(180deg, rgba(15,23,42,0.88) 0%, rgba(15,23,42,0.74) 100%)"
+    ? ANALYTICS_DARK_UI.cardBg
     : "background.paper";
-  const surfaceBorder = chartAppearance.isDark ? "rgba(148,163,184,0.3)" : "divider";
+  const surfaceBorder = chartAppearance.isDark ? ANALYTICS_DARK_UI.border : "divider";
 
   return (
     <Grid container spacing={2} sx={{ mb: 3 }}>
       <Grid size={{ xs: 12, md: 6 }}>
         <Card
           sx={{
-            height: "100%",
-            bgcolor: surfaceBg,
-            border: "1px solid",
-            borderColor: surfaceBorder,
-            boxShadow: chartAppearance.isDark
-              ? "0 12px 26px rgba(2,6,23,0.36)"
-              : "0 8px 18px rgba(15,23,42,0.06)",
+            ...buildAnalyticsCardSx({
+              isDark: chartAppearance.isDark,
+              background: surfaceBg,
+              borderColor: surfaceBorder,
+              shadow: chartAppearance.isDark
+                ? "0 16px 32px rgba(2,6,23,0.42)"
+                : "0 8px 18px rgba(15,23,42,0.06)",
+            }),
             '& .MuiCardContent-root': {
               backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
             },
@@ -1798,22 +1975,23 @@ const InventorySection = ({ data, loading, chartAppearance, viewportWidth }) => 
   const mobileLayout = viewportWidth < 640;
   const tabletLayout = viewportWidth >= 640 && viewportWidth < 960;
   const surfaceBg = chartAppearance.isDark
-    ? "linear-gradient(180deg, rgba(15,23,42,0.88) 0%, rgba(15,23,42,0.74) 100%)"
+    ? ANALYTICS_DARK_UI.cardBg
     : "background.paper";
-  const surfaceBorder = chartAppearance.isDark ? "rgba(148,163,184,0.3)" : "divider";
+  const surfaceBorder = chartAppearance.isDark ? ANALYTICS_DARK_UI.border : "divider";
 
   return (
     <Grid container spacing={2} sx={{ mb: 3 }}>
       <Grid size={{ xs: 12, md: 5 }}>
         <Card
           sx={{
-            height: "100%",
-            bgcolor: surfaceBg,
-            border: "1px solid",
-            borderColor: surfaceBorder,
-            boxShadow: chartAppearance.isDark
-              ? "0 12px 26px rgba(2,6,23,0.36)"
-              : "0 8px 18px rgba(15,23,42,0.06)",
+            ...buildAnalyticsCardSx({
+              isDark: chartAppearance.isDark,
+              background: surfaceBg,
+              borderColor: surfaceBorder,
+              shadow: chartAppearance.isDark
+                ? "0 16px 32px rgba(2,6,23,0.42)"
+                : "0 8px 18px rgba(15,23,42,0.06)",
+            }),
             '& .MuiCardContent-root': {
               backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
             },
@@ -2042,22 +2220,23 @@ const SmsAndDemographicsSection = ({
 
   const summaryGridSize = showGenderChart ? { xs: 12, lg: 6 } : { xs: 12 };
   const surfaceBg = chartAppearance.isDark
-    ? "linear-gradient(180deg, rgba(15,23,42,0.88) 0%, rgba(15,23,42,0.74) 100%)"
+    ? ANALYTICS_DARK_UI.cardBg
     : "background.paper";
-  const surfaceBorder = chartAppearance.isDark ? "rgba(148,163,184,0.3)" : "divider";
+  const surfaceBorder = chartAppearance.isDark ? ANALYTICS_DARK_UI.border : "divider";
 
   return (
     <Grid container spacing={2} sx={{ mb: 3 }}>
       <Grid size={summaryGridSize}>
         <Card
           sx={{
-            height: "100%",
-            bgcolor: surfaceBg,
-            border: "1px solid",
-            borderColor: surfaceBorder,
-            boxShadow: chartAppearance.isDark
-              ? "0 12px 26px rgba(2,6,23,0.36)"
-              : "0 8px 18px rgba(15,23,42,0.06)",
+            ...buildAnalyticsCardSx({
+              isDark: chartAppearance.isDark,
+              background: surfaceBg,
+              borderColor: surfaceBorder,
+              shadow: chartAppearance.isDark
+                ? "0 16px 32px rgba(2,6,23,0.42)"
+                : "0 8px 18px rgba(15,23,42,0.06)",
+            }),
             '& .MuiCardContent-root': {
               backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
             },
@@ -2202,6 +2381,7 @@ const SmsAndDemographicsSection = ({
                   <Alert
                     severity="warning"
                     sx={{
+                      ...buildAnalyticsAlertSx(chartAppearance.isDark, "warning"),
                       py: 0,
                       '& .MuiAlert-message': {
                         py: 0.45,
@@ -2401,22 +2581,23 @@ const AlertsActivityReportsSection = ({
   const activity = data?.activity || [];
   const reports = data?.reportShortcuts || [];
   const surfaceBg = isDark
-    ? "linear-gradient(180deg, rgba(15,23,42,0.88) 0%, rgba(15,23,42,0.74) 100%)"
+    ? ANALYTICS_DARK_UI.cardBg
     : "background.paper";
-  const surfaceBorder = isDark ? "rgba(148,163,184,0.3)" : "divider";
-  const headingColor = isDark ? "#F8FAFC" : "text.primary";
-  const subTextColor = isDark ? "#94A3B8" : "text.secondary";
+  const surfaceBorder = isDark ? ANALYTICS_DARK_UI.border : "divider";
+  const headingColor = isDark ? ANALYTICS_DARK_UI.textPrimary : "text.primary";
+  const subTextColor = isDark ? ANALYTICS_DARK_UI.textMuted : "text.secondary";
 
   return (
     <Grid container spacing={2}>
       <Grid size={{ xs: 12, lg: 4 }}>
         <Card
           sx={{
-            height: "100%",
-            bgcolor: surfaceBg,
-            border: "1px solid",
-            borderColor: surfaceBorder,
-            boxShadow: isDark ? "0 12px 26px rgba(2,6,23,0.36)" : "0 8px 18px rgba(15,23,42,0.06)",
+            ...buildAnalyticsCardSx({
+              isDark,
+              background: surfaceBg,
+              borderColor: surfaceBorder,
+              shadow: isDark ? "0 16px 32px rgba(2,6,23,0.42)" : "0 8px 18px rgba(15,23,42,0.06)",
+            }),
             '& .MuiCardContent-root': {
               backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
             },
@@ -2437,7 +2618,9 @@ const AlertsActivityReportsSection = ({
                 <Skeleton height={80} />
               </>
             ) : alerts.length === 0 ? (
-              <Alert severity="success">No critical alerts for current filters.</Alert>
+              <Alert severity="success" sx={buildAnalyticsAlertSx(isDark, "success")}>
+                No critical alerts for current filters.
+              </Alert>
             ) : (
               <Box sx={{ display: "grid", gap: 1.25 }}>
                 {alerts.slice(0, 6).map((item) => (
@@ -2493,11 +2676,12 @@ const AlertsActivityReportsSection = ({
       <Grid size={{ xs: 12, lg: 5 }}>
         <Card
           sx={{
-            height: "100%",
-            bgcolor: surfaceBg,
-            border: "1px solid",
-            borderColor: surfaceBorder,
-            boxShadow: isDark ? "0 12px 26px rgba(2,6,23,0.36)" : "0 8px 18px rgba(15,23,42,0.06)",
+            ...buildAnalyticsCardSx({
+              isDark,
+              background: surfaceBg,
+              borderColor: surfaceBorder,
+              shadow: isDark ? "0 16px 32px rgba(2,6,23,0.42)" : "0 8px 18px rgba(15,23,42,0.06)",
+            }),
             '& .MuiCardContent-root': {
               backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
             },
@@ -2519,7 +2703,9 @@ const AlertsActivityReportsSection = ({
                 <Skeleton height={60} />
               </>
             ) : activity.length === 0 ? (
-              <Alert severity="info">No recent activity for current filter range.</Alert>
+              <Alert severity="info" sx={buildAnalyticsAlertSx(isDark, "info")}>
+                No recent activity for current filter range.
+              </Alert>
             ) : (
               <Box
                 sx={{
@@ -2598,11 +2784,12 @@ const AlertsActivityReportsSection = ({
       <Grid size={{ xs: 12, lg: 3 }}>
         <Card
           sx={{
-            height: "100%",
-            bgcolor: surfaceBg,
-            border: "1px solid",
-            borderColor: surfaceBorder,
-            boxShadow: isDark ? "0 12px 26px rgba(2,6,23,0.36)" : "0 8px 18px rgba(15,23,42,0.06)",
+            ...buildAnalyticsCardSx({
+              isDark,
+              background: surfaceBg,
+              borderColor: surfaceBorder,
+              shadow: isDark ? "0 16px 32px rgba(2,6,23,0.42)" : "0 8px 18px rgba(15,23,42,0.06)",
+            }),
             '& .MuiCardContent-root': {
               backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
             },
@@ -2624,7 +2811,9 @@ const AlertsActivityReportsSection = ({
                 <Skeleton height={54} />
               </>
             ) : reports.length === 0 ? (
-              <Alert severity="info">No report shortcuts available.</Alert>
+              <Alert severity="info" sx={buildAnalyticsAlertSx(isDark, "info")}>
+                No report shortcuts available.
+              </Alert>
             ) : (
               <Box sx={{ display: "grid", gap: 1 }}>
                 {reports.map((report) => (
@@ -2674,18 +2863,18 @@ const AlertsActivityReportsSection = ({
 };
 
 const SummaryMiniCard = ({ label, value, error = false, isDark = false }) => {
-  const labelColor = isDark ? '#CBD5E1' : 'text.secondary';
-  const valueColor = error ? (isDark ? '#FCA5A5' : 'error.main') : (isDark ? '#F8FAFC' : 'text.primary');
+  const labelColor = isDark ? ANALYTICS_DARK_UI.textMuted : "text.secondary";
+  const valueColor = error ? (isDark ? "#FCA5A5" : "error.main") : (isDark ? ANALYTICS_DARK_UI.textPrimary : "text.primary");
 
   return (
     <Box
       sx={{
         border: "1px solid",
-        borderColor: isDark ? 'rgba(148,163,184,0.34)' : 'divider',
+        borderColor: isDark ? ANALYTICS_DARK_UI.border : "divider",
         borderRadius: 2,
         p: 1.5,
         minHeight: 72,
-        bgcolor: isDark ? 'rgba(30,41,59,0.68)' : 'transparent',
+        bgcolor: isDark ? ANALYTICS_DARK_UI.panelSurface : "rgba(248,250,252,0.72)",
       }}
     >
       <Typography variant="caption" sx={{ color: labelColor, display: "block" }}>
@@ -2771,6 +2960,10 @@ const AnalyticsDashboard = () => {
   const [shortcutLoadingKey, setShortcutLoadingKey] = useState("");
 
   const pollRef = useRef(null);
+  const sectionDividerSx = useMemo(
+    () => ({ mb: 3, borderColor: isDark ? ANALYTICS_DARK_UI.divider : "divider" }),
+    [isDark],
+  );
 
   const fetchDashboard = useCallback(async ({ silent = false } = {}) => {
     if (!silent) {
@@ -3065,7 +3258,7 @@ const AnalyticsDashboard = () => {
   return (
     <Box sx={{
       p: { xs: 2, sm: 2.5, md: 3 },
-      bgcolor: isDark ? '#111827' : 'transparent',
+      bgcolor: isDark ? ANALYTICS_DARK_UI.pageBg : 'transparent',
       minHeight: '100vh',
       borderRadius: isDark ? 2 : 0,
       display: 'flex',
@@ -3102,17 +3295,23 @@ const AnalyticsDashboard = () => {
             mb: 2,
             mt: 3,
             borderBottom: 1,
-            borderColor: 'divider',
+            borderColor: isDark ? ANALYTICS_DARK_UI.divider : 'divider',
             '& .MuiTab-root': {
-              color: isDark ? '#FFFFFF' : '#64748B',
+              color: isDark ? ANALYTICS_DARK_UI.textMuted : '#64748B',
               fontWeight: 700,
+              '&:hover': {
+                color: isDark ? ANALYTICS_DARK_UI.textSecondary : '#334155',
+              },
               '&.Mui-selected': {
-                color: isDark ? '#FFFFFF' : '#0F172A',
+                color: isDark ? ANALYTICS_DARK_UI.textPrimary : '#0F172A',
                 fontWeight: 700,
               },
             },
             '& .MuiTabs-indicator': {
               backgroundColor: isDark ? '#5B8DEF' : '#5B8DEF',
+            },
+            '& .MuiTabs-scrollButtons': {
+              color: isDark ? ANALYTICS_DARK_UI.textSecondary : undefined,
             },
           }}
           aria-label="Analytics content sections"
@@ -3148,19 +3347,19 @@ const AnalyticsDashboard = () => {
                 Retry
               </Button>
             }
-            sx={{ mb: 2 }}
+            sx={{ mb: 2, ...buildAnalyticsAlertSx(isDark, "error") }}
           >
             {error}
           </Alert>
         ) : null}
 
         {refreshWarning ? (
-          <Alert severity="warning" sx={{ mb: 2 }}>
+          <Alert severity="warning" sx={{ mb: 2, ...buildAnalyticsAlertSx(isDark, "warning") }}>
             {refreshWarning}
           </Alert>
         ) : null}
 
-        <Typography variant="caption" sx={{ display: "block", mb: 2, color: isDark ? '#64748B' : 'text.secondary' }}>
+        <Typography variant="caption" sx={{ display: "block", mb: 2, color: isDark ? ANALYTICS_DARK_UI.textMuted : 'text.secondary' }}>
           Scope: {dashboardData?.scopeLabel || "Current health center scope"}
           {dashboardData?.generatedAt ? ` • Last generated: ${toShortDateTime(dashboardData.generatedAt)}` : ""}
         </Typography>
@@ -3175,7 +3374,7 @@ const AnalyticsDashboard = () => {
         {tab === 1 && (
           <>
             <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
-            <Divider sx={{ mb: 3 }} />
+            <Divider sx={sectionDividerSx} />
             <VaccineProgressSection data={dashboardData} loading={loading} chartAppearance={chartAppearance} />
           </>
         )}
@@ -3183,7 +3382,7 @@ const AnalyticsDashboard = () => {
         {tab === 2 && (
           <>
             <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
-            <Divider sx={{ mb: 3 }} />
+            <Divider sx={sectionDividerSx} />
             <AppointmentAndFollowupSection
               data={dashboardData}
               loading={loading}
@@ -3195,7 +3394,7 @@ const AnalyticsDashboard = () => {
         {tab === 3 && (
           <>
             <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
-            <Divider sx={{ mb: 3 }} />
+            <Divider sx={sectionDividerSx} />
             <InventorySection
               data={dashboardData}
               loading={loading}
@@ -3214,7 +3413,7 @@ const AnalyticsDashboard = () => {
         {tab === 4 && (
           <>
             <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
-            <Divider sx={{ mb: 3 }} />
+            <Divider sx={sectionDividerSx} />
             <SmsAndDemographicsSection
               data={dashboardData}
               loading={loading}
