@@ -1417,6 +1417,22 @@ class ApiClient {
     return this.request(`/inventory/vaccine-batches${suffix}`);
   }
 
+  async getAvailableInventoryLots(filters = {}) {
+    const params = new URLSearchParams(filters || {});
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    const response = await this.request(`/inventory/available-lots${suffix}`);
+
+    if (response && response.success !== undefined) {
+      return Array.isArray(response.data) ? response.data : [];
+    }
+
+    if (Array.isArray(response)) {
+      return response;
+    }
+
+    return Array.isArray(response?.data) ? response.data : [];
+  }
+
   async createInventoryVaccineBatch(batchData) {
     return this.request("/inventory/vaccine-batches", {
       method: "POST",

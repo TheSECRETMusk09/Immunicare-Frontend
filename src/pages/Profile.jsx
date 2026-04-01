@@ -126,14 +126,15 @@ export default function Profile() {
         }
 
         const response = await apiClient.getUserProfile(user.id);
-        if (response.data) {
+        const userData = response?.data ?? response;
+        if (userData) {
           setFormData({
-            name: response.data.name || response.data.username || "",
-            email: response.data.email || "",
-            phone: response.data.phone || "",
-            address: response.data.address || "",
-            emergency_contact: response.data.emergency_contact || "",
-            emergency_phone: response.data.emergency_phone || "",
+            name: userData.name || userData.username || "",
+            email: userData.email || "",
+            phone: userData.phone || "",
+            address: userData.address || "",
+            emergency_contact: userData.emergency_contact || "",
+            emergency_phone: userData.emergency_phone || "",
           });
         }
       }

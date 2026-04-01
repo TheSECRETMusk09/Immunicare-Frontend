@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   Button,
@@ -15,12 +15,34 @@ import DownloadCenter from "../components/DownloadCenter";
 import MonitoringDashboard from "../components/MonitoringDashboard";
 import DocumentTemplates from "../components/DocumentTemplates";
 
+const DIGITAL_PAPERS_DEFAULT_TAB = "paper_configuration";
+const DIGITAL_PAPERS_TAB_ALIASES = {
+  paper_configuration: "paper_configuration",
+  download_center: "download_center",
+  monitoring_dashboard: "monitoring_dashboard",
+  document_templates: "document_templates",
+};
+
+const normalizeDigitalPapersTab = (value) => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const normalized = String(value).trim().toLowerCase().replace(/\s+/g, "_");
+  return DIGITAL_PAPERS_TAB_ALIASES[normalized] || null;
+};
+
 export default function DigitalPapersDashboard() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const urlTab = searchParams.get("tab");
   const { user, isAdmin, isAdminOrSuperAdmin, isHealthcareWorker } = useAuth();
-  const [activeTab, setActiveTab] = useState(urlTab || "paper_configuration");
+  const tabFromUrl = useMemo(
+    () => normalizeDigitalPapersTab(searchParams.get("tab")),
+    [searchParams],
+  );
+  const [activeTab, setActiveTab] = useState(
+    () => tabFromUrl || DIGITAL_PAPERS_DEFAULT_TAB,
+  );
   const [stats, setStats] = useState({
     totalTemplates: 0,
     totalDownloads: 0,
@@ -48,10 +70,40 @@ export default function DigitalPapersDashboard() {
     "User";
 
   useEffect(() => {
+    const resolvedTab = tabFromUrl || DIGITAL_PAPERS_DEFAULT_TAB;
+
+    setActiveTab((previous) =>
+      previous === resolvedTab ? previous : resolvedTab,
+    );
+
+    if (searchParams.get("tab") !== resolvedTab) {
+      const nextSearchParams = new URLSearchParams(searchParams);
+      nextSearchParams.set("tab", resolvedTab);
+      setSearchParams(nextSearchParams, { replace: true });
+    }
+  }, [tabFromUrl, searchParams, setSearchParams]);
+
+  useEffect(() => {
     if (hasAccess) {
       fetchStats();
     }
   }, [hasAccess]);
+
+  const handleTabChange = useCallback(
+    (nextTab) => {
+      const resolvedTab =
+        normalizeDigitalPapersTab(nextTab) || DIGITAL_PAPERS_DEFAULT_TAB;
+
+      setActiveTab(resolvedTab);
+
+      if (searchParams.get("tab") !== resolvedTab) {
+        const nextSearchParams = new URLSearchParams(searchParams);
+        nextSearchParams.set("tab", resolvedTab);
+        setSearchParams(nextSearchParams);
+      }
+    },
+    [searchParams, setSearchParams],
+  );
 
   const fetchStats = async () => {
     try {
@@ -168,7 +220,7 @@ export default function DigitalPapersDashboard() {
           actions={
             <div className="flex space-x-2 overflow-x-auto bg-white/20 dark:bg-gray-800/50 p-1.5 rounded-xl backdrop-blur-sm border border-white/10 dark:border-gray-700">
               <button
-                onClick={() => setActiveTab("paper_configuration")}
+                onClick={() => handleTabChange("paper_configuration")}
                 className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
                   activeTab === "paper_configuration"
                     ? "bg-white text-blue-600 shadow-sm"
@@ -178,7 +230,7 @@ export default function DigitalPapersDashboard() {
                 Paper Configuration
               </button>
               <button
-                onClick={() => setActiveTab("download_center")}
+                onClick={() => handleTabChange("download_center")}
                 className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
                   activeTab === "download_center"
                     ? "bg-white text-blue-600 shadow-sm"
@@ -188,7 +240,7 @@ export default function DigitalPapersDashboard() {
                 Download Center
               </button>
               <button
-                onClick={() => setActiveTab("monitoring_dashboard")}
+                onClick={() => handleTabChange("monitoring_dashboard")}
                 className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
                   activeTab === "monitoring_dashboard"
                     ? "bg-white text-blue-600 shadow-sm"
@@ -198,7 +250,7 @@ export default function DigitalPapersDashboard() {
                 Monitoring Dashboard
               </button>
               <button
-                onClick={() => setActiveTab("document_templates")}
+                onClick={() => handleTabChange("document_templates")}
                 className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
                   activeTab === "document_templates"
                     ? "bg-white text-blue-600 shadow-sm"

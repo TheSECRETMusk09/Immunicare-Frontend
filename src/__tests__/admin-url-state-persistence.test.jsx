@@ -481,4 +481,14 @@ describe("Admin module URL state persistence", () => {
     expect(screen.getByText("Staff Nurse")).toBeInTheDocument();
     expect(screen.queryByText(/save inventory/i)).not.toBeInTheDocument();
   });
+
+  test("Inventory legacy reports tab canonicalizes to the supported inventory sheet tab", async () => {
+    renderInventoryRoute("/inventory?tab=reports");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location-search")).toHaveTextContent(
+        "tab=inventory_sheet",
+      );
+    });
+  });
 });

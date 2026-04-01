@@ -60,13 +60,6 @@ const VaccinationsDashboard = lazy(() =>
   })),
 );
 
-// Transfer-In Cases - lazy loaded
-const TransferInCases = lazy(() =>
-  import("./pages/TransferInCases").then((module) => ({
-    default: module.default,
-  })),
-);
-
 // Page components - lazy loaded with prefetching
 const Analytics = lazy(() => import("./pages/Analytics"));
 const Appointments = lazy(() => import("./pages/Appointments"));
@@ -122,7 +115,6 @@ const GuardianGrowthChartPage = lazy(() =>
 const Reports = lazy(() => import("./pages/Reports"));
 const Announcements = lazy(() => import("./pages/Announcements"));
 const Notifications = lazy(() => import("./pages/Notifications"));
-const Settings = lazy(() => import("./pages/Settings"));
 const ChangePasswordPage = lazy(() => import("./pages/ChangePassword"));
 
 // Digital Papers Pages - lazy loaded
@@ -529,17 +521,6 @@ function AppContent() {
                </ProtectedRoute>
              }
            />
-           {/* Transfer-In Cases Route */}
-           <Route
-             path="/transfer-in-cases"
-             element={
-               <ProtectedRoute requireSystemAdmin>
-                 <AdminLayout>
-                   <TransferInCases />
-                 </AdminLayout>
-               </ProtectedRoute>
-             }
-           />
           {/* Redirect old vaccine-tracking routes to vaccination-management */}
           <Route
             path="/vaccine-tracking"
@@ -575,16 +556,6 @@ function AppContent() {
               <ProtectedRoute requireSystemAdmin>
                 <AdminLayout>
                   <Notifications />
-                </AdminLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/settings"
-            element={
-              <ProtectedRoute requireSystemAdmin>
-                <AdminLayout>
-                  <Settings />
                 </AdminLayout>
               </ProtectedRoute>
             }

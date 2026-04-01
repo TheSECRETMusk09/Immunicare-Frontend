@@ -32,54 +32,12 @@ import {
   triggerGuardianAddChildModal,
 } from "../components/QuickActionFAB";
 import { trackEvent } from "../utils/telemetry";
+import { isPhilippineHoliday, getMinBookingDate, isWeekend } from "../utils/holidays";
+import { formatTimeSlotLabel } from "../utils/dateUtils";
 
 // Get minimum booking date (today)
 const getMinDate = () => {
-  const today = new Date();
-  return today.toISOString().split("T")[0];
-};
-
-const formatTimeSlotLabel = (value) => {
-  if (!value) return "";
-  const parsed = new Date(`2000-01-01T${value}`);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-};
-
-// Philippine holiday check
-const isPhilippineHoliday = (dateStr) => {
-  const date = new Date(dateStr);
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-
-  // Regular holidays
-  const regularHolidays = [
-    { month: 1, day: 1, name: "New Year's Day" },
-    { month: 4, day: 9, name: "Araw ng Kagitingan" },
-    { month: 5, day: 1, name: "Labor Day" },
-    { month: 6, day: 12, name: "Independence Day" },
-    { month: 8, day: 21, name: "Ninoy Aquino Day" },
-    { month: 8, day: 31, name: "National Heroes Day" },
-    { month: 11, day: 1, name: "All Saints Day" },
-    { month: 11, day: 30, name: "Bonifacio Day" },
-    { month: 12, day: 8, name: "Feast of the Immaculate Conception" },
-    { month: 12, day: 24, name: "Christmas Eve" },
-    { month: 12, day: 25, name: "Christmas Day" },
-    { month: 12, day: 30, name: "Rizal Day" },
-    { month: 12, day: 31, name: "New Year's Eve" },
-  ];
-
-  for (const holiday of regularHolidays) {
-    if (holiday.month === month && holiday.day === day) {
-      return { name: holiday.name, type: "regular" };
-    }
-  }
-
-  return null;
+  return getMinBookingDate();
 };
 
 // Validate date selection
@@ -127,6 +85,22 @@ const normalizeAppointmentSuggestions = (response) => {
   return [];
 };
 
+const getBlockedBookingMessage = (readinessData) => {
+  const uniqueReasons = [
+    ...new Set(
+      (Array.isArray(readinessData?.blockedVaccines) ? readinessData.blockedVaccines : [])
+        .map((vaccine) => String(vaccine?.reason || "").trim())
+        .filter(Boolean),
+    ),
+  ];
+
+  if (uniqueReasons.length === 0) {
+    return null;
+  }
+
+  return `Booking is blocked: ${uniqueReasons.join(", ")}`;
+};
+
 export default function GuardianAppointmentBooking() {
   const { guardianId } = useAuth();
   const navigate = useNavigate();
@@ -161,6 +135,7 @@ export default function GuardianAppointmentBooking() {
 
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
+  const blockedBookingMessage = getBlockedBookingMessage(childReadiness);
 
   // Fetch children for this guardian
   const fetchChildren = useCallback(async () => {
@@ -622,7 +597,7 @@ export default function GuardianAppointmentBooking() {
           title="Book Appointment"
           subtitle="Schedule a vaccination appointment for your child"
           icon={<Calendar className="w-8 h-8 text-white" />}
-          className="guardian-appointment-booking-header"
+          className="guardian-appointment-booking-header mb-4 lg:mb-3"
         />
 
         {/* Error Alert */}
@@ -633,11 +608,11 @@ export default function GuardianAppointmentBooking() {
           </Alert>
         )}
 
-        <form onSubmit={handleSubmit} className="guardian-form space-y-6">
+        <form onSubmit={handleSubmit} className="guardian-form space-y-6 lg:space-y-4">
           {/* Main Content Grid */}
-          <div className="guardian-cards-grid grid grid-cols-1 min-[768px]:grid-cols-2 gap-4 sm:gap-5 lg:gap-6">
+          <div className="guardian-cards-grid grid grid-cols-1 min-[768px]:grid-cols-2 gap-4 sm:gap-5 lg:gap-5">
             {/* Left Column - Form */}
-            <div className="space-y-6">
+            <div className="space-y-6 lg:space-y-4">
               {/* Child Selection Card */}
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5">
                 <h3 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2 break-words">
@@ -1090,8 +1065,8 @@ export default function GuardianAppointmentBooking() {
                 <AlertCircle className="w-5 h-5 mr-2" />
                 {childReadiness.readinessStatus === 'OVERDUE'
                   ? 'This child has overdue vaccines. Please schedule an appointment as soon as possible.'
-                  : childReadiness.blockedVaccines && childReadiness.blockedVaccines.length > 0
-                    ? `Booking is blocked: ${childReadiness.blockedVaccines.map(v => v.reason).join(', ')}`
+                  : blockedBookingMessage
+                    ? blockedBookingMessage
                     : 'This child is not yet eligible for vaccination. Please check the recommended appointment date.'}
               </Alert>
             )}

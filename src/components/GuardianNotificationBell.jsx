@@ -304,12 +304,24 @@ const GuardianNotificationBell = () => {
       }
     };
 
+    const handleNotificationChange = () => {
+      fetchNotifications();
+    };
+
     on("notification", handleNewNotification);
     on("critical-notification", handleNewNotification);
+    on("actionable-notification", handleNewNotification);
+    on("notification-updated", handleNotificationChange);
+    on("notification-deleted", handleNotificationChange);
+    on("notifications-read-all", handleNotificationChange);
 
     return () => {
       off("notification", handleNewNotification);
       off("critical-notification", handleNewNotification);
+      off("actionable-notification", handleNewNotification);
+      off("notification-updated", handleNotificationChange);
+      off("notification-deleted", handleNotificationChange);
+      off("notifications-read-all", handleNotificationChange);
     };
   }, [isConnected, on, off, isOpen, fetchNotifications]);
 

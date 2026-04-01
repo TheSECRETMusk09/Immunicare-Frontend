@@ -15,6 +15,7 @@ jest.mock("../utils/api", () => ({
     getInfants: jest.fn(),
     getVaccines: jest.fn(),
     getSystemUsers: jest.fn(),
+    getAnalyticsDashboard: jest.fn(),
   },
 }));
 
@@ -48,6 +49,7 @@ describe("Vaccinations dashboard metric consistency", () => {
 
     useVaccinationSocket.mockImplementation(() => undefined);
     apiClient.getSystemUsers.mockResolvedValue([]);
+    apiClient.getAnalyticsDashboard.mockResolvedValue(null);
   });
 
   afterEach(() => {

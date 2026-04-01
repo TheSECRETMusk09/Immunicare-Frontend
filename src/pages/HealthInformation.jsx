@@ -114,8 +114,9 @@ export default function HealthInformation() {
     try {
       const response = await apiClient.getGrowthRecordsByInfant(childId);
       // Use growth data for both health records and growth data (they're the same)
-      setHealthRecords(response.data || []);
-      setGrowthData(response.data || []);
+      const records = Array.isArray(response) ? response : (response?.data || []);
+      setHealthRecords(records);
+      setGrowthData(records);
     } catch (err) {
       console.error("Error fetching growth data:", err);
     }

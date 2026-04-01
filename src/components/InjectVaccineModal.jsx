@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import apiClient from "../utils/api";
 import { Button, Input, Modal, Select, Alert, AdminModalActions } from "./UI";
 import { useAuth } from "../contexts/AuthContext";
+import SearchableInfantSelect from "./SearchableInfantSelect";
 import VaccineEligibilityIndicator from "./VaccineEligibilityIndicator";
 import {
   normalizeVaccinesResponse,
@@ -424,16 +425,6 @@ export default function InjectVaccineModal({
     return allVaccines.find(v => v.vaccineId === Number(formData.vaccine_id)) || null;
   }, [eligibleVaccines, formData.vaccine_id]);
 
-  const infantSelectOptions = useMemo(
-    () => [
-      { value: "", label: infantName ? infantName : "Select Infant" },
-      ...infants.map((infant) => ({
-        value: infant.id,
-        label: buildInfantDropdownLabel(infant),
-      })),
-    ],
-    [infantName, infants],
-  );
 
   const selectedBatchOption = useMemo(
     () =>
@@ -457,9 +448,7 @@ export default function InjectVaccineModal({
         value: "",
         label: vaccinationBatchOptionsLoading
           ? "Loading valid FEFO batch sources..."
-          : vaccinationBatchOptions.length
-            ? "Select FEFO batch source"
-            : "No valid FEFO batch source available for this vaccine",
+          : "Select FEFO batch source",
       },
       ...vaccinationBatchOptions.map((record) => ({
         value: String(record.batch_id),
@@ -598,8 +587,15 @@ export default function InjectVaccineModal({
     setVaccinationBatchOptionsLoading(true);
     setVaccinationBatchOptionsError(null);
 
-    apiClient
-      .getVaccineInventoryStatus(Number(formData.vaccine_id))
+    const loadBatchSources =
+      typeof apiClient.getAvailableInventoryLots === "function"
+        ? () =>
+            apiClient.getAvailableInventoryLots({
+              vaccine_id: Number(formData.vaccine_id),
+            })
+        : () => apiClient.getVaccineInventoryStatus(Number(formData.vaccine_id));
+
+    loadBatchSources()
       .then((response) => {
         if (!isCurrent) return;
 
@@ -1036,21 +1032,19 @@ export default function InjectVaccineModal({
       )}
 
       <form id="injectVaccineForm" onSubmit={handleSubmit} className="admin-form">
-        <div className="admin-field-group">
-          <Select
-            label="Select Infant"
-            name="infant_id"
-            value={selectedInfantId}
-            onChange={(e) => {
-              const newInfantId = e.target.value;
-              setSelectedInfantId(newInfantId);
-              void fetchVaccinationHistory(newInfantId);
-              void fetchEligibleVaccines(newInfantId);
-            }}
-            options={infantSelectOptions}
-            required
-          />
-        </div>
+        <SearchableInfantSelect
+          infants={infants}
+          value={selectedInfantId}
+          onChange={(e) => {
+            const newInfantId = e.target.value;
+            setSelectedInfantId(newInfantId);
+            void fetchVaccinationHistory(newInfantId);
+            void fetchEligibleVaccines(newInfantId);
+          }}
+          label="Select Infant"
+          required
+          placeholder="Search by name, control number, or date of birth..."
+        />
 
         <div className="admin-form-row-2">
           <Select
@@ -1262,7 +1256,7 @@ export default function InjectVaccineModal({
                 value: "",
                 label: selectedVaccineBrandOptions.length > 0
                   ? "Select approved brand"
-                  : "No approved brands configured",
+                  : "Brand optional",
               },
               ...selectedVaccineBrandOptions.map((brand) => ({
                 value: brand,
@@ -1272,12 +1266,6 @@ export default function InjectVaccineModal({
             disabled={!formData.vaccine_id || selectedVaccineBrandOptions.length === 0}
           />
         </div>
-
-        {formData.vaccine_id && selectedVaccineBrandOptions.length === 0 && (
-          <p className="text-xs text-amber-700 dark:text-amber-300 -mt-2">
-            No approved vaccine brands are configured for the selected vaccine. Leave the brand field blank unless an approved brand is registered.
-          </p>
-        )}
 
         <div className="admin-form-row-2">
           <Select

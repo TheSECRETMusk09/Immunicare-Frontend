@@ -311,7 +311,7 @@ export default function UserManagement() {
   );
 
   const resolveClinicName = useCallback(
-    (clinicId, fallbackName = "San Nicolas Health Center, Pasig City") => {
+    (clinicId, fallbackName = "") => {
       const normalizedClinicId = resolveClinicId(clinicId);
       const matchingClinic = Array.isArray(clinics)
         ? clinics.find(
@@ -323,7 +323,7 @@ export default function UserManagement() {
         matchingClinic?.name ||
         fallbackName ||
         clinics?.[0]?.name ||
-        "San Nicolas Health Center, Pasig City"
+        ""
       );
     },
     [clinics],

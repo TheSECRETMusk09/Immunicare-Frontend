@@ -17,6 +17,7 @@ jest.mock("../utils/api", () => ({
   default: {
     getFacilityInfo: jest.fn(),
     getVaccineInventory: jest.fn(),
+    getAvailableInventoryLots: jest.fn(),
     getVaccines: jest.fn(),
     createVaccineInventory: jest.fn(),
     updateVaccineInventory: jest.fn(),
@@ -82,6 +83,24 @@ describe("Inventory Management save behavior", () => {
       barangay: "San Nicolas",
     });
     apiClient.getVaccineInventory.mockResolvedValue(inventoryRecords);
+    apiClient.getAvailableInventoryLots.mockResolvedValue([
+      {
+        batch_id: 2001,
+        lot_number: "LOT-BCG-001",
+        available_quantity: 5,
+        expiry_date: "2026-12-31",
+        storage_location: "Cold Room A",
+        vaccine_name: "BCG",
+      },
+      {
+        batch_id: 2002,
+        lot_number: "LOT-BCG-002",
+        available_quantity: 7,
+        expiry_date: "2027-01-15",
+        storage_location: "Refrigerator 2",
+        vaccine_name: "BCG",
+      },
+    ]);
     apiClient.getVaccines.mockResolvedValue([]);
     apiClient.createVaccineInventory.mockResolvedValue({});
     apiClient.updateVaccineInventory.mockResolvedValue({});
@@ -153,18 +172,21 @@ describe("Inventory Management save behavior", () => {
 
     renderInventoryRoute();
 
-    const hepaBRow = await screen.findByText("Hepatitis B");
+    await screen.findByRole("button", { name: /save inventory/i });
+
+    const hepaBRow =
+      screen.queryByText("Hepatitis B") || (await screen.findByText(/hepa b/i));
     fireEvent.click(
       within(hepaBRow.closest("tr")).getByRole("button", { name: /receive/i }),
     );
 
-    fireEvent.change(screen.getByLabelText(/^quantity$/i), {
+    fireEvent.change(await screen.findByLabelText(/^quantity$/i), {
       target: { value: "3" },
     });
-    fireEvent.change(screen.getByLabelText(/lot\/batch #/i), {
+    fireEvent.change(await screen.findByLabelText(/lot\/batch #/i), {
       target: { value: "HEPB-LOT-002" },
     });
-    fireEvent.change(screen.getByLabelText(/expiry date/i), {
+    fireEvent.change(await screen.findByLabelText(/expiry date/i), {
       target: { value: "2026-12-31" },
     });
 
@@ -187,24 +209,43 @@ describe("Inventory Management save behavior", () => {
     });
   });
 
-  test("reuses the inventory row lot data for issue transactions", async () => {
+  test("requires selecting an available lot/batch for issue transactions", async () => {
     const today = new Date().toISOString().slice(0, 10);
     apiClient.createVaccineInventoryTransaction.mockResolvedValueOnce({
       id: 902,
+      batch_id: 2002,
+      selected_batch: {
+        batch_id: 2002,
+        lot_number: "LOT-BCG-002",
+        remaining_quantity: 5,
+      },
     });
 
     renderInventoryRoute();
 
+    await screen.findByRole("button", { name: /save inventory/i });
     const bcgRow = await screen.findByText("BCG");
     fireEvent.click(
       within(bcgRow.closest("tr")).getByRole("button", { name: /issue/i }),
     );
 
-    fireEvent.change(screen.getByLabelText(/^quantity$/i), {
+    fireEvent.change(await screen.findByLabelText(/^quantity$/i), {
       target: { value: "2" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /^issue$/i }));
+    await waitFor(() => {
+      expect(apiClient.getAvailableInventoryLots).toHaveBeenCalledWith({
+        vaccine_id: 1,
+      });
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /lot-bcg-002/i,
+      }),
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: /^issue$/i }).at(-1));
 
     await waitFor(() => {
       expect(apiClient.createVaccineInventoryTransaction).toHaveBeenCalledWith(
@@ -212,14 +253,49 @@ describe("Inventory Management save behavior", () => {
           vaccine_inventory_id: 1,
           vaccine_id: 1,
           clinic_id: 7,
+          batch_id: 2002,
           transaction_type: "ISSUE",
           quantity: 2,
           transaction_date: today,
-          lot_number: "LOT-BCG-001",
-          lot_batch_number: "LOT-BCG-001",
+          lot_number: "LOT-BCG-002",
+          lot_batch_number: "LOT-BCG-002",
         }),
       );
     });
+  });
+
+  test("blocks waste transactions when the selected lot/batch cannot fulfill the requested quantity", async () => {
+    renderInventoryRoute();
+
+    await screen.findByRole("button", { name: /save inventory/i });
+    const bcgRow = await screen.findByText("BCG");
+    fireEvent.click(
+      within(bcgRow.closest("tr")).getByRole("button", { name: /waste/i }),
+    );
+
+    await waitFor(() => {
+      expect(apiClient.getAvailableInventoryLots).toHaveBeenCalledWith({
+        vaccine_id: 1,
+      });
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /lot-bcg-001/i,
+      }),
+    );
+
+    fireEvent.change(await screen.findByLabelText(/^quantity$/i), {
+      target: { value: "9" },
+    });
+
+    expect(
+      screen.getByText(/only 5 units are available in the selected lot\/batch/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: /^record$/i }).at(-1),
+    ).toBeDisabled();
+    expect(apiClient.createVaccineInventoryTransaction).not.toHaveBeenCalled();
   });
 
   test("keeps backend validation errors inside the transaction modal instead of replacing the page", async () => {
@@ -238,18 +314,19 @@ describe("Inventory Management save behavior", () => {
 
     renderInventoryRoute();
 
+    await screen.findByRole("button", { name: /save inventory/i });
     const bcgRow = await screen.findByText("BCG");
     fireEvent.click(
       within(bcgRow.closest("tr")).getByRole("button", { name: /receive/i }),
     );
 
-    fireEvent.change(screen.getByLabelText(/^quantity$/i), {
+    fireEvent.change(await screen.findByLabelText(/^quantity$/i), {
       target: { value: "4" },
     });
-    fireEvent.change(screen.getByLabelText(/lot\/batch #/i), {
+    fireEvent.change(await screen.findByLabelText(/lot\/batch #/i), {
       target: { value: "LOT-BCG-002" },
     });
-    fireEvent.change(screen.getByLabelText(/expiry date/i), {
+    fireEvent.change(await screen.findByLabelText(/expiry date/i), {
       target: { value: "2026-12-31" },
     });
 

@@ -30,7 +30,6 @@ import {
   validateNumberRange,
 } from "../utils/adminFormValidation";
 import { APPROVED_VACCINE_NAMES } from "../constants/approvedVaccines";
-import InventoryMonitoringDashboard from "./InventoryMonitoringDashboard";
 import { useAuth } from "../contexts/AuthContext";
 import PrintDateRangeControls from "./PrintDateRangeControls";
 import usePrintDateRange from "../hooks/usePrintDateRange";
@@ -38,6 +37,8 @@ import {
   filterItemsByPrintDateRange,
   formatPrintDateRangeLabel,
   formatPrintDateValue,
+  parseDateLikeValue,
+  parseDateOnlyValue,
 } from "../utils/printDateRange";
 import {
   downloadWordDocument,
@@ -70,6 +71,7 @@ const INVENTORY_TAB_ALIASES = {
   movements: "stock_movements",
   transactions: "stock_movements",
   suppliers: "inventory_sheet",
+  reports: "inventory_sheet",
   inventory_summary: "inventory_summary",
   "inventory-summary": "inventory_summary",
   summary: "inventory_summary",
@@ -351,8 +353,8 @@ const formatStockAlertTimestamp = (value) => {
 const DOH_LGU_REPORT_LEFT_SEAL_SRC = "/stock-form-doh-seal.png";
 const DOH_LGU_REPORT_RIGHT_SEAL_SRC = "/stock-form-pasig-seal.png";
 const DOH_LGU_REPORT_FILENAME_PREFIX = "doh-lgu-stock-inventory-report";
-const PASIG_REPORT_SEAL_SRC = "/pasig-logo.png";
-const DOH_REPORT_SEAL_SRC = "/doh-logo.png";
+const PASIG_REPORT_SEAL_SRC = DOH_LGU_REPORT_RIGHT_SEAL_SRC;
+const DOH_REPORT_SEAL_SRC = DOH_LGU_REPORT_LEFT_SEAL_SRC;
 const INVENTORY_SHEET_LEFT_LOGO_SRC = DOH_REPORT_SEAL_SRC;
 const INVENTORY_SHEET_RIGHT_LOGO_SRC = "/san-nicolas-logo.jpg";
 const INVENTORY_SHEET_ROWS_PER_PAGE = 18;
@@ -697,6 +699,7 @@ const INVENTORY_MOVEMENT_TYPE_META = Object.freeze({
   RECEIPT: { label: "Receipt", badgeVariant: "success", accentClass: "text-green-700 dark:text-green-300", quantityPrefix: "+" },
   ISSUE: { label: "Issue", badgeVariant: "info", accentClass: "text-blue-700 dark:text-blue-300", quantityPrefix: "-" },
   WASTE: { label: "Waste", badgeVariant: "danger", accentClass: "text-red-700 dark:text-red-300", quantityPrefix: "-" },
+  WASTAGE: { label: "Wastage", badgeVariant: "danger", accentClass: "text-red-700 dark:text-red-300", quantityPrefix: "-" },
   EXPIRE: { label: "Expired", badgeVariant: "danger", accentClass: "text-red-700 dark:text-red-300", quantityPrefix: "-" },
   TRANSFER_IN: { label: "Transfer In", badgeVariant: "primary", accentClass: "text-purple-700 dark:text-purple-300", quantityPrefix: "+" },
   TRANSFER_OUT: { label: "Transfer Out", badgeVariant: "warning", accentClass: "text-orange-700 dark:text-orange-300", quantityPrefix: "-" },
@@ -780,6 +783,328 @@ const formatInventoryMovementDate = (value) => {
   return parsed.toLocaleString();
 };
 
+const formatInventoryBatchDate = (value) => {
+  if (!value) {
+    return "No expiry";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "No expiry";
+  }
+
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const getInventoryBatchSearchText = (batch) =>
+  [
+    batch?.lot_number,
+    batch?.batch_number,
+    batch?.vaccine_name,
+    batch?.storage_location,
+    batch?.expiry_date,
+    batch?.available_quantity,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+const createDefaultInventoryDisplayFilters = () => ({
+  startDate: "",
+  endDate: "",
+  vaccine: "all",
+  status: "all",
+});
+
+const createDefaultStockMovementFilters = () => ({
+  startDate: "",
+  endDate: "",
+  type: "all",
+  vaccine: "all",
+});
+
+const INVENTORY_STATUS_FILTER_OPTIONS = [
+  { value: "all", label: "All Statuses" },
+  { value: "in_stock", label: "In Stock" },
+  { value: "low_stock", label: "Low Stock" },
+  { value: "critical", label: "Critical / Out" },
+  { value: "expired", label: "Expired" },
+  { value: "with_waste", label: "With Waste" },
+];
+
+const hasDisplayDateRangeValue = ({ startDate = "", endDate = "" } = {}) =>
+  Boolean(String(startDate || "").trim() || String(endDate || "").trim());
+
+const matchesOptionalDateRange = (
+  candidateValues = [],
+  { startDate = "", endDate = "" } = {},
+) => {
+  const parsedStart = parseDateOnlyValue(startDate);
+  const parsedEnd = parseDateOnlyValue(endDate, { endOfDay: true });
+
+  if (!parsedStart && !parsedEnd) {
+    return true;
+  }
+
+  return []
+    .concat(candidateValues || [])
+    .some((candidateValue) => {
+      const parsedCandidate = parseDateLikeValue(candidateValue);
+      if (!parsedCandidate) {
+        return false;
+      }
+
+      if (parsedStart && parsedCandidate.getTime() < parsedStart.getTime()) {
+        return false;
+      }
+
+      if (parsedEnd && parsedCandidate.getTime() > parsedEnd.getTime()) {
+        return false;
+      }
+
+      return true;
+    });
+};
+
+const matchesInventoryStatusFilter = (item = {}, status = "all") => {
+  const normalizedStatus = String(status || "all").trim().toLowerCase();
+  const stockOnHand = Number(item.stock_on_hand || 0);
+  const criticalThreshold = Number(item.critical_stock_threshold || 5);
+  const lowThreshold = Number(item.low_stock_threshold || 10);
+
+  switch (normalizedStatus) {
+    case "in_stock":
+      return stockOnHand > 0;
+    case "low_stock":
+      return stockOnHand <= lowThreshold && stockOnHand > criticalThreshold;
+    case "critical":
+      return stockOnHand <= criticalThreshold;
+    case "expired":
+      return isExpiredInventoryDate(item.expiry_date);
+    case "with_waste":
+      return Number(item.expired_wasted || 0) > 0;
+    default:
+      return true;
+  }
+};
+
+const summarizeStockMovements = (rows = []) =>
+  rows.reduce(
+    (result, movement) => {
+      const type = normalizeInventoryMovementType(movement.transaction_type);
+      const quantity = Math.abs(normalizeInventoryNumber(movement.quantity, 0));
+
+      result.totalRecords += 1;
+
+      switch (type) {
+        case "RECEIVE":
+        case "RECEIPT":
+        case "TRANSFER_IN":
+          result.stockIn += quantity;
+          break;
+        case "ISSUE":
+        case "TRANSFER_OUT":
+          result.stockOut += quantity;
+          break;
+        case "WASTE":
+        case "WASTAGE":
+        case "EXPIRE":
+          result.wasted += quantity;
+          break;
+        default:
+          break;
+      }
+
+      return result;
+    },
+    {
+      totalRecords: 0,
+      stockIn: 0,
+      stockOut: 0,
+      wasted: 0,
+    },
+  );
+
+function InventoryDisplayToolbarFilters({
+  filters,
+  vaccineOptions,
+  onFilterChange,
+  onClearFilters,
+  hasActiveFilters,
+  showDivider = true,
+}) {
+  return (
+    <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3 xl:justify-end">
+      {showDivider ? (
+        <>
+          <div className="hidden h-10 w-px self-end bg-gray-200 dark:bg-gray-700 xl:block" />
+          <div className="hidden self-end pb-2 2xl:block">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+              Inventory Filters
+            </p>
+          </div>
+        </>
+      ) : null}
+      <Input
+        label="From Date"
+        type="date"
+        value={filters.startDate}
+        onChange={(event) => onFilterChange("startDate", event.target.value)}
+        className="text-sm"
+        containerClassName="w-full sm:w-[160px] xl:w-[144px]"
+      />
+      <Input
+        label="To Date"
+        type="date"
+        value={filters.endDate}
+        onChange={(event) => onFilterChange("endDate", event.target.value)}
+        className="text-sm"
+        containerClassName="w-full sm:w-[160px] xl:w-[144px]"
+      />
+      <Select
+        label="Vaccine"
+        value={filters.vaccine}
+        onChange={(event) => onFilterChange("vaccine", event.target.value)}
+        options={vaccineOptions}
+        className="text-sm"
+        containerClassName="w-full sm:w-[188px] xl:w-[172px]"
+      />
+      <Select
+        label="Status"
+        value={filters.status}
+        onChange={(event) => onFilterChange("status", event.target.value)}
+        options={INVENTORY_STATUS_FILTER_OPTIONS}
+        className="text-sm"
+        containerClassName="w-full sm:w-[188px] xl:w-[172px]"
+      />
+      <div className="flex items-center gap-2 self-end">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onClearFilters}
+          disabled={!hasActiveFilters}
+          className="min-h-[40px] whitespace-nowrap"
+        >
+          Clear Filters
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function StockMovementToolbarFilters({
+  filters,
+  typeOptions,
+  vaccineOptions,
+  onFilterChange,
+  onClearFilters,
+  hasActiveFilters,
+  showDivider = true,
+}) {
+  return (
+    <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3 xl:justify-end">
+      {showDivider ? (
+        <>
+          <div className="hidden h-10 w-px self-end bg-gray-200 dark:bg-gray-700 xl:block" />
+          <div className="hidden self-end pb-2 2xl:block">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+              Stock Movement Filters
+            </p>
+          </div>
+        </>
+      ) : null}
+      <Input
+        label="From Date"
+        type="date"
+        value={filters.startDate}
+        onChange={(event) => onFilterChange("startDate", event.target.value)}
+        className="text-sm"
+        containerClassName="w-full sm:w-[160px] xl:w-[144px]"
+      />
+      <Input
+        label="To Date"
+        type="date"
+        value={filters.endDate}
+        onChange={(event) => onFilterChange("endDate", event.target.value)}
+        className="text-sm"
+        containerClassName="w-full sm:w-[160px] xl:w-[144px]"
+      />
+      <Select
+        label="Type"
+        value={filters.type}
+        onChange={(event) => onFilterChange("type", event.target.value)}
+        options={typeOptions}
+        className="text-sm"
+        containerClassName="w-full sm:w-[176px] xl:w-[160px]"
+      />
+      <Select
+        label="Vaccine"
+        value={filters.vaccine}
+        onChange={(event) => onFilterChange("vaccine", event.target.value)}
+        options={vaccineOptions}
+        className="text-sm"
+        containerClassName="w-full sm:w-[188px] xl:w-[172px]"
+      />
+      <div className="flex items-center gap-2 self-end">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onClearFilters}
+          disabled={!hasActiveFilters}
+          className="min-h-[40px] whitespace-nowrap"
+        >
+          Clear Filters
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function InventoryActiveTabToolbarFilters({
+  activeTab,
+  inventoryFilters,
+  inventoryVaccineOptions,
+  onInventoryFilterChange,
+  onClearInventoryFilters,
+  hasActiveInventoryFilters,
+  stockMovementFilters,
+  stockMovementTypeOptions,
+  stockMovementVaccineOptions,
+  onStockMovementFilterChange,
+  onClearStockMovementFilters,
+  hasActiveStockMovementFilters,
+  showDivider = true,
+}) {
+  if (activeTab === "stock_movements") {
+    return (
+      <StockMovementToolbarFilters
+        filters={stockMovementFilters}
+        typeOptions={stockMovementTypeOptions}
+        vaccineOptions={stockMovementVaccineOptions}
+        onFilterChange={onStockMovementFilterChange}
+        onClearFilters={onClearStockMovementFilters}
+        hasActiveFilters={hasActiveStockMovementFilters}
+        showDivider={showDivider}
+      />
+    );
+  }
+
+  return (
+    <InventoryDisplayToolbarFilters
+      filters={inventoryFilters}
+      vaccineOptions={inventoryVaccineOptions}
+      onFilterChange={onInventoryFilterChange}
+      onClearFilters={onClearInventoryFilters}
+      hasActiveFilters={hasActiveInventoryFilters}
+      showDivider={showDivider}
+    />
+  );
+}
+
 function StockMovementsPanel({
   movements,
   loading,
@@ -787,41 +1112,7 @@ function StockMovementsPanel({
   onRetry,
 }) {
   const summary = useMemo(
-    () =>
-      movements.reduce(
-        (result, movement) => {
-          const type = normalizeInventoryMovementType(movement.transaction_type);
-          const quantity = Math.abs(normalizeInventoryNumber(movement.quantity, 0));
-
-          result.totalRecords += 1;
-
-          switch (type) {
-            case "RECEIVE":
-            case "RECEIPT":
-            case "TRANSFER_IN":
-              result.stockIn += quantity;
-              break;
-            case "ISSUE":
-            case "TRANSFER_OUT":
-              result.stockOut += quantity;
-              break;
-            case "WASTE":
-            case "EXPIRE":
-              result.wasted += quantity;
-              break;
-            default:
-              break;
-          }
-
-          return result;
-        },
-        {
-          totalRecords: 0,
-          stockIn: 0,
-          stockOut: 0,
-          wasted: 0,
-        },
-      ),
+    () => summarizeStockMovements(movements),
     [movements],
   );
 
@@ -944,8 +1235,7 @@ function StockMovementsPanel({
                       colSpan="8"
                       className="px-4 py-12 text-center text-sm text-gray-500 dark:text-gray-400"
                     >
-                      No stock movement transactions found for the selected
-                      inventory records.
+                      No stock movement transactions match the selected filters.
                     </td>
                   </tr>
                 ) : (
@@ -2476,6 +2766,104 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
 
   .inventory-sheet-summary-print-report__page,
   .doh-lgu-stock-print-report__page,
+  .ris-word-report {
+    width: 100%;
+  }
+
+  .ris-word-report__page {
+    width: 100%;
+    max-width: 7.9in;
+    margin: 0 auto;
+    border: 1.4px solid #111827;
+    padding: 0.18in;
+    background: #ffffff;
+  }
+
+  .ris-word-header-table,
+  .ris-word-meta-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    color: #111827;
+  }
+
+  .ris-word-header-table {
+    margin-bottom: 0.12in;
+  }
+
+  .ris-word-header-table__seal-cell {
+    width: 0.92in;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .ris-word-header-table__seal {
+    display: block;
+    width: 0.68in;
+    height: 0.68in;
+    margin: 0 auto;
+    object-fit: cover;
+    border-radius: 9999px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  .ris-word-header-table__title-cell {
+    text-align: center;
+    vertical-align: middle;
+    padding: 0 0.1in;
+  }
+
+  .ris-word-header-table__title,
+  .ris-word-header-table__subtitle,
+  .ris-word-header-table__municipality {
+    margin: 0;
+    color: #111827;
+  }
+
+  .ris-word-header-table__title {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .ris-word-header-table__subtitle {
+    margin-top: 0.03in;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .ris-word-header-table__municipality {
+    margin-top: 0.03in;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .ris-word-meta-table {
+    margin-bottom: 0.12in;
+  }
+
+  .ris-word-meta-table td {
+    padding: 0.04in 0.03in;
+    font-size: 10px;
+    vertical-align: bottom;
+  }
+
+  .ris-word-meta-table__label {
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .ris-word-meta-table__value {
+    border-bottom: 1px solid #111827;
+  }
+
+  .ris-word-table {
+    margin-top: 0.02in;
+  }
   .ris-print-report__page {
     margin: 0 auto;
     background: #ffffff;
@@ -2802,10 +3190,12 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
     width: 0.9in;
     height: 0.9in;
     object-fit: contain;
+    background: transparent;
   }
 
   .inventory-sheet-summary-print-header__logo--circle {
     border-radius: 9999px;
+    clip-path: circle(50% at 50% 50%);
   }
 
   .inventory-sheet-summary-print-header__line--government {
@@ -2873,6 +3263,104 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
     box-shadow: none;
   }
 
+  .ris-word-report {
+    width: 100%;
+  }
+
+  .ris-word-report__page {
+    width: 100%;
+    max-width: 7.9in;
+    margin: 0 auto;
+    border: 1.4px solid #111827;
+    padding: 0.18in;
+    background: #ffffff;
+  }
+
+  .ris-word-header-table,
+  .ris-word-meta-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    color: #111827;
+  }
+
+  .ris-word-header-table {
+    margin-bottom: 0.12in;
+  }
+
+  .ris-word-header-table__seal-cell {
+    width: 0.92in;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .ris-word-header-table__seal {
+    display: block;
+    width: 0.68in;
+    height: 0.68in;
+    margin: 0 auto;
+    object-fit: cover;
+    border-radius: 9999px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  .ris-word-header-table__title-cell {
+    text-align: center;
+    vertical-align: middle;
+    padding: 0 0.1in;
+  }
+
+  .ris-word-header-table__title,
+  .ris-word-header-table__subtitle,
+  .ris-word-header-table__municipality {
+    margin: 0;
+    color: #111827;
+  }
+
+  .ris-word-header-table__title {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .ris-word-header-table__subtitle {
+    margin-top: 0.03in;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .ris-word-header-table__municipality {
+    margin-top: 0.03in;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .ris-word-meta-table {
+    margin-bottom: 0.12in;
+  }
+
+  .ris-word-meta-table td {
+    padding: 0.04in 0.03in;
+    font-size: 10px;
+    vertical-align: bottom;
+  }
+
+  .ris-word-meta-table__label {
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .ris-word-meta-table__value {
+    border-bottom: 1px solid #111827;
+  }
+
+  .ris-word-table {
+    margin-top: 0.02in;
+  }
   .ris-print-report__page {
     width: 100%;
     max-width: 7.9in;
@@ -2984,7 +3472,7 @@ const buildRisWordHtml = (props) =>
   buildInventoryExportDocument({
     title: PRINT_REPORT_COPY.risTitle,
     orientation: RIS_EXPORT_PAGE.orientation,
-    bodyMarkup: renderToStaticMarkup(<RequisitionIssueSlipPrintReport {...props} />),
+    bodyMarkup: renderToStaticMarkup(<RequisitionIssueSlipWordReport {...props} />),
   });
 
 const loadImageDataUrl = async (src) => {
@@ -3408,7 +3896,7 @@ const InventorySheetSummaryPrintHeader = ({
             <img
               src={leftLogoSrc}
               alt="Department of Health logo"
-              className="inventory-sheet-summary-print-header__logo"
+              className="inventory-sheet-summary-print-header__logo inventory-sheet-summary-print-header__logo--circle"
             />
           ) : null}
         </div>
@@ -3854,6 +4342,161 @@ const DohLguStockInventoryPrintReport = ({
   );
 };
 
+const RequisitionIssueSlipWordReport = ({
+  facilityInfo,
+  reportDate,
+  reportRows,
+  controlNumber,
+  dateRangeStart,
+  dateRangeEnd,
+  isFiltering,
+  leftSealSrc = PASIG_REPORT_SEAL_SRC,
+  rightSealSrc = DOH_REPORT_SEAL_SRC,
+}) => {
+  const facilityName =
+    String(facilityInfo?.healthCenter || "").trim() ||
+    DEFAULT_PRINT_HEADER.healthCenter;
+  const address =
+    buildFacilityAddress(facilityInfo) || DEFAULT_PRINT_HEADER.barangay;
+  const reportDateLabel = formatPrintDateValue(reportDate || new Date(), {
+    month: "numeric",
+    day: "numeric",
+    year: "numeric",
+  });
+  const reportYear = formatPrintDateValue(reportDate || new Date(), {
+    year: "numeric",
+  });
+  const reportingPeriod = resolveInventoryReportPeriodLabel({
+    reportDate,
+    dateRangeStart,
+    dateRangeEnd,
+    isFiltering,
+  });
+
+  return (
+    <section className="ris-word-report" data-testid="inventory-ris-word-report">
+      <div className="ris-word-report__page">
+        <table className="ris-word-header-table" role="presentation">
+          <tbody>
+            <tr>
+              <td className="ris-word-header-table__seal-cell">
+                {leftSealSrc ? (
+                  <img
+                    src={leftSealSrc}
+                    alt="Municipality of Pasig seal"
+                    className="ris-word-header-table__seal"
+                  />
+                ) : null}
+              </td>
+              <td className="ris-word-header-table__title-cell">
+                <h1 className="ris-word-header-table__title">
+                  {PRINT_REPORT_COPY.risTitle}
+                </h1>
+                <p className="ris-word-header-table__subtitle">
+                  {PRINT_REPORT_COPY.risSubtitle}
+                </p>
+                <p className="ris-word-header-table__municipality">
+                  {PRINT_REPORT_COPY.risMunicipality}
+                </p>
+              </td>
+              <td className="ris-word-header-table__seal-cell">
+                {rightSealSrc ? (
+                  <img
+                    src={rightSealSrc}
+                    alt="Department of Health seal"
+                    className="ris-word-header-table__seal"
+                  />
+                ) : null}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table className="ris-word-meta-table" role="presentation">
+          <colgroup>
+            <col style={{ width: "12%" }} />
+            <col style={{ width: "48%" }} />
+            <col style={{ width: "16%" }} />
+            <col style={{ width: "24%" }} />
+          </colgroup>
+          <tbody>
+            <tr>
+              <td className="ris-word-meta-table__label">Health Center:</td>
+              <td className="ris-word-meta-table__value">{facilityName}</td>
+              <td className="ris-word-meta-table__label">Control Number:</td>
+              <td className="ris-word-meta-table__value">{controlNumber}</td>
+            </tr>
+            <tr>
+              <td className="ris-word-meta-table__label">Private Clinic:</td>
+              <td className="ris-word-meta-table__value">{RIS_PRIVATE_CLINIC_VALUE}</td>
+              <td className="ris-word-meta-table__label">Year:</td>
+              <td className="ris-word-meta-table__value">{reportYear}</td>
+            </tr>
+            <tr>
+              <td className="ris-word-meta-table__label">Date:</td>
+              <td className="ris-word-meta-table__value">{reportDateLabel}</td>
+              <td className="ris-word-meta-table__label">Reporting Period:</td>
+              <td className="ris-word-meta-table__value">{reportingPeriod}</td>
+            </tr>
+            <tr>
+              <td className="ris-word-meta-table__label">Address:</td>
+              <td className="ris-word-meta-table__value" colSpan={3}>{address}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table className="ris-print-table ris-word-table" data-testid="inventory-ris-word-table">
+          <colgroup>
+            <col style={{ width: "40%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "13%" }} />
+            <col style={{ width: "13%" }} />
+            <col style={{ width: "13%" }} />
+            <col style={{ width: "11%" }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th colSpan={3}>REQUISITION</th>
+              <th>REQUEST FORM</th>
+              <th>ISSUED BY FROM</th>
+              <th rowSpan={3}>TOTAL</th>
+            </tr>
+            <tr>
+              <th rowSpan={2}>DESCRIPTION</th>
+              <th rowSpan={2}>UNIT</th>
+              <th rowSpan={2}>BALANCE ON HAND</th>
+              <th>HEALTH CENTER</th>
+              <th>CHO</th>
+            </tr>
+            <tr>
+              <th>QTY</th>
+              <th>QTY</th>
+            </tr>
+          </thead>
+          <tbody>
+            {reportRows.map((row) =>
+              row.type === "section" ? (
+                <tr key={row.key} className="ris-print-table__section-row">
+                  <td colSpan={6}>{row.description}</td>
+                </tr>
+              ) : (
+                <tr key={row.key}>
+                  <td className="ris-print-table__description">{row.description}</td>
+                  <td>{row.unit}</td>
+                  <td className="ris-print-table__numeric">{row.balanceOnHand}</td>
+                  <td className="ris-print-table__numeric">{row.requestQty}</td>
+                  <td className="ris-print-table__numeric">{row.issuedQty}</td>
+                  <td className="ris-print-table__numeric">{row.totalQty}</td>
+                </tr>
+              ),
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+};
+
 const RequisitionIssueSlipPrintReport = ({
   facilityInfo,
   reportDate,
@@ -4031,6 +4674,20 @@ export default function InventoryManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const fallbackClinicId = user?.clinic_id || user?.facility_id || 1;
+  const currentUserId = user?.id ?? null;
+  const currentUserUsername = String(user?.username || "").trim() || null;
+  const currentUserRole =
+    String(user?.role_type || user?.role || "").trim() || null;
+  const currentUserDisplayName = useMemo(
+    () => getInventoryActorDisplayName(user),
+    [
+      currentUserId,
+      currentUserRole,
+      currentUserUsername,
+      user?.first_name,
+      user?.last_name,
+    ],
+  );
   const canManageStockAlertActions =
     String(user?.role_type || user?.role || "").trim().toUpperCase() ===
     "SYSTEM_ADMIN";
@@ -4067,6 +4724,12 @@ export default function InventoryManagement() {
   const [inventory, setInventory] = useState([]);
   const [inventoryReportSource, setInventoryReportSource] = useState([]);
   const [stockMovements, setStockMovements] = useState([]);
+  const [inventoryDisplayFilters, setInventoryDisplayFilters] = useState(
+    createDefaultInventoryDisplayFilters,
+  );
+  const [stockMovementFilters, setStockMovementFilters] = useState(
+    createDefaultStockMovementFilters,
+  );
   const [stockMovementsLoading, setStockMovementsLoading] = useState(false);
   const [stockMovementsError, setStockMovementsError] = useState(null);
   const [persistedStockAlerts, setPersistedStockAlerts] = useState([]);
@@ -4085,6 +4748,11 @@ export default function InventoryManagement() {
   const [formData, setFormData] = useState({});
   const [transactionErrors, setTransactionErrors] = useState({});
   const [transactionSubmitError, setTransactionSubmitError] = useState(null);
+  const [isTransactionSubmitting, setIsTransactionSubmitting] = useState(false);
+  const [availableLots, setAvailableLots] = useState([]);
+  const [availableLotsLoading, setAvailableLotsLoading] = useState(false);
+  const [availableLotsError, setAvailableLotsError] = useState(null);
+  const [lotSearchTerm, setLotSearchTerm] = useState("");
   const [isPrintLayoutActive, setIsPrintLayoutActive] = useState(false);
   const [activePrintReportType, setActivePrintReportType] = useState(null);
   const [selectedExportReportType, setSelectedExportReportType] = useState(
@@ -4105,6 +4773,103 @@ export default function InventoryManagement() {
   const dateRangeStart = printDateRange.appliedStartDate;
   const dateRangeEnd = printDateRange.appliedEndDate;
   const isFiltering = printDateRange.hasAppliedDateRange;
+  const requiresBatchSelection =
+    modalType === "issue" || modalType === "waste";
+
+  const resolveTransactionInventoryContext = useCallback(
+    (item) => {
+      const matchedInventory =
+        inventory.find((inventoryItem) => inventoryItem.id === item?.id) || item;
+
+      return {
+        matchedInventory,
+        inventoryId: resolveInventorySaveRowId(matchedInventory?._apiId),
+        vaccineId: resolveInventorySaveRowId(matchedInventory?._vaccineId),
+        clinicId:
+          resolveInventorySaveRowId(matchedInventory?._facilityId) ||
+          resolveInventorySaveRowId(matchedInventory?.clinic_id) ||
+          resolveInventorySaveRowId(matchedInventory?.facility_id) ||
+          Number(fallbackClinicId) ||
+          1,
+      };
+    },
+    [fallbackClinicId, inventory],
+  );
+
+  const selectedBatchOption = useMemo(() => {
+    const selectedBatchId = resolveInventorySaveRowId(formData.batch_id);
+    if (!selectedBatchId) {
+      return null;
+    }
+
+    return (
+      availableLots.find(
+        (batch) =>
+          resolveInventorySaveRowId(batch.batch_id || batch.inventory_id) ===
+          selectedBatchId,
+      ) || null
+    );
+  }, [availableLots, formData.batch_id]);
+
+  const filteredAvailableLots = useMemo(() => {
+    const normalizedQuery = lotSearchTerm.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return availableLots;
+    }
+
+    return availableLots.filter((batch) =>
+      getInventoryBatchSearchText(batch).includes(normalizedQuery),
+    );
+  }, [availableLots, lotSearchTerm]);
+
+  const parsedTransactionQuantity = useMemo(() => {
+    const parsed = Number.parseInt(formData.quantity, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  }, [formData.quantity]);
+
+  const batchStockPreview = useMemo(() => {
+    if (!selectedBatchOption) {
+      return null;
+    }
+
+    const available = Number(
+      selectedBatchOption.available_quantity ?? selectedBatchOption.stock ?? 0,
+    );
+    const transactionQuantity = parsedTransactionQuantity;
+    const remaining = available - transactionQuantity;
+
+    return {
+      available,
+      transactionQuantity,
+      remaining,
+      insufficientStock: transactionQuantity > available,
+      unavailable: available <= 0,
+    };
+  }, [parsedTransactionQuantity, selectedBatchOption]);
+
+  const liveBatchQuantityError = useMemo(() => {
+    if (!requiresBatchSelection || !selectedBatchOption || !batchStockPreview) {
+      return null;
+    }
+
+    if (batchStockPreview.unavailable) {
+      return "The selected lot/batch has no available stock remaining.";
+    }
+
+    if (batchStockPreview.insufficientStock) {
+      return `Only ${batchStockPreview.available} units are available in the selected lot/batch.`;
+    }
+
+    return null;
+  }, [batchStockPreview, requiresBatchSelection, selectedBatchOption]);
+
+  const isTransactionSubmitDisabled =
+    isTransactionSubmitting ||
+    (requiresBatchSelection &&
+      (availableLotsLoading ||
+        !selectedBatchOption ||
+        batchStockPreview?.unavailable ||
+        batchStockPreview?.insufficientStock));
 
   // Facility info for print
   const [facilityInfo, setFacilityInfo] = useState({
@@ -4208,17 +4973,12 @@ export default function InventoryManagement() {
         movementRows = response.transactions;
       }
 
-      const currentActorName = getInventoryActorDisplayName(user);
-      const currentActorUsername =
-        String(user?.username || "").trim() || null;
-      const currentActorRole =
-        String(user?.role_type || user?.role || "").trim() || null;
       const normalizedMovements = movementRows
         .map(normalizeInventoryMovementRecord)
         .map((movement) => {
           if (
             (movement.performed_by_name || movement.performed_by_username) ||
-            (!currentActorName && !currentActorUsername)
+            (!currentUserDisplayName && !currentUserUsername)
           ) {
             return movement;
           }
@@ -4232,14 +4992,14 @@ export default function InventoryManagement() {
           if (
             rawPerformedBy !== null &&
             rawPerformedBy !== undefined &&
-            String(rawPerformedBy) === String(user?.id)
+            String(rawPerformedBy) === String(currentUserId)
           ) {
             return {
               ...movement,
-              performed_by_name: currentActorName,
+              performed_by_name: currentUserDisplayName,
               performed_by_username:
-                movement.performed_by_username || currentActorUsername,
-              performed_by_role: movement.performed_by_role || currentActorRole,
+                movement.performed_by_username || currentUserUsername,
+              performed_by_role: movement.performed_by_role || currentUserRole,
             };
           }
 
@@ -4257,7 +5017,13 @@ export default function InventoryManagement() {
     } finally {
       setStockMovementsLoading(false);
     }
-  }, [fallbackClinicId, user]);
+  }, [
+    currentUserDisplayName,
+    currentUserId,
+    currentUserRole,
+    currentUserUsername,
+    fallbackClinicId,
+  ]);
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -4391,6 +5157,115 @@ export default function InventoryManagement() {
     };
   }, [fetchData]);
 
+  useEffect(() => {
+    if (!showModal || !selectedItem || !requiresBatchSelection) {
+      setAvailableLots((prev) => (prev.length > 0 ? [] : prev));
+      setAvailableLotsError((prev) => (prev ? null : prev));
+      setAvailableLotsLoading((prev) => (prev ? false : prev));
+      setLotSearchTerm((prev) => (prev ? "" : prev));
+      return undefined;
+    }
+
+    const { vaccineId } = resolveTransactionInventoryContext(selectedItem);
+
+    if (!vaccineId) {
+      setAvailableLots([]);
+      setAvailableLotsError(
+        "Available lot/batch records could not be loaded for this vaccine.",
+      );
+      setAvailableLotsLoading(false);
+      return undefined;
+    }
+
+    let isActive = true;
+
+    const loadAvailableLots = async () => {
+      setAvailableLotsLoading(true);
+      setAvailableLotsError(null);
+
+      try {
+        const response = await apiClient.getAvailableInventoryLots({
+          vaccine_id: vaccineId,
+        });
+        const normalizedLots = (Array.isArray(response) ? response : [])
+          .map((batch) => {
+            const batchId = resolveInventorySaveRowId(
+              batch.batch_id || batch.inventory_id,
+            );
+            const availableQuantity = Number(
+              batch.available_quantity ?? batch.stock ?? 0,
+            );
+            const lotNumber = sanitizeText(
+              batch.lot_number || batch.batch_number,
+              {
+                maxLength: 100,
+              },
+            );
+
+            return {
+              batch_id: batchId,
+              inventory_id: batch.inventory_id || batchId,
+              lot_number: lotNumber,
+              batch_number: lotNumber,
+              available_quantity: availableQuantity,
+              stock: availableQuantity,
+              expiry_date: sanitizeText(batch.expiry_date, { maxLength: 10 }) || null,
+              storage_location:
+                sanitizeText(batch.storage_location, { maxLength: 120 }) || null,
+              vaccine_name:
+                sanitizeText(batch.vaccine_name, { maxLength: 120 }) ||
+                selectedItem?.name ||
+                "Vaccine",
+            };
+          })
+          .filter(
+            (batch) =>
+              batch.batch_id &&
+              batch.available_quantity > 0 &&
+              batch.lot_number,
+          );
+
+        if (!isActive) {
+          return;
+        }
+
+        setAvailableLots(normalizedLots);
+        if (normalizedLots.length === 0) {
+          setAvailableLotsError(
+            "No active lot/batch records with available stock were found for this vaccine.",
+          );
+        }
+      } catch (lotError) {
+        if (!isActive) {
+          return;
+        }
+
+        setAvailableLots([]);
+        setAvailableLotsError(
+          lotError?.response?.data?.error ||
+            lotError?.message ||
+            "Failed to load available lot/batch records.",
+        );
+      } finally {
+        if (isActive) {
+          setAvailableLotsLoading(false);
+        }
+      }
+    };
+
+    loadAvailableLots();
+
+    return () => {
+      isActive = false;
+    };
+  }, [
+    modalType,
+    requiresBatchSelection,
+    resolveTransactionInventoryContext,
+    selectedItem,
+    showModal,
+  ]);
+
   const updatePrintPageStyle = useCallback((reportType) => {
     if (typeof document === "undefined") {
       return;
@@ -4516,13 +5391,173 @@ export default function InventoryManagement() {
     });
   }, [stockMovements, isFiltering, dateRangeStart, dateRangeEnd]);
 
+  const inventoryFilterVaccineOptions = useMemo(() => {
+    const vaccineNames = Array.from(
+      new Set(
+        inventory
+          .map((item) => String(item?.name || "").trim())
+          .filter(Boolean),
+      ),
+    ).sort((left, right) => left.localeCompare(right));
+
+    return [
+      { value: "all", label: "All Vaccines" },
+      ...vaccineNames.map((name) => ({ value: name, label: name })),
+    ];
+  }, [inventory]);
+
+  const stockMovementTypeOptions = useMemo(() => {
+    const uniqueTypes = Array.from(
+      new Set(
+        stockMovements
+          .map((movement) => normalizeInventoryMovementType(movement.transaction_type))
+          .filter(Boolean),
+      ),
+    ).sort((left, right) =>
+      getInventoryMovementTypeMeta(left).label.localeCompare(
+        getInventoryMovementTypeMeta(right).label,
+      ),
+    );
+
+    return [
+      { value: "all", label: "All Types" },
+      ...uniqueTypes.map((type) => ({
+        value: type,
+        label: getInventoryMovementTypeMeta(type).label,
+      })),
+    ];
+  }, [stockMovements]);
+
+  const stockMovementVaccineOptions = useMemo(() => {
+    const vaccineNames = Array.from(
+      new Set(
+        stockMovements
+          .map((movement) => String(movement?.vaccine_name || "").trim())
+          .filter(Boolean),
+      ),
+    ).sort((left, right) => left.localeCompare(right));
+
+    return [
+      { value: "all", label: "All Vaccines" },
+      ...vaccineNames.map((name) => ({ value: name, label: name })),
+    ];
+  }, [stockMovements]);
+
+  const displayedInventory = useMemo(() => {
+    return filteredInventory.filter((item) => {
+      const matchesDateFilter = matchesOptionalDateRange(
+        [
+          item.last_transaction_date,
+          item.received_date,
+          item.transferred_in_date,
+          item.transferred_out_date,
+          item.issuance_date,
+          item.expiry_date,
+        ],
+        inventoryDisplayFilters,
+      );
+
+      const matchesVaccineFilter =
+        inventoryDisplayFilters.vaccine === "all" ||
+        item.name === inventoryDisplayFilters.vaccine;
+      const matchesStatusFilter = matchesInventoryStatusFilter(
+        item,
+        inventoryDisplayFilters.status,
+      );
+
+      return matchesDateFilter && matchesVaccineFilter && matchesStatusFilter;
+    });
+  }, [filteredInventory, inventoryDisplayFilters]);
+
+  const displayedInventoryReportSource = useMemo(() => {
+    return filteredInventoryReportSource.filter((item) => {
+      const matchesDateFilter = matchesOptionalDateRange(
+        [
+          item.last_transaction_date,
+          item.received_date,
+          item.transferred_in_date,
+          item.transferred_out_date,
+          item.issuance_date,
+          item.expiry_date,
+        ],
+        inventoryDisplayFilters,
+      );
+
+      const matchesVaccineFilter =
+        inventoryDisplayFilters.vaccine === "all" ||
+        item.name === inventoryDisplayFilters.vaccine;
+      const matchesStatusFilter = matchesInventoryStatusFilter(
+        item,
+        inventoryDisplayFilters.status,
+      );
+
+      return matchesDateFilter && matchesVaccineFilter && matchesStatusFilter;
+    });
+  }, [filteredInventoryReportSource, inventoryDisplayFilters]);
+
+  const displayedStockMovements = useMemo(() => {
+    return filteredStockMovements.filter((movement) => {
+      const matchesDateFilter = matchesOptionalDateRange(
+        [movement.created_at, movement.transaction_date],
+        stockMovementFilters,
+      );
+      const normalizedType = normalizeInventoryMovementType(
+        movement.transaction_type,
+      );
+      const matchesTypeFilter =
+        stockMovementFilters.type === "all" ||
+        normalizedType === stockMovementFilters.type;
+      const matchesVaccineFilter =
+        stockMovementFilters.vaccine === "all" ||
+        movement.vaccine_name === stockMovementFilters.vaccine;
+
+      return matchesDateFilter && matchesTypeFilter && matchesVaccineFilter;
+    });
+  }, [filteredStockMovements, stockMovementFilters]);
+
+  const hasActiveInventoryDisplayFilters = useMemo(
+    () =>
+      hasDisplayDateRangeValue(inventoryDisplayFilters) ||
+      inventoryDisplayFilters.vaccine !== "all" ||
+      inventoryDisplayFilters.status !== "all",
+    [inventoryDisplayFilters],
+  );
+
+  const hasActiveStockMovementFilters = useMemo(
+    () =>
+      hasDisplayDateRangeValue(stockMovementFilters) ||
+      stockMovementFilters.type !== "all" ||
+      stockMovementFilters.vaccine !== "all",
+    [stockMovementFilters],
+  );
+
+  const updateInventoryDisplayFilter = useCallback((field, value) => {
+    setInventoryDisplayFilters((previous) =>
+      previous[field] === value ? previous : { ...previous, [field]: value },
+    );
+  }, []);
+
+  const clearInventoryDisplayFilters = useCallback(() => {
+    setInventoryDisplayFilters(createDefaultInventoryDisplayFilters());
+  }, []);
+
+  const updateStockMovementFilter = useCallback((field, value) => {
+    setStockMovementFilters((previous) =>
+      previous[field] === value ? previous : { ...previous, [field]: value },
+    );
+  }, []);
+
+  const clearStockMovementFilters = useCallback(() => {
+    setStockMovementFilters(createDefaultStockMovementFilters());
+  }, []);
+
   const trackedInventory = useMemo(
-    () => inventory.filter((item) => shouldPersistInventoryRow(item)),
-    [inventory],
+    () => displayedInventory.filter((item) => shouldPersistInventoryRow(item)),
+    [displayedInventory],
   );
 
   const inventorySummaryStats = useMemo(() => {
-    const trackedReportRows = inventoryReportSource.filter((item) =>
+    const trackedReportRows = displayedInventoryReportSource.filter((item) =>
       shouldPersistInventoryRow(item),
     );
 
@@ -4538,7 +5573,7 @@ export default function InventoryManagement() {
           isExpiredInventoryDate(item.expiry_date),
       ).length,
     };
-  }, [inventoryReportSource, trackedInventory]);
+  }, [displayedInventoryReportSource, trackedInventory]);
 
   // Persist inventory sheet to backend
   const handleSaveInventorySheet = async () => {
@@ -4623,10 +5658,9 @@ export default function InventoryManagement() {
     }
   };
 
-  // Calculate totals - uses filtered inventory when filtering is active
+  // Calculate totals from the currently displayed inventory rows
   const calculateTotals = useCallback(() => {
-    const dataToUse = isFiltering ? filteredInventory : inventory;
-    return dataToUse.reduce(
+    return displayedInventory.reduce(
       (acc, item) => ({
         beginning_balance: acc.beginning_balance + item.beginning_balance,
         received: acc.received + item.received,
@@ -4652,7 +5686,18 @@ export default function InventoryManagement() {
         stock_on_hand: 0,
       },
     );
-  }, [inventory, filteredInventory, isFiltering]);
+  }, [displayedInventory]);
+
+  const closeTransactionModal = useCallback(() => {
+    setShowModal(false);
+    setTransactionErrors({});
+    setTransactionSubmitError(null);
+    setIsTransactionSubmitting(false);
+    setAvailableLots([]);
+    setAvailableLotsError(null);
+    setAvailableLotsLoading(false);
+    setLotSearchTerm("");
+  }, []);
 
   // Open modal for transaction
   const openTransactionModal = (type, item = null) => {
@@ -4660,7 +5705,13 @@ export default function InventoryManagement() {
     setSelectedItem(item);
     setTransactionErrors({});
     setTransactionSubmitError(null);
+    setIsTransactionSubmitting(false);
+    setAvailableLots([]);
+    setAvailableLotsError(null);
+    setAvailableLotsLoading(false);
+    setLotSearchTerm("");
     setFormData({
+      batch_id: "",
       quantity: "",
       lot_number: "",
       expiry_date: "",
@@ -4782,13 +5833,23 @@ export default function InventoryManagement() {
       nextErrors.notes = "Notes must not exceed 500 characters.";
     }
 
-    if (
-      ["issue", "waste", "transfer_out"].includes(modalType) &&
-      Number.isFinite(qty)
-    ) {
-      if (qty > Number(selectedItem.stock_on_hand || 0)) {
-        nextErrors.quantity = "Quantity cannot exceed current stock on hand.";
+    if (requiresBatchSelection) {
+      if (!selectedBatchOption) {
+        nextErrors.batch_id = availableLotsLoading
+          ? "Available lot/batch records are still loading."
+          : "Select the exact lot/batch to continue.";
+      } else if (batchStockPreview?.unavailable) {
+        nextErrors.batch_id =
+          "The selected lot/batch has no available stock remaining.";
+      } else if (Number.isFinite(qty) && batchStockPreview?.insufficientStock) {
+        nextErrors.quantity = `Only ${batchStockPreview.available} units are available in the selected lot/batch.`;
       }
+    } else if (
+      ["issue", "waste", "transfer_out"].includes(modalType) &&
+      Number.isFinite(qty) &&
+      qty > Number(selectedItem.stock_on_hand || 0)
+    ) {
+      nextErrors.quantity = "Quantity cannot exceed current stock on hand.";
     }
 
     if (hasFieldErrors(nextErrors)) {
@@ -4797,19 +5858,21 @@ export default function InventoryManagement() {
     }
 
     try {
+      setIsTransactionSubmitting(true);
       setTransactionErrors({});
       setTransactionSubmitError(null);
 
-      const matchedInventory = inventory.find((item) => item.id === selectedItem.id);
+      const {
+        matchedInventory,
+        inventoryId: dbInventoryId,
+        vaccineId: matchedVaccineId,
+        clinicId,
+      } = resolveTransactionInventoryContext(selectedItem);
       if (!matchedInventory) {
         setTransactionSubmitError("Selected inventory item was not found.");
         return;
       }
 
-      // Check if inventory record exists in database
-      const dbInventoryId = resolveInventorySaveRowId(matchedInventory._apiId);
-      const matchedVaccineId = resolveInventorySaveRowId(matchedInventory._vaccineId);
-      
       // For RECEIVE transactions, we can auto-create the inventory record if it doesn't exist
       // For other transaction types, the inventory record must exist first
       if (!dbInventoryId && modalType !== 'receive') {
@@ -4822,21 +5885,22 @@ export default function InventoryManagement() {
         return;
       }
 
-      // Ensure clinic_id is always set
-      const matchedFacilityId =
-        resolveInventorySaveRowId(matchedInventory._facilityId) ||
-        resolveInventorySaveRowId(matchedInventory.clinic_id) ||
-        resolveInventorySaveRowId(matchedInventory.facility_id);
-      const clinicId = matchedFacilityId || Number(fallbackClinicId) || 1;
       const effectiveLotNumber =
-        lotNumber ||
-        sanitizeText(
-          matchedInventory.lot_batch_number || matchedInventory.lot_number,
-          { maxLength: 50 },
-        );
+        requiresBatchSelection
+          ? sanitizeText(
+              selectedBatchOption?.lot_number || selectedBatchOption?.batch_number,
+              { maxLength: 50 },
+            )
+          : lotNumber ||
+            sanitizeText(
+              matchedInventory.lot_batch_number || matchedInventory.lot_number,
+              { maxLength: 50 },
+            );
       const effectiveExpiryDate =
-        expiryDateInput ||
-        sanitizeText(matchedInventory.expiry_date, { maxLength: 10 });
+        requiresBatchSelection
+          ? sanitizeText(selectedBatchOption?.expiry_date, { maxLength: 10 })
+          : expiryDateInput ||
+            sanitizeText(matchedInventory.expiry_date, { maxLength: 10 });
 
       if (!Number.isInteger(Number(clinicId)) || Number(clinicId) < 1) {
         setTransactionSubmitError(
@@ -4849,7 +5913,7 @@ export default function InventoryManagement() {
       console.log('- modalType:', modalType);
       console.log('- dbInventoryId:', dbInventoryId);
       console.log('- matchedVaccineId:', matchedVaccineId);
-      console.log('- matchedFacilityId:', matchedFacilityId);
+      console.log('- clinicId:', clinicId);
       console.log('- fallbackClinicId:', fallbackClinicId);
       console.log('- clinicId:', clinicId);
       console.log('- formData:', formData);
@@ -4864,6 +5928,9 @@ export default function InventoryManagement() {
         clinic_id: Number(clinicId),
       };
 
+      if (requiresBatchSelection && selectedBatchOption?.batch_id) {
+        payload.batch_id = Number(selectedBatchOption.batch_id);
+      }
       if (effectiveLotNumber) {
         payload.lot_number = effectiveLotNumber;
         payload.lot_batch_number = effectiveLotNumber;
@@ -4877,7 +5944,8 @@ export default function InventoryManagement() {
 
       console.log('📤 Sending transaction payload:', JSON.stringify(payload, null, 2));
 
-      await apiClient.createVaccineInventoryTransaction(payload);
+      const transactionResponse =
+        await apiClient.createVaccineInventoryTransaction(payload);
 
       setInventory((prev) =>
         prev.map((item) => {
@@ -4887,7 +5955,8 @@ export default function InventoryManagement() {
             switch (modalType) {
               case "receive":
                 updatedItem.received += qty;
-                updatedItem.lot_batch_number = lotNumber || updatedItem.lot_batch_number;
+                updatedItem.lot_batch_number =
+                  effectiveLotNumber || updatedItem.lot_batch_number;
                 updatedItem.expiry_date = formData.expiry_date || updatedItem.expiry_date;
                 updatedItem.received_date = formData.date || updatedItem.received_date;
                 break;
@@ -4933,9 +6002,36 @@ export default function InventoryManagement() {
         }),
       );
 
-      setShowModal(false);
-      setTransactionErrors({});
-      setTransactionSubmitError(null);
+      if (requiresBatchSelection && selectedBatchOption?.batch_id) {
+        const remainingQuantity = Number(
+          transactionResponse?.selected_batch?.remaining_quantity ??
+            Math.max(
+              Number(selectedBatchOption.available_quantity || 0) - Number(qty || 0),
+              0,
+            ),
+        );
+
+        setAvailableLots((prev) =>
+          prev
+            .map((batch) => {
+              if (
+                resolveInventorySaveRowId(batch.batch_id || batch.inventory_id) !==
+                resolveInventorySaveRowId(selectedBatchOption.batch_id)
+              ) {
+                return batch;
+              }
+
+              return {
+                ...batch,
+                available_quantity: remainingQuantity,
+                stock: remainingQuantity,
+              };
+            })
+            .filter((batch) => Number(batch.available_quantity || 0) > 0),
+        );
+      }
+
+      closeTransactionModal();
 
       // Broadcast event so other charts and dashboards update their inventory figures instantly
       window.dispatchEvent(new CustomEvent("inventory-update"));
@@ -4957,6 +6053,8 @@ export default function InventoryManagement() {
           err.message ||
           "Failed to save inventory transaction.",
       );
+    } finally {
+      setIsTransactionSubmitting(false);
     }
   };
 
@@ -5041,6 +6139,10 @@ export default function InventoryManagement() {
   }, [trackedInventory]);
 
   const stockAlerts = getStockAlerts();
+  const stockMovementSummary = useMemo(
+    () => summarizeStockMovements(stockMovements),
+    [stockMovements],
+  );
   const pendingPersistedStockAlerts = useMemo(
     () =>
       persistedStockAlerts.filter(
@@ -5474,15 +6576,22 @@ export default function InventoryManagement() {
       }
 
       if (reportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP) {
+        const [embeddedLeftSealSrc, embeddedRightSealSrc] = await Promise.all([
+          loadImageDataUrl(PASIG_REPORT_SEAL_SRC),
+          loadImageDataUrl(DOH_REPORT_SEAL_SRC),
+        ]);
+
         downloadWordDocument({
           html: buildRisWordHtml({
             ...commonProps,
             reportRows: risReportRows,
             controlNumber: risControlNumber,
+            leftSealSrc: embeddedLeftSealSrc || PASIG_REPORT_SEAL_SRC,
+            rightSealSrc: embeddedRightSealSrc || DOH_REPORT_SEAL_SRC,
           }),
           filename: `${RIS_REPORT_FILENAME_PREFIX}-${reportDate || "report"}.docx`,
           title: PRINT_REPORT_COPY.risTitle,
-          headerText: PRINT_REPORT_COPY.risTitle,
+          headerText: "",
           footerText: "Requisition and issue slip",
           page: RIS_EXPORT_PAGE.wordPagePreset,
         });
@@ -5514,8 +6623,6 @@ export default function InventoryManagement() {
     printReport(normalizeInventoryReportType(selectedExportReportType));
   };
 
-  const downloadPDF = () => downloadSelectedPdf(PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM);
-  const downloadRisPdf = () => downloadSelectedPdf(PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP);
   const activePrintReportMarkup =
     isPrintLayoutActive &&
     (activePrintReportType === PRINT_REPORT_TYPES.INVENTORY_SHEET ? (
@@ -5595,8 +6702,11 @@ export default function InventoryManagement() {
         />
 
         {/* Tab Navigation */}
-        <div className="mt-4 flex space-x-2 overflow-x-auto bg-gray-100 dark:bg-gray-800 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700">
-          <button
+        <div className="mt-4 rounded-t-xl rounded-b-none border border-b-0 border-gray-200 bg-white/90 p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/90">
+          <div className="flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-end xl:justify-between">
+            <div className="min-w-0 overflow-x-auto">
+              <div className="inline-flex min-w-max gap-2 rounded-xl bg-gray-100 p-1.5 dark:bg-gray-900/70">
+                <button
             onClick={() => handleTabChange("inventory_sheet")}
             aria-controls={INVENTORY_TAB_PANEL_IDS.inventory_sheet}
             aria-pressed={resolvedActiveTab === "inventory_sheet"}
@@ -5610,7 +6720,7 @@ export default function InventoryManagement() {
             <span>📋</span>
             <span>Inventory Sheet</span>
           </button>
-          <button
+                <button
             onClick={() => handleTabChange("inventory_summary")}
             aria-controls={INVENTORY_TAB_PANEL_IDS.inventory_summary}
             aria-pressed={resolvedActiveTab === "inventory_summary"}
@@ -5629,7 +6739,7 @@ export default function InventoryManagement() {
               </span>
             )}
           </button>
-          <button
+                <button
             onClick={() => handleTabChange("stock_movements")}
             aria-controls={INVENTORY_TAB_PANEL_IDS.stock_movements}
             aria-pressed={resolvedActiveTab === "stock_movements"}
@@ -5644,6 +6754,27 @@ export default function InventoryManagement() {
             <span>Stock Movements</span>
           </button>
         </div>
+      </div>
+          </div>
+        </div>
+
+      <div className="-mt-4 rounded-b-xl rounded-t-none border border-gray-200 bg-white/90 px-3 pb-3 pt-2 shadow-sm dark:border-gray-700 dark:bg-gray-800/90 print:hidden">
+        <InventoryActiveTabToolbarFilters
+          activeTab={resolvedActiveTab}
+          inventoryFilters={inventoryDisplayFilters}
+          inventoryVaccineOptions={inventoryFilterVaccineOptions}
+          onInventoryFilterChange={updateInventoryDisplayFilter}
+          onClearInventoryFilters={clearInventoryDisplayFilters}
+          hasActiveInventoryFilters={hasActiveInventoryDisplayFilters}
+          stockMovementFilters={stockMovementFilters}
+          stockMovementTypeOptions={stockMovementTypeOptions}
+          stockMovementVaccineOptions={stockMovementVaccineOptions}
+          onStockMovementFilterChange={updateStockMovementFilter}
+          onClearStockMovementFilters={clearStockMovementFilters}
+          hasActiveStockMovementFilters={hasActiveStockMovementFilters}
+          showDivider={false}
+        />
+      </div>
       </div>
 
       {activePrintReportMarkup ? (
@@ -5896,7 +7027,9 @@ export default function InventoryManagement() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={downloadPDF}
+                onClick={() =>
+                  downloadSelectedPdf(PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM)
+                }
                 className="gap-2"
               >
                 <svg
@@ -5940,7 +7073,9 @@ export default function InventoryManagement() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={downloadRisPdf}
+                onClick={() =>
+                  downloadSelectedPdf(PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP)
+                }
                 className="gap-2"
               >
                 <svg
@@ -6031,8 +7166,17 @@ export default function InventoryManagement() {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Use filtered inventory for display when filtering is active */}
-                  {(isFiltering ? filteredInventory : inventory).map((item, index) => (
+                  {displayedInventory.length === 0 ? (
+                    <tr className="bg-white dark:bg-gray-800">
+                      <td
+                        colSpan={13}
+                        className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 print:text-gray-700"
+                      >
+                        No inventory rows match the selected filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    displayedInventory.map((item, index) => (
                     <tr
                       key={item.id}
                       className={
@@ -6122,7 +7266,8 @@ export default function InventoryManagement() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    ))
+                  )}
                   {/* Totals Row */}
                   <tr className="bg-gray-300 dark:bg-gray-600 print:bg-gray-400 font-bold">
                     <td
@@ -6367,13 +7512,13 @@ export default function InventoryManagement() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                    Waste
+                    Wasted / Expired
                   </p>
                   <p className="text-xl font-bold text-orange-600 dark:text-orange-400">
-                    {stockAlerts.wasted.length}
+                    {stockMovementSummary.wasted.toLocaleString()}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    High
+                    High items: {stockAlerts.wasted.length}
                   </p>
                 </div>
                 <div className="p-2 bg-orange-100 dark:bg-orange-900/50 rounded-full">
@@ -6603,7 +7748,7 @@ export default function InventoryManagement() {
           className="flex min-h-0 flex-1 flex-col"
         >
           <StockMovementsPanel
-            movements={filteredStockMovements}
+            movements={displayedStockMovements}
             loading={stockMovementsLoading}
             error={stockMovementsError}
             onRetry={loadStockMovements}
@@ -6659,11 +7804,7 @@ export default function InventoryManagement() {
       {/* Transaction Modal */}
       <Modal
         isOpen={showModal}
-        onClose={() => {
-          setShowModal(false);
-          setTransactionErrors({});
-          setTransactionSubmitError(null);
-        }}
+        onClose={closeTransactionModal}
         title={
           modalType === "receive"
             ? "Receive Stock"
@@ -6679,15 +7820,18 @@ export default function InventoryManagement() {
             <Button
               variant="cancel"
               type="button"
-              onClick={() => {
-                setShowModal(false);
-                setTransactionErrors({});
-                setTransactionSubmitError(null);
-              }}
+              onClick={closeTransactionModal}
+              disabled={isTransactionSubmitting}
             >
               Cancel
             </Button>
-            <Button variant="primary" type="submit" form="inventoryTransactionForm">
+            <Button
+              variant="primary"
+              type="submit"
+              form="inventoryTransactionForm"
+              loading={isTransactionSubmitting}
+              disabled={isTransactionSubmitDisabled}
+            >
               {modalType === "receive"
                 ? "Receive"
                 : modalType === "issue"
@@ -6769,7 +7913,7 @@ export default function InventoryManagement() {
                     }));
                   }}
                   required
-                  error={transactionErrors.quantity}
+                  error={transactionErrors.quantity || liveBatchQuantityError}
                   className="w-full"
                 />
               </div>
@@ -6793,7 +7937,7 @@ export default function InventoryManagement() {
                 />
               </div>
 
-              {modalType !== "issue" && (
+              {modalType === "receive" && (
                 <>
                   <div className="admin-field-group">
                     <Input
@@ -6811,26 +7955,156 @@ export default function InventoryManagement() {
                       className="w-full"
                     />
                   </div>
-                  {modalType === "receive" && (
-                    <div className="admin-field-group">
-                      <Input
-                        label="Expiry Date"
-                        type="date"
-                        value={formData.expiry_date || ""}
-                        onChange={(e) => {
-                          setFormData({ ...formData, expiry_date: e.target.value });
-                          setTransactionErrors((prev) => ({
-                            ...prev,
-                            expiry_date: undefined,
-                          }));
-                        }}
-                        required
-                        error={transactionErrors.expiry_date}
-                        className="w-full"
-                      />
+                  <div className="admin-field-group">
+                    <Input
+                      label="Expiry Date"
+                      type="date"
+                      value={formData.expiry_date || ""}
+                      onChange={(e) => {
+                        setFormData({ ...formData, expiry_date: e.target.value });
+                        setTransactionErrors((prev) => ({
+                          ...prev,
+                          expiry_date: undefined,
+                        }));
+                      }}
+                      required
+                      error={transactionErrors.expiry_date}
+                      className="w-full"
+                    />
+                  </div>
+                </>
+              )}
+              {requiresBatchSelection && (
+                <div
+                  className="admin-field-group"
+                  style={{ gridColumn: "1 / -1" }}
+                >
+                  <Input
+                    label="Select Lot/Batch"
+                    type="text"
+                    value={lotSearchTerm}
+                    onChange={(e) => {
+                      setLotSearchTerm(e.target.value);
+                      setFormData((prev) => ({
+                        ...prev,
+                        batch_id: "",
+                        lot_number: "",
+                        expiry_date: "",
+                      }));
+                      setTransactionErrors((prev) => ({
+                        ...prev,
+                        batch_id: undefined,
+                        quantity: undefined,
+                      }));
+                    }}
+                    placeholder="Search lot number, item, quantity, storage, or expiry"
+                    autoComplete="off"
+                    error={transactionErrors.batch_id}
+                    className="w-full"
+                  />
+
+                  <div className="mt-2 rounded-xl border border-white/10 bg-white/80 dark:bg-gray-800/80 dark:border-gray-700">
+                    {availableLotsLoading ? (
+                      <div className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">
+                        Loading available lot/batch records...
+                      </div>
+                    ) : filteredAvailableLots.length > 0 ? (
+                      <div className="max-h-56 overflow-y-auto">
+                        {filteredAvailableLots.map((batch) => {
+                          const isSelected =
+                            resolveInventorySaveRowId(
+                              batch.batch_id || batch.inventory_id,
+                            ) ===
+                            resolveInventorySaveRowId(formData.batch_id);
+
+                          return (
+                            <button
+                              key={batch.batch_id || batch.inventory_id}
+                              type="button"
+                              onClick={() => {
+                                setLotSearchTerm(batch.lot_number || "");
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  batch_id:
+                                    batch.batch_id || batch.inventory_id || "",
+                                  lot_number: batch.lot_number || "",
+                                  expiry_date: batch.expiry_date || "",
+                                }));
+                                setTransactionErrors((prev) => ({
+                                  ...prev,
+                                  batch_id: undefined,
+                                  quantity: undefined,
+                                }));
+                              }}
+                              className={`w-full border-b border-gray-100 px-3 py-3 text-left transition last:border-b-0 dark:border-gray-700 ${isSelected ? "bg-blue-50 dark:bg-blue-900/30" : "hover:bg-gray-50 dark:hover:bg-gray-700/50"}`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                    {batch.lot_number}
+                                  </p>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    {batch.vaccine_name}
+                                  </p>
+                                </div>
+                                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/40 dark:text-blue-100">
+                                  {batch.available_quantity} available
+                                </span>
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-300">
+                                <span>Expiry: {formatInventoryBatchDate(batch.expiry_date)}</span>
+                                {batch.storage_location && (
+                                  <span>Storage: {batch.storage_location}</span>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">
+                        {availableLotsError ||
+                          "No selectable lot/batch records match the current search."}
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    Only active, non-expired lot/batch records with available stock
+                    can be selected.
+                  </p>
+
+                  {selectedBatchOption && batchStockPreview && (
+                    <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+                      <div className="rounded-lg border border-white/10 bg-white/70 px-3 py-2 dark:bg-gray-800/80 dark:border-gray-700">
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          Available in Batch
+                        </p>
+                        <p className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                          {batchStockPreview.available}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-white/10 bg-white/70 px-3 py-2 dark:bg-gray-800/80 dark:border-gray-700">
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          {modalType === "issue" ? "Issued Quantity" : "Wasted Quantity"}
+                        </p>
+                        <p className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                          {batchStockPreview.transactionQuantity}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-white/10 bg-white/70 px-3 py-2 dark:bg-gray-800/80 dark:border-gray-700">
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          Remaining After Transaction
+                        </p>
+                        <p
+                          className={`text-base font-semibold ${batchStockPreview.insufficientStock ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-gray-100"}`}
+                        >
+                          {Math.max(batchStockPreview.remaining, 0)}
+                        </p>
+                      </div>
                     </div>
                   )}
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -6935,7 +8209,105 @@ export default function InventoryManagement() {
 
           .inventory-sheet-summary-print-report__page,
           .doh-lgu-stock-print-report__page,
-          .ris-print-report__page {
+          .ris-word-report {
+    width: 100%;
+  }
+
+  .ris-word-report__page {
+    width: 100%;
+    max-width: 7.9in;
+    margin: 0 auto;
+    border: 1.4px solid #111827;
+    padding: 0.18in;
+    background: #ffffff;
+  }
+
+  .ris-word-header-table,
+  .ris-word-meta-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    color: #111827;
+  }
+
+  .ris-word-header-table {
+    margin-bottom: 0.12in;
+  }
+
+  .ris-word-header-table__seal-cell {
+    width: 0.92in;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .ris-word-header-table__seal {
+    display: block;
+    width: 0.68in;
+    height: 0.68in;
+    margin: 0 auto;
+    object-fit: cover;
+    border-radius: 9999px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  .ris-word-header-table__title-cell {
+    text-align: center;
+    vertical-align: middle;
+    padding: 0 0.1in;
+  }
+
+  .ris-word-header-table__title,
+  .ris-word-header-table__subtitle,
+  .ris-word-header-table__municipality {
+    margin: 0;
+    color: #111827;
+  }
+
+  .ris-word-header-table__title {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .ris-word-header-table__subtitle {
+    margin-top: 0.03in;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .ris-word-header-table__municipality {
+    margin-top: 0.03in;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .ris-word-meta-table {
+    margin-bottom: 0.12in;
+  }
+
+  .ris-word-meta-table td {
+    padding: 0.04in 0.03in;
+    font-size: 10px;
+    vertical-align: bottom;
+  }
+
+  .ris-word-meta-table__label {
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .ris-word-meta-table__value {
+    border-bottom: 1px solid #111827;
+  }
+
+  .ris-word-table {
+    margin-top: 0.02in;
+  }
+  .ris-print-report__page {
             display: block !important;
             margin: 0 auto !important;
             padding: 0 !important;
@@ -6967,7 +8339,105 @@ export default function InventoryManagement() {
             border: 1.6px solid #111827 !important;
           }
 
-          .ris-print-report__page {
+          .ris-word-report {
+    width: 100%;
+  }
+
+  .ris-word-report__page {
+    width: 100%;
+    max-width: 7.9in;
+    margin: 0 auto;
+    border: 1.4px solid #111827;
+    padding: 0.18in;
+    background: #ffffff;
+  }
+
+  .ris-word-header-table,
+  .ris-word-meta-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    color: #111827;
+  }
+
+  .ris-word-header-table {
+    margin-bottom: 0.12in;
+  }
+
+  .ris-word-header-table__seal-cell {
+    width: 0.92in;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .ris-word-header-table__seal {
+    display: block;
+    width: 0.68in;
+    height: 0.68in;
+    margin: 0 auto;
+    object-fit: cover;
+    border-radius: 9999px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  .ris-word-header-table__title-cell {
+    text-align: center;
+    vertical-align: middle;
+    padding: 0 0.1in;
+  }
+
+  .ris-word-header-table__title,
+  .ris-word-header-table__subtitle,
+  .ris-word-header-table__municipality {
+    margin: 0;
+    color: #111827;
+  }
+
+  .ris-word-header-table__title {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .ris-word-header-table__subtitle {
+    margin-top: 0.03in;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .ris-word-header-table__municipality {
+    margin-top: 0.03in;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .ris-word-meta-table {
+    margin-bottom: 0.12in;
+  }
+
+  .ris-word-meta-table td {
+    padding: 0.04in 0.03in;
+    font-size: 10px;
+    vertical-align: bottom;
+  }
+
+  .ris-word-meta-table__label {
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .ris-word-meta-table__value {
+    border-bottom: 1px solid #111827;
+  }
+
+  .ris-word-table {
+    margin-top: 0.02in;
+  }
+  .ris-print-report__page {
             width: min(calc(100% - 1.8cm), 8.1in) !important;
             max-width: 8.1in !important;
             max-height: var(--inventory-print-page-height) !important;
@@ -7225,10 +8695,12 @@ export default function InventoryManagement() {
             width: 0.9in !important;
             height: 0.9in !important;
             object-fit: contain !important;
+            background: transparent !important;
           }
 
           .inventory-sheet-summary-print-header__logo--circle {
             border-radius: 9999px !important;
+            clip-path: circle(50% at 50% 50%) !important;
           }
 
           .inventory-sheet-summary-print-header__line--government {

@@ -414,7 +414,11 @@ const normalizeVaccineBatch = (row = {}, fallbackClinicId = null) => ({
     row.lot_no,
   ),
   stock_on_hand: toNumber(
-    row.stock_on_hand ?? row.qty_current ?? row.available_stock,
+    row.stock_on_hand ??
+      row.qty_current ??
+      row.available_quantity ??
+      row.available_stock ??
+      row.stock,
     0,
   ),
   expiry_date: row.expiry_date ?? null,
@@ -427,10 +431,7 @@ export const buildFefoBatchOptions = ({
   clinicId = null,
   referenceDate = new Date(),
 }) => {
-  const batchPayload = toObjectPayload(batches);
-  const effectiveClinicId = toNumber(
-    batchPayload?.clinicId ?? batchPayload?.clinic_id ?? clinicId,
-  );
+  const effectiveClinicId = toNumber(clinicId);
   const normalizedVaccineId = toNumber(vaccineId);
   const normalizedInventoryRecords = Array.isArray(inventoryRecords)
     ? inventoryRecords.map((row) => normalizeVaccineInventoryRecord(row || {}))

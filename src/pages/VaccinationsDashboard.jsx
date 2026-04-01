@@ -31,6 +31,7 @@ import {
 
 const pollingIntervalMs = 60000;
 const vaccinationRecordsPageSize = 5000;
+const analyticsPollingIntervalMs = 120000; // 2 minutes
 
 const normalizeRoleName = (value) => String(value || "").trim().toLowerCase();
 
@@ -154,6 +155,7 @@ const VaccinationsDashboard = () => {
   const [infants, setInfants] = useState([]);
   const [vaccines, setVaccines] = useState([]);
   const [healthWorkerUsers, setHealthWorkerUsers] = useState([]);
+  const [analyticsData, setAnalyticsData] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -197,25 +199,12 @@ const VaccinationsDashboard = () => {
   );
 
   const fetchAllVaccinationRecords = useCallback(async () => {
-    const allRecords = [];
-    let offset = 0;
-
-    while (true) {
-      const pageData = await apiClient.getVaccinationRecords({
-        limit: vaccinationRecordsPageSize,
-        offset,
-      });
-      const normalizedPage = normalizeVaccinationRecordsResponse(pageData);
-      allRecords.push(...normalizedPage);
-
-      if (normalizedPage.length < vaccinationRecordsPageSize) {
-        break;
-      }
-
-      offset += vaccinationRecordsPageSize;
-    }
-
-    return allRecords;
+    const pageData = await apiClient.getVaccinationRecords({
+      limit: vaccinationRecordsPageSize,
+      offset: 0,
+    });
+    const normalizedPage = normalizeVaccinationRecordsResponse(pageData);
+    return normalizedPage;
   }, []);
 
   const fetchData = useCallback(
@@ -230,8 +219,18 @@ const VaccinationsDashboard = () => {
         setError(null);
 
         const recordsPromise = fetchAllVaccinationRecords();
+        const analyticsPromise = apiClient
+          .getAnalyticsDashboard()
+          .catch(() => null);
 
-        const [recordsData, schedulesData, infantsData, vaccinesData, systemUsersData] =
+        const [
+          recordsData,
+          schedulesData,
+          infantsData,
+          vaccinesData,
+          systemUsersData,
+          analyticsResponse,
+        ] =
           await Promise.all([
             recordsPromise,
             apiClient.getVaccinationSchedules(),
@@ -244,6 +243,7 @@ const VaccinationsDashboard = () => {
                 is_active: true,
               })
               .catch(() => ({ data: [] })),
+            analyticsPromise,
           ]);
 
         const normalizedRecords = Array.isArray(recordsData)
@@ -253,6 +253,8 @@ const VaccinationsDashboard = () => {
           normalizeVaccinationSchedulesResponse(schedulesData);
         const normalizedInfants = normalizeInfantsResponse(infantsData);
         const normalizedVaccines = normalizeVaccinesResponse(vaccinesData);
+        const normalizedAnalyticsPayload =
+          analyticsResponse?.data || analyticsResponse || null;
 
         const allUsers = Array.isArray(systemUsersData)
           ? systemUsersData
@@ -305,6 +307,9 @@ const VaccinationsDashboard = () => {
         setInfants(normalizedInfants);
         setVaccines(normalizedVaccines);
         setHealthWorkerUsers(normalizedHealthWorkers);
+        setAnalyticsData(
+          normalizedAnalyticsPayload?.summary ? normalizedAnalyticsPayload : null,
+        );
 
         if (selectedInfantId) {
           const exists = normalizedInfants.some((entry) => entry.id === selectedInfantId);
@@ -319,6 +324,7 @@ const VaccinationsDashboard = () => {
         setInfants([]);
         setVaccines([]);
         setHealthWorkerUsers([]);
+        setAnalyticsData(null);
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -717,6 +723,17 @@ const VaccinationsDashboard = () => {
   }, [allScheduleOverviewRows, debouncedSearchQuery]);
 
   const dashboardStats = useMemo(() => {
+    // Use analytics API data if available for accurate metrics
+    if (analyticsData?.summary) {
+      return {
+        completed: analyticsData.summary.administeredInPeriod || 0,
+        dueSoon: analyticsData.summary.dueSoon7Days || 0,
+        overdue: analyticsData.summary.overdueVaccinations || 0,
+        trackedInfants: analyticsData.summary.totalRegisteredInfants || infants.length,
+      };
+    }
+
+    // Fallback to frontend calculation if API data not available
     if (!allScheduleOverviewRows.length) {
       return fallbackDashboardStats;
     }
@@ -727,9 +744,14 @@ const VaccinationsDashboard = () => {
     const completed = allScheduleOverviewRows.filter(
       (row) => row.status_key === "completed",
     ).length;
-    const overdue = allScheduleOverviewRows.filter(
-      (row) => row.status_key === "overdue",
-    ).length;
+    
+    // Count unique infants with overdue vaccinations (not all overdue doses)
+    const overdue = new Set(
+      allScheduleOverviewRows
+        .filter((row) => row.status_key === "overdue")
+        .map((row) => row.infant_id)
+    ).size;
+    
     const dueSoon = allScheduleOverviewRows.filter((row) => {
       if (row.status_key === "completed" || !row.due_date) {
         return false;
@@ -753,7 +775,7 @@ const VaccinationsDashboard = () => {
       overdue,
       trackedInfants: infants.length,
     };
-  }, [allScheduleOverviewRows, fallbackDashboardStats, infants.length]);
+  }, [analyticsData, allScheduleOverviewRows, fallbackDashboardStats, infants.length]);
 
   const scheduleStatusSummary = useMemo(
     () =>

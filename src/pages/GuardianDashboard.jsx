@@ -31,42 +31,9 @@ import { triggerGuardianAddChildModal } from '../components/QuickActionFAB';
 import guardianNotificationService from '../services/guardianNotificationService';
 import { trackEvent } from '../utils/telemetry';
 import ErrorBoundary from '../components/ErrorBoundary';
-
-const unwrapApiPayload = (value) => {
-  if (value && typeof value === 'object' && 'data' in value) {
-    return value.data;
-  }
-  return value;
-};
-
-const normalizeArrayPayload = (value, candidateKeys = []) => {
-  const payload = unwrapApiPayload(value);
-
-  if (Array.isArray(payload)) {
-    return payload;
-  }
-
-  if (payload && typeof payload === 'object') {
-    const keys = ['data', ...candidateKeys];
-    for (const key of keys) {
-      if (Array.isArray(payload[key])) {
-        return payload[key];
-      }
-    }
-  }
-
-  return [];
-};
-
-const inferNotificationType = (notification = {}) => {
-  const rawType = String(notification.notification_type || notification.type || '').toLowerCase();
-
-  if (rawType.includes('appointment')) return 'appointment';
-  if (rawType.includes('vaccination') || rawType.includes('vaccine')) return 'vaccination';
-  if (rawType.includes('message')) return 'message';
-  if (rawType.includes('alert') || rawType.includes('error') || rawType.includes('warning')) return 'alert';
-  return 'info';
-};
+import { unwrapApiPayload, normalizeArrayPayload } from '../utils/apiUtils';
+import { inferNotificationType } from '../utils/notificationUtils';
+import { APPOINTMENT_STATUS_META, TRANSFER_STATUS_META, getAppointmentStatusMeta } from '../constants/statusMappings';
 
 const buildDueVaccineIdentity = (child, vaccine, dueDate) => {
   const vaccineId =
@@ -92,59 +59,6 @@ const buildDueVaccineIdentity = (child, vaccine, dueDate) => {
 
   return `${child?.id || 'child'}-${vaccineId}-${doseNumber}-${dueDateKey}`;
 };
-
-const TRANSFER_STATUS_META = {
-  approved: {
-    label: 'Transfer Approved',
-    className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-  },
-  for_validation: {
-    label: 'Transfer Review',
-    className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-  },
-  needs_clarification: {
-    label: 'Needs Clarification',
-    className: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',
-  },
-  rejected: {
-    label: 'Transfer Rejected',
-    className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-  },
-};
-
-const APPOINTMENT_STATUS_META = {
-  scheduled: {
-    label: 'Scheduled',
-    className: 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300',
-  },
-  confirmed: {
-    label: 'Confirmed',
-    className: 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300',
-  },
-  rescheduled: {
-    label: 'Rescheduled',
-    className: 'bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300',
-  },
-  pending: {
-    label: 'Pending',
-    className: 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300',
-  },
-  attended: {
-    label: 'Attended',
-    className: 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300',
-  },
-  cancelled: {
-    label: 'Cancelled',
-    className: 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300',
-  },
-  no_show: {
-    label: 'No Show',
-    className: 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300',
-  },
-};
-
-const getAppointmentStatusMeta = (status) =>
-  APPOINTMENT_STATUS_META[String(status || '').toLowerCase()] || APPOINTMENT_STATUS_META.scheduled;
 
 // ============================================
 // SKELETON LOADING COMPONENTS
@@ -727,8 +641,9 @@ const GuardianDashboard = () => {
     };
   }, [stats.vaccinatedCount, stats.pendingCount]);
 
-  // Phase 2: Derived Data Lag fix - Show skeleton if children exist but 0 total vaccines are mapped yet
-  const isGeneratingSchedule = stats.childrenCount > 0 && vaccinationProgress.total === 0;
+  // Phase 2: Derived Data Lag fix - Show skeleton only during initial load, not when counts are legitimately 0
+  // Only show "Analyzing" state if we're still loading OR if we have children but haven't processed schedules yet
+  const isGeneratingSchedule = loading && stats.childrenCount > 0 && vaccinationProgress.total === 0;
 
   return (
     <div className="guardian-page-wrapper min-h-screen bg-theme-bg-primary transition-colors duration-200">
@@ -937,9 +852,9 @@ const GuardianDashboard = () => {
                 />
                 <ProgressCard
                   title="This Month"
-                  completed={Math.min(stats.vaccinatedCount, 5)}
+                  completed={stats.vaccinatedCount}
                   pending={stats.pendingCount}
-                  total={Math.max(stats.vaccinatedCount + stats.pendingCount, 5)}
+                  total={Math.max(stats.vaccinatedCount + stats.pendingCount, 1)}
                   icon={Calendar}
                   color="blue"
                 />

@@ -51,7 +51,8 @@ export default function UserProfile() {
       }
 
       const response = await apiClient.getUserProfile(user.id);
-      setProfile(response.data || {});
+      const profileData = response?.data ?? response;
+      setProfile(profileData || {});
     } catch (err) {
       setError(err.message);
     } finally {
@@ -92,7 +93,8 @@ export default function UserProfile() {
 
       const response = await apiClient.updateUserProfile(user.id, profile);
       setSuccess("Profile updated successfully!");
-      updateUser(response.data);
+      const updatedUser = response?.data ?? response;
+      updateUser(updatedUser);
       setTimeout(() => setSuccess(null), 5000);
     } catch (err) {
       setError(err.message);

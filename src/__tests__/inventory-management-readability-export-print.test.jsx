@@ -544,12 +544,18 @@ describe("Inventory Management print and export behavior", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /download word/i }));
 
-    expect(downloadWordDocument).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "REQUISITION AND ISSUE SLIP",
-        page: PRINT_PAGE_PRESETS.legalPortrait,
-      }),
-    );
+    await waitFor(() => {
+      expect(downloadWordDocument).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "REQUISITION AND ISSUE SLIP",
+          page: PRINT_PAGE_PRESETS.legalPortrait,
+        }),
+      );
+    });
+
+    const risWordCall = downloadWordDocument.mock.calls.at(-1)?.[0] || {};
+    expect(risWordCall.headerText).toBe("");
+    expect(risWordCall.html).toContain("ris-word-header-table");
 
     fireEvent.change(screen.getByLabelText(/report format/i), {
       target: { value: "inventory-sheet" },

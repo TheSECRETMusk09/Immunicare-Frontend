@@ -5,12 +5,22 @@ import "@testing-library/jest-dom";
 import Reports from "../pages/Reports";
 import apiClient from "../utils/api";
 
+const mockSocketOn = jest.fn();
+const mockSocketOff = jest.fn();
+
 jest.mock("../utils/api", () => ({
   __esModule: true,
   default: {
     request: jest.fn(),
     customRequest: jest.fn(),
   },
+}));
+
+jest.mock("../contexts/SocketContext", () => ({
+  useSocket: () => ({
+    on: mockSocketOn,
+    off: mockSocketOff,
+  }),
 }));
 
 jest.mock("../components/UI", () => {
@@ -211,7 +221,7 @@ describe("Reports page backend contract alignment", () => {
     });
   });
 
-  test("format dropdown excludes JSON and report generation payload keeps canonical format", async () => {
+  test("format dropdown keeps the supported PDF format and generation payload stays canonical", async () => {
     render(<Reports />);
 
     await screen.findByRole("heading", { name: /reports management/i });
@@ -225,15 +235,15 @@ describe("Reports page backend contract alignment", () => {
       .map((option) => option.value);
 
     expect(formatOptions).toContain("pdf");
-    expect(formatOptions).toContain("excel");
-    expect(formatOptions).toContain("csv");
+    expect(formatOptions).not.toContain("excel");
+    expect(formatOptions).not.toContain("csv");
     expect(formatOptions).not.toContain("json");
 
     fireEvent.change(within(modal).getByTestId("select-type"), {
       target: { name: "type", value: "vaccination" },
     });
     fireEvent.change(formatSelect, {
-      target: { name: "format", value: "excel" },
+      target: { name: "format", value: "pdf" },
     });
 
     fireEvent.click(within(modal).getByRole("button", { name: /generate report/i }));
@@ -245,7 +255,7 @@ describe("Reports page backend contract alignment", () => {
           method: "POST",
           data: expect.objectContaining({
             type: "vaccination",
-            format: "excel",
+            format: "pdf",
           }),
         }),
       );
@@ -397,5 +407,53 @@ describe("Reports page backend contract alignment", () => {
     expect(screen.getByText(/expired lots/i)).toBeInTheDocument();
     expect(screen.getByText(/transfer turnaround/i)).toBeInTheDocument();
     expect(screen.getByText(/days • open: 2/i)).toBeInTheDocument();
+  });
+
+  test("summary refreshes when an infant sync event arrives", async () => {
+    apiClient.request.mockImplementation((endpoint, options = {}) => {
+      if (endpoint === "/reports" && !options.method) {
+        return Promise.resolve({ success: true, data: [] });
+      }
+
+      if (endpoint === "/reports/templates") {
+        return Promise.resolve({ success: true, data: [] });
+      }
+
+      if (endpoint === "/reports/admin/summary") {
+        return Promise.resolve({
+          success: true,
+          data: {
+            vaccination: { total: 12, completed: 12 },
+            inventory: { total_items: 6, low_stock_items: 2, expired_items: 1 },
+            appointments: { total: 8, completed: 5, no_show: 2 },
+            guardians: { total: 4, active: 4 },
+            infants: { total: 7, up_to_date: 5 },
+            reports: { total_reports: 3, total_downloads: 11 },
+            transfers: { total: 5, open_cases: 2, avg_turnaround_days: 3.5 },
+          },
+        });
+      }
+
+      return Promise.resolve({ success: true, data: [] });
+    });
+
+    render(<Reports />);
+
+    await screen.findByRole("heading", { name: /reports management/i });
+
+    const infantCreatedSubscription = mockSocketOn.mock.calls.find(
+      ([eventName]) => eventName === "infant_created",
+    );
+
+    expect(infantCreatedSubscription).toBeTruthy();
+
+    await waitFor(async () => {
+      await infantCreatedSubscription[1]();
+      expect(
+        apiClient.request.mock.calls.filter(
+          ([endpoint]) => endpoint === "/reports/admin/summary",
+        ).length,
+      ).toBeGreaterThanOrEqual(2);
+    });
   });
 });

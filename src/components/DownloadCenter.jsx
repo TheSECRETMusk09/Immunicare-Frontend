@@ -10,6 +10,7 @@ import {
 } from "./UI";
 import { toArrayPayload } from "../utils/adminDataAdapters";
 import apiClient from "../utils/api";
+import SearchableInfantSelect from "./SearchableInfantSelect";
 
 const DIGITAL_PAPER_SHORTCUTS = [
   {
@@ -114,6 +115,11 @@ export default function DownloadCenter({ onRefresh }) {
 
   const handleGenerateDocument = async (e) => {
     e.preventDefault();
+    if (!generateForm.infant_id || !generateForm.template_id) {
+      setError("Please select an infant and template before generating a document.");
+      return;
+    }
+
     try {
       await apiClient.generateDocument(generateForm.template_id, generateForm);
       setShowGenerateModal(false);
@@ -435,26 +441,16 @@ export default function DownloadCenter({ onRefresh }) {
           onSubmit={handleGenerateDocument}
           className="space-y-4"
         >
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Select Infant
-            </label>
-            <select
-              value={generateForm.infant_id}
-              onChange={(e) =>
-                setGenerateForm({ ...generateForm, infant_id: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
-              required
-            >
-              <option value="">Select Infant</option>
-              {infants.map((infant) => (
-                <option key={infant.id} value={infant.id}>
-                  {infant.first_name} {infant.last_name} - {infant.dob}
-                </option>
-              ))}
-            </select>
-          </div>
+          <SearchableInfantSelect
+            infants={infants}
+            value={generateForm.infant_id}
+            onChange={(e) =>
+              setGenerateForm({ ...generateForm, infant_id: e.target.value })
+            }
+            label="Select Infant"
+            required
+            placeholder="Search by name, control number, or date of birth..."
+          />
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

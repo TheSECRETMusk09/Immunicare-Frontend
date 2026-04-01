@@ -1,6 +1,7 @@
 import React, { useState, useEffect, memo, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useSocket } from "../contexts/SocketContext";
 import { usePrefetchGuardian } from "../hooks/useCachedData";
 import useGuardianNotifications from "../hooks/useGuardianNotifications";
 import apiClient from "../utils/api";
@@ -52,10 +53,11 @@ const GuardianSidebar = memo(
     const { user, logout, guardianId } = useAuth();
     const { prefetchGuardianData } = usePrefetchGuardian();
 
-    const { unreadCount: hookUnreadCount } = useGuardianNotifications({
+    const { unreadCount: hookUnreadCount, refresh: refreshNotifications } = useGuardianNotifications({
       pollingInterval: 30000, // Poll every 30 seconds
       limit: 10,
     });
+    const { isConnected, on, off } = useSocket();
 
     // ✅ Submenu refs (for reliable height measurement; fixes overlay)
     const submenuRefs = useRef({});
@@ -64,6 +66,32 @@ const GuardianSidebar = memo(
     useEffect(() => {
       setNotificationCount(hookUnreadCount);
     }, [hookUnreadCount]);
+
+    useEffect(() => {
+      if (!isConnected) {
+        return undefined;
+      }
+
+      const handleNotificationChange = () => {
+        void refreshNotifications();
+      };
+
+      on("notification", handleNotificationChange);
+      on("critical-notification", handleNotificationChange);
+      on("actionable-notification", handleNotificationChange);
+      on("notification-updated", handleNotificationChange);
+      on("notification-deleted", handleNotificationChange);
+      on("notifications-read-all", handleNotificationChange);
+
+      return () => {
+        off("notification", handleNotificationChange);
+        off("critical-notification", handleNotificationChange);
+        off("actionable-notification", handleNotificationChange);
+        off("notification-updated", handleNotificationChange);
+        off("notification-deleted", handleNotificationChange);
+        off("notifications-read-all", handleNotificationChange);
+      };
+    }, [isConnected, on, off, refreshNotifications]);
 
     // Fetch children count for mobile sidebar indicator
     useEffect(() => {

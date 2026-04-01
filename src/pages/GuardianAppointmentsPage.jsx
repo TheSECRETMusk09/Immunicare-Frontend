@@ -5,7 +5,7 @@ import apiClient from "../utils/api";
 import { Alert, Button, Input, Modal, Select } from "../components/UI";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
 import GuardianTopHeader from "../components/GuardianTopHeader";
-import { PackageX, Calendar, Plus, RefreshCw, Bell, User } from "lucide-react";
+import { Calendar, Plus, RefreshCw, Bell, User } from "lucide-react";
 import moment from "moment";
 import { useMediaQuery } from "@mui/material";
 
@@ -23,70 +23,11 @@ import {
   getHolidayTypeClass,
 } from "../utils/holidays";
 import { trackEvent } from "../utils/telemetry";
+import { toDateKey, toMonthKey, fromDateKey, formatDateTime, formatTimeSlotLabel } from "../utils/dateUtils";
+import { getStatusPillClass } from "../constants/statusMappings";
 
 const isWeekendDate = (value) => {
   return isWeekend(value);
-};
-
-const toDateKey = (value) => {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-const toMonthKey = (date) => {
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${date.getFullYear()}-${month}`;
-};
-
-const fromDateKey = (value) => {
-  if (!value || typeof value !== "string") return null;
-  const parsedDate = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(parsedDate.getTime())) return null;
-  return parsedDate;
-};
-
-const formatDateTime = (value) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-};
-
-const formatTimeSlotLabel = (value) => {
-  if (!value) return "";
-  const parsed = new Date(`2000-01-01T${value}`);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-};
-
-const getStatusPillClass = (status) => {
-  switch (status) {
-    case "scheduled":
-    case "confirmed":
-      return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300";
-    case "completed":
-    case "attended":
-      return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300";
-    case "cancelled":
-      return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
-    default:
-      return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300";
-  }
 };
 
 const getEventColor = (status) => {
@@ -125,12 +66,6 @@ export default function GuardianAppointmentsPage() {
   const calendarRef = useRef(null);
 
   const [monthCursor, setMonthCursor] = useState(new Date());
-  const [inventorySummary, setInventorySummary] = useState({
-    totalAvailableStock: 0,
-    availableVaccines: 0,
-    vaccines: [],
-  });
-
   const [selectedDate, setSelectedDate] = useState(toDateKey(new Date()));
   const [selectedDateDetails, setSelectedDateDetails] = useState(null);
 
@@ -470,34 +405,16 @@ export default function GuardianAppointmentsPage() {
 
   const fetchCalendarAvailability = useCallback(async (signal) => {
     if (!guardianId) {
-      setInventorySummary({
-        totalAvailableStock: 0,
-        availableVaccines: 0,
-        vaccines: [],
-      });
       return;
     }
 
     setCalendarLoading(true);
     try {
-      const response = await apiClient.getAppointmentCalendarAvailability({
+      await apiClient.getAppointmentCalendarAvailability({
         month: toMonthKey(monthCursor),
       }, { signal });
-
-      setInventorySummary(
-        response?.inventory || {
-          totalAvailableStock: 0,
-          availableVaccines: 0,
-          vaccines: [],
-        }
-      );
     } catch (err) {
       if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
-      setInventorySummary({
-        totalAvailableStock: 0,
-        availableVaccines: 0,
-        vaccines: [],
-      });
     } finally {
       setCalendarLoading(false);
     }
@@ -892,18 +809,6 @@ export default function GuardianAppointmentsPage() {
           </div>
         </section>
 
-        {inventorySummary.totalAvailableStock <= 0 && (
-          <Alert variant="warning">
-            <div className="flex items-start gap-2">
-              <PackageX className="w-4 h-4 mt-0.5" />
-              <div>
-                <p className="font-semibold">No vaccines available right now.</p>
-                <p className="text-sm">Booking is temporarily disabled until inventory is replenished.</p>
-              </div>
-            </div>
-          </Alert>
-        )}
-
         <div className="guardian-appointments-layout grid grid-cols-1 min-[768px]:grid-cols-2 min-[1025px]:grid-cols-3 gap-4 md:gap-5 lg:gap-6">
           {/* Left Column - FullCalendar (Admin-style) */}
           <section
@@ -1093,18 +998,6 @@ export default function GuardianAppointmentsPage() {
                   <span className="text-gray-500 dark:text-gray-400">Appointments</span>
                   <span className="font-semibold text-gray-900 dark:text-gray-100">
                     {selectedDateDetails?.summary?.total || 0}
-                  </span>
-                </p>
-                <p className="flex items-center justify-between">
-                  <span className="text-gray-500 dark:text-gray-400">Available vaccines</span>
-                  <span className="font-semibold text-gray-900 dark:text-gray-100">
-                    {inventorySummary.availableVaccines || 0}
-                  </span>
-                </p>
-                <p className="flex items-center justify-between">
-                  <span className="text-gray-500 dark:text-gray-400">Total stock</span>
-                  <span className="font-semibold text-gray-900 dark:text-gray-100">
-                    {inventorySummary.totalAvailableStock || 0}
                   </span>
                 </p>
               </div>

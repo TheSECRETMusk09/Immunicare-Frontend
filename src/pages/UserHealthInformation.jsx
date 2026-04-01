@@ -13,6 +13,66 @@ import apiClient from "../utils/api";
 import { Activity, ArrowLeft, Plus, Loader2 } from "lucide-react";
 import { trackEvent } from "../utils/telemetry";
 
+const unwrapApiData = (response) => response?.data ?? response ?? null;
+
+const toNullableNumber = (value) => {
+  if (value === "" || value === null || value === undefined) {
+    return null;
+  }
+
+  const parsedValue = Number(value);
+  return Number.isFinite(parsedValue) ? parsedValue : null;
+};
+
+const calculateAgeInDays = (dob, measurementDate) => {
+  if (!dob || !measurementDate) {
+    return null;
+  }
+
+  const birthDate = new Date(dob);
+  const recordedDate = new Date(measurementDate);
+  if (
+    Number.isNaN(birthDate.getTime()) ||
+    Number.isNaN(recordedDate.getTime())
+  ) {
+    return null;
+  }
+
+  return Math.floor(
+    (recordedDate.getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24),
+  );
+};
+
+const formatRecordAge = (ageInDays) => {
+  const parsedAgeInDays = Number(ageInDays);
+  if (!Number.isFinite(parsedAgeInDays) || parsedAgeInDays < 0) {
+    return "N/A";
+  }
+
+  if (parsedAgeInDays < 30) {
+    return `${parsedAgeInDays} day${parsedAgeInDays === 1 ? "" : "s"}`;
+  }
+
+  const ageInMonths = Math.floor(parsedAgeInDays / 30.44);
+  return `${ageInMonths} month${ageInMonths === 1 ? "" : "s"}`;
+};
+
+const normalizeHealthRecord = (record = {}) => ({
+  ...record,
+  date: record.measurement_date || record.date || null,
+  height: record.length_cm ?? record.height ?? null,
+  weight: record.weight_kg ?? record.weight ?? null,
+  headCircumference:
+    record.head_circumference_cm ??
+    record.headCircumference ??
+    record.head_circumference ??
+    null,
+  temperature: record.temperature_celsius ?? record.temperature ?? null,
+  notes: record.notes ?? "",
+  recordedBy: record.measured_by_username ?? record.recordedBy ?? null,
+  age: formatRecordAge(record.age_in_days),
+});
+
 export default function UserHealthInformation() {
   const { childId } = useParams();
   const navigate = useNavigate();
@@ -31,8 +91,9 @@ export default function UserHealthInformation() {
 
   const fetchChildData = useCallback(async () => {
     try {
+      setError(null);
       const response = await apiClient.getInfant(childId);
-      setChild(response.data);
+      setChild(unwrapApiData(response));
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     }
@@ -41,8 +102,12 @@ export default function UserHealthInformation() {
   const fetchHealthRecords = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await apiClient.getHealthRecords(childId);
-      setHealthRecords(response.data || []);
+      setError(null);
+      const response = await apiClient.getHealthRecordsByInfant(childId);
+      const records = Array.isArray(response)
+        ? response
+        : unwrapApiData(response) || [];
+      setHealthRecords(records.map(normalizeHealthRecord));
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     } finally {
@@ -71,7 +136,26 @@ export default function UserHealthInformation() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await apiClient.createHealthRecord(childId, newRecord);
+      const ageInDays = calculateAgeInDays(child?.dob, newRecord.date);
+
+      if (ageInDays === null || ageInDays < 0) {
+        setError(
+          "Unable to save this record because the child age could not be calculated.",
+        );
+        return;
+      }
+
+      setError(null);
+      await apiClient.createGrowthRecord({
+        patient_id: Number(childId),
+        measurement_date: newRecord.date,
+        age_in_days: ageInDays,
+        length_cm: toNullableNumber(newRecord.height),
+        weight_kg: toNullableNumber(newRecord.weight),
+        head_circumference_cm: toNullableNumber(newRecord.headCircumference),
+        temperature_celsius: toNullableNumber(newRecord.temperature),
+        notes: newRecord.notes?.trim() || null,
+      });
       setNewRecord({
         date: "",
         height: "",
@@ -81,7 +165,7 @@ export default function UserHealthInformation() {
         notes: "",
       });
       trackEvent("health_record_added", { childId });
-      fetchHealthRecords();
+      await fetchHealthRecords();
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     }
@@ -132,7 +216,13 @@ export default function UserHealthInformation() {
         <Alert variant="danger" className="mb-6">
           {error}
         </Alert>
-        <Button onClick={fetchHealthRecords} className="w-full">
+        <Button
+          onClick={() => {
+            void fetchChildData();
+            void fetchHealthRecords();
+          }}
+          className="w-full"
+        >
           Retry Loading
         </Button>
       </div>
@@ -205,7 +295,7 @@ export default function UserHealthInformation() {
                 </div>
                 <div className="admin-field-group">
                   <TextInput
-                    label="Temperature (°C)"
+                    label={"Temperature (\u00B0C)"}
                     type="number"
                     name="temperature"
                     value={newRecord.temperature}
@@ -241,7 +331,9 @@ export default function UserHealthInformation() {
           <PageContainer title="Health Records History">
             {healthRecords.length === 0 ? (
               <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                <div className="text-4xl mb-4">📋</div>
+                <div className="text-4xl mb-4" aria-hidden="true">
+                  {"\u{1F4CB}"}
+                </div>
                 <p className="text-lg font-medium">
                   No health records found for this child.
                 </p>
@@ -276,7 +368,7 @@ export default function UserHealthInformation() {
                           Height
                         </div>
                         <div className="text-lg font-black text-gray-900 dark:text-white">
-                          {record.height}{" "}
+                          {record.height ?? "N/A"}{" "}
                           <span className="text-xs font-normal text-gray-500">
                             cm
                           </span>
@@ -287,7 +379,7 @@ export default function UserHealthInformation() {
                           Weight
                         </div>
                         <div className="text-lg font-black text-gray-900 dark:text-white">
-                          {record.weight}{" "}
+                          {record.weight ?? "N/A"}{" "}
                           <span className="text-xs font-normal text-gray-500">
                             kg
                           </span>
@@ -298,7 +390,7 @@ export default function UserHealthInformation() {
                           Head Circ.
                         </div>
                         <div className="text-lg font-black text-gray-900 dark:text-white">
-                          {record.headCircumference}{" "}
+                          {record.headCircumference ?? "N/A"}{" "}
                           <span className="text-xs font-normal text-gray-500">
                             cm
                           </span>
@@ -309,9 +401,9 @@ export default function UserHealthInformation() {
                           Temp.
                         </div>
                         <div className="text-lg font-black text-gray-900 dark:text-white">
-                          {record.temperature}{" "}
+                          {record.temperature ?? "N/A"}{" "}
                           <span className="text-xs font-normal text-gray-500">
-                            °C
+                              {"\u00B0C"}
                           </span>
                         </div>
                       </div>

@@ -20,6 +20,7 @@ import {
   validateDateRange,
   validateRequired,
 } from "../utils/adminFormValidation";
+import { useSocket } from "../contexts/SocketContext";
 
 const REPORT_TYPES = Object.freeze([
   "vaccination",
@@ -35,6 +36,16 @@ const REPORT_TYPES = Object.freeze([
 ]);
 
 const REPORT_FORMATS = Object.freeze(["pdf"]);
+
+const EMPTY_ADMIN_SUMMARY = Object.freeze({
+  vaccination: { total: 0, completed: 0 },
+  inventory: { total_items: 0, low_stock_items: 0, expired_items: 0 },
+  appointments: { total: 0, completed: 0, no_show: 0 },
+  guardians: { total: 0, active: 0 },
+  infants: { total: 0, up_to_date: 0 },
+  reports: { total_reports: 0, total_downloads: 0 },
+  transfers: { avg_turnaround_days: 0, open_cases: 0 },
+});
 
 const normalizeReportFormatInput = (value) => {
   const normalized = sanitizeText(value).toLowerCase();
@@ -70,6 +81,7 @@ const formatBackendErrorMessage = (error, fallback = "Request failed") => {
 };
 
 const Reports = () => {
+  const { on, off } = useSocket();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -161,35 +173,16 @@ const Reports = () => {
 
   const fetchAdminSummary = useCallback(async () => {
     try {
-      const [summaryResponse, absoluteStatsResponse] = await Promise.all([
-        apiClient.request("/reports/admin/summary"),
-        apiClient.getDashboardStats() // Fetch absolute totals to ensure consistency
-      ]);
-
-      const summaryData = summaryResponse?.data || summaryResponse || {};
-      const absoluteStats = absoluteStatsResponse?.data?.data || absoluteStatsResponse?.data || absoluteStatsResponse || {};
-
-      const mergedSummary = { ...summaryData };
-
-      // Override the potentially filtered/differently-calculated infants total
-      // with the absolute truth from the dashboard stats
-      if (mergedSummary.infants) {
-        mergedSummary.infants.total = absoluteStats.total_infants || absoluteStats.infants || mergedSummary.infants.total || 0;
-      }
-      if (mergedSummary.guardians) {
-        mergedSummary.guardians.total = absoluteStats.total_guardians || absoluteStats.guardians || mergedSummary.guardians.total || 0;
-      }
-      if (mergedSummary.appointments) {
-        mergedSummary.appointments.total = absoluteStats.total_appointments || absoluteStats.appointments || mergedSummary.appointments.total || 0;
-      }
-      if (mergedSummary.vaccination) {
-        mergedSummary.vaccination.total = absoluteStats.total_vaccinations || absoluteStats.vaccinations || mergedSummary.vaccination.total || 0;
-        mergedSummary.vaccination.completed = absoluteStats.completed_vaccinations || mergedSummary.vaccination.completed || 0;
-      }
-
-      setAdminSummary(mergedSummary);
+      const summaryResponse = await apiClient.request("/reports/admin/summary");
+      
+      // Backend returns { success: true, data: summary }
+      // So we need to access summaryResponse.data.data
+      const summaryData = summaryResponse?.data?.data || summaryResponse?.data || summaryResponse || {};
+      
+      setAdminSummary(summaryData);
     } catch (err) {
       console.error("Error fetching admin summary:", err);
+      setAdminSummary((current) => current || EMPTY_ADMIN_SUMMARY);
     }
   }, []);
 
@@ -239,6 +232,53 @@ const Reports = () => {
     fetchReportTemplates();
     fetchAdminSummary();
   }, [fetchReports, fetchReportTemplates, fetchAdminSummary]);
+
+  useEffect(() => {
+    const refreshSummary = () => {
+      void fetchAdminSummary();
+    };
+
+    const socketEvents = [
+      "appointment_created",
+      "appointment_updated",
+      "appointment_deleted",
+      "vaccination_created",
+      "vaccination_updated",
+      "vaccination_deleted",
+      "inventory_item_created",
+      "inventory_item_updated",
+      "inventory_item_deleted",
+      "vaccine_inventory_created",
+      "vaccine_inventory_updated",
+      "vaccine_inventory_transaction_created",
+      "infant_created",
+      "infant_updated",
+      "infant_deleted",
+      "guardian_created",
+      "guardian_updated",
+      "guardian_deleted",
+    ];
+
+    socketEvents.forEach((eventName) => on(eventName, refreshSummary));
+
+    const windowEvents = [
+      "appointment-update",
+      "vaccination-update",
+      "guardian-data-update",
+      "child-data-update",
+    ];
+
+    windowEvents.forEach((eventName) => {
+      window.addEventListener(eventName, refreshSummary);
+    });
+
+    return () => {
+      socketEvents.forEach((eventName) => off(eventName, refreshSummary));
+      windowEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, refreshSummary);
+      });
+    };
+  }, [fetchAdminSummary, on, off]);
 
   const handleGenerateReport = useCallback(async (event) => {
     event.preventDefault();
@@ -307,6 +347,7 @@ const Reports = () => {
           response.data,
           ...prevReports.filter((row) => row.id !== response.data.id),
         ]);
+        void fetchAdminSummary();
         setShowGenerateModal(false);
         setFormData({
           type: "vaccination",
@@ -331,7 +372,7 @@ const Reports = () => {
     } finally {
       setIsGenerating(false);
     }
-  }, [formData]);
+  }, [fetchAdminSummary, formData]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -431,6 +472,7 @@ const Reports = () => {
             };
           }),
         );
+        void fetchAdminSummary();
       } catch (err) {
         setError(formatBackendErrorMessage(err, "Failed to download report."));
         console.error("Error downloading report:", err);
@@ -438,7 +480,7 @@ const Reports = () => {
         setDownloadingReportId(null);
       }
     },
-    [],
+    [fetchAdminSummary],
   );
 
   const handleDeleteReport = useCallback((reportId) => {
@@ -456,6 +498,7 @@ const Reports = () => {
         method: "DELETE",
       });
       setReports((prevReports) => prevReports.filter((r) => r.id !== deletingReportId));
+      void fetchAdminSummary();
       setShowDeleteModal(false);
       setDeletingReportId(null);
     } catch (err) {
@@ -464,7 +507,7 @@ const Reports = () => {
     } finally {
       setIsDeleting(false);
     }
-  }, [deletingReportId]);
+  }, [deletingReportId, fetchAdminSummary]);
 
   const closeDeleteModal = useCallback(() => {
     setShowDeleteModal(false);

@@ -4,6 +4,21 @@ const path = require("path");
 
 const DEFAULT_BACKEND_PORT = Number.parseInt(process.env.BACKEND_PORT || "5000", 10) || 5000;
 
+const isProcessAlive = (pid) => {
+  const parsedPid = Number.parseInt(pid, 10);
+
+  if (!Number.isFinite(parsedPid) || parsedPid <= 0) {
+    return false;
+  }
+
+  try {
+    process.kill(parsedPid, 0);
+    return true;
+  } catch (error) {
+    return error?.code === "EPERM";
+  }
+};
+
 const resolveBackendTarget = () => {
   const configuredTarget = process.env.BACKEND_TARGET_URL;
   if (configuredTarget && configuredTarget.trim()) {
@@ -17,7 +32,14 @@ const resolveBackendTarget = () => {
       const runtime = JSON.parse(fs.readFileSync(runtimePortStateFile, "utf8"));
       const port = Number.parseInt(runtime?.port, 10);
       const status = String(runtime?.status || "").toLowerCase();
-      if (Number.isFinite(port) && port > 0 && status === "running") {
+      const pid = Number.parseInt(runtime?.pid, 10);
+      const shouldUseRuntimePort =
+        Number.isFinite(port) &&
+        port > 0 &&
+        status === "running" &&
+        (!Number.isFinite(pid) || pid <= 0 || isProcessAlive(pid));
+
+      if (shouldUseRuntimePort) {
         return `http://localhost:${port}`;
       }
     }

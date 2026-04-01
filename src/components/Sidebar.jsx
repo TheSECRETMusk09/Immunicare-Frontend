@@ -106,7 +106,6 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
       "User Management": adminRoutePaths.users,
       "Infant Management": adminRoutePaths.infants,
       Vaccinations: adminRoutePaths.vaccinations,
-      "Transfer-In Cases": adminRoutePaths.transferInCases,
       Inventory: adminRoutePaths.inventory,
       Appointments: adminRoutePaths.appointments,
       "Digital Papers": adminRoutePaths.digitalPapers,
@@ -133,7 +132,6 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
     // Check paths
     if (path.includes("/inventory")) return "Inventory";
     if (path.includes("/vaccination-management")) return "Vaccinations";
-    if (path.includes("/transfer-in-cases")) return "Transfer-In Cases";
     if (path.includes("/users")) return "User Management";
     if (path.includes("/infants")) return "Infant Management";
     if (path.includes("/analytics")) return "Analytics";

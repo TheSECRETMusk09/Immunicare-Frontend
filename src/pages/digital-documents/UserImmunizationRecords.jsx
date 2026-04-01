@@ -49,7 +49,7 @@ export default function UserImmunizationRecords() {
   const fetchVaccinationRecords = async (childId) => {
     try {
       const response = await apiClient.getVaccinationsByInfant(childId);
-      setVaccinationRecords(response.data || []);
+      setVaccinationRecords(Array.isArray(response) ? response : (response?.data || []));
     } catch (err) {
       console.error("Error fetching vaccination records:", err);
     }

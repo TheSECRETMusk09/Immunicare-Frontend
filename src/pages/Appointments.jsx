@@ -1074,8 +1074,8 @@ export default function Appointments() {
     }
   };
 
-  // Combined loading state: show skeleton when initially loading OR when no appointments have been loaded yet
-  const isLoading = loading || (appointments.length === 0 && !hookError && !isRefreshing);
+  // Show loading skeleton only when the hook is actively loading
+  const isLoading = loading && !isRefreshing;
 
   if (isLoading) {
     return (

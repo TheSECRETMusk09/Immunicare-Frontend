@@ -353,6 +353,42 @@ describe("Guardian appointments weekend blocking and action order", () => {
     expect(buttons[1]).toHaveTextContent(/close/i);
   });
 
+  test("guardian appointments page hides vaccine stock details from guardians", async () => {
+    apiClient.getAppointmentCalendarAvailability.mockResolvedValueOnce({
+      inventory: {
+        totalAvailableStock: 0,
+        availableVaccines: 0,
+        vaccines: [],
+      },
+    });
+
+    apiClient.getAppointmentDateDetails.mockResolvedValueOnce({
+      availability: { available: true, message: "Date is available" },
+      summary: { total: 0 },
+      holiday: null,
+      isWeekend: false,
+      appointments: [],
+      inventory: {
+        totalAvailableStock: 99,
+        availableVaccines: 3,
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <GuardianAppointmentsPage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: /selected date/i }),
+    ).toBeInTheDocument();
+
+    expect(screen.queryByText(/available vaccines/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/total stock/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no vaccines available right now/i)).not.toBeInTheDocument();
+  });
+
   test("day view header renderer includes weekday, month, numeric day, and year", async () => {
     render(
       <MemoryRouter>
@@ -471,5 +507,38 @@ describe("Guardian appointments weekend blocking and action order", () => {
         }),
       );
     });
+  });
+
+  test("booking page deduplicates repeated pending confirmation reasons", async () => {
+    apiClient.getVaccinationReadiness.mockResolvedValueOnce({
+      success: true,
+      data: {
+        readinessStatus: "PENDING_CONFIRMATION",
+        dueVaccines: [],
+        overdueVaccines: [],
+        blockedVaccines: [
+          { vaccineId: 11, reason: "Pending admin confirmation" },
+          { vaccineId: 12, reason: "Pending admin confirmation" },
+        ],
+        nextAppointmentPrediction: null,
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <GuardianAppointmentBooking />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /john doe/i }));
+
+    expect(
+      await screen.findByText("Booking is blocked: Pending admin confirmation"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "Booking is blocked: Pending admin confirmation, Pending admin confirmation",
+      ),
+    ).not.toBeInTheDocument();
   });
 });
