@@ -1031,6 +1031,31 @@ textarea:focus-visible {
   background-color: rgba(156, 163, 175, 0.7);
 }
 
+/* Admin module scroll regions.
+   Adjust --admin-module-scroll-max-height to tune the module limit,
+   or remove .admin-module-scroll-region to let a page expand without contained scrolling. */
+.admin-module-scroll-region {
+  --admin-module-scroll-max-height: calc(100dvh - 11rem);
+  min-height: 0;
+  max-height: min(100%, var(--admin-module-scroll-max-height));
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+@media (max-width: 1024px) {
+  .admin-module-scroll-region {
+    --admin-module-scroll-max-height: calc(100dvh - 10rem);
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-module-scroll-region {
+    --admin-module-scroll-max-height: calc(100dvh - 8.75rem);
+  }
+}
+
 /* Modern sleek scrollbar - auto-show on scroll with fade effect */
 .modern-scrollbar {
   scrollbar-width: thin;

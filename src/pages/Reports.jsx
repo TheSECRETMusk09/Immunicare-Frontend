@@ -641,7 +641,7 @@ const Reports = () => {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex h-screen min-h-0 flex-col overflow-hidden">
       {/* Page Header - Fixed/Sticky at top */}
       <div className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6">
         <PageHeader
@@ -651,12 +651,16 @@ const Reports = () => {
         />
       </div>
 
-      <div className="flex-1 flex flex-col p-4 sm:px-6 sm:pb-6 pt-3 overflow-y-auto space-y-4">
-      {error && (
-        <Alert variant="error" className="flex-shrink-0" onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+      <div className="flex-1 min-h-0 overflow-hidden p-4 pt-3 sm:px-6 sm:pb-6">
+        <div
+          data-testid="reports-scroll-region"
+          className="admin-module-scroll-region modern-scrollbar flex h-full min-h-0 flex-col gap-4 scroll-smooth pr-1 sm:pr-2"
+        >
+          {error && (
+            <Alert variant="error" className="flex-shrink-0" onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
 
       {/* Admin Dashboard Summary */}
       {adminSummary && (
@@ -848,6 +852,7 @@ const Reports = () => {
         )}
       </Card>
 
+        </div>
       </div>
       {/* Generate Report Modal */}
       <Modal

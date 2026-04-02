@@ -205,13 +205,85 @@ const SHORTCUT_FORMAT_EXTENSION = Object.freeze({
   excel: "xlsx",
 });
 
-const formatDateToIsoDay = (value) => {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) {
+const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+const MONTH_ABBREVIATIONS = Object.freeze([
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+]);
+
+const padDatePart = (value) => String(value).padStart(2, "0");
+
+const buildLocalDate = (year, monthIndex, day) => {
+  const date = new Date(year, monthIndex, day);
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear() !== year ||
+    date.getMonth() !== monthIndex ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
+};
+
+const parseLocalDateValue = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return buildLocalDate(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+
+  const text = String(value).trim();
+  const dateOnlyMatch = text.match(DATE_ONLY_PATTERN);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return buildLocalDate(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return buildLocalDate(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+};
+
+const toLocalDateKey = (value) => {
+  const date = parseLocalDateValue(value);
+  if (!date) {
     return "";
   }
 
-  return date.toISOString().slice(0, 10);
+  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
+};
+
+const toMonthDayLabel = (value) => {
+  const normalizedKey = toLocalDateKey(value);
+  const match = normalizedKey.match(DATE_ONLY_PATTERN);
+  if (!match) {
+    return String(value || "");
+  }
+
+  const monthIndex = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  return `${MONTH_ABBREVIATIONS[monthIndex] || ""} ${day}`.trim();
+};
+
+const formatDateToIsoDay = (value) => {
+  return toLocalDateKey(value);
 };
 
 const resolveShortcutDateRange = (filters = {}) => {
@@ -225,21 +297,20 @@ const resolveShortcutDateRange = (filters = {}) => {
   }
 
   const end = new Date();
-  end.setHours(0, 0, 0, 0);
+  const today = parseLocalDateValue(end) || end;
 
-  const start = new Date(end);
+  const start = new Date(today);
   if (period === "today") {
     // same-day report range
   } else if (period === "week") {
     start.setDate(start.getDate() - 6);
   } else {
-    // default to 30-day analytics-aligned range
-    start.setDate(start.getDate() - 29);
+    start.setFullYear(today.getFullYear(), today.getMonth(), 1);
   }
 
   return {
     startDate: formatDateToIsoDay(start),
-    endDate: formatDateToIsoDay(end),
+    endDate: formatDateToIsoDay(today),
   };
 };
 
@@ -596,15 +667,7 @@ const toTitleCase = (value = "") => {
 
 const toDateLabel = (value) => {
   if (!value) return "";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return String(value);
-  }
-
-  return parsed.toLocaleDateString("en-PH", {
-    month: "short",
-    day: "numeric",
-  });
+  return toMonthDayLabel(value);
 };
 
 const normalizeResponsePayload = (response) => {
@@ -2457,7 +2520,9 @@ const TrendsSection = ({ data, loading, chartAppearance }) => {
               />
               <XAxis
                 dataKey="label"
+                interval="preserveStartEnd"
                 tickFormatter={formatTrendLabelTick}
+                tickMargin={8}
                 minTickGap={14}
                 tick={axisTick}
                 axisLine={axisLine}
@@ -2522,7 +2587,9 @@ const TrendsSection = ({ data, loading, chartAppearance }) => {
               />
               <XAxis
                 dataKey="label"
+                interval="preserveStartEnd"
                 tickFormatter={formatTrendLabelTick}
+                tickMargin={8}
                 minTickGap={14}
                 tick={axisTick}
                 axisLine={axisLine}

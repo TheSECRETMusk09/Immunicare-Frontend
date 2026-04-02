@@ -225,6 +225,10 @@ describe("Reports page backend contract alignment", () => {
     render(<Reports />);
 
     await screen.findByRole("heading", { name: /reports management/i });
+    expect(screen.getByTestId("reports-scroll-region")).toHaveClass(
+      "admin-module-scroll-region",
+      "modern-scrollbar",
+    );
 
     fireEvent.click(screen.getAllByRole("button", { name: /\+ generate new report/i })[0]);
 

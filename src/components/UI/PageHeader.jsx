@@ -18,6 +18,9 @@ import React from "react";
  * - Mobile (<768px): padding 16px 20px, title 20px
  */
 const PageHeader = ({ title, subtitle, actions, icon, className = "", glassmorphism = false }) => {
+  const getStandardIconClassName = (existingClassName = "") =>
+    `${existingClassName} w-6 h-6 sm:w-8 sm:h-8`.trim();
+
   // Render icon based on its type
   const renderIcon = () => {
     if (!icon) return null;
@@ -33,7 +36,16 @@ const PageHeader = ({ title, subtitle, actions, icon, className = "", glassmorph
 
     // If icon is a React element (JSX), clone it with consistent styling
     if (React.isValidElement(icon)) {
-      return <div className="page-header__icon text-xl sm:text-2xl">{icon}</div>;
+      const existingClassName =
+        typeof icon.props?.className === "string" ? icon.props.className : "";
+
+      return (
+        <div className="page-header__icon text-xl sm:text-2xl">
+          {React.cloneElement(icon, {
+            className: getStandardIconClassName(existingClassName),
+          })}
+        </div>
+      );
     }
 
     // If icon is a component reference (function/class), render it
@@ -41,7 +53,7 @@ const PageHeader = ({ title, subtitle, actions, icon, className = "", glassmorph
       const IconComponent = icon;
       return (
         <div className="page-header__icon text-xl sm:text-2xl">
-          <IconComponent className="w-6 h-6 sm:w-8 sm:h-8" />
+          <IconComponent className={getStandardIconClassName()} />
         </div>
       );
     }

@@ -60,6 +60,8 @@ const INVENTORY_TAB_CONFIG = [
   { key: "stock_movements", label: "Stock Movements" }
 ];
 
+const INVENTORY_TABLE_PAGE_SIZE = 20;
+
 const INVENTORY_DEFAULT_TAB_KEY = INVENTORY_TAB_CONFIG[0].key;
 const INVENTORY_TAB_STORAGE_KEY = "admin.inventory.activeTab";
 
@@ -178,6 +180,27 @@ const INVENTORY_PRINT_REPORT_OPTIONS = [
   {
     value: PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP,
     label: "RIS Form",
+  },
+];
+
+const INVENTORY_REPORT_DELIVERY_TYPES = Object.freeze({
+  PRINT: "print",
+  PDF: "pdf",
+  WORD: "word",
+});
+
+const INVENTORY_REPORT_DELIVERY_OPTIONS = [
+  {
+    value: INVENTORY_REPORT_DELIVERY_TYPES.PRINT,
+    label: "Print Preview",
+  },
+  {
+    value: INVENTORY_REPORT_DELIVERY_TYPES.PDF,
+    label: "PDF Document",
+  },
+  {
+    value: INVENTORY_REPORT_DELIVERY_TYPES.WORD,
+    label: "Word Document",
   },
 ];
 
@@ -935,6 +958,8 @@ function InventoryDisplayToolbarFilters({
   onFilterChange,
   onClearFilters,
   hasActiveFilters,
+  selectedReportType,
+  onReportTypeChange,
   showDivider = true,
 }) {
   return (
@@ -981,6 +1006,16 @@ function InventoryDisplayToolbarFilters({
         className="text-sm"
         containerClassName="w-full sm:w-[188px] xl:w-[172px]"
       />
+      {typeof onReportTypeChange === "function" ? (
+        <Select
+          label="Report Format"
+          value={selectedReportType}
+          onChange={(event) => onReportTypeChange(event.target.value)}
+          options={INVENTORY_PRINT_REPORT_OPTIONS}
+          className="text-sm"
+          containerClassName="w-full sm:w-[220px] xl:w-[196px]"
+        />
+      ) : null}
       <div className="flex items-center gap-2 self-end">
         <Button
           variant="ghost"
@@ -1077,6 +1112,11 @@ function InventoryActiveTabToolbarFilters({
   onStockMovementFilterChange,
   onClearStockMovementFilters,
   hasActiveStockMovementFilters,
+  selectedReportType,
+  onReportTypeChange,
+  onSaveInventory,
+  onPrintReport,
+  onGenerateReport,
   showDivider = true,
 }) {
   if (activeTab === "stock_movements") {
@@ -1093,15 +1133,167 @@ function InventoryActiveTabToolbarFilters({
     );
   }
 
-  return (
+  const inventoryControls = (
     <InventoryDisplayToolbarFilters
       filters={inventoryFilters}
       vaccineOptions={inventoryVaccineOptions}
       onFilterChange={onInventoryFilterChange}
       onClearFilters={onClearInventoryFilters}
       hasActiveFilters={hasActiveInventoryFilters}
+      selectedReportType={selectedReportType}
+      onReportTypeChange={onReportTypeChange}
       showDivider={showDivider}
     />
+  );
+
+  if (activeTab !== "inventory_sheet") {
+    return inventoryControls;
+  }
+
+  return (
+    <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3 xl:justify-end">
+      {inventoryControls}
+      <div className="flex items-center gap-2 self-end">
+        {typeof onSaveInventory === "function" ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onSaveInventory}
+            className="min-h-[40px] whitespace-nowrap"
+          >
+            Save Inventory
+          </Button>
+        ) : null}
+        {typeof onPrintReport === "function" ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => onPrintReport()}
+            className="min-h-[40px] whitespace-nowrap"
+          >
+            Print Report
+          </Button>
+        ) : null}
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={onGenerateReport}
+          className="min-h-[40px] whitespace-nowrap"
+        >
+          Generate Report
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function InventoryHeaderTabs({
+  activeTab,
+  onTabChange,
+  criticalAlertCount = 0,
+}) {
+  return (
+    <div className="flex space-x-2 overflow-x-auto rounded-xl border border-white/10 bg-white/20 p-1.5 backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800/50">
+      <button
+        onClick={() => onTabChange("inventory_sheet")}
+        aria-pressed={activeTab === "inventory_sheet"}
+        data-tab-key="inventory_sheet"
+        className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
+          activeTab === "inventory_sheet"
+            ? "bg-white text-blue-600 shadow-sm"
+            : "text-white/80 hover:bg-white/10 hover:text-white"
+        }`}
+      >
+        Inventory Sheet
+      </button>
+      <button
+        onClick={() => onTabChange("inventory_summary")}
+        aria-pressed={activeTab === "inventory_summary"}
+        data-tab-key="inventory_summary"
+        className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
+          activeTab === "inventory_summary"
+            ? "bg-white text-blue-600 shadow-sm"
+            : "text-white/80 hover:bg-white/10 hover:text-white"
+        }`}
+      >
+        <span>Inventory Summary</span>
+        {criticalAlertCount > 0 ? (
+          <span
+            className={`ml-2 inline-flex rounded-full px-2 py-0.5 text-xs ${
+              activeTab === "inventory_summary"
+                ? "bg-red-100 text-red-600"
+                : "bg-white/20 text-white"
+            }`}
+          >
+            {criticalAlertCount}
+          </span>
+        ) : null}
+      </button>
+      <button
+        onClick={() => onTabChange("stock_movements")}
+        aria-pressed={activeTab === "stock_movements"}
+        data-tab-key="stock_movements"
+        className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
+          activeTab === "stock_movements"
+            ? "bg-white text-blue-600 shadow-sm"
+            : "text-white/80 hover:bg-white/10 hover:text-white"
+        }`}
+      >
+        Stock Movements
+      </button>
+    </div>
+  );
+}
+
+function InventoryPaginationFooter({
+  currentPage,
+  itemsPerPage,
+  totalItems,
+  itemLabel,
+  onPrevious,
+  onNext,
+  className = "",
+  testId,
+}) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+
+  if (totalItems === 0 || totalPages <= 1) {
+    return null;
+  }
+
+  const startIndex = (currentPage - 1) * itemsPerPage + 1;
+  const endIndex = Math.min(currentPage * itemsPerPage, totalItems);
+
+  return (
+    <div
+      data-testid={testId}
+      className={`flex flex-shrink-0 items-center justify-between border-t border-gray-200 bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-800 ${className}`.trim()}
+    >
+      <div className="text-sm text-gray-500 dark:text-gray-400">
+        Showing {startIndex} to {endIndex} of {totalItems} {itemLabel}
+      </div>
+      <div className="flex gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onPrevious}
+          disabled={currentPage === 1}
+        >
+          Previous
+        </Button>
+        <span className="flex items-center px-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Page {currentPage} of {totalPages}
+        </span>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onNext}
+          disabled={currentPage === totalPages}
+        >
+          Next
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -1111,10 +1303,26 @@ function StockMovementsPanel({
   error,
   onRetry,
 }) {
+  const [currentPage, setCurrentPage] = useState(1);
   const summary = useMemo(
     () => summarizeStockMovements(movements),
     [movements],
   );
+  const totalPages = Math.max(
+    1,
+    Math.ceil(movements.length / INVENTORY_TABLE_PAGE_SIZE),
+  );
+  const paginatedMovements = useMemo(() => {
+    const startIndex = (currentPage - 1) * INVENTORY_TABLE_PAGE_SIZE;
+    return movements.slice(
+      startIndex,
+      startIndex + INVENTORY_TABLE_PAGE_SIZE,
+    );
+  }, [currentPage, movements]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [movements]);
 
   if (loading && movements.length === 0) {
     return (
@@ -1193,12 +1401,10 @@ function StockMovementsPanel({
         </div>
 
         <div
-          className="overflow-x-auto"
+          className="flex-1 min-h-0 overflow-auto auto-hide-scrollbar"
+          data-testid="stock-movements-scroll-region"
         >
-          <div
-            className="modern-scrollbar min-h-0 max-h-[min(62vh,36rem)] overflow-y-auto"
-            data-testid="stock-movements-scroll-region"
-          >
+          <div className="min-w-full">
             <table className="min-w-full">
               <thead className="sticky top-0 z-10 bg-white shadow-sm dark:bg-gray-900">
                 <tr>
@@ -1239,7 +1445,7 @@ function StockMovementsPanel({
                     </td>
                   </tr>
                 ) : (
-                  movements.map((movement) => {
+                  paginatedMovements.map((movement) => {
                     const typeMeta = getInventoryMovementTypeMeta(
                       movement.transaction_type,
                     );
@@ -1313,6 +1519,17 @@ function StockMovementsPanel({
             </table>
           </div>
         </div>
+        <InventoryPaginationFooter
+          testId="stock-movements-pagination"
+          currentPage={currentPage}
+          itemsPerPage={INVENTORY_TABLE_PAGE_SIZE}
+          totalItems={movements.length}
+          itemLabel="entries"
+          onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+          onNext={() =>
+            setCurrentPage((page) => Math.min(totalPages, page + 1))
+          }
+        />
       </Card>
     </div>
   );
@@ -4736,6 +4953,7 @@ export default function InventoryManagement() {
   const [stockAlertFeedback, setStockAlertFeedback] = useState(null);
   const [stockAlertLoadError, setStockAlertLoadError] = useState(null);
   const [stockAlertsLoading, setStockAlertsLoading] = useState(false);
+  const [stockAlertWorkflowPage, setStockAlertWorkflowPage] = useState(1);
   const [pendingBulkStockAlertAction, setPendingBulkStockAlertAction] =
     useState(null);
   const [isSubmittingBulkStockAlertAction, setIsSubmittingBulkStockAlertAction] =
@@ -4758,6 +4976,11 @@ export default function InventoryManagement() {
   const [selectedExportReportType, setSelectedExportReportType] = useState(
     normalizeInventoryReportType(PRINT_REPORT_TYPES.INVENTORY_SHEET),
   );
+  const [selectedReportDeliveryType, setSelectedReportDeliveryType] = useState(
+    INVENTORY_REPORT_DELIVERY_TYPES.PRINT,
+  );
+  const [isGenerateReportModalOpen, setIsGenerateReportModalOpen] =
+    useState(false);
   const activePrintReportTypeRef = useRef(null);
   const printPageStyleRef = useRef(null);
 
@@ -6164,6 +6387,22 @@ export default function InventoryManagement() {
       ),
     [persistedStockAlerts],
   );
+  const stockAlertWorkflowTotalPages = Math.max(
+    1,
+    Math.ceil(persistedStockAlerts.length / INVENTORY_TABLE_PAGE_SIZE),
+  );
+  const paginatedPersistedStockAlerts = useMemo(() => {
+    const startIndex =
+      (stockAlertWorkflowPage - 1) * INVENTORY_TABLE_PAGE_SIZE;
+    return persistedStockAlerts.slice(
+      startIndex,
+      startIndex + INVENTORY_TABLE_PAGE_SIZE,
+    );
+  }, [persistedStockAlerts, stockAlertWorkflowPage]);
+
+  useEffect(() => {
+    setStockAlertWorkflowPage(1);
+  }, [persistedStockAlerts]);
 
   const openBulkStockAlertConfirmation = useCallback(
     (action) => {
@@ -6255,7 +6494,7 @@ export default function InventoryManagement() {
     }
 
     return (
-      <Card className="flex flex-col overflow-hidden p-4 dark:bg-gray-800 dark:border-gray-700">
+      <Card className="flex min-h-0 flex-col overflow-hidden p-4 dark:bg-gray-800 dark:border-gray-700">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <div>
@@ -6324,11 +6563,11 @@ export default function InventoryManagement() {
         )}
 
         <div
-          className="modern-scrollbar mt-4 max-h-[min(58vh,32rem)] overflow-auto"
+          className="auto-hide-scrollbar mt-4 min-h-0 max-h-[min(52vh,30rem)] overflow-auto"
           data-testid="inventory-summary-workflow-scroll-region"
         >
           <table className="w-full text-xs">
-            <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700/40">
+            <thead className="sticky top-0 z-[1] bg-gray-50 dark:bg-gray-700/40">
               <tr>
                 <th className="bg-gray-50 px-3 py-2 text-left text-gray-700 dark:bg-gray-700/40 dark:text-gray-300">
                   Vaccine
@@ -6354,7 +6593,7 @@ export default function InventoryManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {persistedStockAlerts.map((alert) => (
+              {paginatedPersistedStockAlerts.map((alert) => (
                 <tr key={alert.id} className="dark:bg-gray-800/40">
                   <td className="px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
                     {alert.vaccine_name}
@@ -6408,14 +6647,30 @@ export default function InventoryManagement() {
             </div>
           )}
         </div>
+        <InventoryPaginationFooter
+          testId="inventory-summary-workflow-pagination"
+          className="-mx-4 -mb-4 mt-4"
+          currentPage={stockAlertWorkflowPage}
+          itemsPerPage={INVENTORY_TABLE_PAGE_SIZE}
+          totalItems={persistedStockAlerts.length}
+          itemLabel="alerts"
+          onPrevious={() =>
+            setStockAlertWorkflowPage((page) => Math.max(1, page - 1))
+          }
+          onNext={() =>
+            setStockAlertWorkflowPage((page) =>
+              Math.min(stockAlertWorkflowTotalPages, page + 1),
+            )
+          }
+        />
       </Card>
     );
   };
 
-  // Use filtered inventory for print/export when filtering is active
+  // Use the currently displayed inventory rows for report generation/export
   const printRows = useMemo(
-    () => buildInventoryPrintRows(isFiltering ? filteredInventory : inventory),
-    [inventory, filteredInventory, isFiltering],
+    () => buildInventoryPrintRows(displayedInventory),
+    [displayedInventory],
   );
 
   const printTotals = useMemo(
@@ -6424,36 +6679,26 @@ export default function InventoryManagement() {
   );
 
   const reportRows = useMemo(
-    () =>
-      buildDohLguReportRows(
-        isFiltering ? filteredInventoryReportSource : inventoryReportSource,
-      ),
-    [inventoryReportSource, filteredInventoryReportSource, isFiltering],
+    () => buildDohLguReportRows(displayedInventoryReportSource),
+    [displayedInventoryReportSource],
   );
 
   const risReportRows = useMemo(
-    () =>
-      buildRisReportRows(
-        isFiltering ? filteredInventoryReportSource : inventoryReportSource,
-      ),
-    [inventoryReportSource, filteredInventoryReportSource, isFiltering],
+    () => buildRisReportRows(displayedInventoryReportSource),
+    [displayedInventoryReportSource],
   );
 
   const risControlNumber = useMemo(
     () =>
       resolveRisControlNumber({
         facilityInfo,
-        inventoryRows: isFiltering
-          ? filteredInventoryReportSource
-          : inventoryReportSource,
+        inventoryRows: displayedInventoryReportSource,
         reportDate,
         clinicId: fallbackClinicId,
       }),
     [
       facilityInfo,
-      filteredInventoryReportSource,
-      inventoryReportSource,
-      isFiltering,
+      displayedInventoryReportSource,
       reportDate,
       fallbackClinicId,
     ],
@@ -6619,8 +6864,39 @@ export default function InventoryManagement() {
     selectedExportReportType,
   ]);
 
-  const handleSelectedReportPrint = () => {
-    printReport(normalizeInventoryReportType(selectedExportReportType));
+  const handleSelectedReportPrint = (reportTypeOverride) => {
+    printReport(
+      normalizeInventoryReportType(
+        reportTypeOverride ?? selectedExportReportType,
+      ),
+    );
+  };
+
+  const handleGenerateReportFromModal = async () => {
+    const selectedReportType = normalizeInventoryReportType(
+      selectedExportReportType,
+    );
+    const selectedDeliveryType = selectedReportDeliveryType;
+
+    if (!printDateRange.ensureReadyForPrint()) {
+      return;
+    }
+
+    setIsGenerateReportModalOpen(false);
+
+    if (selectedDeliveryType === INVENTORY_REPORT_DELIVERY_TYPES.PDF) {
+      await downloadSelectedPdf(selectedReportType);
+      return;
+    }
+
+    if (selectedDeliveryType === INVENTORY_REPORT_DELIVERY_TYPES.WORD) {
+      await downloadSelectedWord(selectedReportType);
+      return;
+    }
+
+    setTimeout(() => {
+      handleSelectedReportPrint(selectedReportType);
+    }, 0);
   };
 
   const activePrintReportMarkup =
@@ -6695,16 +6971,18 @@ export default function InventoryManagement() {
           icon={<span className="text-2xl drop-shadow-md">💉</span>}
           className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 rounded-xl sm:rounded-2xl text-white shadow-lg w-full border-0"
           actions={
-            <div className="flex flex-wrap gap-2">
-              {/* No export buttons here - moved to filter row */}
-            </div>
+            <InventoryHeaderTabs
+              activeTab={resolvedActiveTab}
+              onTabChange={handleTabChange}
+              criticalAlertCount={stockAlerts.critical.length}
+            />
           }
         />
 
         {/* Tab Navigation */}
-        <div className="mt-4 rounded-t-xl rounded-b-none border border-b-0 border-gray-200 bg-white/90 p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/90">
-          <div className="flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-end xl:justify-between">
-            <div className="min-w-0 overflow-x-auto">
+        <div className="mt-4 rounded-xl border border-gray-200 bg-white/90 p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/90">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="hidden">
               <div className="inline-flex min-w-max gap-2 rounded-xl bg-gray-100 p-1.5 dark:bg-gray-900/70">
                 <button
             onClick={() => handleTabChange("inventory_sheet")}
@@ -6755,26 +7033,46 @@ export default function InventoryManagement() {
           </button>
         </div>
       </div>
+            <InventoryActiveTabToolbarFilters
+              activeTab={resolvedActiveTab}
+              inventoryFilters={inventoryDisplayFilters}
+              inventoryVaccineOptions={inventoryFilterVaccineOptions}
+              onInventoryFilterChange={updateInventoryDisplayFilter}
+              onClearInventoryFilters={clearInventoryDisplayFilters}
+              hasActiveInventoryFilters={hasActiveInventoryDisplayFilters}
+              stockMovementFilters={stockMovementFilters}
+              stockMovementTypeOptions={stockMovementTypeOptions}
+              stockMovementVaccineOptions={stockMovementVaccineOptions}
+              onStockMovementFilterChange={updateStockMovementFilter}
+              onClearStockMovementFilters={clearStockMovementFilters}
+              hasActiveStockMovementFilters={hasActiveStockMovementFilters}
+              selectedReportType={selectedExportReportType}
+              onReportTypeChange={(value) =>
+                setSelectedExportReportType(
+                  normalizeInventoryReportType(value),
+                )
+              }
+              onSaveInventory={
+                resolvedActiveTab === "inventory_sheet"
+                  ? handleSaveInventorySheet
+                  : undefined
+              }
+              onPrintReport={
+                resolvedActiveTab === "inventory_sheet"
+                  ? handleSelectedReportPrint
+                  : undefined
+              }
+              onGenerateReport={() => {
+                setSelectedReportDeliveryType(
+                  INVENTORY_REPORT_DELIVERY_TYPES.PRINT,
+                );
+                setIsGenerateReportModalOpen(true);
+              }}
+              showDivider={false}
+            />
           </div>
         </div>
 
-      <div className="-mt-4 rounded-b-xl rounded-t-none border border-gray-200 bg-white/90 px-3 pb-3 pt-2 shadow-sm dark:border-gray-700 dark:bg-gray-800/90 print:hidden">
-        <InventoryActiveTabToolbarFilters
-          activeTab={resolvedActiveTab}
-          inventoryFilters={inventoryDisplayFilters}
-          inventoryVaccineOptions={inventoryFilterVaccineOptions}
-          onInventoryFilterChange={updateInventoryDisplayFilter}
-          onClearInventoryFilters={clearInventoryDisplayFilters}
-          hasActiveInventoryFilters={hasActiveInventoryDisplayFilters}
-          stockMovementFilters={stockMovementFilters}
-          stockMovementTypeOptions={stockMovementTypeOptions}
-          stockMovementVaccineOptions={stockMovementVaccineOptions}
-          onStockMovementFilterChange={updateStockMovementFilter}
-          onClearStockMovementFilters={clearStockMovementFilters}
-          hasActiveStockMovementFilters={hasActiveStockMovementFilters}
-          showDivider={false}
-        />
-      </div>
       </div>
 
       {activePrintReportMarkup ? (
@@ -6788,161 +7086,13 @@ export default function InventoryManagement() {
           data-testid="inventory-sheet-panel"
           className="inventory-sheet-print-area space-y-3 print:space-y-1"
         >
-          <div className="print:hidden">
-            <div className="rounded-2xl border border-gray-200 bg-white/90 p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/90">
-              <div className="flex flex-wrap items-end gap-3 xl:flex-nowrap xl:gap-2.5">
-                <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3 xl:flex-nowrap xl:gap-2.5">
-                  <Input
-                    id="inventory-report-date-toolbar"
-                    label="Report Date"
-                    aria-label="Report Date"
-                    type="date"
-                    value={reportDate}
-                    onChange={(e) => setReportDate(e.target.value)}
-                    className="text-sm"
-                    containerClassName="w-full sm:w-[164px] xl:w-[144px] 2xl:w-[152px]"
-                  />
-
-                  <Input
-                    label="Start Date"
-                    aria-label="Start Date"
-                    type="date"
-                    value={printDateRange.startDateInput}
-                    onChange={(event) =>
-                      printDateRange.setStartDateInput(event.target.value)
-                    }
-                    className={`text-sm ${printDateRange.validationError ? "border-danger-300 focus:border-danger-500 focus:ring-danger-500" : ""}`.trim()}
-                    containerClassName="w-full sm:w-[164px] xl:w-[144px] 2xl:w-[152px]"
-                  />
-
-                  <Input
-                    label="End Date"
-                    aria-label="End Date"
-                    type="date"
-                    value={printDateRange.endDateInput}
-                    onChange={(event) =>
-                      printDateRange.setEndDateInput(event.target.value)
-                    }
-                    className={`text-sm ${printDateRange.validationError ? "border-danger-300 focus:border-danger-500 focus:ring-danger-500" : ""}`.trim()}
-                    containerClassName="w-full sm:w-[164px] xl:w-[144px] 2xl:w-[152px]"
-                  />
-
-                  <div className="flex flex-wrap items-center gap-2 self-end xl:flex-nowrap">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={printDateRange.applyDateRange}
-                      className="min-h-[40px] whitespace-nowrap"
-                    >
-                      Apply Range
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={printDateRange.clearDateRange}
-                      className="min-h-[40px] whitespace-nowrap"
-                    >
-                      Clear
-                    </Button>
-                  </div>
-
-                  <Select
-                    label="Report Format"
-                    aria-label="Report Format"
-                    value={selectedExportReportType}
-                    onChange={(event) =>
-                      setSelectedExportReportType(
-                        normalizeInventoryReportType(event.target.value),
-                      )
-                    }
-                    options={INVENTORY_PRINT_REPORT_OPTIONS}
-                    className="text-sm"
-                    containerClassName="w-full sm:w-[210px] xl:w-[188px] 2xl:w-[200px]"
-                  />
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 xl:ml-auto xl:flex-nowrap xl:justify-end">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={handleSaveInventorySheet}
-                    className="min-h-[40px] whitespace-nowrap"
-                  >
-                    Save Inventory
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleSelectedReportPrint}
-                    className="min-h-[40px] whitespace-nowrap"
-                  >
-                    Print Report
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={downloadSelectedPdf}
-                    className="min-h-[40px] whitespace-nowrap"
-                  >
-                    Download PDF
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={downloadSelectedWord}
-                    className="min-h-[40px] whitespace-nowrap"
-                  >
-                    Download Word
-                  </Button>
-                </div>
+          {printDateRange.hasAppliedDateRange ? (
+            <div className="print:hidden flex flex-wrap items-center justify-end gap-2">
+              <div className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+                {printDateRange.activeDateRangeLabel}
               </div>
             </div>
-
-            <div className="mt-3 flex flex-wrap items-center gap-2 px-1">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => downloadSelectedPdf(PRINT_REPORT_TYPES.INVENTORY_SHEET)}
-                className="min-h-[40px] whitespace-nowrap"
-              >
-                Download Inventory Sheet PDF
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => downloadSelectedPdf(PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM)}
-                className="min-h-[40px] whitespace-nowrap"
-              >
-                Download DOH/LGU PDF
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => downloadSelectedPdf(PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP)}
-                className="min-h-[40px] whitespace-nowrap"
-              >
-                Download RIS PDF
-              </Button>
-            </div>
-
-            <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
-              {printDateRange.validationError ? (
-                <p className="text-sm font-medium text-danger-600 dark:text-danger-400">
-                  {printDateRange.validationError}
-                </p>
-              ) : (
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Leave both dates blank to include all available records. After changing the dates, click Apply Range before printing or exporting.
-                </p>
-              )}
-
-              {printDateRange.hasAppliedDateRange && (
-                <div className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
-                  {printDateRange.activeDateRangeLabel}
-                </div>
-              )}
-            </div>
-          </div>
+          ) : null}
 
            {/* Report Date and Date Range Filter - Hidden on Print, Visible on Screen */}
           <div className="hidden" hidden aria-hidden="true">
@@ -7098,59 +7248,79 @@ export default function InventoryManagement() {
 
           {/* Paper Configuration Inventory Table */}
           <Card className="overflow-hidden p-0 print:shadow-none print:border-none dark:bg-gray-800 dark:border-gray-700">
-            <div className="overflow-auto print:overflow-visible">
+            <div className="overflow-x-auto overflow-y-visible print:overflow-visible">
               <table
                 className="w-full border-collapse text-xs sm:text-sm"
                 id="inventory-table"
               >
                 <thead>
                   <tr className="bg-gray-200 dark:bg-gray-700 print:bg-gray-300">
-                    <th className="px-2 py-1 text-center font-bold border border-black dark:border-gray-500 text-gray-900 dark:text-gray-100">
+                    <th
+                      className="sticky top-0 z-10 border border-black bg-gray-200 px-2 py-1 text-center font-bold text-gray-900 dark:border-gray-500 dark:bg-gray-700 dark:text-gray-100 print:bg-gray-300"
+                    >
                       A
                     </th>
-                    <th className="px-2 py-1 text-left font-bold border border-black dark:border-gray-500 min-w-[100px] text-gray-900 dark:text-gray-100">
+                    <th
+                      className="sticky top-0 z-10 min-w-[100px] border border-black bg-gray-200 px-2 py-1 text-left font-bold text-gray-900 dark:border-gray-500 dark:bg-gray-700 dark:text-gray-100 print:bg-gray-300"
+                    >
                       ITEMS
                     </th>
-                    <th className="px-2 py-1 text-center font-bold border border-black dark:border-gray-500 w-12 bg-blue-100 dark:bg-blue-900/50">
+                    <th
+                      className="sticky top-0 z-10 w-12 border border-black bg-blue-100 px-2 py-1 text-center font-bold dark:border-gray-500 dark:bg-blue-900/50"
+                    >
                       B
                       <br />
                       Beginning
                       <br />
                       Balance
                     </th>
-                    <th className="px-2 py-1 text-center font-bold border border-black dark:border-gray-500 w-12 bg-green-100 dark:bg-green-900/50">
+                    <th
+                      className="sticky top-0 z-10 w-12 border border-black bg-green-100 px-2 py-1 text-center font-bold dark:border-gray-500 dark:bg-green-900/50"
+                    >
                       C
                       <br />
                       Received
                     </th>
-                    <th className="px-2 py-1 text-center font-bold border border-black dark:border-gray-500 w-16 bg-gray-100 dark:bg-gray-700">
+                    <th
+                      className="sticky top-0 z-10 w-16 border border-black bg-gray-100 px-2 py-1 text-center font-bold dark:border-gray-500 dark:bg-gray-700"
+                    >
                       Lot /
                       <br />
                       Batch Number
                     </th>
-                    <th className="px-2 py-1 text-center font-bold border border-black dark:border-gray-500 w-10 bg-gray-100 dark:bg-gray-700">
+                    <th
+                      className="sticky top-0 z-10 w-10 border border-black bg-gray-100 px-2 py-1 text-center font-bold dark:border-gray-500 dark:bg-gray-700"
+                    >
                       Stock Movement
                       <br />
                       (In / Out)
                     </th>
-                    <th className="px-2 py-1 text-center font-bold border border-black dark:border-gray-500 w-10 bg-red-50 dark:bg-red-900/30 text-gray-900 dark:text-gray-100">
+                    <th
+                      className="sticky top-0 z-10 w-10 border border-black bg-red-50 px-2 py-1 text-center font-bold text-gray-900 dark:border-gray-500 dark:bg-red-900/30 dark:text-gray-100"
+                    >
                       Expired /
                       <br />
                       Wasted
                     </th>
-                    <th className="px-2 py-1 text-center font-bold border border-black dark:border-gray-500 w-12 bg-blue-200 dark:bg-blue-800/50">
+                    <th
+                      className="sticky top-0 z-10 w-12 border border-black bg-blue-200 px-2 py-1 text-center font-bold dark:border-gray-500 dark:bg-blue-800/50"
+                    >
                       G
                       <br />
                       Total
                       <br />
                       Available
                     </th>
-                    <th className="px-2 py-1 text-center font-bold border border-black dark:border-gray-500 w-10 bg-yellow-100 dark:bg-yellow-900/50">
+                    <th
+                      className="sticky top-0 z-10 w-10 border border-black bg-yellow-100 px-2 py-1 text-center font-bold dark:border-gray-500 dark:bg-yellow-900/50"
+                    >
                       H
                       <br />
                       Issued
                     </th>
-                    <th className="px-2 py-1 text-center font-bold border border-black dark:border-gray-500 w-12 bg-green-200 dark:bg-green-800/50">
+                    <th
+                      className="sticky top-0 z-10 w-12 border border-black bg-green-200 px-2 py-1 text-center font-bold dark:border-gray-500 dark:bg-green-800/50"
+                    >
                       I+J
                       <br />
                       Stock On
@@ -7158,7 +7328,7 @@ export default function InventoryManagement() {
                       Hand
                     </th>
                     <th
-                      className="px-1 py-1 text-center font-bold border border-black dark:border-gray-500 w-8 print:hidden text-gray-900 dark:text-gray-100"
+                      className="sticky top-0 z-10 w-8 border border-black bg-gray-200 px-1 py-1 text-center font-bold text-gray-900 dark:border-gray-500 dark:bg-gray-700 dark:text-gray-100 print:hidden print:bg-gray-300"
                       colSpan={3}
                     >
                       Act
@@ -7410,7 +7580,7 @@ export default function InventoryManagement() {
           >
             {/* Alert Summary Cards */}
             <div
-              className="sticky top-0 z-10 bg-gray-50/95 pb-4 backdrop-blur dark:bg-gray-900/95"
+              className="sticky top-0 z-20 bg-gray-50/95 pb-4 backdrop-blur dark:bg-gray-900/95"
               data-testid="inventory-summary-alert-cards-sticky"
             >
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -7755,6 +7925,136 @@ export default function InventoryManagement() {
           />
         </section>
       )}
+
+      <Modal
+        isOpen={isGenerateReportModalOpen}
+        onClose={() => setIsGenerateReportModalOpen(false)}
+        title="Generate Report"
+        size="md"
+        footer={
+          <AdminModalActions>
+            <Button
+              variant="cancel"
+              type="button"
+              onClick={() => setIsGenerateReportModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              type="button"
+              onClick={handleGenerateReportFromModal}
+            >
+              Generate Report
+            </Button>
+          </AdminModalActions>
+        }
+      >
+        <div className="space-y-5">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Select
+              label="Report Type *"
+              value={selectedExportReportType}
+              onChange={(event) =>
+                setSelectedExportReportType(
+                  normalizeInventoryReportType(event.target.value),
+                )
+              }
+              options={INVENTORY_PRINT_REPORT_OPTIONS}
+            />
+            <Select
+              label="Format *"
+              value={selectedReportDeliveryType}
+              onChange={(event) =>
+                setSelectedReportDeliveryType(event.target.value)
+              }
+              options={INVENTORY_REPORT_DELIVERY_OPTIONS}
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <Input
+              label="Report Date"
+              aria-label="Report Date"
+              type="date"
+              value={reportDate}
+              onChange={(event) => setReportDate(event.target.value)}
+            />
+            <Input
+              label="Start Date"
+              aria-label="Start Date"
+              type="date"
+              value={printDateRange.startDateInput}
+              onChange={(event) =>
+                printDateRange.setStartDateInput(event.target.value)
+              }
+              className={
+                printDateRange.validationError
+                  ? "border-danger-300 focus:border-danger-500 focus:ring-danger-500"
+                  : ""
+              }
+            />
+            <Input
+              label="End Date"
+              aria-label="End Date"
+              type="date"
+              value={printDateRange.endDateInput}
+              onChange={(event) =>
+                printDateRange.setEndDateInput(event.target.value)
+              }
+              className={
+                printDateRange.validationError
+                  ? "border-danger-300 focus:border-danger-500 focus:ring-danger-500"
+                  : ""
+              }
+            />
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-800/70">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  type="button"
+                  onClick={printDateRange.applyDateRange}
+                  className="min-h-[40px] whitespace-nowrap"
+                >
+                  Apply Range
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  onClick={printDateRange.clearDateRange}
+                  className="min-h-[40px] whitespace-nowrap"
+                >
+                  Clear Range
+                </Button>
+              </div>
+
+              {printDateRange.hasAppliedDateRange ? (
+                <div className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+                  {printDateRange.activeDateRangeLabel}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Leave both dates blank to include all available records.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {printDateRange.validationError ? (
+            <Alert variant="error">{printDateRange.validationError}</Alert>
+          ) : null}
+
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Reports use the current Inventory Sheet data and the active table
+            filters already applied on the page.
+          </p>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={Boolean(pendingBulkStockAlertAction)}

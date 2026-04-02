@@ -209,7 +209,7 @@ export default function DigitalPapersDashboard() {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex h-screen min-h-0 flex-col overflow-hidden">
       {/* Header */}
       <div className="flex-shrink-0 sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6">
         <PageHeader
@@ -264,57 +264,64 @@ export default function DigitalPapersDashboard() {
         />
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 sm:px-6 sm:pb-6 pt-6 space-y-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-4 flex-shrink-0">
-        <Card className="p-6 text-center">
-          <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
-            Total Templates
-          </h3>
-          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-2">
-            {stats.totalTemplates}
-          </p>
-        </Card>
-        <Card className="p-6 text-center">
-          <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
-            Total Downloads
-          </h3>
-          <p className="text-2xl font-bold text-success-600 mt-2">
-            {stats.totalDownloads}
-          </p>
-        </Card>
-        <Card className="p-6 text-center">
-          <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
-            Pending Completions
-          </h3>
-          <p className="text-2xl font-bold text-warning-600 mt-2">
-            {stats.pendingCompletions}
-          </p>
-        </Card>
-        <Card className="p-6 text-center">
-          <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
-            Recent Activity
-          </h3>
-          <p className="text-2xl font-bold text-primary-600 mt-2">
-            {stats.recentActivity.length}
-          </p>
-        </Card>
-      </div>
+      <div className="flex-1 min-h-0 overflow-hidden p-4 pt-6 sm:px-6 sm:pb-6">
+        <div className="flex h-full min-h-0 flex-col gap-6">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-4 flex-shrink-0">
+            <Card className="p-6 text-center">
+              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Total Templates
+              </h3>
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-2">
+                {stats.totalTemplates}
+              </p>
+            </Card>
+            <Card className="p-6 text-center">
+              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Total Downloads
+              </h3>
+              <p className="text-2xl font-bold text-success-600 mt-2">
+                {stats.totalDownloads}
+              </p>
+            </Card>
+            <Card className="p-6 text-center">
+              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Pending Completions
+              </h3>
+              <p className="text-2xl font-bold text-warning-600 mt-2">
+                {stats.pendingCompletions}
+              </p>
+            </Card>
+            <Card className="p-6 text-center">
+              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Recent Activity
+              </h3>
+              <p className="text-2xl font-bold text-primary-600 mt-2">
+                {stats.recentActivity.length}
+              </p>
+            </Card>
+          </div>
 
-        {/* Active Tab Content */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden p-6 flex-shrink-0">
-          {activeTab === "paper_configuration" && (
-            <PaperConfiguration onRefresh={fetchStats} />
-          )}
-          {activeTab === "download_center" && (
-            <DownloadCenter onRefresh={fetchStats} />
-          )}
-          {activeTab === "monitoring_dashboard" && (
-            <MonitoringDashboard onRefresh={fetchStats} />
-          )}
-          {activeTab === "document_templates" && (
-            <DocumentTemplates onRefresh={fetchStats} />
-          )}
+          {/* Active Tab Content */}
+          <div className="flex-1 min-h-0 bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden p-6">
+            <div
+              data-testid="digital-papers-scroll-region"
+              className="admin-module-scroll-region modern-scrollbar h-full min-h-0 scroll-smooth pr-1 sm:pr-2"
+            >
+              {activeTab === "paper_configuration" && (
+                <PaperConfiguration onRefresh={fetchStats} />
+              )}
+              {activeTab === "download_center" && (
+                <DownloadCenter onRefresh={fetchStats} />
+              )}
+              {activeTab === "monitoring_dashboard" && (
+                <MonitoringDashboard onRefresh={fetchStats} />
+              )}
+              {activeTab === "document_templates" && (
+                <DocumentTemplates onRefresh={fetchStats} />
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

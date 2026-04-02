@@ -756,7 +756,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
 
       <div className="flex-1 flex flex-col p-4 sm:px-6 sm:pb-6 pt-3 overflow-hidden">
         {activeView === "transfer-in" ? (
-          <div className="flex-1 overflow-auto animate-fade-in -mx-4 sm:-mx-6 -mb-6 px-4 sm:px-6 pb-6">
+          <div className="flex-1 min-h-0 overflow-hidden animate-fade-in -mx-4 sm:-mx-6 -mb-6 px-4 sm:px-6 pb-6">
             <TransferInCases
               ref={transferInCasesRef}
               showHeader={false}

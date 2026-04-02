@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
@@ -36,6 +36,35 @@ const renderInventoryRoute = (initialEntry) =>
       </Routes>
     </MemoryRouter>,
   );
+
+const createStockMovement = (id) => ({
+  id,
+  transaction_type: id % 3 === 0 ? "ISSUE" : "RECEIVE",
+  created_at: `2026-03-${String((id % 28) + 1).padStart(2, "0")}T08:00:00.000Z`,
+  vaccine_name: `Vaccine ${id}`,
+  quantity: id % 3 === 0 ? -id : id,
+  previous_balance: 500 + id,
+  new_balance: 500,
+  lot_batch_number: `LOT-${String(id).padStart(3, "0")}`,
+  reference_number: `REF-${String(id).padStart(3, "0")}`,
+  notes: `Movement ${id}`,
+  performed_by_name: "Admin User",
+  performed_by_username: "admin.user",
+  performed_by_role: "SYSTEM_ADMIN",
+});
+
+const createPersistedAlert = (id) => ({
+  id,
+  vaccine_name: `Alert Vaccine ${id}`,
+  alert_type: "CRITICAL_STOCK",
+  priority: "URGENT",
+  current_stock: Math.max(0, 10 - id),
+  threshold_value: 10,
+  status: "active",
+  message: `Alert message ${id}`,
+  updated_at: "2026-04-03T00:25:21.000Z",
+  created_at: "2026-04-03T00:25:21.000Z",
+});
 
 describe("Inventory Management sticky layout", () => {
   beforeEach(() => {
@@ -110,7 +139,7 @@ describe("Inventory Management sticky layout", () => {
     expect(screen.getByTestId("inventory-sticky-shell")).toHaveClass("sticky");
 
     const scrollRegion = screen.getByTestId("stock-movements-scroll-region");
-    expect(scrollRegion).toHaveClass("overflow-y-auto");
+    expect(scrollRegion).toHaveClass("overflow-auto");
 
     expect(screen.getByText(/^date$/i).closest("thead")).toHaveClass("sticky");
     expect(screen.getByText("admin.user")).toBeInTheDocument();
@@ -138,8 +167,60 @@ describe("Inventory Management sticky layout", () => {
       "inventory-summary-workflow-scroll-region",
     );
     expect(workflowScrollRegion).toHaveClass("overflow-auto");
-    expect(screen.getByText(/^vaccine$/i).closest("thead")).toHaveClass(
+    expect(within(workflowScrollRegion).getByText(/^vaccine$/i).closest("thead")).toHaveClass(
       "sticky",
     );
+  });
+
+  test("paginates stock movement history in infant-management sized batches", async () => {
+    apiClient.getVaccineInventoryTransactions.mockResolvedValue(
+      Array.from({ length: 25 }, (_, index) => createStockMovement(index + 1)),
+    );
+
+    renderInventoryRoute("/inventory?tab=stock_movements");
+
+    await waitFor(() => {
+      expect(apiClient.getVaccineInventoryTransactions).toHaveBeenCalled();
+    });
+
+    expect(screen.getByTestId("stock-movements-pagination")).toHaveTextContent(
+      "Showing 1 to 20 of 25 entries",
+    );
+    expect(screen.getByText("Movement 20")).toBeInTheDocument();
+    expect(screen.queryByText("Movement 21")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^next$/i }));
+
+    expect(screen.getByTestId("stock-movements-pagination")).toHaveTextContent(
+      "Showing 21 to 25 of 25 entries",
+    );
+    expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Movement 21")).toBeInTheDocument();
+  });
+
+  test("paginates persisted stock alerts inside the inventory summary workflow card", async () => {
+    apiClient.getVaccineStockAlerts.mockResolvedValue(
+      Array.from({ length: 25 }, (_, index) => createPersistedAlert(index + 1)),
+    );
+
+    renderInventoryRoute("/inventory?tab=inventory_summary");
+
+    await waitFor(() => {
+      expect(apiClient.getVaccineStockAlerts).toHaveBeenCalled();
+    });
+
+    expect(
+      screen.getByTestId("inventory-summary-workflow-pagination"),
+    ).toHaveTextContent("Showing 1 to 20 of 25 alerts");
+    expect(screen.getByText("Alert message 20")).toBeInTheDocument();
+    expect(screen.queryByText("Alert message 21")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^next$/i }));
+
+    expect(
+      screen.getByTestId("inventory-summary-workflow-pagination"),
+    ).toHaveTextContent("Showing 21 to 25 of 25 alerts");
+    expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Alert message 21")).toBeInTheDocument();
   });
 });

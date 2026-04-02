@@ -77,6 +77,10 @@ describe("Digital papers URL state", () => {
     renderRoute("/digital-papers?tab=download_center");
 
     expect(await screen.findByText("Download Center Content")).toBeInTheDocument();
+    expect(screen.getByTestId("digital-papers-scroll-region")).toHaveClass(
+      "admin-module-scroll-region",
+      "modern-scrollbar",
+    );
     expect(screen.getByTestId("location-search")).toHaveTextContent(
       "tab=download_center",
     );

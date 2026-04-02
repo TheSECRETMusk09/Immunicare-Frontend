@@ -7,7 +7,6 @@ import {
   PageHeader,
   PageContainer,
   Alert,
-  DataTable,
   Badge,
   LoadingSpinner,
   Input,
@@ -90,6 +89,14 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
   const [isImporting, setIsImporting] = useState(false);
 
   const [isValidating, setIsValidating] = useState(false);
+  const paginatedCases = React.useMemo(
+    () =>
+      filteredCases.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage,
+      ),
+    [filteredCases, currentPage],
+  );
 
   const fetchCases = useCallback(async (isRefresh = false) => {
     try {
@@ -410,6 +417,21 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
     </div>
   );
 
+  const handleExport = () => {
+    const headers = columns.map((column) => column.label).join(",");
+    const rows = paginatedCases.map((row) =>
+      columns.map((column) => JSON.stringify(row[column.key] || "")).join(","),
+    );
+    const csv = [headers, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "transfer-in-cases.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (!isAdmin) {
     return (
       <PageContainer>
@@ -447,7 +469,7 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
   }
 
   return (
-    <div className="space-y-8 px-6">
+    <div className="flex h-full min-h-0 flex-col gap-8 px-6">
       {showHeader && (
         <div className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6 -mx-6 -mt-6">
           <PageHeader
@@ -472,106 +494,184 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
       )}
 
       {/* Filters - Sticky below header */}
-      <div className={`sticky ${showHeader ? "top-[88px]" : "top-0"} z-20 bg-white dark:bg-gray-900 -mx-6 px-6`}>
+      <div
+        className={`sticky ${showHeader ? "top-[88px]" : "top-0"} z-20 bg-white dark:bg-gray-900 -mx-6 px-6`}
+      >
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
           <div className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <Input
-              placeholder="Search by guardian name, facility, or vaccine..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Input
+                placeholder="Search by guardian name, facility, or vaccine..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            <Select
+              placeholder="Filter by status"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              options={[
+                { value: "", label: "All Statuses" },
+                {
+                  value: TRANSFER_STATUS.FOR_VALIDATION,
+                  label: "For Validation",
+                },
+                { value: TRANSFER_STATUS.APPROVED, label: "Approved" },
+                {
+                  value: TRANSFER_STATUS.NEEDS_CLARIFICATION,
+                  label: "Needs Clarification",
+                },
+                { value: TRANSFER_STATUS.REJECTED, label: "Rejected" },
+              ]}
+              className="w-48"
+            />
+
+            <Select
+              placeholder="Filter by priority"
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              options={[
+                { value: "", label: "All Priorities" },
+                { value: VALIDATION_PRIORITY.LOW, label: "Low" },
+                { value: VALIDATION_PRIORITY.NORMAL, label: "Normal" },
+                { value: VALIDATION_PRIORITY.HIGH, label: "High" },
+              ]}
+              className="w-48"
+            />
+
+            <Select
+              placeholder="Filter by triage"
+              value={triageFilter}
+              onChange={(e) => setTriageFilter(e.target.value)}
+              options={[
+                { value: "", label: "All Categories" },
+                ...TRIAGE_CATEGORIES.map((category) => ({
+                  value: category,
+                  label: TRIAGE_LABELS[category].label,
+                })),
+              ]}
+              className="w-48"
             />
           </div>
-
-          <Select
-            placeholder="Filter by status"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            options={[
-              { value: "", label: "All Statuses" },
-              {
-                value: TRANSFER_STATUS.FOR_VALIDATION,
-                label: "For Validation",
-              },
-              { value: TRANSFER_STATUS.APPROVED, label: "Approved" },
-              {
-                value: TRANSFER_STATUS.NEEDS_CLARIFICATION,
-                label: "Needs Clarification",
-              },
-              { value: TRANSFER_STATUS.REJECTED, label: "Rejected" },
-            ]}
-            className="w-48"
-          />
-
-          <Select
-            placeholder="Filter by priority"
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-            options={[
-              { value: "", label: "All Priorities" },
-              { value: VALIDATION_PRIORITY.LOW, label: "Low" },
-              { value: VALIDATION_PRIORITY.NORMAL, label: "Normal" },
-              { value: VALIDATION_PRIORITY.HIGH, label: "High" },
-            ]}
-            className="w-48"
-          />
-
-          <Select
-            placeholder="Filter by triage"
-            value={triageFilter}
-            onChange={(e) => setTriageFilter(e.target.value)}
-            options={[
-              { value: "", label: "All Categories" },
-              ...TRIAGE_CATEGORIES.map((category) => ({
-                value: category,
-                label: TRIAGE_LABELS[category].label,
-              })),
-            ]}
-            className="w-48"
-          />
-        </div>
         </div>
       </div>
 
-      <div className="animate-fade-in px-6 -mx-6">
-        <DataTable
-          data={filteredCases.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
-          columns={columns}
-          actions={tableActions}
-          emptyMessage="No transfer-in cases found."
-          emptyIcon={<span>📄</span>}
-          title="Transfer-In Cases - Click to View Details"
-        />
-        {filteredCases.length > itemsPerPage && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-b-xl">
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredCases.length)} of {filteredCases.length} cases
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-              >
-                Previous
-              </Button>
-              <div className="text-sm text-gray-600 dark:text-gray-400 self-center px-3">
-                Page {currentPage} of {Math.ceil(filteredCases.length / itemsPerPage)}
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredCases.length / itemsPerPage), p + 1))}
-                disabled={currentPage >= Math.ceil(filteredCases.length / itemsPerPage)}
-              >
-                Next
-              </Button>
-            </div>
+      <div className="animate-fade-in px-6 -mx-6 flex-1 min-h-0 flex flex-col">
+        <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between gap-4 flex-shrink-0">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+              Transfer-In Cases - Click to View Details
+            </h3>
+            <Button variant="secondary" size="sm" onClick={handleExport}>
+              Export CSV
+            </Button>
           </div>
-        )}
+
+          <div className="flex-1 min-h-0 overflow-auto auto-hide-scrollbar scroll-smooth">
+            <table className="min-w-full w-full table-auto divide-y divide-gray-200 dark:divide-gray-700 relative">
+              <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
+                <tr>
+                  {columns.map((column) => (
+                    <th
+                      key={column.key}
+                      scope="col"
+                      className={`px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 ${column.headerClassName || ""}`}
+                    >
+                      {column.label}
+                    </th>
+                  ))}
+                  <th
+                    scope="col"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 w-px whitespace-nowrap"
+                  >
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {paginatedCases.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={columns.length + 1}
+                      className="px-6 py-12 text-center text-gray-500 dark:text-gray-400"
+                    >
+                      <div className="flex flex-col items-center justify-center">
+                        <span className="text-4xl mb-3">&#128196;</span>
+                        <p className="text-lg font-medium">
+                          No transfer-in cases found.
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedCases.map((row) => (
+                    <tr
+                      key={row.id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                    >
+                      {columns.map((column, columnIndex) => (
+                        <td
+                          key={column.key || columnIndex}
+                          className={`px-4 py-4 align-top text-sm text-gray-900 dark:text-gray-100 ${column.cellClassName || "whitespace-nowrap"}`}
+                        >
+                          {column.render
+                            ? column.render(row[column.key], row)
+                            : row[column.key]}
+                        </td>
+                      ))}
+                      <td className="px-4 py-4 align-top whitespace-nowrap text-sm font-medium w-px">
+                        {tableActions(row)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          {filteredCases.length > itemsPerPage && (
+            <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+                {Math.min(currentPage * itemsPerPage, filteredCases.length)} of{" "}
+                {filteredCases.length} cases
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <div className="text-sm text-gray-600 dark:text-gray-400 self-center px-3">
+                  Page {currentPage} of{" "}
+                  {Math.ceil(filteredCases.length / itemsPerPage)}
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() =>
+                    setCurrentPage((p) =>
+                      Math.min(
+                        Math.ceil(filteredCases.length / itemsPerPage),
+                        p + 1,
+                      ),
+                    )
+                  }
+                  disabled={
+                    currentPage >= Math.ceil(filteredCases.length / itemsPerPage)
+                  }
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Details Modal */}
