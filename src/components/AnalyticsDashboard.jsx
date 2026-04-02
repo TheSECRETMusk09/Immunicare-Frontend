@@ -3394,17 +3394,22 @@ const AnalyticsDashboard = () => {
       </Box>
 
       {/* Scrollable Content Area */}
-      <Box sx={{
+      <Box
+        data-testid="analytics-scroll-region"
+        className="admin-module-scroll-region modern-scrollbar scroll-smooth"
+        sx={{
         flex: 1,
+        minHeight: 0,
         overflowY: 'auto',
+        overflowX: 'hidden',
         px: { xs: 2, sm: 3 },
         pb: { xs: 2, sm: 3 },
         pt: 3,
+        pr: { xs: 1, sm: 1.25 },
         display: 'flex',
         flexDirection: 'column',
-        '&::-webkit-scrollbar': { width: '8px' },
-        '&::-webkit-scrollbar-thumb': { backgroundColor: isDark ? 'rgba(148,163,184,0.3)' : 'rgba(148,163,184,0.4)', borderRadius: '4px' },
-      }}>
+      }}
+      >
 
         {error ? (
           <Alert

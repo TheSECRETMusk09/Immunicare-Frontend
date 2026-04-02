@@ -25,6 +25,7 @@ import {
 import { trackEvent } from "../utils/telemetry";
 import { toDateKey, toMonthKey, fromDateKey, formatDateTime, formatTimeSlotLabel } from "../utils/dateUtils";
 import { getStatusPillClass } from "../constants/statusMappings";
+import { normalizeArrayPayload } from "../utils/apiUtils";
 
 const isWeekendDate = (value) => {
   return isWeekend(value);
@@ -453,9 +454,7 @@ export default function GuardianAppointmentsPage() {
         apiClient.getVaccines(),
       ]);
 
-      const childList = Array.isArray(childrenResponse)
-        ? childrenResponse
-        : childrenResponse?.data || [];
+      const childList = normalizeArrayPayload(childrenResponse, ["infants", "children", "patients"]);
       const vaccineList = Array.isArray(vaccinesResponse)
         ? vaccinesResponse
         : vaccinesResponse?.data || [];

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import apiClient from "../../utils/api";
 import { Button, Card, PageHeader } from "../../components/UI";
 import ImmunizationRecordBooklet from "../../components/ImmunizationRecordBooklet";
+import { normalizeArrayPayload } from "../../utils/apiUtils";
 
 export default function UserImmunizationRecords() {
   const { user, guardianId } = useAuth();
@@ -35,9 +36,10 @@ export default function UserImmunizationRecords() {
     try {
       setLoading(true);
       const response = await apiClient.getInfantsByGuardian(guardianId);
-      setChildren(response.data || []);
-      if (response.data && response.data.length > 0) {
-        setSelectedChild(response.data[0]);
+      const childrenData = normalizeArrayPayload(response, ["infants", "children", "patients"]);
+      setChildren(childrenData);
+      if (childrenData.length > 0) {
+        setSelectedChild(childrenData[0]);
       }
     } catch (err) {
       setError(err.message);

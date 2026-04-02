@@ -8,6 +8,7 @@ import GuardianTopHeader from "../components/GuardianTopHeader";
 import { LoadingSpinner, Alert, Button } from "../components/UI";
 import { FileCheck, ChevronDown, Activity, CheckCircle } from "lucide-react";
 import { trackEvent } from "../utils/telemetry";
+import { normalizeArrayPayload } from "../utils/apiUtils";
 
 /**
  * GuardianImmunizationChartPage
@@ -37,10 +38,7 @@ export default function GuardianImmunizationChartPage() {
     try {
       setLoading(true);
       const response = await apiClient.getInfantsByGuardian(guardianId);
-      // Handle both direct array response and wrapped response
-      const childrenData = Array.isArray(response)
-        ? response
-        : response?.data || response || [];
+      const childrenData = normalizeArrayPayload(response, ["infants", "children", "patients"]);
       setChildren(childrenData);
       if (childrenData.length > 0) {
         if (childId) {

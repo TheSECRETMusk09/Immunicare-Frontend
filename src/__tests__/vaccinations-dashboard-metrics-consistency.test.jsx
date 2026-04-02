@@ -130,9 +130,16 @@ describe("Vaccinations dashboard metric consistency", () => {
     ).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(apiClient.getVaccinationRecords).toHaveBeenCalledWith({
-        limit: 5000,
-        offset: 0,
+      expect(apiClient.getVaccinationRecords).toHaveBeenNthCalledWith(1, {
+        page: 1,
+        limit: 1000,
+      });
+      expect(apiClient.getVaccinationRecords).toHaveBeenNthCalledWith(2, {
+        page: 1,
+        limit: 1,
+      });
+      expect(apiClient.getInfants).toHaveBeenCalledWith({
+        scope: "system",
       });
     });
 

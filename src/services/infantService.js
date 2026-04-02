@@ -50,8 +50,8 @@ const infantService = {
    * Get all infants
    * @returns {Promise<Object>}
    */
-  async getAll() {
-    return handleApiResponse(apiClient.getInfants(), "Fetch infants");
+  async getAll(filters = {}) {
+    return handleApiResponse(apiClient.getInfants(filters), "Fetch infants");
   },
 
   /**

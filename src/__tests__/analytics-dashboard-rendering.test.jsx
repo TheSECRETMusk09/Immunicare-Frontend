@@ -255,6 +255,10 @@ describe("Analytics dashboard rendering and filter stability", () => {
       expect(apiClient.getAnalyticsDashboard).toHaveBeenCalled();
     });
 
+    expect(screen.getByTestId("analytics-scroll-region")).toHaveClass(
+      "admin-module-scroll-region",
+      "modern-scrollbar",
+    );
     expect(screen.getByText(/vaccination trend/i)).toBeInTheDocument();
     expect(screen.getByText(/appointment trend/i)).toBeInTheDocument();
     expect(screen.queryByText(/no timeline points available/i)).not.toBeInTheDocument();

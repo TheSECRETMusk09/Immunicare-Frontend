@@ -58,6 +58,10 @@ export const handleApiResponse = async (apiCall, context = "Operation") => {
       error: null,
       status: null,
       details,
+      pagination: response?.pagination || response?.meta?.pagination || null,
+      meta: response?.meta || null,
+      summary: response?.summary || null,
+      raw: response,
     };
   } catch (error) {
     console.error(`${context} failed:`, error);
@@ -69,6 +73,10 @@ export const handleApiResponse = async (apiCall, context = "Operation") => {
       error: error.message || `${context} failed. Please try again.`,
       status: error.status || error.response?.status || null,
       details: error.data || error.response?.data || null,
+      pagination: error.response?.data?.pagination || null,
+      meta: error.response?.data?.meta || null,
+      summary: error.response?.data?.summary || null,
+      raw: error.response?.data || null,
     };
   }
 };

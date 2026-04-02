@@ -3,6 +3,7 @@ import React from "react";
 const Card = ({
   children,
   className = "",
+  bodyClassName = "",
   title,
   footer,
   noPadding = false,
@@ -24,7 +25,9 @@ const Card = ({
           )}
         </div>
       )}
-      <div className={noPadding ? "" : "p-4"}>{children}</div>
+      <div className={`${noPadding ? "" : "p-4"} ${bodyClassName}`.trim()}>
+        {children}
+      </div>
       {footer && (
         <div className="px-4 py-3 border-t border-[var(--color-border-light)]">
           {footer}

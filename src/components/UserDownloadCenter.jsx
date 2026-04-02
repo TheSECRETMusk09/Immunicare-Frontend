@@ -2,6 +2,10 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Button, Input, Modal, Card, Alert } from "./UI";
 import { useAuth } from "../contexts/AuthContext";
 import apiClient from "../utils/api";
+import {
+  normalizeGuardianChildren,
+  normalizeDownloadHistory,
+} from "../utils/guardianDataNormalizers";
 
 const normalizeDownloadRecord = (record = {}) => ({
   ...record,
@@ -64,8 +68,8 @@ export default function UserDownloadCenter() {
         apiClient.getPaperTemplates(),
       ]);
 
-      setDownloads((downloadsData?.data || downloadsData || []).map(normalizeDownloadRecord));
-      setInfants(Array.isArray(infantsData) ? infantsData : (infantsData?.data || []));
+      setDownloads(normalizeDownloadHistory(downloadsData).map(normalizeDownloadRecord));
+      setInfants(normalizeGuardianChildren(infantsData));
       setTemplates(templatesData?.data || templatesData || []);
     } catch (err) {
       setError(err.message);

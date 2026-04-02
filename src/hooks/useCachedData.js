@@ -1,5 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../utils/api";
+import {
+  normalizeGuardianChildren,
+  normalizeGuardianAppointments,
+  normalizeGuardianStats,
+  normalizeGuardianNotifications,
+} from "../utils/guardianDataNormalizers";
 
 // Query keys for consistent caching
 export const queryKeys = {
@@ -179,13 +185,10 @@ export const useGuardianChildren = (guardianId) => {
     queryFn: async () => {
       if (!guardianId) return [];
       const response = await apiClient.getInfantsByGuardian(guardianId);
-      if (response?.data)
-        return Array.isArray(response.data) ? response.data : [];
-      if (Array.isArray(response)) return response;
-      return [];
+      return normalizeGuardianChildren(response);
     },
     staleTime: 5 * 60 * 1000,
-    enabled: !!guardianId, // Only run if guardianId exists
+    enabled: !!guardianId,
   });
 };
 
@@ -202,10 +205,7 @@ export const useGuardianAppointments = (guardianId, options = {}) => {
       const response = await apiClient.getGuardianAppointments(guardianId, {
         limit,
       });
-      if (response?.data)
-        return Array.isArray(response.data) ? response.data : [];
-      if (Array.isArray(response)) return response;
-      return [];
+      return normalizeGuardianAppointments(response);
     },
     staleTime: 5 * 60 * 1000,
     enabled: !!guardianId,
@@ -222,7 +222,7 @@ export const useGuardianStats = (guardianId) => {
     queryFn: async () => {
       if (!guardianId) return {};
       const response = await apiClient.getGuardianStats(guardianId);
-      return response?.data || response || {};
+      return normalizeGuardianStats(response);
     },
     staleTime: 5 * 60 * 1000,
     enabled: !!guardianId,
@@ -238,13 +238,9 @@ export const useGuardianStats = (guardianId) => {
       queryKey: [...queryKeys.guardian.notifications(), limit],
       queryFn: async () => {
         const response = await apiClient.getGuardianNotifications({ limit });
-        const payload = response?.data ?? response;
-
-        if (Array.isArray(payload)) return payload;
-        if (Array.isArray(payload?.notifications)) return payload.notifications;
-        return [];
+        return normalizeGuardianNotifications(response);
       },
-      staleTime: 2 * 60 * 1000, // 2 minutes
+      staleTime: 2 * 60 * 1000,
     });
   };
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import infantService from "../services/infantService";
 import VaccineScheduleBooklet from "../components/VaccineScheduleBooklet";
@@ -10,6 +10,7 @@ import AddInfantModal from "../components/AddInfantModal";
 import InjectVaccineModal from "../components/InjectVaccineModal";
 import VaccineReadinessManager from "../components/VaccineReadinessManager";
 import useInfantManagementSocket from "../hooks/useInfantManagementSocket";
+import { useAuth } from "../contexts/AuthContext";
 import { normalizeInfantsResponse } from "../utils/adminDataAdapters";
 import {
   Button,
@@ -76,6 +77,7 @@ const normalizeVaccinationPrefillFromRoute = (prefill = {}) => {
 };
 
 export default function InfantManagement() {
+  const { isAdmin } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [infants, setInfants] = useState([]);
@@ -95,6 +97,20 @@ export default function InfantManagement() {
   const itemsPerPage = 20;
   const [dateFilter, setDateFilter] = useState("");
   const [transferCasesRefreshing, setTransferCasesRefreshing] = useState(false);
+  const [infantPagination, setInfantPagination] = useState({
+    page: 1,
+    limit: itemsPerPage,
+    total: 0,
+    totalPages: 0,
+    hasNext: false,
+    hasPrev: false,
+  });
+  const [infantSummary, setInfantSummary] = useState({
+    total: 0,
+    needsReview: 0,
+    withImportedHistory: 0,
+    pendingVaccinations: 0,
+  });
 
   const isMountedRef = useRef(true);
   const fetchRequestIdRef = useRef(0);
@@ -163,15 +179,44 @@ export default function InfantManagement() {
       }
       setError(null);
 
-      // Fetch all infants to allow reliable client-side sorting, filtering, and pagination
-      const result = await infantService.getAll();
+      const result = await infantService.getAll({
+        page: currentPage,
+        limit: itemsPerPage,
+        ...(isAdmin ? { scope: "system" } : {}),
+        ...(debouncedSearchQuery ? { search: debouncedSearchQuery } : {}),
+        ...(dateFilter ? { date_of_birth: dateFilter } : {}),
+      });
       const infantsData = normalizeInfantsResponse(result?.data ?? result);
+      const nextPagination = result?.pagination || {
+        page: currentPage,
+        limit: itemsPerPage,
+        total: infantsData.length,
+        totalPages:
+          infantsData.length > 0 ? Math.ceil(infantsData.length / itemsPerPage) : 0,
+        hasNext: false,
+        hasPrev: currentPage > 1,
+      };
+      const nextSummary = result?.summary || {
+        total: nextPagination.total,
+        needsReview: infantsData.filter(
+          (infant) => infant.workflow_status === "needs_review",
+        ).length,
+        withImportedHistory: infantsData.filter(
+          (infant) => infant.latest_transfer_case_id != null,
+        ).length,
+        pendingVaccinations: infantsData.reduce(
+          (total, infant) => total + Number(infant.pending_vaccinations || 0),
+          0,
+        ),
+      };
 
       if (!isMountedRef.current || requestId !== fetchRequestIdRef.current) {
         return;
       }
 
       setInfants(infantsData);
+      setInfantPagination(nextPagination);
+      setInfantSummary(nextSummary);
       if (selectedInfant?.id) {
         const refreshedSelected = infantsData.find(
           (entry) => entry.id === selectedInfant.id,
@@ -188,6 +233,20 @@ export default function InfantManagement() {
       console.error("[InfantManagement] Error fetching infants:", err);
       setError(err.message || "Failed to load infants. Please try again.");
       setInfants([]); // Ensure infants is always an array on error
+      setInfantPagination({
+        page: currentPage,
+        limit: itemsPerPage,
+        total: 0,
+        totalPages: 0,
+        hasNext: false,
+        hasPrev: currentPage > 1,
+      });
+      setInfantSummary({
+        total: 0,
+        needsReview: 0,
+        withImportedHistory: 0,
+        pendingVaccinations: 0,
+      });
     } finally {
       if (!isMountedRef.current || requestId !== fetchRequestIdRef.current) {
         return;
@@ -196,7 +255,14 @@ export default function InfantManagement() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedInfant?.id]);
+  }, [
+    currentPage,
+    dateFilter,
+    debouncedSearchQuery,
+    isAdmin,
+    itemsPerPage,
+    selectedInfant?.id,
+  ]);
 
   useInfantManagementSocket({
     setInfants,
@@ -208,6 +274,15 @@ export default function InfantManagement() {
   useEffect(() => {
     void fetchInfants();
   }, [fetchInfants]);
+
+  useEffect(() => {
+    if (
+      infantPagination.totalPages > 0 &&
+      currentPage > infantPagination.totalPages
+    ) {
+      setCurrentPage(infantPagination.totalPages);
+    }
+  }, [currentPage, infantPagination.totalPages]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -251,50 +326,19 @@ export default function InfantManagement() {
     setReadinessTargetInfant(null);
   };
 
-  // Centralized filter + memory-safe chunking
-  const filteredInfants = useMemo(() => {
-    let result = [...infants];
-
-    if (debouncedSearchQuery) {
-      const query = debouncedSearchQuery.toLowerCase();
-      result = result.filter(infant =>
-        infant.first_name?.toLowerCase().includes(query) ||
-        infant.last_name?.toLowerCase().includes(query) ||
-        infant.guardian_name?.toLowerCase().includes(query) ||
-        infant.mother_name?.toLowerCase().includes(query) ||
-        infant.father_name?.toLowerCase().includes(query) ||
-        infant.control_number?.toLowerCase().includes(query) ||
-        infant.cellphone_number?.toLowerCase().includes(query) ||
-        infant.guardian_phone?.toLowerCase().includes(query)
-      );
-    }
-
-    if (dateFilter) {
-      result = result.filter(infant => infant.dob && new Date(infant.dob).toISOString().split('T')[0] === dateFilter);
-    }
-
-    return result;
-  }, [infants, debouncedSearchQuery, dateFilter]);
-
-  const paginatedInfants = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredInfants.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredInfants, currentPage]);
-  const totalPages = Math.ceil(filteredInfants.length / itemsPerPage);
-
-  const infantSummary = {
-    total: filteredInfants.length,
-    needsReview: filteredInfants.filter(
-      (infant) => infant.workflow_status === "needs_review",
-    ).length,
-    withImportedHistory: filteredInfants.filter(
-      (infant) => infant.latest_transfer_case_id != null,
-    ).length,
-    pendingVaccinations: filteredInfants.reduce(
-      (total, infant) => total + Number(infant.pending_vaccinations || 0),
-      0,
-    ),
-  };
+  const filteredInfants = infants;
+  const paginatedInfants = infants;
+  const totalPages = Math.max(
+    1,
+    Number(infantPagination?.totalPages || 0) || 1,
+  );
+  const totalInfants = Number(infantPagination?.total || infants.length || 0) || 0;
+  const visibleInfantStart =
+    totalInfants > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
+  const visibleInfantEnd =
+    totalInfants > 0
+      ? Math.min(currentPage * itemsPerPage, totalInfants)
+      : 0;
 
   const columns = [
     {
@@ -818,7 +862,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                 <span className="mr-1">🔄</span> {refreshing ? 'Refreshing...' : 'Refresh'}
               </Button>
               <div className="text-sm text-gray-600 dark:text-gray-400 self-center">
-                Showing {Math.min(currentPage * itemsPerPage, filteredInfants.length)} of {filteredInfants.length} infants
+                Showing {visibleInfantEnd} of {totalInfants} infants
               </div>
             </div>
           </div>
@@ -889,16 +933,14 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
           {totalPages > 1 && (
             <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
               <div className="text-sm text-gray-500">
-                Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                {Math.min(currentPage * itemsPerPage, filteredInfants.length)}{" "}
-                of {filteredInfants.length} infants
+                Showing {visibleInfantStart} to {visibleInfantEnd} of {totalInfants} infants
               </div>
               <div className="flex gap-2">
                 <Button
                   variant="secondary"
                   size="sm"
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
+                  disabled={!infantPagination?.hasPrev || currentPage === 1}
                 >
                   Previous
                 </Button>
@@ -909,7 +951,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                   variant="secondary"
                   size="sm"
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
+                  disabled={!infantPagination?.hasNext || currentPage === totalPages}
                 >
                   Next
                 </Button>

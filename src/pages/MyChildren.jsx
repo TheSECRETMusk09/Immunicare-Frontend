@@ -46,6 +46,7 @@ import {
   validateTransferHistoryEntries,
 } from "../utils/transferCasePayloads";
 import { trackEvent } from "../utils/telemetry";
+import { normalizeArrayPayload } from "../utils/apiUtils";
 
 const getErrorFieldMap = (error) => {
   if (!error || !error.response || !error.response.data) {
@@ -310,10 +311,7 @@ export default function MyChildren() {
     try {
       setLoading(true);
       const response = await apiClient.getInfantsByGuardian(guardianId);
-      // Handle both direct array response and wrapped response
-      const childrenData = Array.isArray(response)
-        ? response
-        : response?.data || response || [];
+      const childrenData = normalizeArrayPayload(response, ["infants", "children", "patients"]);
       setChildren(childrenData);
       // Fetch readiness for each child
       await fetchAllChildrenReadiness(childrenData);

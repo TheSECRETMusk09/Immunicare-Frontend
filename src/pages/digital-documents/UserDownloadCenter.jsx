@@ -3,6 +3,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../utils/api";
 import { Button, Card, PageHeader } from "../../components/UI";
+import { normalizeGuardianChildren } from "../../utils/guardianDataNormalizers";
 
 export default function UserDownloadCenter() {
   const { user, guardianId } = useAuth();
@@ -35,9 +36,10 @@ export default function UserDownloadCenter() {
     try {
       setLoading(true);
       const response = await apiClient.getInfantsByGuardian(guardianId);
-      setChildren(response.data || []);
-      if (response.data && response.data.length > 0) {
-        setSelectedChild(response.data[0]);
+      const childrenData = normalizeGuardianChildren(response);
+      setChildren(childrenData);
+      if (childrenData.length > 0) {
+        setSelectedChild(childrenData[0]);
       }
     } catch (err) {
       setError(err.message);

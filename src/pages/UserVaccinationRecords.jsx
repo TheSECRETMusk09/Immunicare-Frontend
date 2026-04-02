@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { trackEvent } from "../utils/telemetry";
 import ImmunizationRecordBooklet from "../components/ImmunizationRecordBooklet";
+import { normalizeArrayPayload } from "../utils/apiUtils";
 
 const PROVIDER_FALLBACK_LABEL = "Provider unavailable";
 
@@ -144,10 +145,7 @@ export default function UserVaccinationRecords() {
     try {
       setLoading(true);
       const response = await apiClient.getInfantsByGuardian(guardianId);
-      // Handle both direct array response and wrapped response
-      const childrenData = Array.isArray(response)
-        ? response
-        : response?.data || response || [];
+      const childrenData = normalizeArrayPayload(response, ["infants", "children", "patients"]);
       setChildren(childrenData);
 
       if (childrenData.length === 0) {

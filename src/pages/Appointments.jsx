@@ -209,20 +209,10 @@ const canCancelAppointment = (status) =>
   ["pending", "scheduled"].includes(normalizeAppointmentStatus(status));
 
 export default function Appointments() {
-  // Use local state for appointments to enable CRUD operations
-  const {
-    appointments: initialAppointments,
-    loading,
-    error: hookError,
-    refreshAppointments: refreshAppointmentsFromSource,
-  } = useAppointments();
-  const { infants } = useInfants();
-
+  const [view, setView] = useState("list");
   const [appointments, setAppointments] = useState([]);
   const [error, setError] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const [view, setView] = useState("list");
   // Custom calendar state (matching GuardianAppointmentsPage)
   const [monthCursor, setMonthCursor] = useState(new Date());
   const [calendarLoading, setCalendarLoading] = useState(false);
@@ -243,20 +233,7 @@ export default function Appointments() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rowAction, setRowAction] = useState({ id: null, action: null });
   const [statusFilter, setStatusFilter] = useState('all');
-  const lastAppliedAppointmentsSignatureRef = useRef("");
   const latestMonthKeyRef = useRef("");
-
-  const initialAppointmentsSignature = useMemo(
-    () =>
-      JSON.stringify(
-        (initialAppointments || []).map((appointment) => ({
-          id: appointment?.id ?? null,
-          scheduled_date: appointment?.scheduled_date ?? null,
-          status: appointment?.status ?? null,
-        })),
-      ),
-    [initialAppointments],
-  );
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -271,6 +248,44 @@ export default function Appointments() {
   // Sorting state
   const [sortField, setSortField] = useState("scheduled_date");
   const [sortDirection, setSortDirection] = useState("desc");
+  const listQueryParams = useMemo(
+    () => ({
+      page: currentPage,
+      limit: itemsPerPage,
+      ...(debouncedSearchQuery ? { search: debouncedSearchQuery } : {}),
+      ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+      ...(dateFilterStart ? { start_date: dateFilterStart } : {}),
+      ...(dateFilterEnd ? { end_date: dateFilterEnd } : {}),
+      sort_field: sortField,
+      sort_direction: sortDirection,
+    }),
+    [
+      currentPage,
+      itemsPerPage,
+      debouncedSearchQuery,
+      statusFilter,
+      dateFilterStart,
+      dateFilterEnd,
+      sortField,
+      sortDirection,
+    ],
+  );
+  const {
+    appointments: listAppointments,
+    pagination: listPagination,
+    loading,
+    error: hookError,
+    refreshAppointments: refreshAppointmentsFromSource,
+  } = useAppointments({
+    fetchAll: false,
+    enabled: view === "list",
+    params: listQueryParams,
+  });
+  const { infants } = useInfants({
+    fetchAll: true,
+    limit: 500,
+    page: 1,
+  });
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 350);
@@ -281,79 +296,21 @@ export default function Appointments() {
     setCurrentPage(1);
   }, [debouncedSearchQuery, statusFilter, dateFilterStart, dateFilterEnd, sortField, sortDirection]);
 
-  // Enhanced filtered appointments with search, date filtering, and sorting
-  const filteredAppointments = useMemo(() => {
-    let result = [...appointments];
-
-    // Search query filtering - search by infant details, guardian info, control number, contact
-    if (debouncedSearchQuery) {
-      const query = debouncedSearchQuery.toLowerCase();
-      result = result.filter(apt =>
-        apt.first_name?.toLowerCase().includes(query) ||
-        apt.last_name?.toLowerCase().includes(query) ||
-        apt.guardian_name?.toLowerCase().includes(query) ||
-        apt.control_number?.toLowerCase().includes(query) ||
-        apt.infant_name?.toLowerCase().includes(query) ||
-        apt.contact?.toLowerCase().includes(query) ||
-        apt.phone?.toLowerCase().includes(query)
-      );
-    }
-
-    // Status filter
-    if (statusFilter !== 'all') {
-      result = result.filter(
-        (apt) => normalizeAppointmentStatus(apt.status) === statusFilter,
-      );
-    }
-
-    // Date range filtering
-    if (dateFilterStart) {
-      const startDate = new Date(dateFilterStart);
-      startDate.setHours(0, 0, 0, 0);
-      result = result.filter(apt => {
-        if (!apt.scheduled_date) return false;
-        const aptDate = new Date(apt.scheduled_date);
-        return aptDate >= startDate;
-      });
-    }
-    if (dateFilterEnd) {
-      const endDate = new Date(dateFilterEnd);
-      endDate.setHours(23, 59, 59, 999);
-      result = result.filter(apt => {
-        if (!apt.scheduled_date) return false;
-        const aptDate = new Date(apt.scheduled_date);
-        return aptDate <= endDate;
-      });
-    }
-
-    // Sorting
-    result.sort((a, b) => {
-      let aVal = a[sortField];
-      let bVal = b[sortField];
-
-      // Handle dates
-      if (sortField === "scheduled_date") {
-        aVal = aVal ? new Date(aVal).getTime() : 0;
-        bVal = bVal ? new Date(bVal).getTime() : 0;
-      }
-
-      // Handle null/undefined
-      if (aVal == null) aVal = "";
-      if (bVal == null) bVal = "";
-
-      if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
-      return 0;
-    });
-
-    return result;
-  }, [appointments, debouncedSearchQuery, statusFilter, dateFilterStart, dateFilterEnd, sortField, sortDirection]);
-
-  const paginatedAppointments = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredAppointments.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredAppointments, currentPage]);
-  const totalPages = Math.ceil(filteredAppointments.length / itemsPerPage);
+  const filteredAppointments = listAppointments;
+  const paginatedAppointments = listAppointments;
+  const totalPages = Math.max(1, Number(listPagination?.totalPages || 0) || 1);
+  const totalAppointments =
+    Number(listPagination?.total || listAppointments.length || 0) || 0;
+  const listPage = Number(listPagination?.page || currentPage) || currentPage;
+  const visibleAppointmentStart =
+    totalAppointments > 0 ? (listPage - 1) * itemsPerPage + 1 : 0;
+  const visibleAppointmentEnd =
+    totalAppointments > 0
+      ? Math.min(
+          listPage * itemsPerPage,
+          totalAppointments,
+        )
+      : 0;
   const [dateDetailsLoading, setDateDetailsLoading] = useState(false);
   const [createFormError, setCreateFormError] = useState("");
   const [editFormErrors, setEditFormErrors] = useState({});
@@ -478,6 +435,59 @@ export default function Appointments() {
     }
   }, [monthCursor]);
 
+  const fetchCalendarAppointments = useCallback(
+    async () => {
+      const monthStart = new Date(
+        monthCursor.getFullYear(),
+        monthCursor.getMonth(),
+        1,
+      );
+      const monthEnd = new Date(
+        monthCursor.getFullYear(),
+        monthCursor.getMonth() + 1,
+        0,
+      );
+
+      try {
+        let page = 1;
+        let hasNext = true;
+        const scopedAppointments = [];
+
+        while (hasNext) {
+          const response = await apiClient.getAppointments({
+            start_date: toDateKey(monthStart),
+            end_date: toDateKey(monthEnd),
+            sort_field: "scheduled_date",
+            sort_direction: "asc",
+            page,
+            limit: 200,
+          });
+
+          const pageRows = Array.isArray(response?.data)
+            ? response.data
+            : Array.isArray(response)
+              ? response
+              : [];
+          const pagination = response?.metadata || response?.pagination || null;
+
+          scopedAppointments.push(...pageRows);
+          hasNext = Boolean(pagination?.hasNext);
+          page += 1;
+        }
+
+        if (latestMonthKeyRef.current === toMonthKey(monthCursor)) {
+          setAppointments(normalizeAppointmentCollection(scopedAppointments));
+        }
+      } catch (calendarError) {
+        console.error("Failed to fetch calendar appointments:", calendarError);
+        if (latestMonthKeyRef.current === toMonthKey(monthCursor)) {
+          setAppointments([]);
+        }
+      }
+    },
+    [monthCursor],
+  );
+
   // Toggle blocked date handler
   const handleToggleBlockedDate = async (dateKey) => {
     try {
@@ -502,6 +512,15 @@ export default function Appointments() {
     fetchCalendarData(abortController.signal);
     return () => abortController.abort();
   }, [fetchCalendarData]);
+
+  useEffect(() => {
+    if (view !== "calendar") {
+      return undefined;
+    }
+
+    void fetchCalendarAppointments();
+    return undefined;
+  }, [fetchCalendarAppointments, view]);
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -566,28 +585,18 @@ export default function Appointments() {
     });
   };
 
-  // Sync initial appointments when they load
-  useEffect(() => {
-    if (!isRefreshing && initialAppointmentsSignature !== lastAppliedAppointmentsSignatureRef.current) {
-      setAppointments(normalizeAppointmentCollection(initialAppointments));
-      lastAppliedAppointmentsSignatureRef.current = initialAppointmentsSignature;
-    }
-  }, [initialAppointments, initialAppointmentsSignature, isRefreshing]);
-
   // Refresh appointments from API
   const refreshAppointments = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      let refreshedAppointments;
-
-      if (typeof refreshAppointmentsFromSource === "function") {
-        refreshedAppointments = await refreshAppointmentsFromSource({ silent: true });
-      } else {
-        const response = await apiClient.getAppointments();
-        refreshedAppointments = Array.isArray(response) ? response : response?.data || [];
+      if (view === "calendar") {
+        await Promise.all([
+          fetchCalendarAppointments(),
+          fetchCalendarData(),
+        ]);
+      } else if (typeof refreshAppointmentsFromSource === "function") {
+        await refreshAppointmentsFromSource({ silent: true });
       }
-
-      setAppointments(normalizeAppointmentCollection(refreshedAppointments));
       setError(null);
     } catch (err) {
       console.error('Failed to refresh appointments:', err);
@@ -595,7 +604,7 @@ export default function Appointments() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [refreshAppointmentsFromSource]);
+  }, [fetchCalendarAppointments, fetchCalendarData, refreshAppointmentsFromSource, view]);
 
   const columns = [
     {
@@ -1091,7 +1100,11 @@ export default function Appointments() {
   }
 
   // Show error state only when there's a hook error AND no appointments have been loaded
-  const hasError = hookError && appointments.length === 0 && !isRefreshing;
+  const hasError =
+    view === "list" &&
+    hookError &&
+    filteredAppointments.length === 0 &&
+    !isRefreshing;
 
   if (hasError) {
     return (
@@ -1552,7 +1565,7 @@ export default function Appointments() {
               {/* Results Count - Spacer */}
               <div className="flex-1 min-w-[100px]">
                 <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {Math.min(currentPage * itemsPerPage, filteredAppointments.length)} of {filteredAppointments.length}
+                  {visibleAppointmentEnd} of {totalAppointments}
                 </span>
               </div>
             </div>
@@ -1614,27 +1627,26 @@ export default function Appointments() {
               {totalPages > 1 && (
                 <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
                   <div className="text-sm text-gray-500">
-                    Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                    {Math.min(currentPage * itemsPerPage, filteredAppointments.length)}{" "}
-                    of {filteredAppointments.length} appointments
+                    Showing {visibleAppointmentStart} to {visibleAppointmentEnd} of{" "}
+                    {totalAppointments} appointments
                   </div>
                   <div className="flex gap-2">
                     <Button
                       variant="secondary"
                       size="sm"
                       onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
+                      disabled={!listPagination?.hasPrev || listPage === 1}
                     >
                       Previous
                     </Button>
                     <span className="flex items-center px-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Page {currentPage} of {totalPages}
+                      Page {listPage} of {totalPages}
                     </span>
                     <Button
                       variant="secondary"
                       size="sm"
                       onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
+                      disabled={!listPagination?.hasNext || listPage === totalPages}
                     >
                       Next
                     </Button>
@@ -2437,7 +2449,7 @@ export default function Appointments() {
       >
         {view === "calendar"
           ? `Calendar view: ${monthCursor.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`
-          : `List view showing ${filteredAppointments.length} appointments`
+          : `List view showing ${visibleAppointmentEnd} of ${totalAppointments} appointments`
         }
       </div>
     </div>

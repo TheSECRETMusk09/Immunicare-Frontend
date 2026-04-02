@@ -188,7 +188,6 @@ function AppContent() {
 
   // Define public routes that don't require authentication
   const isPublicRoute = [
-    "/",
     "/login",
     "/client/login",
     "/admin/login",
@@ -196,7 +195,8 @@ function AppContent() {
     "/register",
     "/forgot-password",
     "/reset-password",
-  ].some((route) => location.pathname.startsWith(route));
+    "/guardian/introduction",
+  ].includes(location.pathname) || location.pathname === "/";
 
   // If not authenticated and not on a public route, redirect to login
   // But prevent redirect loops by checking if we're already on login page
@@ -436,7 +436,7 @@ function AppContent() {
           <Route
             path="/digital-papers"
             element={
-              <ProtectedRoute adminOnly>
+              <ProtectedRoute requireSystemAdmin>
                 <AdminLayout>
                   <DigitalPapersDashboard />
                 </AdminLayout>
@@ -661,8 +661,8 @@ function AppContent() {
               path="reports"
               element={<Navigate to="/guardian/immunization-chart" replace />}
             />
-            {/* Catch-all route for guardian - ensure something always renders */}
-            <Route path="*" element={null} />
+            {/* Catch-all route for guardian - redirect to dashboard */}
+            <Route path="*" element={<Navigate to="/guardian/dashboard" replace />} />
           </Route>
           {/* Default redirects */}
           <Route

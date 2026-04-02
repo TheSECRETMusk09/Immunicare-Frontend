@@ -72,6 +72,10 @@ const extractPaginationMeta = (data) => {
     return null;
   }
 
+  if (data.metadata) {
+    return data.metadata;
+  }
+
   if (data.meta?.pagination) {
     return data.meta.pagination;
   }
@@ -204,33 +208,89 @@ export const useDashboardStats = () => {
   return { stats, loading, error };
 };
 
-export const useInfants = () => {
+export const useInfants = (options = {}) => {
   const [infants, setInfants] = useState([]);
+  const [pagination, setPagination] = useState(
+    buildDefaultPagination(options.limit || 1000),
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const fetchAllPages = options.fetchAll === true;
+  const enabled = options.enabled ?? true;
+  const paramsKey = JSON.stringify({
+    limit: options.limit || 1000,
+    page: options.page || 1,
+    scope: options.scope || null,
+  });
+
+  const refreshInfants = useCallback(async () => {
+    try {
+      setLoading(true);
+      const params = JSON.parse(paramsKey);
+      const requestLimit = Math.max(
+        1,
+        Number.parseInt(params.limit, 10) || 1000,
+      );
+
+      if (fetchAllPages) {
+        let page = 1;
+        let hasNext = true;
+        let lastPagination = buildDefaultPagination(requestLimit);
+        const aggregatedInfants = [];
+
+        while (hasNext) {
+          const response = await apiClient.getDashboardInfants({
+            ...params,
+            page,
+            limit: requestLimit,
+          });
+          const collection = extractCollectionResponse(response, "data");
+          aggregatedInfants.push(...collection.items);
+          lastPagination =
+            collection.pagination || buildDefaultPagination(requestLimit);
+          hasNext = Boolean(lastPagination.hasNext);
+          page += 1;
+        }
+
+        setInfants(aggregatedInfants);
+        setPagination({
+          ...lastPagination,
+          page: 1,
+          total: aggregatedInfants.length,
+          totalPages: Math.ceil(
+            aggregatedInfants.length / Math.max(requestLimit, 1),
+          ),
+          hasNext: false,
+          hasPrev: false,
+        });
+      } else {
+        const response = await apiClient.getDashboardInfants(params);
+        const collection = extractCollectionResponse(response, "data");
+        setInfants(collection.items);
+        setPagination(
+          collection.pagination || buildDefaultPagination(requestLimit),
+        );
+      }
+
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchAllPages, paramsKey]);
 
   useEffect(() => {
-    const fetchInfants = async () => {
-      try {
-        // PERFORMANCE FIX: Fetch limited infants with pagination
-        // Previous: Fetches all 5,000+ infants (10-40 seconds)
-        // Now: Fetches first 1000 infants (2-3 seconds)
-        const data = await apiClient.getDashboardInfants({
-          limit: 1000,
-          page: 1,
-        });
-        setInfants(normalizeToArray(data));
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (!enabled) {
+      setLoading(false);
+      return undefined;
+    }
 
-    fetchInfants();
-  }, []);
+    refreshInfants().catch(() => undefined);
+    return undefined;
+  }, [enabled, refreshInfants]);
 
-  return { infants, loading, error };
+  return { infants, loading, error, pagination, refreshInfants };
 };
 
 export const useGuardians = (params = {}, options = {}) => {
@@ -276,15 +336,21 @@ export const useGuardians = (params = {}, options = {}) => {
   };
 };
 
-export const useAppointments = () => {
+export const useAppointments = (options = {}) => {
   const [appointments, setAppointments] = useState([]);
+  const [pagination, setPagination] = useState(
+    buildDefaultPagination(options.params?.limit || 200),
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { user } = useAuth();
   const hasLoadedAppointmentsRef = useRef(false);
+  const paramsKey = JSON.stringify(options.params || {});
+  const fetchAllPages = options.fetchAll !== false;
+  const enabled = options.enabled ?? true;
 
   const refreshAppointments = useCallback(
-    async ({ silent = false } = {}) => {
+    async ({ silent = false, params: overrideParams = {} } = {}) => {
       const scopeIds = Array.from(
         new Set(
           [user?.clinic_id, user?.facility_id]
@@ -293,10 +359,18 @@ export const useAppointments = () => {
         ),
       );
 
+      const requestedParams = {
+        ...(JSON.parse(paramsKey) || {}),
+        ...(overrideParams || {}),
+      };
       const scopedFilters = {
         ...(scopeIds[0] ? { clinic_id: scopeIds[0] } : {}),
         ...(scopeIds[1] ? { facility_id: scopeIds[1] } : {}),
       };
+      const requestLimit = Math.max(
+        1,
+        Number.parseInt(requestedParams.limit, 10) || (fetchAllPages ? 200 : 20),
+      );
 
       const shouldManageInitialLoading =
         !silent && !hasLoadedAppointmentsRef.current;
@@ -306,18 +380,55 @@ export const useAppointments = () => {
       }
 
       try {
-        // Optimize: Fetch only first page initially for faster load
-        // Full pagination can be handled by the component if needed
+        if (fetchAllPages) {
+          let page = 1;
+          let hasNext = true;
+          const aggregatedAppointments = [];
+          let lastPagination = buildDefaultPagination(requestLimit);
+
+          while (hasNext) {
+            const response = await apiClient.getAppointments({
+              ...scopedFilters,
+              ...requestedParams,
+              page,
+              limit: requestLimit,
+            });
+            const collection = extractCollectionResponse(response, "data");
+            aggregatedAppointments.push(...collection.items);
+            lastPagination =
+              collection.pagination || buildDefaultPagination(requestLimit);
+            hasNext = Boolean(lastPagination.hasNext);
+            page += 1;
+          }
+
+          setAppointments(aggregatedAppointments);
+          setPagination({
+            ...lastPagination,
+            page: 1,
+            total: aggregatedAppointments.length,
+            totalPages: Math.ceil(
+              aggregatedAppointments.length / Math.max(requestLimit, 1),
+            ),
+            hasNext: false,
+            hasPrev: false,
+          });
+          setError(null);
+          return aggregatedAppointments;
+        }
+
         const response = await apiClient.getAppointments({
           ...scopedFilters,
-          page: 1,
-          limit: 500, // Increased limit for better initial data
+          ...requestedParams,
+          page: Number.parseInt(requestedParams.page, 10) || 1,
+          limit: requestLimit,
         });
-
-        const appointments = normalizeToArray(response);
-        setAppointments(appointments);
+        const collection = extractCollectionResponse(response, "data");
+        setAppointments(collection.items);
+        setPagination(
+          collection.pagination || buildDefaultPagination(requestLimit),
+        );
         setError(null);
-        return appointments;
+        return collection.items;
       } catch (err) {
         setError(err.message);
         throw err;
@@ -328,14 +439,20 @@ export const useAppointments = () => {
         }
       }
     },
-    [user?.clinic_id, user?.facility_id],
+    [fetchAllPages, paramsKey, user?.clinic_id, user?.facility_id],
   );
 
   useEffect(() => {
-    refreshAppointments().catch(() => undefined);
-  }, [refreshAppointments]);
+    if (!enabled) {
+      setLoading(false);
+      return undefined;
+    }
 
-  return { appointments, loading, error, refreshAppointments };
+    refreshAppointments().catch(() => undefined);
+    return undefined;
+  }, [enabled, refreshAppointments]);
+
+  return { appointments, pagination, loading, error, refreshAppointments };
 };
 
 export const useVaccinationAnalytics = () => {

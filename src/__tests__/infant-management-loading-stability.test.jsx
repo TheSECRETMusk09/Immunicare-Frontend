@@ -231,7 +231,7 @@ describe("Infant module loading stability under StrictMode lifecycle", () => {
       expect(screen.getByText(/detailed visit records for/i)).toBeInTheDocument();
     });
 
-    expect(screen.getByRole("button", { name: /print \/ pdf/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^print$/i })).toBeInTheDocument();
     expect(screen.getAllByText(/^6 weeks$/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/^10 weeks$/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/^14 weeks$/i).length).toBeGreaterThanOrEqual(1);
@@ -299,7 +299,7 @@ describe("Infant module loading stability under StrictMode lifecycle", () => {
       expect(screen.getByText(/detailed visit records for/i)).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /print \/ pdf/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^print$/i }));
 
     await waitFor(() => {
       expect(framePrint).toHaveBeenCalledTimes(1);

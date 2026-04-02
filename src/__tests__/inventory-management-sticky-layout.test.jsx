@@ -140,6 +140,9 @@ describe("Inventory Management sticky layout", () => {
 
     const scrollRegion = screen.getByTestId("stock-movements-scroll-region");
     expect(scrollRegion).toHaveClass("overflow-auto");
+    expect(scrollRegion.parentElement).toHaveClass("flex");
+    expect(scrollRegion.parentElement).toHaveClass("min-h-0");
+    expect(scrollRegion.parentElement).toHaveClass("flex-1");
 
     expect(screen.getByText(/^date$/i).closest("thead")).toHaveClass("sticky");
     expect(screen.getByText("admin.user")).toBeInTheDocument();

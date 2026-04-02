@@ -10,6 +10,7 @@ import {
   Alert,
 } from "../components/UI";
 import { BarChart2, Calendar, Download, Bell, Loader2 } from "lucide-react";
+import { normalizeArrayPayload } from "../utils/apiUtils";
 
 const calculateAgeInMonths = (dob) => {
   if (!dob) return 0;
@@ -95,9 +96,7 @@ export default function HealthInformation() {
       const response = isAdmin
         ? await apiClient.getInfants()
         : await apiClient.getInfantsByGuardian(guardianId);
-      const childRows = Array.isArray(response)
-        ? response
-        : response?.data || [];
+      const childRows = normalizeArrayPayload(response, ["infants", "children", "patients"]);
 
       setChildren(childRows);
       if (childRows.length > 0) {

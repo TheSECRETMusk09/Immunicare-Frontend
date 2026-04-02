@@ -34,6 +34,7 @@ import {
 import { trackEvent } from "../utils/telemetry";
 import { isPhilippineHoliday, getMinBookingDate, isWeekend } from "../utils/holidays";
 import { formatTimeSlotLabel } from "../utils/dateUtils";
+import { normalizeArrayPayload } from "../utils/apiUtils";
 
 // Get minimum booking date (today)
 const getMinDate = () => {
@@ -143,7 +144,7 @@ export default function GuardianAppointmentBooking() {
 
     try {
       const data = await apiClient.getInfantsByGuardian(guardianId);
-      const childrenData = Array.isArray(data) ? data : data?.data || [];
+      const childrenData = normalizeArrayPayload(data, ["infants", "children", "patients"]);
       setChildren(childrenData);
 
       // Pre-select child if passed in URL

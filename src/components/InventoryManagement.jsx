@@ -1383,7 +1383,11 @@ function StockMovementsPanel({
         </Alert>
       )}
 
-      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <Card
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        bodyClassName="flex min-h-0 flex-1 flex-col"
+        noPadding
+      >
         <div className="border-b border-gray-200 bg-gray-50 px-4 py-4 dark:border-gray-700 dark:bg-gray-800/80">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>

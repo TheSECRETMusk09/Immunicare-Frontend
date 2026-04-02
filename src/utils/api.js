@@ -922,8 +922,9 @@ class ApiClient {
   }
 
   // Infants Management endpoints
-  async getInfants() {
-    return this.request("/infants");
+  async getInfants(params = {}) {
+    const suffix = this.buildQuerySuffix(params);
+    return this.request(`/infants${suffix}`);
   }
 
   async getInfant(id) {
