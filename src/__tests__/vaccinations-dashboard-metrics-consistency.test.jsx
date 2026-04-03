@@ -133,10 +133,12 @@ describe("Vaccinations dashboard metric consistency", () => {
       expect(apiClient.getVaccinationRecords).toHaveBeenNthCalledWith(1, {
         page: 1,
         limit: 1000,
+        scope: "system",
       });
       expect(apiClient.getVaccinationRecords).toHaveBeenNthCalledWith(2, {
         page: 1,
         limit: 1,
+        scope: "system",
       });
       expect(apiClient.getInfants).toHaveBeenCalledWith({
         scope: "system",

@@ -221,7 +221,7 @@ export default function VaccineReadinessManager({ infantId, infantName, isOpen, 
       transition={false}
       animation={false}
     >
-      <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-2">
+      <div className="space-y-4 max-h-[75vh] overflow-y-auto modern-scrollbar pr-2">
         {/* Error/Success Messages */}
         {error && (
           <Alert variant="error" dismissible onDismiss={() => setError(null)}>

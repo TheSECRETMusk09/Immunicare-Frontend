@@ -222,6 +222,7 @@ const VaccinationsDashboard = () => {
     const response = await apiClient.getVaccinationRecords({
       page: 1,
       limit: 1,
+      ...infantQueryScope,
     });
     const metadata = response?.metadata || response?.pagination || {};
 
@@ -229,7 +230,7 @@ const VaccinationsDashboard = () => {
       total: Number(metadata.total || 0) || 0,
       completed: Number(metadata.completed || 0) || 0,
     };
-  }, []);
+  }, [infantQueryScope]);
 
   const fetchAllVaccinationRecords = useCallback(async () => {
     let page = 1;
@@ -240,6 +241,7 @@ const VaccinationsDashboard = () => {
       const pageData = await apiClient.getVaccinationRecords({
         page,
         limit: vaccinationRecordsBatchSize,
+        ...infantQueryScope,
       });
       const metadata = pageData?.metadata || pageData?.pagination || null;
       aggregatedRecords.push(...normalizeVaccinationRecordsResponse(pageData));
@@ -248,13 +250,14 @@ const VaccinationsDashboard = () => {
     }
 
     return aggregatedRecords;
-  }, []);
+  }, [infantQueryScope]);
 
   const fetchVaccinationRecordPage = useCallback(
     async ({ page, search }) => {
       const response = await apiClient.getVaccinationRecords({
         page,
         limit: itemsPerPage,
+        ...infantQueryScope,
         ...(search ? { search } : {}),
       });
       const metadata = {
@@ -273,7 +276,7 @@ const VaccinationsDashboard = () => {
         metadata,
       };
     },
-    [itemsPerPage],
+    [infantQueryScope, itemsPerPage],
   );
 
   const fetchData = useCallback(

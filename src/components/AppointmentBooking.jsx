@@ -284,7 +284,7 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Select Time
           </label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-40 overflow-y-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-40 overflow-y-auto modern-scrollbar">
             {availableSlots.map((time) => (
               <button
                 key={time}

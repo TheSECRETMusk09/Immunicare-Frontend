@@ -48,7 +48,7 @@ const DashboardMetricsSkeleton = () => (
 // Skeleton version of the monitoring card
 const MonitoringCardSkeleton = () => (
   <Card title="Admin Vaccination Monitoring" className="xl:col-span-2">
-    <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
+    <div className="space-y-3 max-h-[460px] overflow-y-auto modern-scrollbar pr-1">
       {Array.from({ length: 8 }).map((_, i) => (
         <div
           key={i}
@@ -77,7 +77,7 @@ const NotificationsPanelSkeleton = () => (
         <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-2 animate-pulse" />
         <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-2/3 animate-pulse" />
       </div>
-      <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+      <div className="space-y-2 max-h-[280px] overflow-y-auto modern-scrollbar pr-1">
         {Array.from({ length: 5 }).map((_, i) => (
           <div
             key={i}
@@ -297,7 +297,7 @@ export default function DashboardOverview() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Admin Vaccination Monitoring */}
         <Card title={<span className="font-bold">Admin Vaccination Monitoring</span>} className="lg:col-span-1">
-          <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+          <div className="space-y-3 max-h-[320px] overflow-y-auto modern-scrollbar pr-1">
             {monitoringRows.length === 0 ? (
               <p className="text-sm text-gray-500">No monitoring records available.</p>
             ) : (
@@ -343,7 +343,7 @@ export default function DashboardOverview() {
               </p>
             </div>
 
-            <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[200px] overflow-y-auto modern-scrollbar pr-1">
               {priorityNotifications.length === 0 ? (
                 <p className="text-sm text-gray-500">No urgent notifications.</p>
               ) : (
@@ -376,7 +376,7 @@ export default function DashboardOverview() {
 
         {/* Upcoming Appointments */}
         <Card title={<span className="font-bold">Upcoming Appointments</span>}>
-          <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-[280px] overflow-y-auto modern-scrollbar pr-1">
             {appointmentsLoading ? (
               <SkeletonTable rows={5} columns={2} />
             ) : (appointments || []).length === 0 ? (

@@ -129,15 +129,15 @@ export default function DigitalPapersDashboard() {
         completionsResult.status === "fulfilled" ? completionsResult.value : null;
 
       setStats({
-        totalTemplates: templates.data?.length || 0,
+        totalTemplates: templates?.data?.length || 0,
         totalDownloads:
-          allDownloads.pagination?.total ||
-          allDownloads.total ||
-          allDownloads.data?.length ||
-          allDownloads.length ||
+          allDownloads?.pagination?.total ||
+          allDownloads?.total ||
+          allDownloads?.data?.length ||
+          allDownloads?.length ||
           0,
-        pendingCompletions: completions.data?.length || 0,
-        recentActivity: recentDownloads.data || recentDownloads || [],
+        pendingCompletions: completions?.data?.length || 0,
+        recentActivity: recentDownloads?.data || recentDownloads || [],
       });
 
       if (

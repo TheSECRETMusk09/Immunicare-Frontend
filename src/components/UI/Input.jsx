@@ -18,6 +18,7 @@ const Input = ({
   helpText,
   className = "",
   containerClassName = "",
+  surface = "default",
   showPasswordToggle = true,
   showPassword: controlledShowPassword,
   onToggleVisibility,
@@ -73,11 +74,26 @@ const Input = ({
     ${
       error
         ? "border-danger-300 bg-danger-50 dark:bg-danger-900/20 dark:border-danger-600 focus:ring-danger-500 focus:border-danger-500"
-        : "border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 focus:ring-primary-500 focus:border-primary-500"
+        : surface === "light"
+          ? "border-gray-300 bg-white text-gray-900 focus:ring-primary-500 focus:border-primary-500"
+          : surface === "dark"
+            ? "border-gray-600 bg-gray-700 text-gray-100 focus:ring-primary-500 focus:border-primary-500"
+            : "border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 focus:ring-primary-500 focus:border-primary-500"
     }
     focus:outline-none focus:ring-2 focus:ring-opacity-20
-    disabled:bg-gray-100 dark:disabled:bg-gray-600 disabled:cursor-not-allowed
-    placeholder:text-gray-400 dark:placeholder:text-gray-500
+    ${
+      surface === "light"
+        ? "disabled:bg-gray-100"
+        : "disabled:bg-gray-100 dark:disabled:bg-gray-600"
+    }
+    disabled:cursor-not-allowed
+    ${
+      surface === "light"
+        ? "placeholder:text-gray-400"
+        : surface === "dark"
+          ? "placeholder:text-gray-500"
+          : "placeholder:text-gray-400 dark:placeholder:text-gray-500"
+    }
     ${className}
   `;
 
@@ -86,7 +102,9 @@ const Input = ({
       {label && (
         <label
           htmlFor={inputId}
-          className={`block text-sm font-semibold text-gray-800 dark:text-white mb-1.5 ${
+          className={`block text-sm font-semibold ${
+            surface === "light" ? "text-gray-800" : "text-gray-800 dark:text-white"
+          } mb-1.5 ${
             required
               ? "after:content-['*'] after:text-danger-500 after:ml-1"
               : ""
@@ -150,7 +168,9 @@ const Input = ({
       </div>
       {helpText && !error && (
         <p
-          className="mt-1.5 text-sm text-gray-500 dark:text-gray-400"
+          className={`mt-1.5 text-sm ${
+            surface === "light" ? "text-gray-500" : "text-gray-500 dark:text-gray-400"
+          }`}
           id={`${inputId}-help`}
         >
           {helpText}

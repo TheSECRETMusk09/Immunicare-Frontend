@@ -375,7 +375,7 @@ const GuardianNotificationBell = () => {
           </div>
 
           {/* Content */}
-          <div className="max-h-[400px] overflow-y-auto">
+          <div className="max-h-[400px] overflow-y-auto modern-scrollbar">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />

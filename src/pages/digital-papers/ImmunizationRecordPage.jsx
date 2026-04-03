@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 import {
   Button,
   PageHeader,
@@ -9,6 +10,7 @@ import {
 } from "../../components/UI";
 import ImmunizationRecordBooklet from "../../components/ImmunizationRecordBooklet";
 import apiClient from "../../utils/api";
+import { normalizeInfantResponse } from "../../utils/adminDataAdapters";
 import { FileCheck, FileText, Printer } from "lucide-react";
 import { downloadWordDocument, PRINT_PAGE_PRESETS } from "../../utils/printDocumentExport";
 
@@ -53,6 +55,7 @@ const downloadHtmlDocument = ({ title, filename, markup, styles = "" }) => {
 
 export default function ImmunizationRecordPage() {
   const { infantId } = useParams();
+  const { isAdmin } = useAuth();
   const [infant, setInfant] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -64,14 +67,16 @@ export default function ImmunizationRecordPage() {
     }
     try {
       setLoading(true);
-      const data = await apiClient.getInfant(infantId);
-      setInfant(data);
+      const data = await apiClient.getInfant(
+        isAdmin ? `${infantId}?scope=system` : infantId,
+      );
+      setInfant(normalizeInfantResponse(data));
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [infantId]);
+  }, [infantId, isAdmin]);
 
   useEffect(() => {
     fetchInfant();

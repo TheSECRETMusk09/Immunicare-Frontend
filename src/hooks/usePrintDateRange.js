@@ -93,6 +93,49 @@ export default function usePrintDateRange({
     setValidationError("");
   }, []);
 
+  const syncDateRange = useCallback(
+    ({
+      startDate = "",
+      endDate = "",
+      apply = false,
+      clearIfEmpty = true,
+    } = {}) => {
+      const normalizedStart = String(startDate || "").trim();
+      const normalizedEnd = String(endDate || "").trim();
+
+      setStartDateInput(normalizedStart);
+      setEndDateInput(normalizedEnd);
+
+      if (!normalizedStart && !normalizedEnd && clearIfEmpty) {
+        setAppliedStartDate("");
+        setAppliedEndDate("");
+        setValidationError("");
+        return true;
+      }
+
+      if (!apply) {
+        setValidationError("");
+        return true;
+      }
+
+      const nextValidation = validatePrintDateRange({
+        startDate: normalizedStart,
+        endDate: normalizedEnd,
+      });
+
+      if (!nextValidation.isValid) {
+        setValidationError(nextValidation.error);
+        return false;
+      }
+
+      setAppliedStartDate(normalizedStart);
+      setAppliedEndDate(normalizedEnd);
+      setValidationError("");
+      return true;
+    },
+    [],
+  );
+
   const updateStartDate = useCallback((value) => {
     setStartDateInput(value);
     setValidationError("");
@@ -132,6 +175,7 @@ export default function usePrintDateRange({
     setEndDateInput: updateEndDate,
     applyDateRange,
     clearDateRange,
+    syncDateRange,
     ensureReadyForPrint,
     setValidationError,
   };

@@ -425,7 +425,8 @@ const Announcements = () => {
         />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto modern-scrollbar px-6 pb-6 pt-4">
+      {/* Sticky Filter Section - Outside scrollable area */}
+      <div className="flex-shrink-0 sticky top-0 z-20 bg-white dark:bg-gray-900 px-6 pt-4 pb-2">
         {error && (
           <Alert variant="error" className="mb-4" onClose={() => setError(null)}>
             {error}
@@ -442,8 +443,7 @@ const Announcements = () => {
           </Alert>
         )}
 
-        <div className="animate-fade-in">
-        <Card className="mb-4">
+        <Card className="shadow-md">
           <form className="space-y-4" onSubmit={handleApplyFilters}>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
               <Input
@@ -520,7 +520,11 @@ const Announcements = () => {
             </div>
           </form>
         </Card>
+      </div>
 
+      {/* Scrollable Announcements List */}
+      <div className="flex-1 min-h-0 overflow-y-auto modern-scrollbar px-6 pb-6 pt-4">
+        <div className="animate-fade-in">
         {announcements.length === 0 ? (
           <Card>
             <div className="text-center py-12">

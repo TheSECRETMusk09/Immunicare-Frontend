@@ -65,6 +65,38 @@ describe("usePrintDateRange", () => {
     expect(didApply).toBe(false);
     expect(result.current.validationError).toBe("Start Date cannot be later than End Date.");
   });
+
+  test("can sync an externally controlled applied range", () => {
+    const { result } = renderHook(() => usePrintDateRange());
+
+    let didSync = false;
+    act(() => {
+      didSync = result.current.syncDateRange({
+        startDate: "2026-04-01",
+        endDate: "2026-04-30",
+        apply: true,
+      });
+    });
+
+    expect(didSync).toBe(true);
+    expect(result.current.startDateInput).toBe("2026-04-01");
+    expect(result.current.endDateInput).toBe("2026-04-30");
+    expect(result.current.appliedStartDate).toBe("2026-04-01");
+    expect(result.current.appliedEndDate).toBe("2026-04-30");
+    expect(result.current.hasAppliedDateRange).toBe(true);
+
+    act(() => {
+      result.current.syncDateRange({
+        startDate: "",
+        endDate: "",
+        clearIfEmpty: true,
+      });
+    });
+
+    expect(result.current.appliedStartDate).toBe("");
+    expect(result.current.appliedEndDate).toBe("");
+    expect(result.current.hasAppliedDateRange).toBe(false);
+  });
 });
 
 describe("filterItemsByPrintDateRange", () => {

@@ -1179,7 +1179,7 @@ export default function Appointments() {
 
       {view === "calendar" ? (
         <div
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 pt-3 sm:px-6 sm:pb-6"
+          className="flex-1 min-h-0 overflow-y-auto modern-scrollbar overflow-x-hidden p-4 pt-3 sm:px-6 sm:pb-6"
           data-testid="admin-appointments-calendar-scroll-region"
         >
         <PageContainer title="Calendar View" className="overflow-visible">
@@ -1779,7 +1779,7 @@ export default function Appointments() {
           </div>
 
           {/* Appointments List */}
-          <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-[320px] overflow-y-auto modern-scrollbar pr-1">
             <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
               Appointments for this date:
             </h4>

@@ -241,7 +241,7 @@ const GuardianLayout = memo(function GuardianLayout({ children }) {
                 aria-modal="true"
                 aria-labelledby="password-change-title"
               >
-                <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+                <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-gray-200 max-h-[90vh] overflow-y-auto modern-scrollbar">
                   <div className="flex flex-col items-center text-center mb-6">
                     <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-amber-100 flex items-center justify-center mb-4">
                       <AlertCircle className="w-7 h-7 sm:w-8 sm:h-8 text-amber-600" />

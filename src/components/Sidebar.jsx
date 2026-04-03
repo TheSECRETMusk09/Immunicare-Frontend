@@ -226,7 +226,7 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
 
         {/* Navigation */}
         <nav
-          className="flex-1 px-4 py-6 space-y-2 overflow-y-auto"
+          className="flex-1 px-4 py-6 space-y-2 overflow-y-auto modern-scrollbar"
           onMouseEnter={handleMouseEnter}
         >
           {/* Live Date & Time Display */}

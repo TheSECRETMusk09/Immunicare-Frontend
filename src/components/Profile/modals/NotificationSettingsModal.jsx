@@ -151,7 +151,7 @@ const NotificationSettingsModal = ({
         </div>
       }
     >
-      <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
+      <div className="space-y-6 max-h-[60vh] overflow-y-auto modern-scrollbar pr-2">
         {notificationGroups.map((group) => (
           <div key={group.title}>
             <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">

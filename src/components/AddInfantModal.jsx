@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import apiClient from "../utils/api";
 import infantService from "../services/infantService";
-import { Button, Input, Modal, Select, Alert, AdminModalActions } from "./UI";
+import { Button, Input, Modal, Select, Alert, AdminModalActions, TextArea } from "./UI";
 import { useDebounce } from "../hooks/usePerformance";
 
 const createInitialFormData = () => ({
@@ -360,6 +360,7 @@ export default function AddInfantModal({
             <label className="admin-field-label">Infant Control Number</label>
             <Input
               name="control_number"
+              surface="light"
               value={editingInfant?.control_number || "Auto-generated upon creation"}
               disabled
               readOnly
@@ -370,6 +371,7 @@ export default function AddInfantModal({
         <div className="admin-form-row-2">
           <Input
             label="First Name"
+            surface="light"
             name="first_name"
             value={formData.first_name}
             onChange={handleChange}
@@ -380,6 +382,7 @@ export default function AddInfantModal({
           />
           <Input
             label="Last Name"
+            surface="light"
             name="last_name"
             value={formData.last_name}
             onChange={handleChange}
@@ -393,6 +396,7 @@ export default function AddInfantModal({
         <div className="admin-form-row-2">
           <Input
             label="Date of Birth"
+            surface="light"
             name="dob"
             type="date"
             value={formData.dob}
@@ -403,6 +407,7 @@ export default function AddInfantModal({
           />
           <Select
             label="Gender"
+            surface="light"
             name="sex"
             value={formData.sex}
             onChange={handleChange}
@@ -422,6 +427,7 @@ export default function AddInfantModal({
           <div className="admin-form-row-2">
             <Input
               label="Birth Weight (kg)"
+              surface="light"
               name="birth_weight"
               type="number"
               step="0.01"
@@ -431,6 +437,7 @@ export default function AddInfantModal({
             />
             <Input
               label="Birth Length (cm)"
+              surface="light"
               name="birth_length"
               type="number"
               step="0.1"
@@ -442,6 +449,7 @@ export default function AddInfantModal({
           <div className="admin-form-row-2">
             <Input
               label="Head Circumference (cm)"
+              surface="light"
               name="birth_head_circumference"
               type="number"
               step="0.1"
@@ -451,6 +459,7 @@ export default function AddInfantModal({
             />
             <Select
               label="Blood Type"
+              surface="light"
               name="blood_type"
               value={formData.blood_type}
               onChange={handleChange}
@@ -475,6 +484,7 @@ export default function AddInfantModal({
           <div className="admin-form-row-2">
             <Input
               label="Search Guardian"
+              surface="light"
               value={guardianSearchQuery}
               onChange={(e) => setGuardianSearchQuery(e.target.value)}
               helpText={guardianSearchHelpText}
@@ -485,6 +495,7 @@ export default function AddInfantModal({
           <div className="admin-form-row-2">
             <Select
               label="Assign Guardian"
+              surface="light"
               name="guardian_id"
               value={formData.guardian_id}
               onChange={handleChange}
@@ -496,6 +507,7 @@ export default function AddInfantModal({
             />
             <Input
               label="Birthplace"
+              surface="light"
               name="birthplace"
               value={formData.birthplace}
               onChange={handleChange}
@@ -506,12 +518,12 @@ export default function AddInfantModal({
 
         {/* Notes */}
         <div className="admin-form-section">
-          <label className="admin-field-label">Additional Notes</label>
-          <textarea
+          <TextArea
+            label="Additional Notes"
+            surface="light"
             name="notes"
             value={formData.notes}
             onChange={handleChange}
-            className="admin-textarea"
             rows={3}
             placeholder="Any additional information about the infant..."
           />

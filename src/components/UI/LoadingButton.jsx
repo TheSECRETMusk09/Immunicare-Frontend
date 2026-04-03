@@ -13,6 +13,7 @@
 
 import React, { useState, useCallback, useRef } from "react";
 import PropTypes from "prop-types";
+import ActionSpinner from "./ActionSpinner";
 
 const LoadingButton = ({
   children,
@@ -86,18 +87,6 @@ const LoadingButton = ({
       xl: "px-8 py-3 text-lg min-h-[48px]",
     };
     return sizes[size] || sizes.md;
-  };
-
-  // Get spinner size
-  const getSpinnerSizeClass = () => {
-    const sizes = {
-      xs: "w-3 h-3",
-      sm: "w-4 h-4",
-      md: "w-5 h-5",
-      lg: "w-6 h-6",
-      xl: "w-7 h-7",
-    };
-    return sizes[spinnerSize] || sizes.md;
   };
 
   // Handle click with async support and duplicate prevention
@@ -175,27 +164,7 @@ const LoadingButton = ({
 
   // Render loading spinner
   const renderSpinner = () => (
-    <svg
-      className={`animate-spin ${getSpinnerSizeClass()} flex-shrink-0`}
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-      />
-    </svg>
+    <ActionSpinner size={spinnerSize} className="flex-shrink-0" />
   );
 
   // Render success icon

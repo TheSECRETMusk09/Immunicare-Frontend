@@ -11,11 +11,12 @@ import {
 import ImmunizationChart from "../../components/ImmunizationChart";
 import InfantPersonalRecord from "../../components/InfantPersonalRecord";
 import apiClient from "../../utils/api";
+import { normalizeInfantResponse } from "../../utils/adminDataAdapters";
 import { BarChart3 } from "lucide-react";
 
 export default function ImmunizationChartPage() {
   const { infantId } = useParams();
-  const { isGuardian } = useAuth();
+  const { isGuardian, isAdmin } = useAuth();
   const [infant, setInfant] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -28,14 +29,16 @@ export default function ImmunizationChartPage() {
     }
     try {
       setLoading(true);
-      const data = await apiClient.getInfant(infantId);
-      setInfant(data);
+      const data = await apiClient.getInfant(
+        isAdmin ? `${infantId}?scope=system` : infantId,
+      );
+      setInfant(normalizeInfantResponse(data));
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [infantId]);
+  }, [infantId, isAdmin]);
 
   useEffect(() => {
     fetchInfant();

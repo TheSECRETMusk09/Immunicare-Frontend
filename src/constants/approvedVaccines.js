@@ -1,12 +1,10 @@
 export const APPROVED_VACCINE_NAMES = Object.freeze([
   "BCG",
-  "Diluent",
   "Hepa B",
   "Penta Valent",
   "OPV 20-doses",
   "PCV 13/PCV 10",
   "MMR",
-  "Diluent 5ml",
   "IPV multi dose",
 ]);
 

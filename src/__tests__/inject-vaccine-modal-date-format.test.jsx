@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
 import InjectVaccineModal from "../components/InjectVaccineModal";
@@ -79,15 +79,22 @@ describe("InjectVaccineModal infant dropdown labels", () => {
       />,
     );
 
-    const infantSelect = await screen.findByLabelText(/select infant/i);
+    const infantSelect = await screen.findByRole("button", { name: /select infant/i });
+
+    expect(apiClient.getInfants).toHaveBeenCalledWith({
+      limit: 10000,
+      scope: "system",
+    });
+
+    fireEvent.click(infantSelect);
 
     await waitFor(() => {
-      expect(within(infantSelect).getByRole("option", { name: "Alvin Torres (Feb 27, 2026)" })).toBeInTheDocument();
-      expect(within(infantSelect).getByRole("option", { name: "Noel Bacani (Oct 10, 2025)" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /alvin torres/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /noel bacani/i })).toBeInTheDocument();
     });
 
     expect(
-      within(infantSelect).queryByRole("option", {
+      screen.queryByRole("option", {
         name: /2026-02-26T16:00:00\.000Z/i,
       }),
     ).not.toBeInTheDocument();

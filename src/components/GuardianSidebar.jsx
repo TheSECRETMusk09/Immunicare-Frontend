@@ -372,7 +372,7 @@ const GuardianSidebar = memo(
 
           {/* Navigation */}
           <nav
-            className="guardian-sidebar-nav flex-1 px-3 py-4 space-y-1 overflow-y-auto overflow-x-hidden"
+            className="guardian-sidebar-nav flex-1 px-3 py-4 space-y-1 overflow-y-auto modern-scrollbar overflow-x-hidden"
             onMouseEnter={handleMouseEnter}
           >
             {navItems.map((item) => {

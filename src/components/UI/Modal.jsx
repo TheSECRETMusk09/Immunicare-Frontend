@@ -157,7 +157,7 @@ const Modal = ({
             </div>
           )}
 
-          <div className="admin-modal-body flex-1 min-h-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
+          <div className="admin-modal-body flex-1 min-h-0 overflow-y-auto modern-scrollbar px-4 py-4 sm:px-6 sm:py-6">
             {children}
           </div>
 

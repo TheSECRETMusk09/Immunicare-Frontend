@@ -7,6 +7,12 @@ import apiClient from "../utils/api";
 import ImmunizationRecordPage from "../pages/digital-papers/ImmunizationRecordPage";
 import VaccineSchedulePage from "../pages/digital-papers/VaccineSchedulePage";
 
+jest.mock("../contexts/AuthContext", () => ({
+  useAuth: () => ({
+    isAdmin: true,
+  }),
+}));
+
 jest.mock("../utils/api", () => ({
   __esModule: true,
   default: {
@@ -77,6 +83,8 @@ describe("Phase 9 digital papers downloads", () => {
       await screen.findByRole("heading", { name: /child immunization record booklet/i }),
     ).toBeInTheDocument();
 
+    expect(apiClient.getInfant).toHaveBeenCalledWith("7?scope=system");
+
     fireEvent.click(screen.getByRole("button", { name: /download pdf/i }));
 
     await waitFor(() => {
@@ -122,6 +130,8 @@ describe("Phase 9 digital papers downloads", () => {
     expect(
       await screen.findByRole("heading", { name: /vaccine schedule booklet/i }),
     ).toBeInTheDocument();
+
+    expect(apiClient.getInfant).toHaveBeenCalledWith("7?scope=system");
 
     fireEvent.click(screen.getByRole("button", { name: /download pdf/i }));
 

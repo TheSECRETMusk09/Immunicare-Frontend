@@ -220,7 +220,7 @@ const RIS_EXPORT_PAGE = Object.freeze({
 });
 
 const INVENTORY_PRINT_PAGE_SIZES = {
-  [PRINT_REPORT_TYPES.INVENTORY_SHEET]: "legal portrait",
+  [PRINT_REPORT_TYPES.INVENTORY_SHEET]: "legal landscape",
   [PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM]: "legal landscape",
   [PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP]: RIS_EXPORT_PAGE.printPageSize,
 };
@@ -893,6 +893,51 @@ const matchesOptionalDateRange = (
     });
 };
 
+const matchesInventoryReportPeriodRange = (
+  item = {},
+  { startDate = "", endDate = "" } = {},
+) => {
+  const parsedStart = parseDateOnlyValue(startDate);
+  const parsedEnd = parseDateOnlyValue(endDate, { endOfDay: true });
+
+  if (!parsedStart && !parsedEnd) {
+    return true;
+  }
+
+  const periodStart = parseDateOnlyValue(item.period_start);
+  const periodEnd = parseDateOnlyValue(item.period_end, { endOfDay: true });
+
+  if (periodStart || periodEnd) {
+    const normalizedPeriodStart = periodStart || periodEnd;
+    const normalizedPeriodEnd = periodEnd || periodStart;
+
+    if (!normalizedPeriodStart || !normalizedPeriodEnd) {
+      return false;
+    }
+
+    if (parsedStart && normalizedPeriodEnd.getTime() < parsedStart.getTime()) {
+      return false;
+    }
+
+    if (parsedEnd && normalizedPeriodStart.getTime() > parsedEnd.getTime()) {
+      return false;
+    }
+
+    return true;
+  }
+
+  return matchesOptionalDateRange(
+    [
+      item.last_transaction_date,
+      item.received_date,
+      item.transferred_in_date,
+      item.transferred_out_date,
+      item.issuance_date,
+    ],
+    { startDate, endDate },
+  );
+};
+
 const matchesInventoryStatusFilter = (item = {}, status = "all") => {
   const normalizedStatus = String(status || "all").trim().toLowerCase();
   const stockOnHand = Number(item.stock_on_hand || 0);
@@ -960,6 +1005,7 @@ function InventoryDisplayToolbarFilters({
   hasActiveFilters,
   selectedReportType,
   onReportTypeChange,
+  showReportTypeSelector = true,
   showDivider = true,
 }) {
   return (
@@ -1006,7 +1052,7 @@ function InventoryDisplayToolbarFilters({
         className="text-sm"
         containerClassName="w-full sm:w-[188px] xl:w-[172px]"
       />
-      {typeof onReportTypeChange === "function" ? (
+      {showReportTypeSelector && typeof onReportTypeChange === "function" ? (
         <Select
           label="Report Format"
           value={selectedReportType}
@@ -1142,6 +1188,7 @@ function InventoryActiveTabToolbarFilters({
       hasActiveFilters={hasActiveInventoryFilters}
       selectedReportType={selectedReportType}
       onReportTypeChange={onReportTypeChange}
+      showReportTypeSelector={activeTab === "inventory_sheet"}
       showDivider={showDivider}
     />
   );
@@ -1661,6 +1708,8 @@ const normalizeInventoryRecord = (source = {}, fallback = {}) => {
     expired_wasted: expiredWasted,
     issuance,
     issuance_date: source.issuance_date ?? fallback.issuance_date ?? "",
+    period_start: source.period_start ?? fallback.period_start ?? "",
+    period_end: source.period_end ?? fallback.period_end ?? "",
     stock_in: normalizeInventoryNumber(source.stock_in ?? fallback.stock_in),
     stock_out: normalizeInventoryNumber(source.stock_out ?? fallback.stock_out),
     total_available: totalAvailable,
@@ -1999,31 +2048,21 @@ const buildRisReportRows = (inventoryRows = []) => {
 
   return [
     ...primaryRows,
-    {
-      type: "section",
-      key: "others",
-      description: "OTHERS",
-      unit: "",
-      balanceOnHand: "",
-      requestQty: "",
-      issuedQty: "",
-      totalQty: "",
-    },
     ...(othersRows.length > 0
-      ? othersRows
-      : [
+      ? [
           {
-            type: "item",
-            key: "others-empty",
-            description: "",
+            type: "section",
+            key: "others",
+            description: "OTHERS",
             unit: "",
             balanceOnHand: "",
             requestQty: "",
             issuedQty: "",
             totalQty: "",
-            hasData: false,
           },
-        ]),
+          ...othersRows,
+        ]
+      : []),
   ];
 };
 
@@ -2485,6 +2524,33 @@ const buildDohLguPdfHeaderRows = () => [
   ["DOH", "LGU", "DOH", "LGU", "DOH", "LGU", "DOH", "LGU", "DOH", "LGU"],
 ];
 
+const DOH_LGU_PDF_COLUMN_WIDTH_WEIGHTS = [
+  8, 72, 12, 12, 12, 12, 12, 12, 22, 17, 20, 12, 12, 18, 12, 12,
+];
+
+const getScaledPdfColumnStyles = ({
+  weights = [],
+  availableWidth,
+  alignments = {},
+}) => {
+  const totalWeight = weights.reduce(
+    (sum, value) => sum + Number(value || 0),
+    0,
+  );
+
+  if (!totalWeight || !availableWidth) {
+    return {};
+  }
+
+  return weights.reduce((result, weight, index) => {
+    result[index] = {
+      cellWidth: Number(((availableWidth * weight) / totalWeight).toFixed(2)),
+      ...(alignments[index] ? { halign: alignments[index] } : {}),
+    };
+    return result;
+  }, {});
+};
+
 const resolvePdfAutoTableRunner = ({ doc, autoTableModule }) => {
   const moduleAutoTable =
     typeof autoTableModule?.default === "function"
@@ -2529,7 +2595,8 @@ const exportDohLguInventoryPdf = async ({
   const runAutoTable = resolvePdfAutoTableRunner({ doc, autoTableModule });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = { top: 6, right: 6, bottom: 6, left: 6 };
+  const margin = { top: 4.5, right: 4.5, bottom: 4.5, left: 4.5 };
+  const availableTableWidth = pageWidth - margin.left - margin.right;
   const facilityName =
     String(facilityInfo?.healthCenter || "").trim() ||
     DEFAULT_PRINT_HEADER.healthCenter;
@@ -2548,10 +2615,10 @@ const exportDohLguInventoryPdf = async ({
 
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.22);
-  doc.rect(3, 3, pageWidth - 6, pageHeight - 6);
+  doc.rect(2.4, 2.4, pageWidth - 4.8, pageHeight - 4.8);
 
-  const sealSize = 12.5;
-  const sealY = 6.5;
+  const sealSize = 13.5;
+  const sealY = 5.4;
   if (leftSealImage) {
     doc.addImage(leftSealImage, "PNG", margin.left + 1.2, sealY, sealSize, sealSize);
   }
@@ -2567,30 +2634,30 @@ const exportDohLguInventoryPdf = async ({
   }
 
   doc.setFont("times", "normal");
-  doc.setFontSize(8.5);
-  doc.text("Republic of the Philippines", pageWidth / 2, 10, {
+  doc.setFontSize(8.7);
+  doc.text("Republic of the Philippines", pageWidth / 2, 9.5, {
     align: "center",
   });
 
   doc.setFont("times", "bold");
-  doc.setFontSize(11);
-  doc.text("METRO MANILA CENTER FOR HEALTH DEVELOPMENT", pageWidth / 2, 16, {
+  doc.setFontSize(11.6);
+  doc.text("METRO MANILA CENTER FOR HEALTH DEVELOPMENT", pageWidth / 2, 15.2, {
     align: "center",
   });
 
-  doc.setFontSize(9);
-  doc.text(PRINT_REPORT_COPY.dohLguTitle, pageWidth / 2, 22, {
+  doc.setFontSize(9.5);
+  doc.text(PRINT_REPORT_COPY.dohLguTitle, pageWidth / 2, 21.4, {
     align: "center",
   });
 
   doc.setFont("times", "normal");
-  doc.setFontSize(8);
-  doc.text(PRINT_REPORT_COPY.dohLguSubtitle, pageWidth / 2, 26, {
+  doc.setFontSize(8.3);
+  doc.text(PRINT_REPORT_COPY.dohLguSubtitle, pageWidth / 2, 25.6, {
     align: "center",
   });
 
   runAutoTable({
-    startY: 30,
+    startY: 29,
     margin,
     theme: "grid",
     body: [
@@ -2621,15 +2688,15 @@ const exportDohLguInventoryPdf = async ({
     ],
     styles: {
       font: "times",
-      fontSize: 7,
-      cellPadding: 0.7,
+      fontSize: 7.4,
+      cellPadding: 0.8,
       textColor: [0, 0, 0],
       lineColor: [0, 0, 0],
       lineWidth: 0.22,
       valign: "middle",
       halign: "left",
     },
-    tableWidth: pageWidth - margin.left - margin.right,
+    tableWidth: availableTableWidth,
   });
 
   runAutoTable({
@@ -2657,8 +2724,8 @@ const exportDohLguInventoryPdf = async ({
     ]),
     styles: {
       font: "times",
-      fontSize: 6.5,
-      cellPadding: 0.55,
+      fontSize: 6.9,
+      cellPadding: 0.5,
       textColor: [0, 0, 0],
       lineColor: [0, 0, 0],
       lineWidth: 0.24,
@@ -2676,24 +2743,15 @@ const exportDohLguInventoryPdf = async ({
     bodyStyles: {
       fillColor: [255, 255, 255],
     },
-    columnStyles: {
-      0: { cellWidth: 8 },
-      1: { cellWidth: 72, halign: "left" },
-      2: { cellWidth: 12 },
-      3: { cellWidth: 12 },
-      4: { cellWidth: 12 },
-      5: { cellWidth: 12 },
-      6: { cellWidth: 12 },
-      7: { cellWidth: 12 },
-      8: { cellWidth: 22, halign: "left" },
-      9: { cellWidth: 17 },
-      10: { cellWidth: 20 },
-      11: { cellWidth: 12 },
-      12: { cellWidth: 12 },
-      13: { cellWidth: 18 },
-      14: { cellWidth: 12 },
-      15: { cellWidth: 12 },
-    },
+    tableWidth: availableTableWidth,
+    columnStyles: getScaledPdfColumnStyles({
+      weights: DOH_LGU_PDF_COLUMN_WIDTH_WEIGHTS,
+      availableWidth: availableTableWidth,
+      alignments: {
+        1: "left",
+        8: "left",
+      },
+    }),
     didParseCell: (hook) => {
       if (hook.section === "body" && hook.column.index === 1) {
         hook.cell.styles.fontStyle = "bold";
@@ -2740,6 +2798,8 @@ const buildRisPdfHeaderRows = () => [
   ["QTY", "QTY"],
 ];
 
+const RIS_PDF_COLUMN_WIDTH_WEIGHTS = [73, 20, 28, 24, 24, 22];
+
 const exportRisPdf = async ({
   facilityInfo,
   reportDate,
@@ -2765,7 +2825,8 @@ const exportRisPdf = async ({
   const runAutoTable = resolvePdfAutoTableRunner({ doc, autoTableModule });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = { top: 10, right: 10, bottom: 10, left: 10 };
+  const margin = { top: 8, right: 8, bottom: 8, left: 8 };
+  const availableTableWidth = pageWidth - margin.left - margin.right;
   const facilityName =
     String(facilityInfo?.healthCenter || "").trim() ||
     DEFAULT_PRINT_HEADER.healthCenter;
@@ -2795,34 +2856,34 @@ const exportRisPdf = async ({
 
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.25);
-  doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
+  doc.rect(4, 4, pageWidth - 8, pageHeight - 8);
 
   if (pasigLogoResult.status === "fulfilled") {
-    doc.addImage(pasigLogoResult.value, "PNG", 24, 12, 18, 18);
+    doc.addImage(pasigLogoResult.value, "PNG", 22, 11, 18, 18);
   }
 
   if (dohLogoResult.status === "fulfilled") {
-    doc.addImage(dohLogoResult.value, "PNG", pageWidth - 42, 12, 18, 18);
+    doc.addImage(dohLogoResult.value, "PNG", pageWidth - 40, 11, 18, 18);
   }
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.text(PRINT_REPORT_COPY.risTitle, pageWidth / 2, 17, {
+  doc.setFontSize(14.5);
+  doc.text(PRINT_REPORT_COPY.risTitle, pageWidth / 2, 16.5, {
     align: "center",
   });
 
-  doc.setFontSize(9);
-  doc.text(PRINT_REPORT_COPY.risSubtitle, pageWidth / 2, 23, {
+  doc.setFontSize(9.4);
+  doc.text(PRINT_REPORT_COPY.risSubtitle, pageWidth / 2, 22.5, {
     align: "center",
   });
 
-  doc.setFontSize(10.5);
-  doc.text(PRINT_REPORT_COPY.risMunicipality, pageWidth / 2, 29, {
+  doc.setFontSize(10.9);
+  doc.text(PRINT_REPORT_COPY.risMunicipality, pageWidth / 2, 28.5, {
     align: "center",
   });
 
   runAutoTable({
-    startY: 38,
+    startY: 36,
     margin,
     theme: "plain",
     body: [
@@ -2851,8 +2912,8 @@ const exportRisPdf = async ({
     ],
     styles: {
       font: "helvetica",
-      fontSize: 8.4,
-      cellPadding: 1.2,
+      fontSize: 8.7,
+      cellPadding: 1.15,
       textColor: [0, 0, 0],
       lineWidth: 0,
       valign: "middle",
@@ -2860,7 +2921,7 @@ const exportRisPdf = async ({
     },
     columnStyles: {
       0: { cellWidth: 22 },
-      1: { cellWidth: 62 },
+      1: { cellWidth: 66 },
       2: { cellWidth: 10 },
       3: { cellWidth: 28 },
       4: { cellWidth: 48 },
@@ -2880,7 +2941,7 @@ const exportRisPdf = async ({
   });
 
   runAutoTable({
-    startY: (doc.lastAutoTable?.finalY || 38) + 2,
+    startY: (doc.lastAutoTable?.finalY || 36) + 2,
     margin,
     theme: "grid",
     head: buildRisPdfHeaderRows(),
@@ -2905,8 +2966,8 @@ const exportRisPdf = async ({
     ]),
     styles: {
       font: "helvetica",
-      fontSize: 8.2,
-      cellPadding: 1.1,
+      fontSize: 8.45,
+      cellPadding: 1,
       textColor: [0, 0, 0],
       lineColor: [17, 24, 39],
       lineWidth: 0.2,
@@ -2924,14 +2985,14 @@ const exportRisPdf = async ({
     bodyStyles: {
       fillColor: [255, 255, 255],
     },
-    columnStyles: {
-      0: { cellWidth: 73, halign: "left" },
-      1: { cellWidth: 20 },
-      2: { cellWidth: 28 },
-      3: { cellWidth: 24 },
-      4: { cellWidth: 24 },
-      5: { cellWidth: 22 },
-    },
+    tableWidth: availableTableWidth,
+    columnStyles: getScaledPdfColumnStyles({
+      weights: RIS_PDF_COLUMN_WIDTH_WEIGHTS,
+      availableWidth: availableTableWidth,
+      alignments: {
+        0: "left",
+      },
+    }),
     didParseCell: (hook) => {
       if (hook.section === "body" && hook.row.raw?.[0]?.colSpan === 6) {
         hook.cell.styles.fontStyle = "bold";
@@ -2972,11 +3033,11 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
   }
 
   body.inventory-export--landscape {
-    padding: 0.18in;
+    padding: 0.08in 0.1in 0.1in;
   }
 
   body.inventory-export--portrait {
-    padding: 0.22in;
+    padding: 0.1in 0.12in 0.12in;
   }
 
   .inventory-sheet-summary-print-report,
@@ -3098,6 +3159,9 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
   }
 
   .doh-lgu-stock-print-report__page {
+    margin: 0 auto;
+    min-height: 7.75in;
+    padding: 0.05in 0.07in 0.08in;
     border: 1.4px solid #111827;
   }
 
@@ -3455,7 +3519,7 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
   }
 
   .doh-lgu-stock-print-header {
-    padding: 0.16cm 0.2cm 0.13cm;
+    padding: 0.12cm 0.14cm 0.1cm;
     border-bottom: 1.2px solid #111827;
   }
 
@@ -3490,10 +3554,10 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
 
   .ris-word-report__page {
     width: 100%;
-    max-width: 7.9in;
+    max-width: 8.12in;
     margin: 0 auto;
     border: 1.4px solid #111827;
-    padding: 0.18in;
+    padding: 0.12in 0.14in 0.14in;
     background: #ffffff;
   }
 
@@ -5000,6 +5064,23 @@ export default function InventoryManagement() {
   const dateRangeStart = printDateRange.appliedStartDate;
   const dateRangeEnd = printDateRange.appliedEndDate;
   const isFiltering = printDateRange.hasAppliedDateRange;
+
+  useEffect(() => {
+    const startDate = inventoryDisplayFilters.startDate;
+    const endDate = inventoryDisplayFilters.endDate;
+
+    printDateRange.syncDateRange({
+      startDate,
+      endDate,
+      apply: Boolean(startDate && endDate),
+      clearIfEmpty: true,
+    });
+  }, [
+    inventoryDisplayFilters.endDate,
+    inventoryDisplayFilters.startDate,
+    printDateRange.syncDateRange,
+  ]);
+
   const requiresBatchSelection =
     modalType === "issue" || modalType === "waste";
 
@@ -5253,15 +5334,31 @@ export default function InventoryManagement() {
   ]);
 
   // Fetch data
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async ({ background = false } = {}) => {
+    const shouldShowBlockingLoader = !background && inventory.length === 0;
+
     try {
-      setLoading(true);
+      if (shouldShowBlockingLoader) {
+        setLoading(true);
+      }
       setError(null);
 
       // Try to fetch inventory data from API
       try {
+        const inventoryQuery = {
+          clinic_id: fallbackClinicId,
+        };
+
+        if (
+          isValidInventoryDateInput(inventoryDisplayFilters.startDate) &&
+          isValidInventoryDateInput(inventoryDisplayFilters.endDate)
+        ) {
+          inventoryQuery.period_start = inventoryDisplayFilters.startDate;
+          inventoryQuery.period_end = inventoryDisplayFilters.endDate;
+        }
+
         const [inventoryData, vaccinesData] = await Promise.all([
-          apiClient.getVaccineInventory({ clinic_id: fallbackClinicId }),
+          apiClient.getVaccineInventory(inventoryQuery),
           apiClient.getVaccines().catch(() => ({ data: [] })),
         ]);
 
@@ -5310,9 +5407,7 @@ export default function InventoryManagement() {
         );
 
         setInventory(mappedInventory);
-        setInventoryReportSource(
-          normalizedApiInventory.length > 0 ? normalizedApiInventory : mappedInventory,
-        );
+        setInventoryReportSource(normalizedApiInventory);
       } catch (apiErr) {
         console.error("Inventory data load failed:", apiErr);
         setError(
@@ -5354,14 +5449,21 @@ export default function InventoryManagement() {
         console.log("Using default facility info", facilityErr.message);
       }
 
-      setLoading(false);
+      if (shouldShowBlockingLoader) {
+        setLoading(false);
+      }
     } catch (err) {
       setError(err.message);
-      setLoading(false);
+      if (shouldShowBlockingLoader) {
+        setLoading(false);
+      }
     }
   }, [
     fallbackClinicId,
     fetchPersistedStockAlerts,
+    inventory.length,
+    inventoryDisplayFilters.endDate,
+    inventoryDisplayFilters.startDate,
     initializeInventory,
     loadStockMovements,
     vaccineItems,
@@ -5373,7 +5475,7 @@ export default function InventoryManagement() {
 
   // Instantly sync inventory if a vaccination was recorded and deducted stock
   useEffect(() => {
-    const handleSyncUpdate = () => fetchData();
+    const handleSyncUpdate = () => fetchData({ background: true });
 
     window.addEventListener("vaccination-update", handleSyncUpdate);
     window.addEventListener("inventory-update", handleSyncUpdate);
@@ -5577,6 +5679,8 @@ export default function InventoryManagement() {
       startDate: dateRangeStart,
       endDate: dateRangeEnd,
       getItemDates: (item) => [
+        item.period_start,
+        item.period_end,
         item.last_transaction_date,
         item.received_date,
         item.transferred_in_date,
@@ -5592,18 +5696,12 @@ export default function InventoryManagement() {
       return inventoryReportSource;
     }
 
-    return filterItemsByPrintDateRange(inventoryReportSource, {
-      startDate: dateRangeStart,
-      endDate: dateRangeEnd,
-      getItemDates: (item) => [
-        item.last_transaction_date,
-        item.received_date,
-        item.transferred_in_date,
-        item.transferred_out_date,
-        item.issuance_date,
-        item.expiry_date,
-      ],
-    });
+    return inventoryReportSource.filter((item) =>
+      matchesInventoryReportPeriodRange(item, {
+        startDate: dateRangeStart,
+        endDate: dateRangeEnd,
+      }),
+    );
   }, [inventoryReportSource, isFiltering, dateRangeStart, dateRangeEnd]);
 
   const filteredStockMovements = useMemo(() => {
@@ -5674,6 +5772,8 @@ export default function InventoryManagement() {
     return filteredInventory.filter((item) => {
       const matchesDateFilter = matchesOptionalDateRange(
         [
+          item.period_start,
+          item.period_end,
           item.last_transaction_date,
           item.received_date,
           item.transferred_in_date,
@@ -5698,15 +5798,8 @@ export default function InventoryManagement() {
 
   const displayedInventoryReportSource = useMemo(() => {
     return filteredInventoryReportSource.filter((item) => {
-      const matchesDateFilter = matchesOptionalDateRange(
-        [
-          item.last_transaction_date,
-          item.received_date,
-          item.transferred_in_date,
-          item.transferred_out_date,
-          item.issuance_date,
-          item.expiry_date,
-        ],
+      const matchesDateFilter = matchesInventoryReportPeriodRange(
+        item,
         inventoryDisplayFilters,
       );
 
@@ -5721,6 +5814,16 @@ export default function InventoryManagement() {
       return matchesDateFilter && matchesVaccineFilter && matchesStatusFilter;
     });
   }, [filteredInventoryReportSource, inventoryDisplayFilters]);
+
+  const reportInventoryRows = useMemo(
+    () =>
+      aggregateInventoryRecordsByVaccine(
+        displayedInventoryReportSource,
+        vaccineItems,
+        fallbackClinicId,
+      ),
+    [displayedInventoryReportSource, fallbackClinicId, vaccineItems],
+  );
 
   const displayedStockMovements = useMemo(() => {
     return filteredStockMovements.filter((movement) => {
@@ -6673,8 +6776,8 @@ export default function InventoryManagement() {
 
   // Use the currently displayed inventory rows for report generation/export
   const printRows = useMemo(
-    () => buildInventoryPrintRows(displayedInventory),
-    [displayedInventory],
+    () => buildInventoryPrintRows(reportInventoryRows),
+    [reportInventoryRows],
   );
 
   const printTotals = useMemo(
@@ -8313,7 +8416,7 @@ export default function InventoryManagement() {
                         Loading available lot/batch records...
                       </div>
                     ) : filteredAvailableLots.length > 0 ? (
-                      <div className="max-h-56 overflow-y-auto">
+                      <div className="max-h-56 overflow-y-auto modern-scrollbar">
                         {filteredAvailableLots.map((batch) => {
                           const isSelected =
                             resolveInventorySaveRowId(
@@ -8469,8 +8572,8 @@ export default function InventoryManagement() {
           }
 
           body.printing-inventory.printing-report-inventory-sheet {
-            --inventory-print-page-width: calc(8.5in - 0.7cm);
-            --inventory-print-page-height: calc(14in - 0.7cm);
+            --inventory-print-page-width: calc(14in - 0.5cm);
+            --inventory-print-page-height: calc(8.5in - 0.5cm);
           }
 
           html,
@@ -8496,6 +8599,18 @@ export default function InventoryManagement() {
             margin: 0 !important;
             padding: 0.16in !important;
             background: #ffffff !important;
+          }
+
+          body.printing-inventory.printing-report-inventory-sheet #inventory-print-root {
+            padding: 0.1in 0.12in 0.12in !important;
+          }
+
+          body.printing-inventory.printing-report-doh-lgu-stock-form #inventory-print-root {
+            padding: 0.08in 0.1in 0.1in !important;
+          }
+
+          body.printing-inventory.printing-report-requisition-issue-slip #inventory-print-root {
+            padding: 0.1in 0.12in 0.12in !important;
           }
 
           body.printing-inventory.printing-report-inventory-sheet .inventory-sheet-summary-print-report,
@@ -8624,9 +8739,11 @@ export default function InventoryManagement() {
           }
 
           .inventory-sheet-summary-print-report__page {
-            width: min(calc(100% - 0.8cm), var(--inventory-print-page-width)) !important;
+            width: min(calc(100% - 0.08in), var(--inventory-print-page-width)) !important;
             max-width: var(--inventory-print-page-width) !important;
-            min-height: var(--inventory-print-page-height) !important;
+            min-height: calc(var(--inventory-print-page-height) - 0.05in) !important;
+            margin: 0 auto 0.08in !important;
+            padding: 0.03in 0.04in 0.08in !important;
             page-break-after: always !important;
             break-after: page !important;
           }
@@ -8637,9 +8754,11 @@ export default function InventoryManagement() {
           }
 
           .doh-lgu-stock-print-report__page {
-            width: min(calc(100% - 0.8cm), 13.1in) !important;
-            max-width: 13.1in !important;
-            max-height: var(--inventory-print-page-height) !important;
+            width: min(calc(100% - 0.08in), var(--inventory-print-page-width)) !important;
+            max-width: var(--inventory-print-page-width) !important;
+            min-height: calc(var(--inventory-print-page-height) - 0.05in) !important;
+            margin: 0 auto 0.08in !important;
+            padding: 0.04in 0.06in 0.08in !important;
             border: 1.6px solid #111827 !important;
           }
 
@@ -8741,11 +8860,12 @@ export default function InventoryManagement() {
   .ris-word-table {
     margin-top: 0.02in;
   }
-  .ris-print-report__page {
-            width: min(calc(100% - 1.8cm), 8.1in) !important;
-            max-width: 8.1in !important;
-            max-height: var(--inventory-print-page-height) !important;
-            padding: 0.18in 0.18in 0.14in !important;
+          .ris-print-report__page {
+            width: min(calc(100% - 0.12in), 8.14in) !important;
+            max-width: 8.14in !important;
+            min-height: calc(var(--inventory-print-page-height) - 0.05in) !important;
+            margin: 0 auto 0.08in !important;
+            padding: 0.12in 0.14in 0.14in !important;
             border: 1.5px solid #111827 !important;
           }
 
@@ -8755,8 +8875,8 @@ export default function InventoryManagement() {
             align-items: center !important;
             gap: 0.04cm !important;
             text-align: center !important;
-            margin: 0 0 0.28in 0 !important;
-            padding: 0 0 0.16in !important;
+            margin: 0 0 0.2in 0 !important;
+            padding: 0 0 0.13in !important;
             border-bottom: 1.2px solid #cbd5e1 !important;
             color: #0f172a !important;
           }
@@ -8768,14 +8888,14 @@ export default function InventoryManagement() {
           }
 
           .inventory-sheet-summary-print-header__line--primary {
-            font-size: 12.8px !important;
+            font-size: 13.6px !important;
             font-weight: 800 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.014em !important;
           }
 
           .inventory-sheet-summary-print-header__line--department {
-            font-size: 10.4px !important;
+            font-size: 10.8px !important;
             font-weight: 800 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.012em !important;
@@ -8783,14 +8903,14 @@ export default function InventoryManagement() {
 
           .inventory-sheet-summary-print-header__line--title {
             margin-top: 0.01cm !important;
-            font-size: 10px !important;
+            font-size: 10.4px !important;
             font-weight: 800 !important;
             text-transform: none !important;
           }
 
           .inventory-sheet-summary-print-header__line--supporting {
             margin-top: 0 !important;
-            font-size: 9px !important;
+            font-size: 9.2px !important;
             font-weight: 600 !important;
             text-transform: none !important;
             color: #334155 !important;
@@ -8798,7 +8918,7 @@ export default function InventoryManagement() {
 
           .inventory-sheet-summary-print-header__line--label {
             margin-top: 0.04cm !important;
-            font-size: 9px !important;
+            font-size: 9.2px !important;
             font-weight: 800 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.012em !important;
@@ -8806,7 +8926,7 @@ export default function InventoryManagement() {
 
           .inventory-sheet-summary-print-header__line--facility {
             margin-top: 0 !important;
-            font-size: 11px !important;
+            font-size: 11.4px !important;
             font-weight: 800 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.01em !important;
@@ -8814,7 +8934,7 @@ export default function InventoryManagement() {
 
           .inventory-sheet-summary-print-header__line--inventory {
             margin-top: 0.02cm !important;
-            font-size: 9.4px !important;
+            font-size: 9.8px !important;
             font-weight: 700 !important;
             text-transform: none !important;
           }
@@ -8825,8 +8945,8 @@ export default function InventoryManagement() {
             align-items: center !important;
             justify-content: space-between !important;
             gap: 0.25in !important;
-            margin-top: 0.08in !important;
-            padding-top: 0.08in !important;
+            margin-top: 0.06in !important;
+            padding-top: 0.07in !important;
             border-top: 1px solid #e2e8f0 !important;
           }
 
@@ -8835,7 +8955,7 @@ export default function InventoryManagement() {
             align-items: center !important;
             gap: 0.08in !important;
             min-width: 0 !important;
-            font-size: 9px !important;
+            font-size: 9.2px !important;
             font-weight: 700 !important;
             color: #111827 !important;
           }
@@ -8855,12 +8975,12 @@ export default function InventoryManagement() {
 
           .inventory-sheet-summary-print-table {
             width: 100% !important;
-            margin-top: 0.04in !important;
+            margin-top: 0.03in !important;
             table-layout: fixed !important;
             border-collapse: collapse !important;
             border-spacing: 0 !important;
-            font-size: 10.2px !important;
-            line-height: 1.24 !important;
+            font-size: 10.8px !important;
+            line-height: 1.22 !important;
             color: #0f172a !important;
           }
 
@@ -8880,7 +9000,7 @@ export default function InventoryManagement() {
           .inventory-sheet-summary-print-table th,
           .inventory-sheet-summary-print-table td {
             border: 1.35px solid #0f172a !important;
-            padding: 0.14cm 0.08cm !important;
+            padding: 0.16cm 0.1cm !important;
             vertical-align: middle !important;
             word-break: break-word !important;
             overflow-wrap: anywhere !important;
@@ -8890,7 +9010,7 @@ export default function InventoryManagement() {
           }
 
           .inventory-sheet-summary-print-table th {
-            font-size: 9.8px !important;
+            font-size: 10.3px !important;
             font-weight: 800 !important;
             text-transform: none !important;
             text-align: center !important;
@@ -8899,9 +9019,9 @@ export default function InventoryManagement() {
           }
 
           .inventory-sheet-summary-print-table td {
-            font-size: 10.3px !important;
-            min-height: 0.64cm !important;
-            line-height: 1.22 !important;
+            font-size: 10.7px !important;
+            min-height: 0.68cm !important;
+            line-height: 1.18 !important;
             letter-spacing: 0.005em !important;
             font-weight: 500 !important;
             color: #111827 !important;
@@ -8974,15 +9094,15 @@ export default function InventoryManagement() {
           }
 
           .inventory-sheet-summary-print-header {
-            margin: 0 0 0.18in 0 !important;
-            padding: 0 0 0.14in !important;
+            margin: 0 0 0.16in 0 !important;
+            padding: 0 0 0.12in !important;
           }
 
           .inventory-sheet-summary-print-header__branding {
             display: grid !important;
-            grid-template-columns: 0.96in minmax(0, 1fr) 0.96in !important;
+            grid-template-columns: 1.02in minmax(0, 1fr) 1.02in !important;
             align-items: center !important;
-            gap: 0.18in !important;
+            gap: 0.14in !important;
           }
 
           .inventory-sheet-summary-print-header__branding-copy {
@@ -8996,8 +9116,8 @@ export default function InventoryManagement() {
           }
 
           .inventory-sheet-summary-print-header__logo {
-            width: 0.9in !important;
-            height: 0.9in !important;
+            width: 0.96in !important;
+            height: 0.96in !important;
             object-fit: contain !important;
             background: transparent !important;
           }
@@ -9046,7 +9166,7 @@ export default function InventoryManagement() {
             display: block !important;
             text-align: center !important;
             margin: 0 !important;
-            padding: 0.18cm 0.22cm 0.14cm !important;
+            padding: 0.12cm 0.14cm 0.1cm !important;
             border-bottom: 1.35px solid #111827 !important;
             color: #0f172a !important;
           }
@@ -9058,21 +9178,21 @@ export default function InventoryManagement() {
           }
 
           .doh-lgu-stock-print-header__line--government {
-            font-size: 9.2px !important;
-            margin-bottom: 0.08cm !important;
+            font-size: 9.4px !important;
+            margin-bottom: 0.05cm !important;
           }
 
           .doh-lgu-stock-print-header__branding {
             display: grid !important;
             grid-template-columns: 0.72in minmax(0, 1fr) 0.72in !important;
             align-items: center !important;
-            gap: 0.22cm !important;
+            gap: 0.12cm !important;
           }
 
           .doh-lgu-stock-print-header__seal {
             display: block !important;
-            width: 0.7in !important;
-            height: 0.7in !important;
+            width: 0.74in !important;
+            height: 0.74in !important;
             object-fit: cover !important;
             border-radius: 9999px !important;
             clip-path: circle(50% at 50% 50%) !important;
@@ -9088,21 +9208,21 @@ export default function InventoryManagement() {
           }
 
           .doh-lgu-stock-print-header__line--primary {
-            font-size: 11.2px !important;
+            font-size: 12px !important;
             font-weight: 800 !important;
             text-transform: uppercase !important;
           }
 
           .doh-lgu-stock-print-header__line--title {
             margin-top: 0.05cm !important;
-            font-size: 9.9px !important;
+            font-size: 10.4px !important;
             font-weight: 800 !important;
             text-transform: uppercase !important;
           }
 
           .doh-lgu-stock-print-header__line--subtitle {
             margin-top: 0.03cm !important;
-            font-size: 8.6px !important;
+            font-size: 8.9px !important;
             font-weight: 700 !important;
             text-transform: none !important;
             color: #1f2937 !important;
@@ -9111,17 +9231,17 @@ export default function InventoryManagement() {
           .doh-lgu-stock-print-header__meta {
             display: grid !important;
             grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-            gap: 0.08cm 0.28cm !important;
-            margin-top: 0.14cm !important;
-            padding-top: 0.12cm !important;
+            gap: 0.05cm 0.18cm !important;
+            margin-top: 0.08cm !important;
+            padding-top: 0.08cm !important;
             border-top: 1px solid #cbd5e1 !important;
             text-align: left !important;
           }
 
           .doh-lgu-stock-print-header__meta-line {
             margin: 0 !important;
-            font-size: 8.5px !important;
-            line-height: 1.22 !important;
+            font-size: 8.7px !important;
+            line-height: 1.16 !important;
             color: #111827 !important;
           }
 
@@ -9143,7 +9263,7 @@ export default function InventoryManagement() {
           #doh-lgu-print-table th,
           #doh-lgu-print-table td {
             border: 1.15px solid #111827 !important;
-            padding: 0.095cm 0.07cm !important;
+            padding: 0.082cm 0.06cm !important;
             vertical-align: middle !important;
             word-break: break-word !important;
             overflow-wrap: anywhere !important;
@@ -9154,8 +9274,8 @@ export default function InventoryManagement() {
           }
 
           #doh-lgu-print-table {
-            font-size: 7.95px !important;
-            line-height: 1.16 !important;
+            font-size: 8.15px !important;
+            line-height: 1.1 !important;
           }
 
           #doh-lgu-print-table thead {
@@ -9172,19 +9292,19 @@ export default function InventoryManagement() {
           }
 
           #doh-lgu-print-table th {
-            font-size: 7.85px !important;
+            font-size: 8px !important;
             font-weight: 800 !important;
             text-transform: none !important;
             text-align: center !important;
             letter-spacing: 0.007em !important;
-            line-height: 1.12 !important;
+            line-height: 1.06 !important;
             color: #111827 !important;
           }
 
           #doh-lgu-print-table td {
-            font-size: 8px !important;
-            min-height: 0.54cm !important;
-            line-height: 1.15 !important;
+            font-size: 8.15px !important;
+            min-height: 0.5cm !important;
+            line-height: 1.08 !important;
             letter-spacing: 0.004em !important;
             font-weight: 500 !important;
             color: #111827 !important;

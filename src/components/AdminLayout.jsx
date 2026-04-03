@@ -21,7 +21,7 @@ const AdminLayout = memo(({ children }) => {
           />
 
           {/* Main Content - Changes based on route */}
-          <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden transition-none transform-none animate-none">
+          <main className="flex-1 min-h-0 min-w-0 overflow-y-auto modern-scrollbar overflow-x-hidden transition-none transform-none animate-none">
             {children}
           </main>
         </div>

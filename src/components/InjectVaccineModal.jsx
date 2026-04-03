@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import apiClient from "../utils/api";
-import { Button, Input, Modal, Select, Alert, AdminModalActions } from "./UI";
+import { Button, Input, Modal, Select, Alert, AdminModalActions, TextArea } from "./UI";
 import { useAuth } from "../contexts/AuthContext";
 import SearchableInfantSelect from "./SearchableInfantSelect";
 import VaccineEligibilityIndicator from "./VaccineEligibilityIndicator";
@@ -235,10 +235,13 @@ export default function InjectVaccineModal({
 
   const fetchData = useCallback(async () => {
     try {
+      const infantQuery = isAdmin
+        ? { limit: 10000, scope: "system" }
+        : { limit: 1500 };
       const [vaccinesResponse, infantsResponse, inventoryResponse, systemUsersResponse] =
         await Promise.all([
           apiClient.getVaccines(),
-          apiClient.getInfants({ limit: 1500 }),
+          apiClient.getInfants(infantQuery),
           apiClient.getVaccineInventory(
             scopedClinicId ? { clinic_id: scopedClinicId } : {}
           ),
@@ -313,7 +316,7 @@ export default function InjectVaccineModal({
       setInventoryRecords([]);
       setHealthWorkerUsers([]);
     }
-  }, [scopedClinicId]);
+  }, [isAdmin, scopedClinicId]);
 
   const fetchVaccinationHistory = useCallback(async (targetInfantId) => {
     if (!targetInfantId) {
@@ -985,7 +988,7 @@ export default function InjectVaccineModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="💉 Record Vaccinations"
+      title="Record Vaccinations"
       size="md"
       footer={
         <AdminModalActions>
@@ -1049,6 +1052,7 @@ export default function InjectVaccineModal({
         <div className="admin-form-row-2">
           <Select
             label="Vaccine"
+            surface="light"
             name="vaccine_id"
             value={formData.vaccine_id}
             onChange={handleChange}
@@ -1081,6 +1085,7 @@ export default function InjectVaccineModal({
           />
           <Input
             label="Dose Number"
+            surface="light"
             name="dose_number"
             type="number"
             min="1"
@@ -1113,6 +1118,7 @@ export default function InjectVaccineModal({
         <div className="admin-field-group">
           <Select
             label="Batch Source (FEFO)"
+            surface="light"
             name="batch_id"
             value={formData.batch_id}
             onChange={(e) => {
@@ -1212,6 +1218,7 @@ export default function InjectVaccineModal({
         <div className="admin-form-row-2">
           <Input
             label="Date Administered"
+            surface="light"
             name="date_administered"
             type="date"
             value={formData.date_administered}
@@ -1220,6 +1227,7 @@ export default function InjectVaccineModal({
           />
           <Select
             label="Time Administered (8AM - 5PM)"
+            surface="light"
             name="time_administered"
             value={formData.time_administered}
             onChange={handleChange}
@@ -1231,6 +1239,7 @@ export default function InjectVaccineModal({
         <div className="admin-form-row-2">
           <Input
             label="Lot / Batch Number"
+            surface="light"
             name="lot_batch_number"
             value={formData.lot_batch_number}
             placeholder="Auto-filled from selected inventory record"
@@ -1241,6 +1250,7 @@ export default function InjectVaccineModal({
         <div className="admin-form-row-2">
           <Input
             label="Expiration Date"
+            surface="light"
             name="expiration_date"
             type="date"
             value={formData.expiration_date}
@@ -1248,6 +1258,7 @@ export default function InjectVaccineModal({
           />
           <Select
             label="Vaccine Brand"
+            surface="light"
             name="manufacturer"
             value={formData.manufacturer}
             onChange={handleChange}
@@ -1270,6 +1281,7 @@ export default function InjectVaccineModal({
         <div className="admin-form-row-2">
           <Select
             label="Site of Injection"
+            surface="light"
             name="site_of_injection"
             value={formData.site_of_injection}
             onChange={handleChange}
@@ -1278,6 +1290,7 @@ export default function InjectVaccineModal({
           />
           <Select
             label="Route of Injection"
+            surface="light"
             name="route_of_injection"
             value={formData.route_of_injection}
             onChange={handleChange}
@@ -1289,6 +1302,7 @@ export default function InjectVaccineModal({
         <div className="admin-field-group">
           <Select
             label="Administered By Role"
+            surface="light"
             value={formData.administered_by_role}
             onChange={handleAdministeredByRoleChange}
             options={administeredByRoleSelectOptions}
@@ -1298,6 +1312,7 @@ export default function InjectVaccineModal({
           <div className="mt-3 relative">
             <Input
               label="Administered By Name"
+              surface="light"
               value={formData.administered_by_search}
               onChange={handleAdministeredBySearchChange}
               onFocus={() => setShowAdministeredBySuggestions(true)}
@@ -1319,7 +1334,7 @@ export default function InjectVaccineModal({
             {showAdministeredBySuggestions &&
               formData.administered_by_role &&
               administeredBySuggestions.length > 0 && (
-                <ul className="absolute z-40 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                <ul className="absolute z-40 mt-1 max-h-52 w-full overflow-y-auto modern-scrollbar rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
                   {administeredBySuggestions.map((entry) => (
                     <li key={entry.id}>
                       <button
@@ -1377,6 +1392,7 @@ export default function InjectVaccineModal({
         <div className="admin-form-row-2">
           <Select
             label="Reaction (if any)"
+            surface="light"
             name="reaction"
             value={formData.reaction}
             onChange={handleChange}
@@ -1385,6 +1401,7 @@ export default function InjectVaccineModal({
           {formData.reaction === "Other" && (
             <Input
               label="Specify Other Reaction"
+              surface="light"
               name="reaction_other"
               value={formData.reaction_other}
               onChange={handleChange}
@@ -1397,6 +1414,7 @@ export default function InjectVaccineModal({
         <div className="admin-form-row-2">
           <Select
             label="Next Appointment Type"
+            surface="light"
             name="next_appointment_type"
             value={formData.next_appointment_type}
             onChange={handleChange}
@@ -1404,6 +1422,7 @@ export default function InjectVaccineModal({
           />
           <Input
             label="Next Appointment Date"
+            surface="light"
             name="next_appointment_date"
             type="date"
             value={formData.next_appointment_date}
@@ -1415,6 +1434,7 @@ export default function InjectVaccineModal({
         <div className="admin-field-group">
           <Select
             label="Status"
+            surface="light"
             name="status"
             value={formData.status}
             onChange={handleChange}
@@ -1429,12 +1449,12 @@ export default function InjectVaccineModal({
         </div>
 
         <div className="admin-field-group">
-          <label className="admin-field-label">Additional Notes</label>
-          <textarea
+          <TextArea
+            label="Additional Notes"
+            surface="light"
             name="notes"
             value={formData.notes}
             onChange={handleChange}
-            className="admin-textarea"
             rows={3}
             placeholder="Any observations or notes..."
           />

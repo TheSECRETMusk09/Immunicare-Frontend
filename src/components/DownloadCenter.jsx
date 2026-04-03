@@ -8,7 +8,11 @@ import {
   EmptyState,
   SkeletonTable,
 } from "./UI";
-import { toArrayPayload } from "../utils/adminDataAdapters";
+import { useAuth } from "../contexts/AuthContext";
+import {
+  normalizeInfantsResponse,
+  toArrayPayload,
+} from "../utils/adminDataAdapters";
 import apiClient from "../utils/api";
 import SearchableInfantSelect from "./SearchableInfantSelect";
 
@@ -72,6 +76,7 @@ const formatDownloadDate = (value) => {
 };
 
 export default function DownloadCenter({ onRefresh }) {
+  const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const [downloads, setDownloads] = useState([]);
   const [infants, setInfants] = useState([]);
@@ -93,21 +98,25 @@ export default function DownloadCenter({ onRefresh }) {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
+      const infantQuery = isAdmin
+        ? { limit: 10000, scope: "system" }
+        : { limit: 10000 };
+
       const [downloadsData, infantsData, templatesData] = await Promise.all([
         apiClient.getDownloadHistory({ limit: 50 }),
-        apiClient.getInfants({ limit: 1500 }),
+        apiClient.getInfants(infantQuery),
         apiClient.getPaperTemplates(),
       ]);
 
       setDownloads((toArrayPayload(downloadsData) || []).map(normalizeDownloadRecord));
-      setInfants(Array.isArray(infantsData) ? infantsData : (infantsData?.data || []));
+      setInfants(normalizeInfantsResponse(infantsData));
       setTemplates(templatesData?.data || templatesData || []);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     fetchData();

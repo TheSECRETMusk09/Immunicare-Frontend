@@ -177,7 +177,10 @@ const NotificationItem = ({ notification, onMarkRead, onMarkUnread, onDelete }) 
                 to={notification.action_url}
                 className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 px-2.5 py-1 rounded-full transition-colors"
               >
-                Open Module <ChevronRight size={12} />
+                {String(notification.action_url).includes("/guardian/appointments")
+                  ? "Open Appointments Calendar"
+                  : "Open Module"}{" "}
+                <ChevronRight size={12} />
               </Link>
             )}
           </div>

@@ -76,6 +76,30 @@ const normalizeVaccinationPrefillFromRoute = (prefill = {}) => {
   };
 };
 
+const normalizePaginationState = (pagination, currentPage, itemsPerPage, itemCount = 0) => {
+  const normalizedPage = Number(pagination?.page || currentPage || 1) || 1;
+  const normalizedLimit = Number(pagination?.limit || itemsPerPage || 20) || 20;
+  const normalizedTotal = Number(pagination?.total ?? itemCount ?? 0) || 0;
+  const normalizedTotalPages =
+    Number(pagination?.totalPages) ||
+    (normalizedLimit > 0 ? Math.ceil(normalizedTotal / normalizedLimit) : 0);
+
+  return {
+    page: normalizedPage,
+    limit: normalizedLimit,
+    total: normalizedTotal,
+    totalPages: normalizedTotalPages,
+    hasNext:
+      typeof pagination?.hasNext === "boolean"
+        ? pagination.hasNext
+        : normalizedTotalPages > normalizedPage,
+    hasPrev:
+      typeof pagination?.hasPrev === "boolean"
+        ? pagination.hasPrev
+        : normalizedPage > 1,
+  };
+};
+
 export default function InfantManagement() {
   const { isAdmin } = useAuth();
   const location = useLocation();
@@ -93,6 +117,7 @@ export default function InfantManagement() {
   const [recordVaccinationPrefill, setRecordVaccinationPrefill] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
   const [dateFilter, setDateFilter] = useState("");
@@ -172,7 +197,7 @@ export default function InfantManagement() {
     const requestId = ++fetchRequestIdRef.current;
 
     try {
-      if (isRefresh) {
+      if (isRefresh || hasLoadedInitialData) {
         setRefreshing(true);
       } else {
         setLoading(true);
@@ -187,15 +212,12 @@ export default function InfantManagement() {
         ...(dateFilter ? { date_of_birth: dateFilter } : {}),
       });
       const infantsData = normalizeInfantsResponse(result?.data ?? result);
-      const nextPagination = result?.pagination || {
-        page: currentPage,
-        limit: itemsPerPage,
-        total: infantsData.length,
-        totalPages:
-          infantsData.length > 0 ? Math.ceil(infantsData.length / itemsPerPage) : 0,
-        hasNext: false,
-        hasPrev: currentPage > 1,
-      };
+      const nextPagination = normalizePaginationState(
+        result?.pagination,
+        currentPage,
+        itemsPerPage,
+        infantsData.length,
+      );
       const nextSummary = result?.summary || {
         total: nextPagination.total,
         needsReview: infantsData.filter(
@@ -254,11 +276,13 @@ export default function InfantManagement() {
 
       setLoading(false);
       setRefreshing(false);
+      setHasLoadedInitialData(true);
     }
   }, [
     currentPage,
     dateFilter,
     debouncedSearchQuery,
+    hasLoadedInitialData,
     isAdmin,
     itemsPerPage,
     selectedInfant?.id,

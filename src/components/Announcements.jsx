@@ -400,7 +400,7 @@ export default function Announcements() {
             icon={<Megaphone className="w-8 h-8 text-white" />}
           />
         </div>
-        <div className="flex-1 flex flex-col p-4 sm:px-6 sm:pb-6 pt-3 overflow-y-auto space-y-4">
+        <div className="flex-1 flex flex-col p-4 sm:px-6 sm:pb-6 pt-3 overflow-y-auto modern-scrollbar space-y-4">
 
         {/* Stats for non-admin */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

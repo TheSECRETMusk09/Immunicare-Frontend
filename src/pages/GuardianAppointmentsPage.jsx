@@ -577,6 +577,15 @@ export default function GuardianAppointmentsPage() {
     setShowBookingModal(true);
   };
 
+  const openBookingPage = useCallback(() => {
+    const targetChildId = formData.infant_id || childIdFromQuery;
+    const querySuffix = targetChildId
+      ? `?childId=${encodeURIComponent(targetChildId)}`
+      : "";
+
+    navigate(`/guardian/appointments/new${querySuffix}`);
+  }, [childIdFromQuery, formData.infant_id, navigate]);
+
   const openEditModal = (appointment) => {
     const schedule = new Date(appointment.scheduled_date);
     setEditingAppointment(appointment);
@@ -761,7 +770,7 @@ export default function GuardianAppointmentsPage() {
                 <Button variant="secondary" size="sm" onClick={handleToday}>
                   Today
                 </Button>
-                <Button variant="primary" size="sm" onClick={openCreateModal}>
+                <Button variant="primary" size="sm" onClick={openBookingPage}>
                   <Plus className="w-4 h-4 mr-1" />
                   New Appointment
                 </Button>
@@ -1020,7 +1029,7 @@ export default function GuardianAppointmentsPage() {
               {upcomingAppointments.length === 0 ? (
                 <p className="text-sm text-gray-500 dark:text-gray-400">No upcoming appointments found.</p>
               ) : (
-                <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                <div className="space-y-3 max-h-[350px] overflow-y-auto modern-scrollbar pr-1">
                   {upcomingAppointments.map((appointment) => (
                     <div key={appointment.id} className="guardian-appointment-card rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40 flex flex-col gap-3 min-[640px]:flex-row min-[640px]:items-start min-[640px]:justify-between">
                       <div className="min-w-0 flex-1">
@@ -1318,7 +1327,7 @@ export default function GuardianAppointmentsPage() {
                 </div>
               </div>
 
-              <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-[320px] overflow-y-auto modern-scrollbar pr-1">
                 {(selectedDateDetails?.appointments || []).length === 0 ? (
                   <p className="text-sm text-gray-500">No appointments scheduled for this date.</p>
                 ) : (
