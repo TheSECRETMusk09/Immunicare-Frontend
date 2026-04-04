@@ -42,7 +42,6 @@ import {
   WifiOff,
   User,
   Mail,
-  Baby,
   Shield,
   MapPin,
 } from "lucide-react";
@@ -57,10 +56,6 @@ const Register = () => {
     confirmPassword: "",
     purok: "",
     streetColor: "",
-    infantFirstName: "",
-    infantLastName: "",
-    infantSex: "",
-    infantDob: "",
     relationship: "parent",
   });
   const [errors, setErrors] = useState({});
@@ -72,10 +67,6 @@ const Register = () => {
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpError, setOtpError] = useState(null);
   const [isOffline, setIsOffline] = useState(false);
-
-  // Calculate maximum date (today) for infantDob - birth date cannot be in the future
-  const today = new Date();
-  const maxDate = today.toISOString().split("T")[0];
 
   const { isAuthenticated, login, user } = useAuth();
   const { isOnline, isBackendReachable } = useNetworkStatus();
@@ -133,10 +124,6 @@ const Register = () => {
     purok: "purok",
     street_color: "streetColor",
     relationship: "relationship",
-    infant_first_name: "infantFirstName",
-    infant_last_name: "infantLastName",
-    infant_sex: "infantSex",
-    infantDob: "infantDob",
   };
 
   const parseBackendFieldErrors = (error) => {
@@ -276,28 +263,6 @@ const Register = () => {
           return "Selected Purok-Street-Color does not match the selected Purok";
         }
         return null;
-      case "infantFirstName":
-        if (value && value.trim() !== "" && value.length < 2) {
-          return "First name must be at least 2 characters";
-        }
-        return null;
-      case "infantLastName":
-        if (value && value.trim() !== "" && value.length < 2) {
-          return "Last name must be at least 2 characters";
-        }
-        return null;
-      case "infantDob":
-        if (!value || value.trim() === "") {
-          return null;
-        }
-        const dob = new Date(value);
-        const now = new Date();
-        now.setHours(0, 0, 0, 0);
-        dob.setHours(0, 0, 0, 0);
-        if (dob > now) {
-          return "Date of birth cannot be in the future. Please select today or an earlier date.";
-        }
-        return null;
       default:
         return null;
     }
@@ -337,10 +302,6 @@ const Register = () => {
       return;
     }
 
-    const hasInfantInfo = Boolean(
-      formData.infantFirstName || formData.infantLastName || formData.infantDob || formData.infantSex
-    );
-
     // Validate all fields
     const newErrors = {};
     const fieldsToValidate = [
@@ -354,14 +315,6 @@ const Register = () => {
       "streetColor",
       "relationship",
     ];
-
-    if (hasInfantInfo) {
-      if (!formData.infantFirstName?.trim()) newErrors.infantFirstName = "First name is required";
-      if (!formData.infantLastName?.trim()) newErrors.infantLastName = "Last name is required";
-      if (!formData.infantDob) newErrors.infantDob = "Date of birth is required";
-      if (!formData.infantSex) newErrors.infantSex = "Gender is required";
-      fieldsToValidate.push("infantFirstName", "infantLastName", "infantDob", "infantSex");
-    }
 
     fieldsToValidate.forEach((field) => {
       const error = validateField(field, formData[field]);
@@ -407,10 +360,6 @@ const Register = () => {
         confirmPassword: formData.confirmPassword,
         purok: formData.purok,
         streetColor: formData.streetColor,
-        infantFirstName: formData.infantFirstName.trim() || undefined,
-        infantLastName: formData.infantLastName.trim() || undefined,
-        infantSex: formData.infantSex || undefined,
-        infantDob: formData.infantDob || undefined,
         relationship: formData.relationship,
       };
 
@@ -426,7 +375,10 @@ const Register = () => {
         createPendingVerificationState(response, registrationData.phone),
       );
 
-      trackEvent("registration_step_completed", { step: "details_submitted", hasChild: hasInfantInfo });
+      trackEvent("registration_step_completed", {
+        step: "details_submitted",
+        hasChild: false,
+      });
     } catch (error) {
       console.error("Registration error:", error);
 
@@ -911,97 +863,6 @@ const Register = () => {
                       {check.message}
                     </div>
                   ))}
-                </div>
-              </div>
-            </section>
-
-            {/* Child Information */}
-            <section>
-              <div className="flex items-center gap-2 mb-4 sm:mb-6 pb-2 border-b border-white/20">
-                <Baby className="w-5 h-5 text-white" />
-                <h3 className="text-base sm:text-lg font-bold text-white">
-                  Child Information{" "}
-                  <span className="text-white/60 font-normal text-sm inline-block mt-0.5 sm:mt-0">
-                    (optional)
-                  </span>
-                </h3>
-              </div>
-              <p className="text-sm text-white/70 mb-4 sm:mb-6">
-                Add your child's information to link their immunization records
-                to your account.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                <TextInput
-                  label="Child's First Name"
-                  id="infantFirstName"
-                  name="infantFirstName"
-                  value={formData.infantFirstName}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  placeholder="Enter first name"
-                  error={errors.infantFirstName}
-                  disabled={loading}
-                  className="bg-white/10 backdrop-blur-sm border-white/30 text-white placeholder-white/50"
-                />
-                <TextInput
-                  label="Child's Last Name"
-                  id="infantLastName"
-                  name="infantLastName"
-                  value={formData.infantLastName}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  placeholder="Enter last name"
-                  error={errors.infantLastName}
-                  disabled={loading}
-                  className="bg-white/10 backdrop-blur-sm border-white/30 text-white placeholder-white/50"
-                />
-                <TextInput
-                  label="Date of Birth"
-                  id="infantDob"
-                  name="infantDob"
-                  type="date"
-                  value={formData.infantDob}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  error={errors.infantDob}
-                  disabled={loading}
-                  max={maxDate}
-                  className="bg-white/10 backdrop-blur-sm border-white/30 text-white"
-                />
-                <Select
-                  label="Gender"
-                  id="infantSex"
-                  name="infantSex"
-                  value={formData.infantSex}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  disabled={loading}
-                  error={errors.infantSex}
-                  className="bg-white/10 backdrop-blur-md border border-white/30 text-white rounded-xl shadow-lg"
-                >
-                  <option value="" className="text-gray-900">Select gender</option>
-                  <option value="M" className="text-gray-900">Male</option>
-                  <option value="F" className="text-gray-900">Female</option>
-                </Select>
-                <div className="md:col-span-2">
-                  <Select
-                    label="Relationship to Child"
-                    id="relationship"
-                    name="relationship"
-                    value={formData.relationship}
-                    onChange={handleChange}
-                    disabled={loading}
-                    required
-                    error={errors.relationship}
-                    className="bg-white/10 backdrop-blur-md border border-white/30 text-white rounded-xl shadow-lg"
-                  >
-                    <option value="" className="text-gray-900">Select relationship</option>
-                    <option value="parent" className="text-gray-900">Parent</option>
-                    <option value="mother" className="text-gray-900">Mother</option>
-                    <option value="father" className="text-gray-900">Father</option>
-                    <option value="guardian" className="text-gray-900">Guardian</option>
-                    <option value="other" className="text-gray-900">Other</option>
-                  </Select>
                 </div>
               </div>
             </section>
