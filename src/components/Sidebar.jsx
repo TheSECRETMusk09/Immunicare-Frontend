@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo, useCallback } from "react";
+import React, { useState, useEffect, memo, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { usePrefetchDashboard } from "../hooks/useCachedData";
@@ -23,6 +23,8 @@ import {
   User,
 } from "lucide-react";
 
+const PREFETCH_COOLDOWN_MS = 2 * 60 * 1000;
+
 const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
   const [expandedSections, setExpandedSections] = useState({
     healthAlerts: false,
@@ -34,9 +36,17 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
   const location = useLocation();
   const { logout, user } = useAuth();
   const { prefetchDashboardData } = usePrefetchDashboard();
+  const lastPrefetchAtRef = useRef(0);
 
   // Prefetch data on hover with debouncing
   const handleMouseEnter = useCallback(() => {
+    const now = Date.now();
+    if (now - lastPrefetchAtRef.current < PREFETCH_COOLDOWN_MS) {
+      return;
+    }
+
+    lastPrefetchAtRef.current = now;
+
     // Use requestIdleCallback for non-blocking prefetch
     if ("requestIdleCallback" in window) {
       window.requestIdleCallback(

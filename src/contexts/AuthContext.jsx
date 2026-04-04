@@ -91,7 +91,15 @@ export function AuthProvider({ children }) {
           clearAuthStorage();
         }
       } catch (error) {
-        console.error("Error checking authentication:", error);
+        const isExpectedAuthExpiry =
+          error?.status === 401 ||
+          error?.code === "SESSION_EXPIRED" ||
+          error?.code === "NO_TOKEN" ||
+          error?.code === "TOKEN_EXPIRED";
+
+        if (!isExpectedAuthExpiry) {
+          console.error("Error checking authentication:", error);
+        }
         clearAuthStorage();
         if (mounted) {
           setUser(null);
@@ -122,6 +130,7 @@ export function AuthProvider({ children }) {
       console.log("[AuthContext] Login response:", response);
 
       const accessToken = response.accessToken || response.token || null;
+      const refreshToken = response.refreshToken || null;
       const { user: rawUserData } = response;
       const userData = normalizeAuthUser(rawUserData);
       console.log("[AuthContext] Token received:", accessToken ? "yes" : "no");
@@ -133,6 +142,7 @@ export function AuthProvider({ children }) {
 
       persistAuthSession({
         accessToken,
+        refreshToken,
         user: userData,
         rememberMe: credentials.rememberMe,
       });

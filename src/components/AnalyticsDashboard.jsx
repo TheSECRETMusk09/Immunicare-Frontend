@@ -56,6 +56,7 @@ import {
 import { format } from "date-fns";
 import { useLocation, useSearchParams } from "react-router-dom";
 import apiClient from "../utils/api";
+import { useAuth } from "../contexts/AuthContext";
 import { useSocket } from "../contexts/SocketContext";
 import { useTheme as useAppTheme } from "../contexts/ThemeContext";
 import { safeLocalStorage, safeSessionStorage } from "../utils/safeStorage";
@@ -2954,12 +2955,16 @@ const SummaryMiniCard = ({ label, value, error = false, isDark = false }) => {
   );
 };
 
-const buildQueryParams = (filters) => {
+const buildQueryParams = (filters, includeSystemScope = false) => {
   const params = {
     period: filters.period,
     vaccineType: filters.vaccineType,
     vaccinationStatus: filters.vaccinationStatus,
   };
+
+  if (includeSystemScope) {
+    params.scope = "system";
+  }
 
   if (filters.period === "custom") {
     if (filters.startDate) {
@@ -3001,6 +3006,7 @@ const exportRowsToCsv = ({ data, filters }) => {
 };
 
 const AnalyticsDashboard = () => {
+  const { isAdminOrSuperAdmin } = useAuth();
   const theme = useTheme();
   const { darkMode } = useAppTheme();
   const isDark = darkMode;
@@ -3042,7 +3048,7 @@ const AnalyticsDashboard = () => {
         setError("");
       }
       setRefreshWarning("");
-      const params = buildQueryParams(filters);
+      const params = buildQueryParams(filters, isAdminOrSuperAdmin);
       const response = await apiClient.getAnalyticsDashboard(params);
 
       const normalizedPayload = normalizeResponsePayload(response);
@@ -3065,7 +3071,7 @@ const AnalyticsDashboard = () => {
         setLoading(false);
       }
     }
-  }, [filters]);
+  }, [filters, isAdminOrSuperAdmin]);
 
   useEffect(() => {
     fetchDashboard();

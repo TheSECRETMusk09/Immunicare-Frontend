@@ -319,32 +319,35 @@ const PRINTABLE_STYLES = `
   html,
   body {
     margin: 0;
-    padding: 18px;
+    padding: 12px;
     background: #f3f4f6;
     font-family: Arial, Helvetica, sans-serif;
     color: #111827;
   }
 
   .record-booklet-print {
-    width: min(100%, 1120px);
+    width: min(100%, 1280px);
     margin: 0 auto;
     background: #ffffff;
-    padding: 24px 22px 28px;
+    padding: 18px 18px 16px;
     border: 1px solid #d1d5db;
+    overflow: hidden;
+    page-break-inside: avoid;
+    break-inside: avoid-page;
   }
 
   .record-booklet-print__title {
-    margin: 0 0 12px;
-    font-size: 28px;
+    margin: 0 0 10px;
+    font-size: 24px;
     font-weight: 800;
     line-height: 1.05;
   }
 
   .record-booklet-print__details {
     display: grid;
-    grid-template-columns: 1.2fr 1fr 0.85fr;
-    gap: 24px;
-    margin-bottom: 22px;
+    grid-template-columns: 1.15fr 1fr 0.9fr;
+    gap: 14px;
+    margin-bottom: 12px;
   }
 
   .record-booklet-print__detail-column {
@@ -354,9 +357,9 @@ const PRINTABLE_STYLES = `
   .record-booklet-print__field {
     display: flex;
     align-items: flex-end;
-    gap: 8px;
-    margin-bottom: 6px;
-    font-size: 14px;
+    gap: 6px;
+    margin-bottom: 4px;
+    font-size: 12px;
     line-height: 1.1;
   }
 
@@ -372,7 +375,7 @@ const PRINTABLE_STYLES = `
   .record-booklet-print__value {
     display: inline-flex;
     align-items: flex-end;
-    min-height: 18px;
+    min-height: 15px;
     padding: 0 2px 1px;
   }
 
@@ -386,38 +389,38 @@ const PRINTABLE_STYLES = `
   }
 
   .record-booklet-print__value--wide {
-    min-width: 190px;
+    min-width: 170px;
   }
 
   .record-booklet-print__value--medium {
-    min-width: 136px;
+    min-width: 112px;
   }
 
   .record-booklet-print__value--narrow {
-    min-width: 86px;
+    min-width: 72px;
   }
 
   .record-booklet-print__table {
     width: 100%;
     table-layout: fixed;
     border-collapse: separate;
-    border-spacing: 0 4px;
+    border-spacing: 0 3px;
   }
 
   .record-booklet-print__column--vaccine {
-    width: 23%;
+    width: 27%;
   }
 
   .record-booklet-print__column--doses {
-    width: 20%;
+    width: 16%;
   }
 
   .record-booklet-print__column--dates {
-    width: 34%;
+    width: 25%;
   }
 
   .record-booklet-print__column--remarks {
-    width: 23%;
+    width: 32%;
   }
 
   .record-booklet-print__table thead {
@@ -427,10 +430,10 @@ const PRINTABLE_STYLES = `
   .record-booklet-print__table th {
     background: #f4b24d;
     color: #111827;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
     text-align: center;
-    padding: 9px 10px;
+    padding: 7px 8px;
     border: 2px solid #0f6967;
     line-height: 1.15;
     overflow-wrap: anywhere;
@@ -439,10 +442,10 @@ const PRINTABLE_STYLES = `
   .record-booklet-print__table td {
     background: #ffffff;
     border: 2px solid #0f6967;
-    padding: 8px 10px;
+    padding: 5px 6px;
     vertical-align: top;
-    font-size: 13px;
-    line-height: 1.2;
+    font-size: 11px;
+    line-height: 1.15;
     overflow-wrap: anywhere;
     page-break-inside: avoid;
     break-inside: avoid;
@@ -461,128 +464,124 @@ const PRINTABLE_STYLES = `
   .record-booklet-print__dose-list,
   .record-booklet-print__date-grid,
   .record-booklet-print__remarks {
-    min-height: 42px;
+    min-height: 0;
   }
 
   .record-booklet-print__dose-list {
     display: grid;
-    gap: 6px;
+    gap: 4px;
   }
 
   .record-booklet-print__dose-item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
   }
 
   .record-booklet-print__dose-badge {
     display: inline-flex;
-    width: 18px;
-    height: 18px;
+    width: 15px;
+    height: 15px;
     align-items: center;
     justify-content: center;
     border-radius: 999px;
     background: #f4b24d;
     font-weight: 700;
-    font-size: 11px;
+    font-size: 9px;
     color: #111827;
     flex-shrink: 0;
   }
 
   .record-booklet-print__dose-label {
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 600;
     line-height: 1.15;
   }
 
   .record-booklet-print__date-grid {
     display: grid;
-    gap: 6px;
+    gap: 4px;
   }
 
   .record-booklet-print__date-slot {
     position: relative;
-    min-height: 34px;
+    min-height: 22px;
     border: 1.5px solid #94a3b8;
-    padding: 12px 8px 8px;
+    padding: 8px 4px 3px;
     display: flex;
     align-items: center;
     justify-content: center;
     text-align: center;
-    font-size: 12px;
+    font-size: 9px;
     font-weight: 600;
   }
 
   .record-booklet-print__date-slot-index {
     position: absolute;
-    top: 4px;
-    left: 6px;
-    font-size: 9px;
+    top: 2px;
+    left: 4px;
+    font-size: 7px;
     font-weight: 700;
     color: #64748b;
   }
 
   .record-booklet-print__date-slot-value {
-    min-height: 14px;
+    min-height: 10px;
   }
 
   .record-booklet-print__remarks {
-    line-height: 1.25;
+    line-height: 1.1;
     white-space: pre-wrap;
     word-break: break-word;
   }
 
-  .record-booklet-print__empty-row td {
-    min-height: 34px;
-    height: 34px;
-  }
-
   @media print {
     @page {
-      size: A4 landscape;
-      margin: 8mm;
+      size: legal landscape;
+      margin: 5mm;
     }
 
     html,
     body {
       padding: 0;
       background: #ffffff;
-      width: 297mm;
-      min-height: 210mm;
+      width: 356mm;
+      min-height: 216mm;
       overflow: visible;
     }
 
     .record-booklet-print {
-      width: 281mm;
+      width: 346mm;
       max-width: 100%;
-      padding: 5mm 5.5mm 5mm;
+      min-height: 205mm;
+      padding: 4mm 4mm 3mm;
       box-shadow: none;
       border: none;
     }
 
     .record-booklet-print__title {
-      margin-bottom: 8px;
-      font-size: 22px;
+      margin-bottom: 6px;
+      font-size: 18px;
     }
 
     .record-booklet-print__details {
-      grid-template-columns: 1.25fr 1fr 0.95fr;
-      gap: 10px 14px;
-      margin-bottom: 10px;
+      grid-template-columns: 1.12fr 1fr 0.88fr;
+      gap: 6px 10px;
+      margin-bottom: 6px;
     }
 
     .record-booklet-print__field {
-      margin-bottom: 4px;
-      gap: 5px;
-      font-size: 11px;
+      margin-bottom: 3px;
+      gap: 4px;
+      font-size: 9px;
     }
 
     .record-booklet-print__label {
-      font-size: 11px;
+      font-size: 9px;
     }
 
     .record-booklet-print__value {
-      min-height: 14px;
+      min-height: 11px;
       padding: 0 1px 1px;
     }
 
@@ -593,28 +592,28 @@ const PRINTABLE_STYLES = `
 
     .record-booklet-print__value--medium {
       min-width: 0;
-      width: 120px;
+      width: 90px;
       max-width: 100%;
     }
 
     .record-booklet-print__value--narrow {
       min-width: 0;
-      width: 70px;
+      width: 58px;
       max-width: 100%;
     }
 
     .record-booklet-print__table {
-      border-spacing: 0 2px;
+      border-spacing: 0 1px;
     }
 
     .record-booklet-print__table th {
-      font-size: 10px;
-      padding: 5px 6px;
+      font-size: 8px;
+      padding: 3px 4px;
     }
 
     .record-booklet-print__table td {
-      font-size: 10px;
-      padding: 4px 6px;
+      font-size: 7.5px;
+      padding: 2px 3px;
     }
 
     .record-booklet-print__dose-list,
@@ -625,46 +624,54 @@ const PRINTABLE_STYLES = `
 
     .record-booklet-print__dose-list,
     .record-booklet-print__date-grid {
-      gap: 4px;
+      gap: 2px;
     }
 
     .record-booklet-print__dose-item {
-      gap: 6px;
+      gap: 4px;
     }
 
     .record-booklet-print__dose-badge {
-      width: 15px;
-      height: 15px;
-      font-size: 9px;
+      width: 11px;
+      height: 11px;
+      font-size: 7px;
     }
 
     .record-booklet-print__dose-label {
-      font-size: 9.5px;
+      font-size: 7.5px;
     }
 
     .record-booklet-print__date-slot {
-      min-height: 24px;
-      padding: 9px 4px 4px;
-      font-size: 9.5px;
+      min-height: 16px;
+      padding: 6px 2px 2px;
+      font-size: 7px;
     }
 
     .record-booklet-print__date-slot-index {
       top: 2px;
-      left: 4px;
-      font-size: 8px;
+      left: 3px;
+      font-size: 6px;
     }
 
     .record-booklet-print__remarks {
-      font-size: 9.5px;
-      line-height: 1.15;
-    }
-
-    .record-booklet-print__empty-row td {
-      min-height: 16px;
-      height: 16px;
+      font-size: 7px;
+      line-height: 1.05;
     }
   }
 `;
+
+const IMMUNIZATION_RECORD_EXPORT_PAGE = {
+  ...PRINT_PAGE_PRESETS.legalLandscape,
+  margins: {
+    top: 320,
+    right: 320,
+    bottom: 320,
+    left: 320,
+    header: 0,
+    footer: 0,
+    gutter: 0,
+  },
+};
 
 const hasDisplayValue = (value) =>
   value !== null && value !== undefined && String(value).trim() !== "";
@@ -1315,10 +1322,14 @@ export default function ImmunizationRecordBooklet({ infantId }) {
         node: printableNode,
         filename: `Immunization_Record_${infantId || "child"}.pdf`,
         title: "Child Immunization Record Booklet",
-        headerText: "Child Immunization Record Booklet",
-        footerText: printDateRange.activeDateRangeLabel,
-        page: PRINT_PAGE_PRESETS.a4Landscape,
-        scale: 0.65,
+        page: IMMUNIZATION_RECORD_EXPORT_PAGE,
+        marginsMm: {
+          top: 4,
+          right: 4,
+          bottom: 4,
+          left: 4,
+        },
+        scale: 0.84,
       });
     } catch (downloadError) {
       console.error("Error generating immunization record PDF:", downloadError);
@@ -1343,9 +1354,7 @@ export default function ImmunizationRecordBooklet({ infantId }) {
       html: printableHtml,
       filename: `Immunization_Record_${infantId || "child"}.docx`,
       title: "Child Immunization Record Booklet",
-      headerText: "Child Immunization Record Booklet",
-      footerText: printDateRange.activeDateRangeLabel,
-      page: PRINT_PAGE_PRESETS.a4Landscape,
+      page: IMMUNIZATION_RECORD_EXPORT_PAGE,
     });
   }, [buildPrintableDocument, infantId, printDateRange]);
 
@@ -1609,17 +1618,6 @@ export default function ImmunizationRecordBooklet({ infantId }) {
       <div ref={printAreaRef} className="hidden">
         <div className="record-booklet-print">
           <h1 className="record-booklet-print__title">Child Immunization Record</h1>
-          <p
-            style={{
-              margin: "0 0 16px",
-              fontSize: "13px",
-              fontWeight: 600,
-              textAlign: "center",
-              color: "#374151",
-            }}
-          >
-            {printDateRange.activeDateRangeLabel}
-          </p>
 
           <section className="record-booklet-print__details">
             <div className="record-booklet-print__detail-column">
@@ -1725,15 +1723,6 @@ export default function ImmunizationRecordBooklet({ infantId }) {
                       {row.remarks || "\u00A0"}
                     </div>
                   </td>
-                </tr>
-              ))}
-
-              {[0, 1].map((blankIndex) => (
-                <tr key={`print-empty-${blankIndex}`} className="record-booklet-print__empty-row">
-                  <td>&nbsp;</td>
-                  <td>&nbsp;</td>
-                  <td>&nbsp;</td>
-                  <td>&nbsp;</td>
                 </tr>
               ))}
             </tbody>

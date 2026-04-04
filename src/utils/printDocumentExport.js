@@ -217,6 +217,8 @@ const buildDocumentXml = ({
   heightTwips,
   orientation,
   margins,
+  hasHeader,
+  hasFooter,
 }) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document
   xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -224,8 +226,8 @@ const buildDocumentXml = ({
   <w:body>
     <w:altChunk r:id="htmlChunk"/>
     <w:sectPr>
-      <w:headerReference w:type="default" r:id="headerChunk"/>
-      <w:footerReference w:type="default" r:id="footerChunk"/>
+      ${hasHeader ? '<w:headerReference w:type="default" r:id="headerChunk"/>' : ""}
+      ${hasFooter ? '<w:footerReference w:type="default" r:id="footerChunk"/>' : ""}
       <w:pgSz w:w="${widthTwips}" w:h="${heightTwips}"${
         orientation === "landscape" ? ' w:orient="landscape"' : ""
       }/>
@@ -241,20 +243,20 @@ const buildDocumentXml = ({
   </w:body>
 </w:document>`;
 
-const buildDocumentRelationshipsXml = () => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+const buildDocumentRelationshipsXml = ({ hasHeader, hasFooter }) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship
     Id="htmlChunk"
     Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk"
     Target="afchunk.html"/>
-  <Relationship
+  ${hasHeader ? `<Relationship
     Id="headerChunk"
     Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header"
-    Target="header1.xml"/>
-  <Relationship
+    Target="header1.xml"/>` : ""}
+  ${hasFooter ? `<Relationship
     Id="footerChunk"
     Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer"
-    Target="footer1.xml"/>
+    Target="footer1.xml"/>` : ""}
 </Relationships>`;
 
 const buildRootRelationshipsXml = () => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -273,7 +275,7 @@ const buildRootRelationshipsXml = () => `<?xml version="1.0" encoding="UTF-8" st
     Target="docProps/app.xml"/>
 </Relationships>`;
 
-const buildContentTypesXml = () => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+const buildContentTypesXml = ({ hasHeader, hasFooter }) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
@@ -281,8 +283,8 @@ const buildContentTypesXml = () => `<?xml version="1.0" encoding="UTF-8" standal
   <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
   <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-  <Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
-  <Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>
+  ${hasHeader ? '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>' : ""}
+  ${hasFooter ? '<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>' : ""}
 </Types>`;
 
 const buildCorePropsXml = ({ title, author, createdAt }) => {
@@ -402,9 +404,11 @@ export const downloadWordDocument = ({
       ...(page?.margins || {}),
     },
   };
+  const hasHeader = Boolean(String(headerText || "").trim());
+  const hasFooter = Boolean(String(footerText || "").trim());
 
   const blob = createStoredZipBlob([
-    { name: "[Content_Types].xml", content: buildContentTypesXml() },
+    { name: "[Content_Types].xml", content: buildContentTypesXml({ hasHeader, hasFooter }) },
     { name: "_rels/.rels", content: buildRootRelationshipsXml() },
     {
       name: "docProps/core.xml",
@@ -416,20 +420,32 @@ export const downloadWordDocument = ({
     },
     {
       name: "word/document.xml",
-      content: buildDocumentXml(resolvedPage),
+      content: buildDocumentXml({
+        ...resolvedPage,
+        hasHeader,
+        hasFooter,
+      }),
     },
     {
       name: "word/_rels/document.xml.rels",
-      content: buildDocumentRelationshipsXml(),
+      content: buildDocumentRelationshipsXml({ hasHeader, hasFooter }),
     },
-    {
-      name: "word/header1.xml",
-      content: buildWordHeaderXml(headerText),
-    },
-    {
-      name: "word/footer1.xml",
-      content: buildWordFooterXml(footerText),
-    },
+    ...(hasHeader
+      ? [
+          {
+            name: "word/header1.xml",
+            content: buildWordHeaderXml(headerText),
+          },
+        ]
+      : []),
+    ...(hasFooter
+      ? [
+          {
+            name: "word/footer1.xml",
+            content: buildWordFooterXml(footerText),
+          },
+        ]
+      : []),
     {
       name: "word/afchunk.html",
       content: html,

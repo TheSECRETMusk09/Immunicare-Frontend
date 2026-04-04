@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
 
+const PREFETCH_COOLDOWN_MS = 2 * 60 * 1000;
+
 const GuardianSidebar = memo(
   ({ isOpen, onClose, onToggle, isDesktop: propsIsDesktop }) => {
     // Use centralized theme context
@@ -52,6 +54,7 @@ const GuardianSidebar = memo(
     const location = useLocation();
     const { user, logout, guardianId } = useAuth();
     const { prefetchGuardianData } = usePrefetchGuardian();
+    const lastPrefetchAtRef = useRef(0);
 
     const { unreadCount: hookUnreadCount, refresh: refreshNotifications } = useGuardianNotifications({
       pollingInterval: 30000, // Poll every 30 seconds
@@ -149,6 +152,13 @@ const GuardianSidebar = memo(
     // Prefetch guardian data on hover
     const handleMouseEnter = useCallback(() => {
       if (!guardianId) return;
+      const now = Date.now();
+      if (now - lastPrefetchAtRef.current < PREFETCH_COOLDOWN_MS) {
+        return;
+      }
+
+      lastPrefetchAtRef.current = now;
+
       if ("requestIdleCallback" in window) {
         window.requestIdleCallback(
           () => {

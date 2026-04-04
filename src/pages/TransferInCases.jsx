@@ -107,12 +107,43 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
       }
       setErrorState(null);
 
-      const response = await apiClient.getTransferInCases();
+      const pageSize = 1000;
+      let offset = 0;
+      let total = null;
+      let aggregatedCases = [];
 
-      if (response.success) {
-        setCases(response.data || []);
+      do {
+        const response = await apiClient.getTransferInCases({
+          limit: pageSize,
+          offset,
+        });
+
+        if (!response.success) {
+          setErrorState(response.error || "Failed to fetch transfer-in cases");
+          setCases([]);
+          return;
+        }
+
+        const pageCases = Array.isArray(response.data) ? response.data : [];
+        aggregatedCases = aggregatedCases.concat(pageCases);
+
+        const reportedTotal = Number(response.pagination?.total);
+        total = Number.isFinite(reportedTotal) ? reportedTotal : aggregatedCases.length;
+        offset += pageCases.length;
+
+        if (pageCases.length === 0) {
+          break;
+        }
+      } while (offset < total);
+
+      if (aggregatedCases.length > total) {
+        aggregatedCases = aggregatedCases.slice(0, total);
+      }
+
+      if (total !== null && aggregatedCases.length >= 0) {
+        setCases(aggregatedCases);
       } else {
-        setErrorState(response.error || "Failed to fetch transfer-in cases");
+        setErrorState("Failed to fetch transfer-in cases");
         setCases([]);
       }
     } catch (err) {

@@ -30,6 +30,12 @@ jest.mock("../contexts/SocketContext", () => ({
   }),
 }));
 
+jest.mock("../contexts/AuthContext", () => ({
+  useAuth: () => ({
+    isAdminOrSuperAdmin: true,
+  }),
+}));
+
 jest.mock("recharts", () => {
   const React = require("react");
 

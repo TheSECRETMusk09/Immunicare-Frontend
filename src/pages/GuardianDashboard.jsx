@@ -410,27 +410,28 @@ const GuardianDashboard = () => {
       }
       setChildren(childrenData);
 
-      const vaccinationScheduleResponses = await Promise.allSettled(
-        childrenData.map((child) => apiClient.getInfantVaccinationSchedule(child.id)),
+      const vaccinationReadinessResponses = await Promise.allSettled(
+        childrenData.map((child) => apiClient.getVaccinationReadiness(child.id)),
       );
 
-      const vaccinationScheduleMap = new Map();
-      vaccinationScheduleResponses.forEach((response, index) => {
+      const vaccinationReadinessMap = new Map();
+      vaccinationReadinessResponses.forEach((response, index) => {
         const childId = childrenData[index]?.id;
         if (!childId) {
           return;
         }
 
         if (response.status === 'fulfilled') {
-          const normalizedSchedule =
-            normalizeArrayPayload(response.value, ['schedule']) ||
-            response.value?.schedule ||
-            [];
-          vaccinationScheduleMap.set(childId, normalizedSchedule);
+          const readinessPayload =
+            unwrapApiPayload(response.value) ||
+            response.value?.data ||
+            response.value ||
+            null;
+          vaccinationReadinessMap.set(childId, readinessPayload);
           return;
         }
 
-        vaccinationScheduleMap.set(childId, []);
+        vaccinationReadinessMap.set(childId, null);
       });
 
       // Process appointments data
@@ -485,32 +486,22 @@ const GuardianDashboard = () => {
         return acc + Number(child.pending_vaccinations || 0);
       }, 0);
 
-      // Calculate due/overdue vaccinations
+      // Calculate due/overdue vaccinations from authoritative readiness data
       const dueVaccinesList = [];
       const seenDueVaccines = new Set();
-      childrenData.forEach(child => {
-        const scheduleEntries = vaccinationScheduleMap.get(child.id);
-        const candidateVaccines = Array.isArray(scheduleEntries) && scheduleEntries.length > 0
-          ? scheduleEntries
-          : child.vaccinations || [];
+      childrenData.forEach((child) => {
+        const readiness = vaccinationReadinessMap.get(child.id) || {};
+        const candidateVaccines = [
+          ...(Array.isArray(readiness.overdueVaccines) ? readiness.overdueVaccines : []),
+          ...(Array.isArray(readiness.dueVaccines) ? readiness.dueVaccines : []),
+        ];
 
-        const childDueVaccines = candidateVaccines.filter(v => {
-          if (v.status === 'completed') return false;
-          const dueDate =
-            v.schedule?.dueDate ||
-            v.dueDate ||
-            v.scheduledDate;
-          if (!dueDate) return false;
-          const due = new Date(dueDate);
-          const daysUntil = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
-          return daysUntil <= 30; // Due within 30 days
-        });
+        candidateVaccines.forEach((vaccine) => {
+          const dueDate = vaccine.recommendedDate || vaccine.earliestDate || null;
+          if (!dueDate) {
+            return;
+          }
 
-        childDueVaccines.forEach(vaccine => {
-          const dueDate =
-            vaccine.schedule?.dueDate ||
-            vaccine.dueDate ||
-            vaccine.scheduledDate;
           const daysUntil = Math.ceil((new Date(dueDate) - today) / (1000 * 60 * 60 * 24));
           const dueVaccineId = buildDueVaccineIdentity(child, vaccine, dueDate);
 
@@ -523,15 +514,10 @@ const GuardianDashboard = () => {
             id: dueVaccineId,
             childId: child.id,
             childName: child.name || `${child.first_name} ${child.last_name}`.trim(),
-            vaccineName:
-              vaccine.vaccine?.name ||
-              vaccine.name ||
-              vaccine.vaccineName,
-            dueDate: dueDate,
+            vaccineName: vaccine.label || vaccine.vaccineName || vaccine.name || "Vaccination",
+            dueDate,
             daysUntilDue: daysUntil,
-            status:
-              vaccine.status ||
-              (daysUntil < 0 ? 'overdue' : daysUntil <= 7 ? 'due_soon' : 'upcoming'),
+            status: daysUntil < 0 ? 'overdue' : daysUntil <= 7 ? 'due_soon' : 'upcoming',
           });
         });
       });

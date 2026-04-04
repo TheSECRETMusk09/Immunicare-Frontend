@@ -24,6 +24,10 @@ const getRememberMePreference = () =>
 const getStoredAccessToken = () =>
   safeLocalStorage.getItem("token") || safeSessionStorage.getItem("token");
 
+const getStoredRefreshToken = () =>
+  safeLocalStorage.getItem("refreshToken") ||
+  safeSessionStorage.getItem("refreshToken");
+
 const getStoredUserJson = () =>
   safeLocalStorage.getItem("user") || safeSessionStorage.getItem("user");
 
@@ -87,6 +91,23 @@ const getCurrentPath = () => {
 const isPublicAuthRoute = (pathname) =>
   PUBLIC_AUTH_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 
+const isAuthVerifyRequest = (url = "") => String(url).includes("/auth/verify");
+const isAuthRefreshRequest = (url = "") => String(url).includes("/auth/refresh");
+
+const shouldSuppressExpectedAuthErrorLog = (error, config = {}) => {
+  const status = error?.status || error?.response?.status;
+  const url = String(config?.url || error?.config?.url || "");
+
+  if (config?.suppressAuthErrors === true) {
+    return true;
+  }
+
+  return (
+    status === 401 &&
+    (isAuthVerifyRequest(url) || isAuthRefreshRequest(url))
+  );
+};
+
 const clearAuthStorage = () => {
   safeLocalStorage.removeItem("token");
   safeSessionStorage.removeItem("token");
@@ -107,11 +128,17 @@ const isTimeoutError = (error) =>
   error?.code === "ECONNABORTED" ||
   String(error?.message || "").toLowerCase().includes("timeout");
 
-const persistAuthSession = ({ accessToken, user, rememberMe = false } = {}) => {
+const persistAuthSession = ({
+  accessToken,
+  refreshToken,
+  user,
+  rememberMe = false,
+} = {}) => {
   const targetStorage = rememberMe ? safeLocalStorage : safeSessionStorage;
   const secondaryStorage = rememberMe ? safeSessionStorage : safeLocalStorage;
 
   secondaryStorage.removeItem("token");
+  secondaryStorage.removeItem("refreshToken");
   secondaryStorage.removeItem("user");
 
   if (rememberMe) {
@@ -122,6 +149,10 @@ const persistAuthSession = ({ accessToken, user, rememberMe = false } = {}) => {
 
   if (accessToken) {
     targetStorage.setItem("token", accessToken);
+  }
+
+  if (refreshToken) {
+    targetStorage.setItem("refreshToken", refreshToken);
   }
 
   if (user) {
@@ -138,6 +169,15 @@ const persistStoredUser = (user) => {
   storage.setItem("user", JSON.stringify(user));
 };
 
+const persistStoredRefreshToken = (refreshToken) => {
+  if (!refreshToken) {
+    return;
+  }
+
+  const storage = getPreferredAuthStorage();
+  storage.setItem("refreshToken", refreshToken);
+};
+
 const redirectToLoginIfNeeded = () => {
   if (typeof window === "undefined") return;
   const pathname = getCurrentPath();
@@ -150,10 +190,11 @@ const redirectToLoginIfNeeded = () => {
 
 const getOrCreateRefreshRequest = () => {
   if (!refreshRequest) {
+    const storedRefreshToken = getStoredRefreshToken();
     refreshRequest = axios
       .post(
         `${API_BASE_URL}/auth/refresh`,
-        {},
+        storedRefreshToken ? { refreshToken: storedRefreshToken } : {},
         {
           withCredentials: true,
           timeout: 10000,
@@ -316,15 +357,23 @@ axiosClient.interceptors.request.use(
       try {
         const refreshResponse = await getOrCreateRefreshRequest();
         const newToken = refreshResponse.data.token || refreshResponse.data.accessToken;
+        const newRefreshToken = refreshResponse.data.refreshToken;
         if (newToken) {
-          const tokenStorage = getPreferredAuthStorage();
-          tokenStorage.setItem("token", newToken);
+          persistAuthSession({
+            accessToken: newToken,
+            refreshToken: newRefreshToken,
+            user: refreshResponse.data.user || null,
+            rememberMe: getRememberMePreference(),
+          });
           if (refreshResponse.data.user) {
             persistStoredUser(refreshResponse.data.user);
           }
           token = newToken;
         }
       } catch (refreshError) {
+        if (!shouldSuppressExpectedAuthErrorLog(refreshError, config)) {
+          console.warn("Proactive token refresh failed:", refreshError?.message);
+        }
         // Ignore error here, let the request proceed.
         // Response interceptor will catch actual 401s if it truly failed.
       }
@@ -390,10 +439,15 @@ axiosClient.interceptors.response.use(
         // If refresh successful, update token and retry original request
         const newToken =
           refreshResponse.data.token || refreshResponse.data.accessToken;
+        const newRefreshToken = refreshResponse.data.refreshToken;
 
         if (newToken) {
-          const tokenStorage = getPreferredAuthStorage();
-          tokenStorage.setItem("token", newToken);
+          persistAuthSession({
+            accessToken: newToken,
+            refreshToken: newRefreshToken,
+            user: refreshResponse.data.user || null,
+            rememberMe: getRememberMePreference(),
+          });
 
           if (refreshResponse.data.user) {
             persistStoredUser(refreshResponse.data.user);
@@ -410,12 +464,15 @@ axiosClient.interceptors.response.use(
         redirectToLoginIfNeeded();
         return Promise.reject(error);
       } catch (refreshError) {
-        // Refresh failed, logout user
-        console.error("Token refresh error:", refreshError.message);
+        const sessionExpiredError = new Error("Session expired");
+        sessionExpiredError.status = 401;
+        sessionExpiredError.code = "SESSION_EXPIRED";
+        sessionExpiredError.response = refreshError?.response;
+        sessionExpiredError.originalError = refreshError;
 
         clearAuthStorage();
         redirectToLoginIfNeeded();
-        return Promise.reject(refreshError);
+        return Promise.reject(sessionExpiredError);
       }
     }
 
@@ -472,7 +529,10 @@ class ApiClient {
       .request(requestConfig)
       .then((response) => response.data)
       .catch((error) => {
-        if (!isRequestCanceled(error)) {
+        if (
+          !isRequestCanceled(error) &&
+          !shouldSuppressExpectedAuthErrorLog(error, requestConfig)
+        ) {
           console.error("API request failed:", error);
         }
         throw error;
@@ -530,7 +590,10 @@ class ApiClient {
         });
         return response;
       } catch (error) {
-        if (!isRequestCanceled(error)) {
+        if (
+          !isRequestCanceled(error) &&
+          !shouldSuppressExpectedAuthErrorLog(error, options)
+        ) {
           console.error("Custom API request failed:", error);
         }
         throw error;
@@ -654,6 +717,8 @@ class ApiClient {
   async verifySession() {
     return this.request("/auth/verify", {
       method: "GET",
+      disableRetry: true,
+      suppressAuthErrors: true,
     });
   }
 
@@ -2187,9 +2252,11 @@ export {
   clearAuthStorage,
   getRememberMePreference,
   getStoredAccessToken,
+  getStoredRefreshToken,
   getStoredUserJson,
   getPreferredAuthStorage,
   persistAuthSession,
+  persistStoredRefreshToken,
   persistStoredUser,
 };
 export default apiClient;
