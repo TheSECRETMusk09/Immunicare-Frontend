@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Button,
   Card,
@@ -176,6 +176,7 @@ const VaccinationsDashboard = () => {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [recordsHydrationLoading, setRecordsHydrationLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -196,6 +197,7 @@ const VaccinationsDashboard = () => {
   const itemsPerPage = 20;
   const scheduleItemsPerPage = 20;
   const trackingItemsPerPage = 9;
+  const fetchDataRequestIdRef = useRef(0);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 350);
@@ -281,6 +283,9 @@ const VaccinationsDashboard = () => {
 
   const fetchData = useCallback(
     async ({ silent = false } = {}) => {
+      const requestId = Date.now();
+      fetchDataRequestIdRef.current = requestId;
+
       try {
         if (silent) {
           setRefreshing(true);
@@ -290,8 +295,7 @@ const VaccinationsDashboard = () => {
 
         setError(null);
 
-        const recordsPromise =
-          activeTab === "records" ? null : fetchAllVaccinationRecords();
+        const shouldHydrateDetailedRecords = activeTab !== "records";
         const recordSummaryPromise = fetchVaccinationRecordSummary().catch(() => ({
           total: 0,
           completed: 0,
@@ -315,7 +319,7 @@ const VaccinationsDashboard = () => {
                   page: activeRecordPage,
                   search: activeRecordSearch,
                 })
-              : recordsPromise,
+              : Promise.resolve([]),
             activeTab === "records"
               ? Promise.resolve([])
               : apiClient.getVaccinationSchedules(),
@@ -409,8 +413,8 @@ const VaccinationsDashboard = () => {
               hasPrev: activeRecordPage > 1,
             },
           );
+          setRecordsHydrationLoading(false);
         } else {
-          setVaccinationRecords(normalizedRecords);
           setVaccinationSchedules(normalizedSchedules);
           setInfants(normalizedInfants);
         }
@@ -426,6 +430,31 @@ const VaccinationsDashboard = () => {
           if (!exists) {
             setSelectedInfantId(null);
           }
+        }
+
+        if (shouldHydrateDetailedRecords) {
+          setRecordsHydrationLoading(true);
+
+          void fetchAllVaccinationRecords()
+            .then((allRecords) => {
+              if (fetchDataRequestIdRef.current !== requestId) {
+                return;
+              }
+              setVaccinationRecords(allRecords);
+            })
+            .catch((recordsError) => {
+              if (fetchDataRequestIdRef.current !== requestId) {
+                return;
+              }
+              setError((currentError) =>
+                currentError || recordsError?.message || "Failed to fetch vaccination dashboard data.",
+              );
+            })
+            .finally(() => {
+              if (fetchDataRequestIdRef.current === requestId) {
+                setRecordsHydrationLoading(false);
+              }
+            });
         }
       } catch (err) {
         setError(err.message || "Failed to fetch vaccination dashboard data.");
@@ -959,7 +988,10 @@ const VaccinationsDashboard = () => {
   const hasPrimaryTabData =
     activeTab === "records"
       ? recordTableRows.length > 0
-      : vaccinationRecords.length > 0;
+      : approvedVaccinationSchedules.length > 0 ||
+        infants.length > 0 ||
+        vaccines.length > 0 ||
+        Boolean(analyticsData?.summary);
 
   if (loading && !hasPrimaryTabData) {
     return (
@@ -1092,7 +1124,14 @@ const VaccinationsDashboard = () => {
             Vaccination Schedule Overview
           </h3>
 
-          {approvedVaccinationSchedules.length === 0 ? (
+          {recordsHydrationLoading && vaccinationRecords.length === 0 ? (
+            <div className="space-y-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                Loading vaccination history for schedule reconciliation...
+              </div>
+              <SkeletonTable rows={8} columns={9} />
+            </div>
+          ) : approvedVaccinationSchedules.length === 0 ? (
             <EmptyState
               title="No vaccination schedules"
               description="No active schedule definitions were returned by the backend."
@@ -1435,7 +1474,18 @@ const VaccinationsDashboard = () => {
             Vaccination Compliance Tracking
           </h3>
 
-          {infants.length === 0 ? (
+          {recordsHydrationLoading && vaccinationRecords.length === 0 ? (
+            <div className="space-y-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                Loading vaccination history for compliance tracking...
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-2">
+                {[1, 2, 3, 4, 5, 6].map((card) => (
+                  <SkeletonCard key={card} className="h-52" />
+                ))}
+              </div>
+            </div>
+          ) : infants.length === 0 ? (
             <EmptyState
               title="No infants tracked"
               description="There are no infants registered in the system to track vaccination compliance."
