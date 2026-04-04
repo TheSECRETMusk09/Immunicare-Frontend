@@ -319,220 +319,235 @@ const PRINTABLE_STYLES = `
   html,
   body {
     margin: 0;
-    padding: 12px;
-    background: #f3f4f6;
+    padding: 0;
+    background: #ffffff;
     font-family: Arial, Helvetica, sans-serif;
     color: #111827;
   }
 
-  .record-booklet-print {
-    width: min(100%, 1280px);
+  .record-card-export {
+    width: 346mm;
+    min-height: 205mm;
     margin: 0 auto;
     background: #ffffff;
-    padding: 18px 18px 16px;
-    border: 1px solid #d1d5db;
+    padding: 4mm;
+    border: none;
     overflow: hidden;
     page-break-inside: avoid;
     break-inside: avoid-page;
   }
 
-  .record-booklet-print__title {
-    margin: 0 0 10px;
-    font-size: 24px;
+  .record-card-export__shell {
+    width: 100%;
+    min-height: 100%;
+    overflow: hidden;
+    border: 1.5px solid #0f6967;
+    background: #ffffff;
+  }
+
+  .record-card-export__top {
+    padding: 8mm 8mm 5mm;
+    background: #ffffff;
+  }
+
+  .record-card-export__title {
+    margin: 0 0 6mm;
+    font-size: 28px;
     font-weight: 800;
     line-height: 1.05;
   }
 
-  .record-booklet-print__details {
-    display: grid;
-    grid-template-columns: 1.15fr 1fr 0.9fr;
-    gap: 14px;
-    margin-bottom: 12px;
+  .record-card-export__info-grid {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 6mm 0;
+    table-layout: fixed;
   }
 
-  .record-booklet-print__detail-column {
-    min-width: 0;
+  .record-card-export__info-grid > tbody > tr > td {
+    width: 33.333%;
+    vertical-align: top;
   }
 
-  .record-booklet-print__field {
-    display: flex;
-    align-items: flex-end;
-    gap: 6px;
-    margin-bottom: 4px;
+  .record-card-export__field-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 3mm;
+  }
+
+  .record-card-export__field-table th,
+  .record-card-export__field-table td {
     font-size: 12px;
+    line-height: 1.1;
+    padding: 0;
+    vertical-align: bottom;
+  }
+
+  .record-card-export__field-table th {
+    width: 36%;
+    font-weight: 700;
+    white-space: nowrap;
+    text-align: left;
+    padding-right: 8px;
+  }
+
+  .record-card-export__field-table td {
+    border-bottom: 1.5px solid #1f2937;
+    min-height: 17px;
+    height: 17px;
+    padding-bottom: 1px;
+  }
+
+  .record-card-export__field-table td.record-card-export__field-table-cell--multiline {
+    height: 34px;
+    vertical-align: top;
+  }
+
+  .record-card-export__sex-value {
+    line-height: 1.2;
+    white-space: pre-line;
+  }
+
+  .record-card-export__table-wrap {
+    background:
+      linear-gradient(180deg, #0f6967 0, #0f6967 12mm, #f68d3f 12mm, #f68d3f 100%);
+    padding: 6mm 5mm 5mm;
+  }
+
+  .record-card-export__table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 3px;
+    table-layout: fixed;
+  }
+
+  .record-card-export__table th,
+  .record-card-export__table td {
+    border: 2px solid #0f6967;
+    background: #ffffff;
+    color: #111827;
+    vertical-align: top;
+    overflow: hidden;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .record-card-export__table th {
+    background: #f4b24d;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 6px 5px;
+    text-align: center;
     line-height: 1.1;
   }
 
-  .record-booklet-print__field--stacked {
-    align-items: flex-start;
+  .record-card-export__table td {
+    font-size: 10px;
+    padding: 4px;
+    line-height: 1.1;
   }
 
-  .record-booklet-print__label {
-    font-weight: 700;
-    white-space: nowrap;
-  }
-
-  .record-booklet-print__value {
-    display: inline-flex;
-    align-items: flex-end;
-    min-height: 15px;
-    padding: 0 2px 1px;
-  }
-
-  .record-booklet-print__value--filled {
-    border-bottom: none;
-    min-width: 0;
-  }
-
-  .record-booklet-print__value--placeholder {
-    border-bottom: 1.5px solid #374151;
-  }
-
-  .record-booklet-print__value--wide {
-    min-width: 170px;
-  }
-
-  .record-booklet-print__value--medium {
-    min-width: 112px;
-  }
-
-  .record-booklet-print__value--narrow {
-    min-width: 72px;
-  }
-
-  .record-booklet-print__table {
-    width: 100%;
-    table-layout: fixed;
-    border-collapse: separate;
-    border-spacing: 0 3px;
-  }
-
-  .record-booklet-print__column--vaccine {
+  .record-card-export__column--vaccine {
     width: 27%;
   }
 
-  .record-booklet-print__column--doses {
+  .record-card-export__column--doses {
     width: 16%;
   }
 
-  .record-booklet-print__column--dates {
+  .record-card-export__column--dates {
     width: 25%;
   }
 
-  .record-booklet-print__column--remarks {
+  .record-card-export__column--remarks {
     width: 32%;
   }
 
-  .record-booklet-print__table thead {
-    display: table-header-group;
-  }
-
-  .record-booklet-print__table th {
-    background: #f4b24d;
-    color: #111827;
-    font-size: 12px;
+  .record-card-export__vaccine-cell {
     font-weight: 700;
+    font-size: 10px;
+    line-height: 1.12;
     text-align: center;
-    padding: 7px 8px;
-    border: 2px solid #0f6967;
-    line-height: 1.15;
-    overflow-wrap: anywhere;
+    vertical-align: middle !important;
   }
 
-  .record-booklet-print__table td {
-    background: #ffffff;
-    border: 2px solid #0f6967;
-    padding: 5px 6px;
-    vertical-align: top;
-    font-size: 11px;
-    line-height: 1.15;
-    overflow-wrap: anywhere;
-    page-break-inside: avoid;
-    break-inside: avoid;
+  .record-card-export__dose-stack,
+  .record-card-export__remarks-box {
+    min-height: 24px;
   }
 
-  .record-booklet-print__table tbody tr {
-    page-break-inside: avoid;
-    break-inside: avoid;
-  }
-
-  .record-booklet-print__vaccine {
-    font-weight: 700;
-    line-height: 1.15;
-  }
-
-  .record-booklet-print__dose-list,
-  .record-booklet-print__date-grid,
-  .record-booklet-print__remarks {
-    min-height: 0;
-  }
-
-  .record-booklet-print__dose-list {
+  .record-card-export__dose-stack {
     display: grid;
-    gap: 4px;
+    gap: 2px;
   }
 
-  .record-booklet-print__dose-item {
+  .record-card-export__dose-item {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
+    min-height: 14px;
   }
 
-  .record-booklet-print__dose-badge {
-    display: inline-flex;
-    width: 15px;
-    height: 15px;
-    align-items: center;
-    justify-content: center;
+  .record-card-export__dose-badge {
+    width: 13px;
+    height: 13px;
     border-radius: 999px;
     background: #f4b24d;
-    font-weight: 700;
-    font-size: 9px;
-    color: #111827;
+    font-size: 8px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
   }
 
-  .record-booklet-print__dose-label {
-    font-size: 10px;
-    font-weight: 600;
-    line-height: 1.15;
-  }
-
-  .record-booklet-print__date-grid {
-    display: grid;
-    gap: 4px;
-  }
-
-  .record-booklet-print__date-slot {
-    position: relative;
-    min-height: 22px;
-    border: 1.5px solid #94a3b8;
-    padding: 8px 4px 3px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
+  .record-card-export__dose-label {
     font-size: 9px;
-    font-weight: 600;
+    line-height: 1.05;
+    font-weight: 700;
   }
 
-  .record-booklet-print__date-slot-index {
-    position: absolute;
-    top: 2px;
-    left: 4px;
-    font-size: 7px;
+  .record-card-export__date-grid {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 2px;
+    table-layout: fixed;
+  }
+
+  .record-card-export__date-grid td {
+    position: relative;
+    min-height: 18px;
+    height: 18px;
+    border: 1px solid #94a3b8;
+    padding: 7px 2px 1px;
+    text-align: center;
+    vertical-align: middle;
+    font-size: 8px;
     font-weight: 700;
+    background: #ffffff;
+  }
+
+  .record-card-export__date-index {
+    position: absolute;
+    top: 1px;
+    left: 2px;
+    font-size: 6px;
+    font-weight: 800;
     color: #64748b;
   }
 
-  .record-booklet-print__date-slot-value {
-    min-height: 10px;
-  }
-
-  .record-booklet-print__remarks {
-    line-height: 1.1;
+  .record-card-export__remarks-box {
     white-space: pre-wrap;
     word-break: break-word;
+    line-height: 1.08;
+  }
+
+  .record-card-export__footer-note {
+    margin-top: 4mm;
+    color: #ffffff;
+    font-size: 9px;
+    line-height: 1.15;
+    font-weight: 600;
   }
 
   @media print {
@@ -550,112 +565,13 @@ const PRINTABLE_STYLES = `
       overflow: visible;
     }
 
-    .record-booklet-print {
+    .record-card-export {
       width: 346mm;
       max-width: 100%;
       min-height: 205mm;
-      padding: 4mm 4mm 3mm;
+      padding: 0;
       box-shadow: none;
       border: none;
-    }
-
-    .record-booklet-print__title {
-      margin-bottom: 6px;
-      font-size: 18px;
-    }
-
-    .record-booklet-print__details {
-      grid-template-columns: 1.12fr 1fr 0.88fr;
-      gap: 6px 10px;
-      margin-bottom: 6px;
-    }
-
-    .record-booklet-print__field {
-      margin-bottom: 3px;
-      gap: 4px;
-      font-size: 9px;
-    }
-
-    .record-booklet-print__label {
-      font-size: 9px;
-    }
-
-    .record-booklet-print__value {
-      min-height: 11px;
-      padding: 0 1px 1px;
-    }
-
-    .record-booklet-print__value--wide {
-      min-width: 0;
-      width: 100%;
-    }
-
-    .record-booklet-print__value--medium {
-      min-width: 0;
-      width: 90px;
-      max-width: 100%;
-    }
-
-    .record-booklet-print__value--narrow {
-      min-width: 0;
-      width: 58px;
-      max-width: 100%;
-    }
-
-    .record-booklet-print__table {
-      border-spacing: 0 1px;
-    }
-
-    .record-booklet-print__table th {
-      font-size: 8px;
-      padding: 3px 4px;
-    }
-
-    .record-booklet-print__table td {
-      font-size: 7.5px;
-      padding: 2px 3px;
-    }
-
-    .record-booklet-print__dose-list,
-    .record-booklet-print__date-grid,
-    .record-booklet-print__remarks {
-      min-height: 0;
-    }
-
-    .record-booklet-print__dose-list,
-    .record-booklet-print__date-grid {
-      gap: 2px;
-    }
-
-    .record-booklet-print__dose-item {
-      gap: 4px;
-    }
-
-    .record-booklet-print__dose-badge {
-      width: 11px;
-      height: 11px;
-      font-size: 7px;
-    }
-
-    .record-booklet-print__dose-label {
-      font-size: 7.5px;
-    }
-
-    .record-booklet-print__date-slot {
-      min-height: 16px;
-      padding: 6px 2px 2px;
-      font-size: 7px;
-    }
-
-    .record-booklet-print__date-slot-index {
-      top: 2px;
-      left: 3px;
-      font-size: 6px;
-    }
-
-    .record-booklet-print__remarks {
-      font-size: 7px;
-      line-height: 1.05;
     }
   }
 `;
@@ -1045,19 +961,34 @@ const getStatusBadgeClassName = (status) => {
   }
 };
 
-const PrintableField = ({ label, value, widthClassName = "record-booklet-print__value--wide" }) => (
-  <div className="record-booklet-print__field">
-    <span className="record-booklet-print__label">{label}</span>
-    <span
-      className={`record-booklet-print__value ${widthClassName} ${
-        hasDisplayValue(value)
-          ? "record-booklet-print__value--filled"
-          : "record-booklet-print__value--placeholder"
-      }`.trim()}
-    >
-      {hasDisplayValue(value) ? value : "\u00A0"}
-    </span>
-  </div>
+const ExportFieldTable = ({ rows = [] }) => (
+  <table className="record-card-export__field-table">
+    <tbody>
+      {rows.map((row) => (
+        <tr key={row.label}>
+          <th>{row.label}</th>
+          <td className={row.multiline ? "record-card-export__field-table-cell--multiline" : ""}>
+            {hasDisplayValue(row.value) ? row.value : "\u00A0"}
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+);
+
+const ExportDatesTable = ({ slots = [] }) => (
+  <table className="record-card-export__date-grid">
+    <tbody>
+      <tr>
+        {slots.map((slot) => (
+          <td key={`export-date-${slot.key}`}>
+            <span className="record-card-export__date-index">{slot.displayDoseNumber}</span>
+            {formatDate(slot.adminDate) || "\u00A0"}
+          </td>
+        ))}
+      </tr>
+    </tbody>
+  </table>
 );
 
 export default function ImmunizationRecordBooklet({ infantId }) {
@@ -1227,6 +1158,12 @@ export default function ImmunizationRecordBooklet({ infantId }) {
   const birthWeight = formatMeasurement(infant?.birth_weight, "kg");
   const birthHeight = formatMeasurement(infant?.birth_height, "cm");
   const sexLabel = getSexLabel(infant?.sex);
+  const exportSexLabel =
+    sexLabel === "Male"
+      ? "◉Male\n○Female"
+      : sexLabel === "Female"
+        ? "○Male\n◉Female"
+        : "○Male\n○Female";
 
   const summaryFields = useMemo(
     () => [
@@ -1260,7 +1197,7 @@ export default function ImmunizationRecordBooklet({ infantId }) {
   );
 
   const buildPrintableDocument = useCallback(() => {
-    const printableNode = printAreaRef.current;
+    const printableNode = printAreaRef.current?.querySelector(".record-card-export");
     if (!printableNode) {
       return "";
     }
@@ -1324,12 +1261,13 @@ export default function ImmunizationRecordBooklet({ infantId }) {
         title: "Child Immunization Record Booklet",
         page: IMMUNIZATION_RECORD_EXPORT_PAGE,
         marginsMm: {
-          top: 4,
-          right: 4,
-          bottom: 4,
-          left: 4,
+          top: 3,
+          right: 3,
+          bottom: 3,
+          left: 3,
         },
-        scale: 0.84,
+        scale: 0.92,
+        autoPaging: false,
       });
     } catch (downloadError) {
       console.error("Error generating immunization record PDF:", downloadError);
@@ -1616,58 +1554,56 @@ export default function ImmunizationRecordBooklet({ infantId }) {
       </div>
 
       <div ref={printAreaRef} className="hidden">
-        <div className="record-booklet-print">
-          <h1 className="record-booklet-print__title">Child Immunization Record</h1>
+        <div className="record-card-export">
+          <div className="record-card-export__shell">
+            <div className="record-card-export__top">
+              <h1 className="record-card-export__title">Child Immunization Record</h1>
 
-          <section className="record-booklet-print__details">
-            <div className="record-booklet-print__detail-column">
-              <PrintableField label="Child's name:" value={childName} />
-              <PrintableField
-                label="Date of birth:"
-                value={birthDate}
-                widthClassName="record-booklet-print__value--medium"
-              />
-              <PrintableField label="Place of birth:" value={infant.place_of_birth} />
-              <PrintableField label="Address:" value={address} />
+              <table className="record-card-export__info-grid">
+                <tbody>
+                  <tr>
+                    <td>
+                      <ExportFieldTable
+                        rows={[
+                          { label: "Child's name:", value: childName },
+                          { label: "Date of birth:", value: birthDate },
+                          { label: "Place of birth:", value: infant.place_of_birth },
+                          { label: "Address:", value: address, multiline: true },
+                        ]}
+                      />
+                    </td>
+                    <td>
+                      <ExportFieldTable
+                        rows={[
+                          { label: "Mother's name:", value: infant.mother_name },
+                          { label: "Father's name:", value: infant.father_name },
+                          { label: "Birth height:", value: birthHeight },
+                          { label: "Birth weight:", value: birthWeight },
+                          { label: "Sex:", value: exportSexLabel },
+                        ]}
+                      />
+                    </td>
+                    <td>
+                      <ExportFieldTable
+                        rows={[
+                          { label: "Health Center:", value: infant.health_center },
+                          { label: "Barangay:", value: infant.barangay },
+                          { label: "Family no.:", value: infant.family_no },
+                        ]}
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
-            <div className="record-booklet-print__detail-column">
-              <PrintableField label="Mother's name:" value={infant.mother_name} />
-              <PrintableField label="Father's name:" value={infant.father_name} />
-              <PrintableField
-                label="Birth height:"
-                value={birthHeight}
-                widthClassName="record-booklet-print__value--narrow"
-              />
-              <PrintableField
-                label="Birth weight:"
-                value={birthWeight}
-                widthClassName="record-booklet-print__value--narrow"
-              />
-              <PrintableField
-                label="Sex:"
-                value={sexLabel}
-                widthClassName="record-booklet-print__value--narrow"
-              />
-            </div>
-
-            <div className="record-booklet-print__detail-column">
-              <PrintableField label="Health Center:" value={infant.health_center} />
-              <PrintableField label="Barangay:" value={infant.barangay} />
-              <PrintableField
-                label="Family no.:"
-                value={infant.family_no}
-                widthClassName="record-booklet-print__value--medium"
-              />
-            </div>
-          </section>
-
-          <table className="record-booklet-print__table">
+            <div className="record-card-export__table-wrap">
+              <table className="record-card-export__table">
             <colgroup>
-              <col className="record-booklet-print__column--vaccine" />
-              <col className="record-booklet-print__column--doses" />
-              <col className="record-booklet-print__column--dates" />
-              <col className="record-booklet-print__column--remarks" />
+                <col className="record-card-export__column--vaccine" />
+                <col className="record-card-export__column--doses" />
+                <col className="record-card-export__column--dates" />
+                <col className="record-card-export__column--remarks" />
             </colgroup>
             <thead>
               <tr>
@@ -1684,15 +1620,15 @@ export default function ImmunizationRecordBooklet({ infantId }) {
             <tbody>
               {bookletRows.map((row) => (
                 <tr key={`print-${row.key}`}>
-                  <td className="record-booklet-print__vaccine">{row.vaccineLabel}</td>
+                      <td className="record-card-export__vaccine-cell">{row.vaccineLabel}</td>
                   <td>
-                    <div className="record-booklet-print__dose-list">
+                        <div className="record-card-export__dose-stack">
                       {row.slots.map((slot) => (
-                        <div key={`print-dose-${slot.key}`} className="record-booklet-print__dose-item">
-                          <span className="record-booklet-print__dose-badge">
+                            <div key={`print-dose-${slot.key}`} className="record-card-export__dose-item">
+                              <span className="record-card-export__dose-badge">
                             {slot.displayDoseNumber}
                           </span>
-                          <span className="record-booklet-print__dose-label">
+                              <span className="record-card-export__dose-label">
                             {slot.scheduleLabel}
                           </span>
                         </div>
@@ -1700,26 +1636,10 @@ export default function ImmunizationRecordBooklet({ infantId }) {
                     </div>
                   </td>
                   <td>
-                    <div
-                      className="record-booklet-print__date-grid"
-                      style={{
-                        gridTemplateColumns: `repeat(${row.slots.length}, minmax(0, 1fr))`,
-                      }}
-                    >
-                      {row.slots.map((slot) => (
-                        <div key={`print-date-${slot.key}`} className="record-booklet-print__date-slot">
-                          <span className="record-booklet-print__date-slot-index">
-                            {slot.displayDoseNumber}
-                          </span>
-                          <span className="record-booklet-print__date-slot-value">
-                            {formatDate(slot.adminDate) || "\u00A0"}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                        <ExportDatesTable slots={row.slots} />
                   </td>
                   <td>
-                    <div className="record-booklet-print__remarks">
+                        <div className="record-card-export__remarks-box">
                       {row.remarks || "\u00A0"}
                     </div>
                   </td>
@@ -1727,6 +1647,11 @@ export default function ImmunizationRecordBooklet({ infantId }) {
               ))}
             </tbody>
           </table>
+              <div className="record-card-export__footer-note">
+                Sa column ng Petsa ng bakuna, isulat ang petsa ng pagbigay ng bakuna ayon sa kung pang-ilang dose ito. Sa column ng Remarks, isulat ang petsa ng pagbalik para sa susunod na dose, o anumang mahalagang impormasyon na maaaring makaapekto sa pagbabakuna ng bata.
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

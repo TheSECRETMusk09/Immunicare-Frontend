@@ -47,7 +47,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "node scripts/validate-env.js production && react-scripts build",
+    "build": "node scripts/validate-env.js production && node scripts/build.js",
     "test": "react-scripts test",
     "test:ci": "set CI=true && react-scripts test --watchAll=false",
     "e2e": "playwright test",

@@ -521,6 +521,7 @@ export const downloadPdfFromNode = async ({
   scale = 0.75,
   backgroundColor = "#ffffff",
   onClone,
+  autoPaging = "text",
 }) => {
   if (!node || typeof document === "undefined") {
     return;
@@ -590,7 +591,7 @@ export const downloadPdfFromNode = async ({
       y: pageMargins.top + headerBandHeight,
       width: resolvedPage.widthMm - pageMargins.left - pageMargins.right,
       windowWidth: Math.max(exportRoot.scrollWidth || 0, 1200),
-      autoPaging: "text",
+      autoPaging,
       margin: [
         pageMargins.top + headerBandHeight,
         pageMargins.right,
