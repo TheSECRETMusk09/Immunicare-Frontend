@@ -3435,10 +3435,12 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
 
   .inventory-sheet-summary-print-report__page {
     width: 100%;
-    max-width: 13.1in;
-    min-height: 7.6in;
+    max-width: 11.85in;
+    min-height: 7.25in;
     margin: 0 auto;
-    padding: 0 0 0.08in;
+    padding: 0.02in 0 0.04in;
+    display: flex;
+    flex-direction: column;
     page-break-after: always;
     break-after: page;
   }
@@ -3449,16 +3451,18 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
   }
 
   .inventory-sheet-summary-print-header {
-    margin: 0 0 0.18in 0;
-    padding: 0 0 0.14in;
+    width: 100%;
+    max-width: 10.95in;
+    margin: 0 auto 0.28in;
+    padding: 0 0 0.18in;
     border-bottom: 1.2px solid #cbd5e1;
   }
 
   .inventory-sheet-summary-print-header__branding {
     display: grid;
-    grid-template-columns: 0.96in minmax(0, 1fr) 0.96in;
+    grid-template-columns: 1.02in minmax(0, 1fr) 1.02in;
     align-items: center;
-    gap: 0.18in;
+    gap: 0.26in;
   }
 
   .inventory-sheet-summary-print-header__branding-copy {
@@ -3472,8 +3476,8 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
   }
 
   .inventory-sheet-summary-print-header__logo {
-    width: 0.9in;
-    height: 0.9in;
+    width: 0.94in;
+    height: 0.94in;
     object-fit: contain;
     background: transparent;
   }
@@ -3484,13 +3488,13 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
   }
 
   .inventory-sheet-summary-print-header__line--government {
-    margin-bottom: 0.04in;
-    font-size: 9.1px;
+    margin-bottom: 0.05in;
+    font-size: 9.4px;
   }
 
   .inventory-sheet-summary-print-header__line--title {
-    margin-top: 0.02in;
-    font-size: 10px;
+    margin-top: 0.03in;
+    font-size: 10.4px;
     text-transform: none;
   }
 
@@ -3498,7 +3502,12 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: end;
-    gap: 0.16in;
+    gap: 0.22in;
+    width: 100%;
+    max-width: 10.95in;
+    margin: 0.12in auto 0;
+    padding-top: 0.12in;
+    border-top: 1px solid #e2e8f0;
   }
 
   .inventory-sheet-summary-print-header__detail--facility {
@@ -3515,7 +3524,21 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
   }
 
   .inventory-sheet-summary-print-table {
-    margin-top: 0;
+    width: 100%;
+    max-width: 10.95in;
+    margin: 0 auto;
+  }
+
+  .inventory-sheet-summary-print-footer {
+    width: 100%;
+    max-width: 10.95in;
+    margin: auto auto 0;
+    padding-top: 0.12in;
+    border-top: 1px solid #d7deea;
+    text-align: center;
+    font-size: 8.2px;
+    line-height: 1.2;
+    color: #475569;
   }
 
   .doh-lgu-stock-print-header {
@@ -3941,16 +3964,20 @@ const buildInventorySheetPdfBodyRows = ({
 const drawInventorySheetPdfHeader = ({
   doc,
   pageWidth,
+  pageHeight,
   margin,
   headerContext,
   leftLogoImage,
   rightLogoImage,
 }) => {
+  const contentWidth = Math.min(pageWidth - 36, 300);
+  const contentLeft = (pageWidth - contentWidth) / 2;
+  const contentRight = contentLeft + contentWidth;
   const centerX = pageWidth / 2;
   const logoSize = 18;
   const logoY = margin.top + 1;
-  const leftLogoX = margin.left + 18;
-  const rightLogoX = pageWidth - margin.right - logoSize - 18;
+  const leftLogoX = contentLeft + 8;
+  const rightLogoX = contentRight - logoSize - 8;
 
   if (leftLogoImage) {
     doc.addImage(
@@ -4024,22 +4051,42 @@ const drawInventorySheetPdfHeader = ({
   currentY += 4.8;
   doc.setDrawColor(203, 213, 225);
   doc.setLineWidth(0.25);
-  doc.line(margin.left, currentY, pageWidth - margin.right, currentY);
+  doc.line(contentLeft, currentY, contentRight, currentY);
 
-  currentY += 5.8;
+  currentY += 7.2;
   doc.setTextColor(17, 24, 39);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.6);
-  doc.text(PRINT_REPORT_COPY.inventorySheetCodeLabel, margin.left, currentY);
-  doc.line(margin.left + 9.5, currentY + 0.3, margin.left + 45, currentY + 0.3);
+  doc.text(PRINT_REPORT_COPY.inventorySheetCodeLabel, contentLeft, currentY);
+  doc.line(contentLeft + 9.5, currentY + 0.3, contentLeft + 45, currentY + 0.3);
   doc.text(headerContext.facilityName, centerX, currentY, {
     align: "center",
   });
-  doc.text(headerContext.monthLine, pageWidth - margin.right, currentY, {
+  doc.text(headerContext.monthLine, contentRight, currentY, {
     align: "right",
   });
 
-  return currentY + 4.8;
+  const footerY = pageHeight - margin.bottom - 2.2;
+  doc.setDrawColor(215, 222, 234);
+  doc.setLineWidth(0.25);
+  doc.line(contentLeft, footerY - 2, contentRight, footerY - 2);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.6);
+  doc.setTextColor(71, 85, 105);
+  doc.text(
+    `${headerContext.facilityName} • ${headerContext.monthLine}`,
+    centerX,
+    footerY,
+    {
+      align: "center",
+    },
+  );
+
+  return {
+    tableStartY: currentY + 5.2,
+    contentLeft,
+    contentWidth,
+  };
 };
 
 const exportInventorySheetPdf = async ({
@@ -4066,8 +4113,8 @@ const exportInventorySheetPdf = async ({
   });
   const runAutoTable = resolvePdfAutoTableRunner({ doc, autoTableModule });
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
   const margin = { top: 8, right: 8, bottom: 8, left: 8 };
-  const availableWidth = pageWidth - margin.left - margin.right;
   const sanitizedReportDate =
     String(reportDate || "").trim() || new Date().toISOString().split("T")[0];
   const headerContext = buildInventorySheetHeaderContext({
@@ -4088,9 +4135,10 @@ const exportInventorySheetPdf = async ({
       doc.addPage();
     }
 
-    const tableStartY = drawInventorySheetPdfHeader({
+    const { tableStartY, contentLeft, contentWidth } = drawInventorySheetPdfHeader({
       doc,
       pageWidth,
+      pageHeight,
       margin,
       headerContext,
       leftLogoImage,
@@ -4099,9 +4147,14 @@ const exportInventorySheetPdf = async ({
 
     runAutoTable({
       startY: tableStartY,
-      margin,
+      margin: {
+        top: margin.top,
+        right: contentLeft,
+        bottom: margin.bottom + 6,
+        left: contentLeft,
+      },
       theme: "grid",
-      tableWidth: availableWidth,
+      tableWidth: contentWidth,
       head: buildInventorySheetPdfHeaderRows(),
       body: buildInventorySheetPdfBodyRows({
         rows: pageRows,
@@ -4129,7 +4182,7 @@ const exportInventorySheetPdf = async ({
       bodyStyles: {
         fillColor: [255, 255, 255],
       },
-      columnStyles: getInventorySheetPdfColumnStyles(availableWidth),
+      columnStyles: getInventorySheetPdfColumnStyles(contentWidth),
       didParseCell: (hook) => {
         if (hook.section === "head") {
           hook.cell.styles.fillColor = getInventorySheetPdfFillColor(
@@ -4242,6 +4295,15 @@ const InventorySheetSummaryPrintHeader = ({
     </header>
   );
 };
+
+const InventorySheetSummaryPrintFooter = ({
+  facilityName,
+  monthLine,
+}) => (
+  <footer className="inventory-sheet-summary-print-footer">
+    {facilityName} • {monthLine}
+  </footer>
+);
 
 const InventorySheetSummaryPrintReport = ({
   facilityInfo,
@@ -4416,6 +4478,11 @@ const InventorySheetSummaryPrintReport = ({
               )}
             </tbody>
           </table>
+
+          <InventorySheetSummaryPrintFooter
+            facilityName={headerContext.facilityName}
+            monthLine={headerContext.monthLine}
+          />
         </article>
       ))}
     </section>
@@ -8743,7 +8810,9 @@ export default function InventoryManagement() {
             max-width: var(--inventory-print-page-width) !important;
             min-height: calc(var(--inventory-print-page-height) - 0.05in) !important;
             margin: 0 auto 0.08in !important;
-            padding: 0.03in 0.04in 0.08in !important;
+            padding: 0.02in 0 0.04in !important;
+            display: flex !important;
+            flex-direction: column !important;
             page-break-after: always !important;
             break-after: page !important;
           }
@@ -8875,8 +8944,10 @@ export default function InventoryManagement() {
             align-items: center !important;
             gap: 0.04cm !important;
             text-align: center !important;
-            margin: 0 0 0.2in 0 !important;
-            padding: 0 0 0.13in !important;
+            width: 100% !important;
+            max-width: 10.95in !important;
+            margin: 0 auto 0.3in !important;
+            padding: 0 0 0.18in !important;
             border-bottom: 1.2px solid #cbd5e1 !important;
             color: #0f172a !important;
           }
@@ -8940,13 +9011,14 @@ export default function InventoryManagement() {
           }
 
           .inventory-sheet-summary-print-header__detail-row {
-            display: flex !important;
+            display: grid !important;
+            grid-template-columns: auto minmax(0, 1fr) auto !important;
             width: 100% !important;
-            align-items: center !important;
-            justify-content: space-between !important;
-            gap: 0.25in !important;
-            margin-top: 0.06in !important;
-            padding-top: 0.07in !important;
+            max-width: 10.95in !important;
+            align-items: end !important;
+            gap: 0.22in !important;
+            margin: 0.12in auto 0 !important;
+            padding-top: 0.12in !important;
             border-top: 1px solid #e2e8f0 !important;
           }
 
@@ -8975,7 +9047,8 @@ export default function InventoryManagement() {
 
           .inventory-sheet-summary-print-table {
             width: 100% !important;
-            margin-top: 0.03in !important;
+            max-width: 10.95in !important;
+            margin: 0 auto !important;
             table-layout: fixed !important;
             border-collapse: collapse !important;
             border-spacing: 0 !important;
@@ -9093,16 +9166,11 @@ export default function InventoryManagement() {
             background-color: #fae6e6 !important;
           }
 
-          .inventory-sheet-summary-print-header {
-            margin: 0 0 0.16in 0 !important;
-            padding: 0 0 0.12in !important;
-          }
-
           .inventory-sheet-summary-print-header__branding {
             display: grid !important;
             grid-template-columns: 1.02in minmax(0, 1fr) 1.02in !important;
             align-items: center !important;
-            gap: 0.14in !important;
+            gap: 0.26in !important;
           }
 
           .inventory-sheet-summary-print-header__branding-copy {
@@ -9128,21 +9196,14 @@ export default function InventoryManagement() {
           }
 
           .inventory-sheet-summary-print-header__line--government {
-            margin-bottom: 0.04in !important;
-            font-size: 9.1px !important;
+            margin-bottom: 0.05in !important;
+            font-size: 9.4px !important;
           }
 
           .inventory-sheet-summary-print-header__line--title {
-            margin-top: 0.02in !important;
-            font-size: 10px !important;
+            margin-top: 0.03in !important;
+            font-size: 10.4px !important;
             text-transform: none !important;
-          }
-
-          .inventory-sheet-summary-print-header__detail-row {
-            display: grid !important;
-            grid-template-columns: auto minmax(0, 1fr) auto !important;
-            align-items: end !important;
-            gap: 0.16in !important;
           }
 
           .inventory-sheet-summary-print-header__detail--facility {
@@ -9158,8 +9219,16 @@ export default function InventoryManagement() {
             justify-self: end !important;
           }
 
-          .inventory-sheet-summary-print-table {
-            margin-top: 0 !important;
+          .inventory-sheet-summary-print-footer {
+            width: 100% !important;
+            max-width: 10.95in !important;
+            margin: auto auto 0 !important;
+            padding-top: 0.12in !important;
+            border-top: 1px solid #d7deea !important;
+            text-align: center !important;
+            font-size: 8.2px !important;
+            line-height: 1.2 !important;
+            color: #475569 !important;
           }
 
           .doh-lgu-stock-print-header {
