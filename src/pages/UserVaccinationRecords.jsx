@@ -125,6 +125,7 @@ export default function UserVaccinationRecords() {
   const [selectedChild, setSelectedChild] = useState(null);
   const [vaccinationRecords, setVaccinationRecords] = useState([]);
   const [vaccinationSchedules, setVaccinationSchedules] = useState([]);
+  const [scheduleSummary, setScheduleSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState("records"); // "records", "schedule", "upcoming"
@@ -152,6 +153,7 @@ export default function UserVaccinationRecords() {
         setSelectedChild(null);
         setVaccinationRecords([]);
         setVaccinationSchedules([]);
+        setScheduleSummary(null);
         setChildReadiness(null);
       }
     } catch (err) {
@@ -163,6 +165,7 @@ export default function UserVaccinationRecords() {
 
   const fetchVaccinationData = useCallback(async (childId) => {
     try {
+      setScheduleSummary(null);
       const [recordsResponse, schedulesResponse] = await Promise.all([
         apiClient.getVaccinationsByInfant(childId),
         apiClient.getInfantVaccinationSchedule(childId),
@@ -182,15 +185,22 @@ export default function UserVaccinationRecords() {
       );
 
       setVaccinationRecords(normalizedRecords);
+      const normalizedScheduleResponse =
+        schedulesResponse && typeof schedulesResponse === "object"
+          ? schedulesResponse
+          : { schedule: Array.isArray(schedulesResponse) ? schedulesResponse : [] };
+
       setVaccinationSchedules(
-        Array.isArray(schedulesResponse?.schedule)
-          ? schedulesResponse.schedule
-          : Array.isArray(schedulesResponse)
-            ? schedulesResponse
-            : schedulesResponse?.data || [],
+        Array.isArray(normalizedScheduleResponse?.schedule)
+          ? normalizedScheduleResponse.schedule
+          : Array.isArray(normalizedScheduleResponse?.data)
+            ? normalizedScheduleResponse.data
+            : [],
       );
+      setScheduleSummary(normalizedScheduleResponse?.summary || null);
     } catch (err) {
       console.error("Error fetching vaccination data:", err);
+      setScheduleSummary(null);
     }
   }, []);
 
@@ -333,29 +343,40 @@ export default function UserVaccinationRecords() {
 
   // Calculate vaccination statistics
   const stats = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    if (scheduleSummary) {
+      return {
+        completed: Number(scheduleSummary.completed || 0),
+        upcoming: Number(scheduleSummary.upcoming || 0),
+        overdue: Number(scheduleSummary.overdue || 0),
+        total: Number(
+          scheduleSummary.totalVaccines ||
+            normalizedScheduleRecords.length ||
+            vaccinationRecords.length ||
+            0,
+        ),
+      };
+    }
 
-    const completed = vaccinationRecords.filter((v) => v.admin_date).length;
-    const upcoming = vaccinationRecords.filter((v) => {
-      if (v.admin_date) return false;
-      if (!v.due_date) return false;
-      const dueDate = new Date(v.due_date);
-      dueDate.setHours(0, 0, 0, 0);
-      const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-      return daysUntilDue > 0 && daysUntilDue <= 30;
-    }).length;
-    const overdue = vaccinationRecords.filter((v) => {
-      if (v.admin_date) return false;
-      if (!v.due_date) return false;
-      const dueDate = new Date(v.due_date);
-      dueDate.setHours(0, 0, 0, 0);
-      const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-      return daysUntilDue < 0;
-    }).length;
+    const completed = normalizedScheduleRecords.filter(
+      (record) => String(record.status || "").toLowerCase() === "completed",
+    ).length;
+    const upcoming = normalizedScheduleRecords.filter(
+      (record) => String(record.status || "").toLowerCase() === "upcoming",
+    ).length;
+    const overdue = normalizedScheduleRecords.filter(
+      (record) => String(record.status || "").toLowerCase() === "overdue",
+    ).length;
 
-    return { completed, upcoming, overdue };
-  }, [vaccinationRecords]);
+    return {
+      completed,
+      upcoming,
+      overdue,
+      total:
+        normalizedScheduleRecords.length ||
+        vaccinationRecords.length ||
+        completed + upcoming + overdue,
+    };
+  }, [normalizedScheduleRecords, scheduleSummary, vaccinationRecords]);
 
   const getVaccineStatus = (vaccine) => {
     const normalizedStatus = String(vaccine.status || "").toLowerCase();
@@ -598,15 +619,14 @@ export default function UserVaccinationRecords() {
                     Vaccination Progress
                   </span>
                   <span className="font-medium text-gray-900 dark:text-gray-100">
-                    {stats.completed} /{" "}
-                    {stats.completed + stats.upcoming + stats.overdue}
+                    {stats.completed} / {stats.total}
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                   <div
                     className="bg-green-500 h-2 rounded-full transition-all"
                     style={{
-                      width: `${stats.completed + stats.upcoming + stats.overdue > 0 ? (stats.completed / (stats.completed + stats.upcoming + stats.overdue)) * 100 : 0}%`,
+                      width: `${stats.total > 0 ? (stats.completed / stats.total) * 100 : 0}%`,
                     }}
                   ></div>
                 </div>

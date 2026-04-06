@@ -2,9 +2,8 @@ import React, { useState, useEffect, memo, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useSocket } from "../contexts/SocketContext";
-import { usePrefetchGuardian } from "../hooks/useCachedData";
+import { usePrefetchGuardian, useGuardianStats } from "../hooks/useCachedData";
 import useGuardianNotifications from "../hooks/useGuardianNotifications";
-import apiClient from "../utils/api";
 import {
   LayoutDashboard,
   Calendar,
@@ -54,6 +53,7 @@ const GuardianSidebar = memo(
     const location = useLocation();
     const { user, logout, guardianId } = useAuth();
     const { prefetchGuardianData } = usePrefetchGuardian();
+    const { data: guardianStats } = useGuardianStats(guardianId);
     const lastPrefetchAtRef = useRef(0);
 
     const { unreadCount: hookUnreadCount, refresh: refreshNotifications } = useGuardianNotifications({
@@ -96,58 +96,14 @@ const GuardianSidebar = memo(
       };
     }, [isConnected, on, off, refreshNotifications]);
 
-    // Fetch children count for mobile sidebar indicator
     useEffect(() => {
-      let isSubscribed = true;
-
-      const fetchChildrenCount = async () => {
-        if (!guardianId) {
-          if (isSubscribed) {
-            setChildrenCount(0);
-          }
-          return;
-        }
-
-        try {
-          const statsResponse = await apiClient.getGuardianStats(guardianId);
-          const statsPayload =
-            statsResponse && typeof statsResponse === "object" && "data" in statsResponse
-              ? statsResponse.data
-              : statsResponse;
-
-          const resolvedCount = Number(statsPayload?.childrenCount);
-          if (Number.isFinite(resolvedCount)) {
-            if (isSubscribed) {
-              setChildrenCount(resolvedCount);
-            }
-            return;
-          }
-
-          // Fallback for deployments where stats endpoint is unavailable
-          const infantsResponse = await apiClient.getInfantsByGuardian(guardianId);
-          const infantsPayload =
-            infantsResponse && typeof infantsResponse === "object" && "data" in infantsResponse
-              ? infantsResponse.data
-              : infantsResponse;
-          const infants = Array.isArray(infantsPayload) ? infantsPayload : [];
-
-          if (isSubscribed) {
-            setChildrenCount(infants.length);
-          }
-        } catch (error) {
-          console.error("Failed to fetch children count:", error);
-          if (isSubscribed) {
-            setChildrenCount(0);
-          }
-        }
-      };
-
-      fetchChildrenCount();
-
-      return () => {
-        isSubscribed = false;
-      };
-    }, [guardianId]);
+      const resolvedCount = Number(guardianStats?.childrenCount);
+      if (!guardianId) {
+        setChildrenCount(0);
+      } else if (Number.isFinite(resolvedCount)) {
+        setChildrenCount(resolvedCount);
+      }
+    }, [guardianId, guardianStats?.childrenCount]);
 
     // Prefetch guardian data on hover
     const handleMouseEnter = useCallback(() => {

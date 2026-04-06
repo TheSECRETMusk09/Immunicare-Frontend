@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Download, FileText, Calendar, Users, AlertCircle, CheckCircle } from "lucide-react";
+import { Download, FileText, Calendar, Users, AlertCircle } from "lucide-react";
 import { Modal, Button } from "../../UI";
 
 /**

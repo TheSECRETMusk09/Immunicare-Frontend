@@ -101,8 +101,10 @@ export const addNotificationTemplate = (key, template) => {
   };
 };
 
-export default {
+const notificationTemplateUtils = {
   renderNotification,
   getNotificationTemplates,
-  addNotificationTemplate
+  addNotificationTemplate,
 };
+
+export default notificationTemplateUtils;

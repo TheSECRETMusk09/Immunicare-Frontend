@@ -158,6 +158,19 @@ export default function InfantManagement() {
   }, []);
 
   useEffect(() => {
+    if (selectedInfant || (activeView !== "list" && activeView !== "transfer-in")) {
+      return;
+    }
+
+    const requestedView = new URLSearchParams(location.search).get("view");
+    const nextPrimaryView = requestedView === "transfer-in" ? "transfer-in" : "list";
+
+    if (activeView !== nextPrimaryView) {
+      setActiveView(nextPrimaryView);
+    }
+  }, [activeView, location.search, selectedInfant]);
+
+  useEffect(() => {
     const navigationState = location.state;
     if (!navigationState || navigationState.openRecordVaccination !== true) {
       return;
@@ -769,7 +782,12 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                   <Button
                     onClick={() => {
                       setTransferCasesRefreshing(false);
+                      setSelectedInfant(null);
                       setActiveView("list");
+                      navigate("/infants", {
+                        replace: true,
+                        state: location.state,
+                      });
                     }}
                     variant="secondary"
                     className="flex items-center gap-2"
@@ -791,7 +809,9 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                   <Button
                     onClick={() => {
                       setSelectedInfant(null);
-                      setActiveView("transfer-in");
+                      navigate("/infants?view=transfer-in", {
+                        state: location.state,
+                      });
                     }}
                     variant="info"
                     className="flex items-center gap-2"

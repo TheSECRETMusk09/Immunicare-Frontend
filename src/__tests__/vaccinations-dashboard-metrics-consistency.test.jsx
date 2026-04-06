@@ -11,6 +11,7 @@ jest.mock("../utils/api", () => ({
   __esModule: true,
   default: {
     getVaccinationRecords: jest.fn(),
+    getVaccinationReconciliationRecords: jest.fn(),
     getVaccinationSchedules: jest.fn(),
     getInfants: jest.fn(),
     getVaccines: jest.fn(),
@@ -50,6 +51,7 @@ describe("Vaccinations dashboard metric consistency", () => {
     useVaccinationSocket.mockImplementation(() => undefined);
     apiClient.getSystemUsers.mockResolvedValue([]);
     apiClient.getAnalyticsDashboard.mockResolvedValue(null);
+    apiClient.getVaccinationReconciliationRecords.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -58,6 +60,19 @@ describe("Vaccinations dashboard metric consistency", () => {
 
   test("summary cards use full schedule-derived counts instead of only pending record rows", async () => {
     apiClient.getVaccinationRecords.mockResolvedValue([
+      {
+        id: 901,
+        patient_id: 1,
+        vaccine_id: 1,
+        vaccine_name: "BCG",
+        dose_no: 1,
+        admin_date: "2026-03-20",
+        status: "completed",
+        patient_first_name: "Baby",
+        patient_last_name: "One",
+      },
+    ]);
+    apiClient.getVaccinationReconciliationRecords.mockResolvedValue([
       {
         id: 901,
         patient_id: 1,
@@ -130,12 +145,10 @@ describe("Vaccinations dashboard metric consistency", () => {
     ).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(apiClient.getVaccinationRecords).toHaveBeenNthCalledWith(1, {
-        page: 1,
-        limit: 1000,
+      expect(apiClient.getVaccinationReconciliationRecords).toHaveBeenCalledWith({
         scope: "system",
       });
-      expect(apiClient.getVaccinationRecords).toHaveBeenNthCalledWith(2, {
+      expect(apiClient.getVaccinationRecords).toHaveBeenCalledWith({
         page: 1,
         limit: 1,
         scope: "system",

@@ -262,7 +262,7 @@ export const LoadingButton = ({ loading = true, children, className = "" }) => (
 );
 
 // Main export with all components
-export default {
+const SkeletonLoader = {
   SkeletonCard,
   SkeletonGrid,
   SkeletonTable,
@@ -278,3 +278,5 @@ export default {
   SkeletonDashboardOverview,
   LoadingButton,
 };
+
+export default SkeletonLoader;

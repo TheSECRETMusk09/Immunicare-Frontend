@@ -125,6 +125,7 @@ describe("Guardian appointments header booking link", () => {
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith(
         "/guardian/appointments/new?childId=5001",
+        { state: undefined },
       );
     });
   });

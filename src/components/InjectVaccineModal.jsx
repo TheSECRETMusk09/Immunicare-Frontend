@@ -54,42 +54,6 @@ const buildAdministeredByDisplayName = (user = {}) => {
 
 const normalizeSearchValue = (value) => String(value || "").trim().toLowerCase();
 
-const INFANT_DROPDOWN_LOCALE = "en-PH";
-const INFANT_DROPDOWN_TIME_ZONE = "Asia/Manila";
-
-const formatInfantDropdownDate = (value) => {
-  if (!value) return "";
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return "";
-  }
-
-  return new Intl.DateTimeFormat(INFANT_DROPDOWN_LOCALE, {
-    timeZone: INFANT_DROPDOWN_TIME_ZONE,
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(parsed);
-};
-
-const buildInfantDropdownLabel = (infant = {}) => {
-  const displayName = [
-    infant.first_name,
-    infant.last_name,
-  ]
-    .map((part) => String(part || "").trim())
-    .filter(Boolean)
-    .join(" ")
-    .trim() || String(infant.full_name || infant.name || "").trim() || "Unnamed infant";
-
-  const birthDateLabel = formatInfantDropdownDate(
-    infant.dob ?? infant.date_of_birth ?? infant.birth_date,
-  );
-
-  return birthDateLabel ? `${displayName} (${birthDateLabel})` : displayName;
-};
-
 const formatDateInputValue = (value, fallback = "") => {
   if (!value) return fallback;
   const parsed = new Date(value);

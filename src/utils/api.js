@@ -16,7 +16,10 @@ const PUBLIC_AUTH_ROUTES = [
 ];
 
 let refreshRequest = null;
+let refreshCooldownUntil = 0;
+let proactiveRefreshTerminalFailure = false;
 const inFlightGetRequests = new Map();
+const DEFAULT_REFRESH_RATE_LIMIT_COOLDOWN_MS = 30 * 1000;
 
 const getRememberMePreference = () =>
   safeLocalStorage.getItem("rememberMe") === "true";
@@ -93,22 +96,111 @@ const isPublicAuthRoute = (pathname) =>
 
 const isAuthVerifyRequest = (url = "") => String(url).includes("/auth/verify");
 const isAuthRefreshRequest = (url = "") => String(url).includes("/auth/refresh");
+const shouldSkipAuthRefresh = (config = {}) => config?.skipAuthRefresh === true;
+
+const parseRetryAfterSeconds = (value) => {
+  const normalizedValue = Array.isArray(value) ? value[0] : value;
+  const parsedValue = Number.parseInt(normalizedValue, 10);
+
+  return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : null;
+};
+
+const isRefreshRateLimited = () => refreshCooldownUntil > Date.now();
+
+const clearRefreshCooldown = () => {
+  refreshCooldownUntil = 0;
+};
+
+const clearProactiveRefreshTerminalFailure = () => {
+  proactiveRefreshTerminalFailure = false;
+};
+
+const hasProactiveRefreshTerminalFailure = () => proactiveRefreshTerminalFailure === true;
+
+const markProactiveRefreshTerminalFailure = () => {
+  proactiveRefreshTerminalFailure = true;
+};
+
+const setRefreshCooldownFromError = (error) => {
+  const status = error?.response?.status || error?.status || null;
+
+  if (status !== 429) {
+    return;
+  }
+
+  const retryAfterSeconds =
+    parseRetryAfterSeconds(error?.response?.headers?.["retry-after"]) ??
+    parseRetryAfterSeconds(error?.response?.data?.retryAfter) ??
+    parseRetryAfterSeconds(error?.response?.data?.retry_after);
+
+  const cooldownMs = retryAfterSeconds
+    ? retryAfterSeconds * 1000
+    : DEFAULT_REFRESH_RATE_LIMIT_COOLDOWN_MS;
+
+  refreshCooldownUntil = Date.now() + cooldownMs;
+};
+
+const createRefreshRateLimitedError = () => {
+  const retryAfterSeconds = Math.max(
+    1,
+    Math.ceil((refreshCooldownUntil - Date.now()) / 1000),
+  );
+  const rateLimitedError = new Error("Token refresh temporarily rate limited");
+  rateLimitedError.status = 429;
+  rateLimitedError.code = "RATE_LIMIT_EXCEEDED";
+  rateLimitedError.isRefreshRateLimited = true;
+  rateLimitedError.config = {
+    url: `${API_BASE_URL}/auth/refresh`,
+  };
+  rateLimitedError.response = {
+    status: 429,
+    data: {
+      error: "Too many authentication attempts, please try again later.",
+      code: "RATE_LIMIT_EXCEEDED",
+      retryAfter: retryAfterSeconds,
+    },
+  };
+
+  return rateLimitedError;
+};
+
+const isTerminalRefreshFailure = (error) => {
+  const status = error?.response?.status || error?.status || null;
+  const code = error?.response?.data?.code || error?.code || null;
+
+  return (
+    status === 401 ||
+    status === 403 ||
+    code === "NO_REFRESH_TOKEN" ||
+    code === "INVALID_TOKEN" ||
+    code === "TOKEN_EXPIRED" ||
+    code === "USER_NOT_FOUND"
+  );
+};
 
 const shouldSuppressExpectedAuthErrorLog = (error, config = {}) => {
   const status = error?.status || error?.response?.status;
   const url = String(config?.url || error?.config?.url || "");
+  const refreshErrorUrl = String(error?.config?.url || "");
 
   if (config?.suppressAuthErrors === true) {
     return true;
   }
 
   return (
-    status === 401 &&
-    (isAuthVerifyRequest(url) || isAuthRefreshRequest(url))
+    ((status === 401 &&
+      (isAuthVerifyRequest(url) || isAuthRefreshRequest(url))) ||
+      (status === 429 &&
+        (error?.isRefreshRateLimited === true ||
+          isAuthRefreshRequest(refreshErrorUrl) ||
+          isAuthRefreshRequest(url))))
   );
 };
 
 const clearAuthStorage = () => {
+  clearRefreshCooldown();
+  clearProactiveRefreshTerminalFailure();
+  refreshRequest = null;
   safeLocalStorage.removeItem("token");
   safeSessionStorage.removeItem("token");
   safeLocalStorage.removeItem("refreshToken");
@@ -134,6 +226,9 @@ const persistAuthSession = ({
   user,
   rememberMe = false,
 } = {}) => {
+  clearRefreshCooldown();
+  clearProactiveRefreshTerminalFailure();
+
   const targetStorage = rememberMe ? safeLocalStorage : safeSessionStorage;
   const secondaryStorage = rememberMe ? safeSessionStorage : safeLocalStorage;
 
@@ -189,6 +284,10 @@ const redirectToLoginIfNeeded = () => {
 };
 
 const getOrCreateRefreshRequest = () => {
+  if (isRefreshRateLimited()) {
+    return Promise.reject(createRefreshRateLimitedError());
+  }
+
   if (!refreshRequest) {
     const storedRefreshToken = getStoredRefreshToken();
     refreshRequest = axios
@@ -200,6 +299,14 @@ const getOrCreateRefreshRequest = () => {
           timeout: 10000,
         },
       )
+      .then((response) => {
+        clearRefreshCooldown();
+        return response;
+      })
+      .catch((error) => {
+        setRefreshCooldownFromError(error);
+        throw error;
+      })
       .finally(() => {
         refreshRequest = null;
       });
@@ -353,7 +460,13 @@ axiosClient.interceptors.request.use(
     let token = getStoredAccessToken();
 
     // Proactive token refresh before request if nearing expiration
-    if (token && isTokenExpiringSoon(token) && !String(config.url || '').includes('/auth/refresh')) {
+    if (
+      token &&
+      isTokenExpiringSoon(token) &&
+      !hasProactiveRefreshTerminalFailure() &&
+      !shouldSkipAuthRefresh(config) &&
+      !String(config.url || "").includes("/auth/refresh")
+    ) {
       try {
         const refreshResponse = await getOrCreateRefreshRequest();
         const newToken = refreshResponse.data.token || refreshResponse.data.accessToken;
@@ -371,7 +484,14 @@ axiosClient.interceptors.request.use(
           token = newToken;
         }
       } catch (refreshError) {
-        if (!shouldSuppressExpectedAuthErrorLog(refreshError, config)) {
+        const isTerminalFailure = isTerminalRefreshFailure(refreshError);
+        if (isTerminalFailure) {
+          markProactiveRefreshTerminalFailure();
+        }
+        if (
+          !isTerminalFailure &&
+          !shouldSuppressExpectedAuthErrorLog(refreshError, config)
+        ) {
           console.warn("Proactive token refresh failed:", refreshError?.message);
         }
         // Ignore error here, let the request proceed.
@@ -429,6 +549,7 @@ axiosClient.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
+      !shouldSkipAuthRefresh(originalRequest) &&
       !String(originalRequest.url || "").includes("/auth/refresh")
     ) {
       originalRequest._retry = true;
@@ -464,15 +585,28 @@ axiosClient.interceptors.response.use(
         redirectToLoginIfNeeded();
         return Promise.reject(error);
       } catch (refreshError) {
-        const sessionExpiredError = new Error("Session expired");
-        sessionExpiredError.status = 401;
-        sessionExpiredError.code = "SESSION_EXPIRED";
-        sessionExpiredError.response = refreshError?.response;
-        sessionExpiredError.originalError = refreshError;
+        if (isTerminalRefreshFailure(refreshError)) {
+          const sessionExpiredError = new Error("Session expired");
+          sessionExpiredError.status = 401;
+          sessionExpiredError.code =
+            refreshError?.response?.data?.code || "SESSION_EXPIRED";
+          sessionExpiredError.response = refreshError?.response;
+          sessionExpiredError.originalError = refreshError;
 
-        clearAuthStorage();
-        redirectToLoginIfNeeded();
-        return Promise.reject(sessionExpiredError);
+          clearAuthStorage();
+          redirectToLoginIfNeeded();
+          return Promise.reject(sessionExpiredError);
+        }
+
+        const refreshUnavailableError = new Error(
+          "Unable to verify your session right now. Please try again.",
+        );
+        refreshUnavailableError.status =
+          refreshError?.response?.status || refreshError?.status || 503;
+        refreshUnavailableError.code = "AUTH_REFRESH_UNAVAILABLE";
+        refreshUnavailableError.response = refreshError?.response;
+        refreshUnavailableError.originalError = refreshError;
+        return Promise.reject(refreshUnavailableError);
       }
     }
 
@@ -718,6 +852,19 @@ class ApiClient {
     return this.request("/auth/verify", {
       method: "GET",
       disableRetry: true,
+      skipAuthRefresh: true,
+      suppressAuthErrors: true,
+    });
+  }
+
+  async refreshSession() {
+    const storedRefreshToken = getStoredRefreshToken();
+
+    return this.request("/auth/refresh", {
+      method: "POST",
+      data: storedRefreshToken ? { refreshToken: storedRefreshToken } : {},
+      disableRetry: true,
+      skipAuthRefresh: true,
       suppressAuthErrors: true,
     });
   }
@@ -748,6 +895,18 @@ class ApiClient {
 
   async getGuardianStats(guardianId) {
     return this.request(`/dashboard/guardian/${guardianId}/stats`);
+  }
+
+  async getGuardianDashboardOverview(guardianId, filters = {}) {
+    const params = new URLSearchParams();
+    Object.entries(filters || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        params.append(key, value);
+      }
+    });
+
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return this.request(`/dashboard/guardian/${guardianId}/overview${suffix}`);
   }
 
   async getGuardianAppointments(guardianId, filters = {}) {
@@ -1125,6 +1284,11 @@ class ApiClient {
     return this.request(`/vaccinations/records${suffix}`);
   }
 
+  async getVaccinationReconciliationRecords(params = {}) {
+    const suffix = this.buildQuerySuffix(params);
+    return this.request(`/vaccinations/records/reconciliation${suffix}`);
+  }
+
   async getVaccinationRecordsByInfant(infantId) {
     return this.request(`/vaccinations/records/infant/${infantId}`);
   }
@@ -1213,8 +1377,15 @@ class ApiClient {
   }
 
   // Vaccination readiness - automated vaccine readiness calculation
-  async getVaccinationReadiness(infantId) {
-    return this.request(`/vaccination-readiness/${infantId}`);
+  async getVaccinationReadiness(infantId, options = {}) {
+    const params = new URLSearchParams();
+    Object.entries(options || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        params.append(key, String(value));
+      }
+    });
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return this.request(`/vaccination-readiness/${infantId}${suffix}`);
   }
 
   // Vaccine Eligibility - Get eligible vaccines for an infant
@@ -1545,6 +1716,12 @@ class ApiClient {
     const params = new URLSearchParams(filters || {});
     const suffix = params.toString() ? `?${params.toString()}` : "";
     return this.request(`/inventory/vaccine-inventory-transactions${suffix}`);
+  }
+
+  async getInventoryStockMovements(filters = {}) {
+    const params = new URLSearchParams(filters || {});
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return this.request(`/inventory/stock-movements${suffix}`);
   }
 
   async createVaccineInventoryTransaction(transactionData) {

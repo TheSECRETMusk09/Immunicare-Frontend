@@ -1,4 +1,4 @@
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import apiClient from "../utils/api";
@@ -7,7 +7,6 @@ import GuardianModuleHeader from "../components/GuardianModuleHeader";
 import GuardianTopHeader from "../components/GuardianTopHeader";
 import { Calendar, Plus, RefreshCw, Bell, User } from "lucide-react";
 import moment from "moment";
-import { useMediaQuery } from "@mui/material";
 
 // FullCalendar imports (same as Admin Dashboard)
 import FullCalendar from "@fullcalendar/react";
@@ -53,7 +52,6 @@ export default function GuardianAppointmentsPage() {
   const navigate = useNavigate();
   const { guardianId } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const isMobile = useMediaQuery("(max-width: 767px)");
   const [searchParams] = useSearchParams();
   const childIdFromQuery = searchParams.get("childId");
 
@@ -105,6 +103,21 @@ export default function GuardianAppointmentsPage() {
     type: "Vaccination",
     notes: "",
   });
+
+  const buildBookingQuery = useCallback(({ childId, scheduledDate } = {}) => {
+    const params = new URLSearchParams();
+
+    if (childId) {
+      params.set("childId", String(childId));
+    }
+
+    if (scheduledDate) {
+      params.set("date", scheduledDate);
+    }
+
+    const queryString = params.toString();
+    return queryString ? `?${queryString}` : "";
+  }, []);
 
   const calendarCurrentLabel = useMemo(() => {
     const safeCurrentDate =
@@ -292,7 +305,7 @@ export default function GuardianAppointmentsPage() {
     handleViewAppointment(appointment);
   };
 
-  // Handle date click - open booking modal (like Admin Dashboard)
+  // Handle date click - route to the dedicated booking page for a fuller workflow.
   const handleDateClick = (info) => {
     const clickedDate = toDateKey(info.date) || info.dateStr;
     if (!clickedDate) return;
@@ -322,12 +335,19 @@ export default function GuardianAppointmentsPage() {
     }
 
     setCalendarGuardFeedback("");
-    setFormData((prev) => ({
-      ...prev,
-      scheduled_date: clickedDate,
-      infant_id: childIdFromQuery || "",
-    }));
-    setShowBookingModal(true);
+    const targetChildId = formData.infant_id || childIdFromQuery || "";
+    const querySuffix = buildBookingQuery({
+      childId: targetChildId,
+      scheduledDate: clickedDate,
+    });
+
+    navigate(`/guardian/appointments/new${querySuffix}`, {
+      state: {
+        selectedDate: clickedDate,
+        childId: targetChildId || undefined,
+        source: "guardian-appointments-calendar",
+      },
+    });
   };
 
   const getDayCellClassNames = useCallback((args) => {
@@ -558,33 +578,26 @@ export default function GuardianAppointmentsPage() {
     return () => abortController.abort();
   }, [fetchTimeSlots]);
 
-  const openCreateModal = () => {
-    setEditingAppointment(null);
-    setError("");
-    setSuccessMessage("");
-    setTimeSlots([]);
-    setTimeSlotsFeedback(null);
-    setFormData((previous) => ({
-      ...previous,
-      infant_id: previous.infant_id || childIdFromQuery || "",
-      vaccine_id: "",
-      scheduled_date: selectedDate || toDateKey(new Date()),
-      scheduled_time: "",
-      type: "Vaccination",
-      notes: "",
-    }));
-    setCalendarGuardFeedback("");
-    setShowBookingModal(true);
-  };
+  const openBookingPage = useCallback(
+    ({ scheduledDate } = {}) => {
+      const targetChildId = formData.infant_id || childIdFromQuery;
+      const querySuffix = buildBookingQuery({
+        childId: targetChildId,
+        scheduledDate,
+      });
 
-  const openBookingPage = useCallback(() => {
-    const targetChildId = formData.infant_id || childIdFromQuery;
-    const querySuffix = targetChildId
-      ? `?childId=${encodeURIComponent(targetChildId)}`
-      : "";
-
-    navigate(`/guardian/appointments/new${querySuffix}`);
-  }, [childIdFromQuery, formData.infant_id, navigate]);
+      navigate(`/guardian/appointments/new${querySuffix}`, {
+        state: scheduledDate
+          ? {
+              selectedDate: scheduledDate,
+              childId: targetChildId || undefined,
+              source: "guardian-appointments-calendar",
+            }
+          : undefined,
+      });
+    },
+    [buildBookingQuery, childIdFromQuery, formData.infant_id, navigate],
+  );
 
   const openEditModal = (appointment) => {
     const schedule = new Date(appointment.scheduled_date);

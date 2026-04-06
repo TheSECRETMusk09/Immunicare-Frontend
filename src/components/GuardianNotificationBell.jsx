@@ -29,6 +29,7 @@ import guardianNotificationService from "../services/guardianNotificationService
 import { useAuth } from "../contexts/AuthContext";
 import { useSocket } from "../contexts/SocketContext";
 import {
+  isGuardianVisibleNotification,
   isExternalNotificationUrl,
   resolveNotificationActionUrl,
 } from "../utils/notificationRouting";
@@ -183,7 +184,11 @@ const GuardianNotificationBell = () => {
       ]);
 
       if (notificationsRes?.success) {
-        setNotifications(notificationsRes.data || []);
+        setNotifications(
+          (notificationsRes.data || []).filter((notification) =>
+            isGuardianVisibleNotification(notification),
+          ),
+        );
       }
 
       if (countRes?.success) {
@@ -298,6 +303,10 @@ const GuardianNotificationBell = () => {
     if (!isConnected) return;
 
     const handleNewNotification = (data) => {
+      if (data?.notification && !isGuardianVisibleNotification(data.notification)) {
+        return;
+      }
+
       setUnreadCount((prev) => prev + 1);
       if (isOpen) {
         fetchNotifications();

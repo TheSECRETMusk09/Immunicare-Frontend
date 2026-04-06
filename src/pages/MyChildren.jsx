@@ -1,4 +1,4 @@
- import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNotification } from "../contexts/NotificationContext";
 import apiClient from "../utils/api";
@@ -200,10 +200,30 @@ const getActionErrorMessage = (error, fallback) => {
   return error?.message || fallback;
 };
 
+const READINESS_REQUEST_TIMEOUT_MS = 5000;
+
+const withTimeout = (promise, timeoutMs, message) =>
+  new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+
+    Promise.resolve(promise)
+      .then((value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      });
+  });
+
 export default function MyChildren() {
   const { guardianId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const readinessRequestIdRef = useRef(0);
   const [children, setChildren] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -214,6 +234,7 @@ export default function MyChildren() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registerError, setRegisterError] = useState(null);
   const [registerSuccess, setRegisterSuccess] = useState(null);
+  const [registerWarning, setRegisterWarning] = useState(null);
   const [editError, setEditError] = useState(null);
   const [editSuccess, setEditSuccess] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
@@ -256,6 +277,7 @@ export default function MyChildren() {
 
       setRegisterError(null);
       setRegisterSuccess(null);
+      setRegisterWarning(null);
       setRegisterFieldErrors({});
       setShowRegisterModal(true);
     };
@@ -276,7 +298,11 @@ export default function MyChildren() {
   // Fetch vaccine readiness for a child
   const fetchChildReadiness = useCallback(async (childId) => {
     try {
-      const response = await apiClient.get(`/vaccination-readiness/${childId}`);
+      const response = await withTimeout(
+        apiClient.get(`/vaccination-readiness/${childId}`),
+        READINESS_REQUEST_TIMEOUT_MS,
+        `Readiness request timed out for child ${childId}`,
+      );
       if (response?.success) {
         return response.data;
       }
@@ -288,12 +314,28 @@ export default function MyChildren() {
   }, []);
 
   // Fetch readiness for all children
-  const fetchAllChildrenReadiness = useCallback(async (childrenList) => {
-    const readinessEntries = await Promise.all(
+  const fetchAllChildrenReadiness = useCallback(async (childrenList, requestId) => {
+    if (!Array.isArray(childrenList) || childrenList.length === 0) {
+      if (requestId === readinessRequestIdRef.current) {
+        setChildrenReadiness({});
+      }
+      return;
+    }
+
+    const readinessEntries = await Promise.allSettled(
       childrenList.map(async (child) => [child.id, await fetchChildReadiness(child.id)]),
     );
 
-    const readinessMap = readinessEntries.reduce((accumulator, [childId, readiness]) => {
+    if (requestId !== readinessRequestIdRef.current) {
+      return;
+    }
+
+    const readinessMap = readinessEntries.reduce((accumulator, entry) => {
+      if (entry.status !== "fulfilled") {
+        return accumulator;
+      }
+
+      const [childId, readiness] = entry.value;
       if (readiness) {
         accumulator[childId] = readiness;
       }
@@ -305,19 +347,27 @@ export default function MyChildren() {
 
   const fetchChildren = useCallback(async () => {
     if (!guardianId) {
+      readinessRequestIdRef.current += 1;
+      setChildren([]);
+      setChildrenReadiness({});
       setLoading(false);
       return;
     }
     try {
       setLoading(true);
+      setError(null);
       const response = await apiClient.getInfantsByGuardian(guardianId);
       const childrenData = normalizeArrayPayload(response, ["infants", "children", "patients"]);
       setChildren(childrenData);
-      // Fetch readiness for each child
-      await fetchAllChildrenReadiness(childrenData);
+      setChildrenReadiness({});
+      setLoading(false);
+
+      // Fetch readiness for each child without blocking the primary child list.
+      const requestId = readinessRequestIdRef.current + 1;
+      readinessRequestIdRef.current = requestId;
+      void fetchAllChildrenReadiness(childrenData, requestId);
     } catch (err) {
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   }, [guardianId, fetchAllChildrenReadiness]);
@@ -607,6 +657,7 @@ export default function MyChildren() {
     setIsSubmitting(true);
     setRegisterError(null);
     setRegisterSuccess(null);
+    setRegisterWarning(null);
     setRegisterFieldErrors({});
 
     try {
@@ -625,6 +676,7 @@ export default function MyChildren() {
       }
 
       let uploadedCardUrl = null;
+      let uploadWarningMessage = null;
       if (transferFormData.vaccination_card) {
         try {
           const fileData = new FormData();
@@ -644,6 +696,8 @@ export default function MyChildren() {
             null;
         } catch (uploadErr) {
           console.warn("Vaccination card upload failed", uploadErr);
+          uploadWarningMessage =
+            "Transfer case submitted without the vaccination card attachment. You can still coordinate with the clinic if proof needs to be reviewed manually.";
         }
       }
 
@@ -702,8 +756,10 @@ export default function MyChildren() {
 
             // Send notification to guardian
             success(
-              "Transfer-in case submitted successfully! Our staff will review your child's vaccination history.",
-              { title: "Transfer-In Submitted" }
+              uploadWarningMessage
+                ? "Transfer-in case submitted. The clinic did not receive the proof attachment from this upload attempt."
+                : "Transfer-in case submitted successfully! Our staff will review your child's vaccination history.",
+              { title: uploadWarningMessage ? "Transfer-In Submitted With Warning" : "Transfer-In Submitted" }
             );
 
             // Trigger transfer-in submitted notification via notification context
@@ -731,7 +787,15 @@ export default function MyChildren() {
 
        }
 
-      setRegisterSuccess("Transfer-in case submitted successfully! Our staff will review your child's vaccination history.");
+      if (uploadWarningMessage) {
+        setRegisterWarning(uploadWarningMessage);
+      }
+
+      setRegisterSuccess(
+        uploadWarningMessage
+          ? "Transfer-in case submitted successfully. Staff review can begin, but the proof attachment was not included in this submission."
+          : "Transfer-in case submitted successfully! Our staff will review your child's vaccination history.",
+      );
 
       triggerGuardianInfantRegistered(infantData);
       trackEvent("child_profile_created", { method: "transfer_in" });
@@ -745,6 +809,7 @@ export default function MyChildren() {
         setFormData(createInitialChildForm());
         resetTransferForm();
         setRegisterSuccess(null);
+        setRegisterWarning(null);
         if (isNewRoute) {
           navigate("/guardian/children");
         }
@@ -782,6 +847,7 @@ export default function MyChildren() {
     setIsSubmitting(true);
     setRegisterError(null);
     setRegisterSuccess(null);
+    setRegisterWarning(null);
     setRegisterFieldErrors({});
 
     try {
@@ -812,6 +878,7 @@ export default function MyChildren() {
         setShowRegisterModal(false);
         setFormData(createInitialChildForm());
         setRegisterSuccess(null);
+        setRegisterWarning(null);
         // Navigate away from /new route if we're there
         if (isNewRoute) {
           navigate("/guardian/children");
@@ -1125,6 +1192,7 @@ export default function MyChildren() {
               setShowRegisterModal(false);
               setRegisterError(null);
               setRegisterSuccess(null);
+              setRegisterWarning(null);
               // Navigate away from /new route if we're there
               if (isNewRoute) {
                 navigate("/guardian/children");
@@ -1141,6 +1209,7 @@ export default function MyChildren() {
                     setShowRegisterModal(false);
                     setRegisterError(null);
                     setRegisterSuccess(null);
+                    setRegisterWarning(null);
                     if (isNewRoute) {
                       navigate("/guardian/children");
                     }
@@ -1183,6 +1252,16 @@ export default function MyChildren() {
               </Alert>
             )}
 
+            {registerWarning && (
+              <Alert
+                variant="warning"
+                className="mb-4"
+                onClose={() => setRegisterWarning(null)}
+              >
+                {registerWarning}
+              </Alert>
+            )}
+
             <div className="space-y-4">
               {/* Registration Type Tabs */}
               <div className="flex border-b border-theme-border-primary mb-6">
@@ -1194,6 +1273,7 @@ export default function MyChildren() {
                     setRegistrationType("new");
                     setRegisterError(null);
                     setRegisterSuccess(null);
+                    setRegisterWarning(null);
                     setRegisterFieldErrors({});
                   }}
                 >
@@ -1207,6 +1287,7 @@ export default function MyChildren() {
                     setRegistrationType("transfer");
                     setRegisterError(null);
                     setRegisterSuccess(null);
+                    setRegisterWarning(null);
                     setRegisterFieldErrors({});
                   }}
                 >

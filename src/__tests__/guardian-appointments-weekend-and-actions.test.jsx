@@ -14,6 +14,8 @@ import GuardianAppointmentsPage from "../pages/GuardianAppointmentsPage";
 import GuardianAppointmentBooking from "../pages/GuardianAppointmentBooking";
 import apiClient from "../utils/api";
 
+const mockNavigate = jest.fn();
+
 const mockFullCalendarProps = { current: null };
 const mockCalendarApi = {
   changeView: jest.fn(),
@@ -73,6 +75,14 @@ jest.mock("@fullcalendar/react", () => {
 jest.mock("@fullcalendar/daygrid", () => ({ __esModule: true, default: {} }));
 jest.mock("@fullcalendar/timegrid", () => ({ __esModule: true, default: {} }));
 jest.mock("@fullcalendar/interaction", () => ({ __esModule: true, default: {} }));
+
+jest.mock("react-router-dom", () => {
+  const actual = jest.requireActual("react-router-dom");
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
 
 jest.mock("../contexts/AuthContext", () => ({
   useAuth: () => ({
@@ -178,6 +188,7 @@ const setDesktopMatchMedia = () => {
 describe("Guardian appointments weekend blocking and action order", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockNavigate.mockReset();
     setDesktopMatchMedia();
     mockCalendarApi.changeView.mockReset();
     mockCalendarApi.prev.mockReset();
@@ -327,11 +338,12 @@ describe("Guardian appointments weekend blocking and action order", () => {
       await screen.findByText(/appointments can only be booked on weekdays/i),
     ).toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: /book appointment/i })).not.toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
 
     expect(screen.getByText("2030-03-02")).toBeInTheDocument();
   });
 
-  test("weekday click opens booking modal and guardian action order uses submit before close", async () => {
+  test("weekday click routes to the full booking page with selected date prefilled", async () => {
     render(
       <MemoryRouter>
         <GuardianAppointmentsPage />
@@ -344,13 +356,17 @@ describe("Guardian appointments weekend blocking and action order", () => {
 
     fireEvent.click(screen.getByTestId("fc-date-click-monday"));
 
-    expect(await screen.findByRole("dialog", { name: /book appointment/i })).toBeInTheDocument();
-
-    const actions = screen.getByTestId("guardian-booking-form-actions");
-    const buttons = within(actions).getAllByRole("button");
-
-    expect(buttons[0]).toHaveTextContent(/book appointment|save changes/i);
-    expect(buttons[1]).toHaveTextContent(/close/i);
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith(
+        "/guardian/appointments/new?date=2030-03-04",
+        expect.objectContaining({
+          state: expect.objectContaining({
+            selectedDate: "2030-03-04",
+            source: "guardian-appointments-calendar",
+          }),
+        }),
+      );
+    });
   });
 
   test("guardian appointments page hides vaccine stock details from guardians", async () => {
@@ -424,9 +440,6 @@ describe("Guardian appointments weekend blocking and action order", () => {
     });
 
     fireEvent.click(screen.getByTestId("fc-date-click-monday"));
-    expect(await screen.findByRole("dialog", { name: /book appointment/i })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /close/i }));
     fireEvent.click(screen.getByRole("button", { name: /^day$/i }));
 
     expect(mockCalendarApi.changeView).toHaveBeenCalled();
@@ -461,6 +474,42 @@ describe("Guardian appointments weekend blocking and action order", () => {
     expect(buttons[1]).toHaveTextContent(/cancel/i);
   });
 
+  test("booking page preserves calendar-selected date and auto-loads slots for prefilled child context", async () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={["/guardian/appointments/new?childId=1&date=2030-03-04"]}>
+        <GuardianAppointmentBooking />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(container.querySelector('input[type="date"]')).toBeInTheDocument();
+    });
+
+    const dateInput = container.querySelector('input[type="date"]');
+    expect(dateInput).toHaveValue("2030-03-04");
+
+    await waitFor(() => {
+      expect(apiClient.getVaccinationReadiness).toHaveBeenCalledWith(1, {
+        scheduled_date: "2030-03-04",
+      });
+    });
+
+    await waitFor(() => {
+      expect(apiClient.getAppointmentSuggestions).toHaveBeenCalledWith(
+        expect.objectContaining({ infantId: 1, guardianId: 1 }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(apiClient.getAppointmentTimeSlots).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scheduled_date: "2030-03-04",
+          vaccine_id: "11",
+        }),
+      );
+    });
+  });
+
   test("booking page submits a vaccine-aware appointment from smart suggestions", async () => {
     render(
       <MemoryRouter>
@@ -471,7 +520,9 @@ describe("Guardian appointments weekend blocking and action order", () => {
     fireEvent.click(await screen.findByRole("button", { name: /john doe/i }));
 
     await waitFor(() => {
-      expect(apiClient.getVaccinationReadiness).toHaveBeenCalledWith(1);
+      expect(apiClient.getVaccinationReadiness).toHaveBeenCalledWith(1, {
+        scheduled_date: "2030-03-04",
+      });
     });
 
     await waitFor(() => {
@@ -510,7 +561,7 @@ describe("Guardian appointments weekend blocking and action order", () => {
   });
 
   test("booking page deduplicates repeated pending confirmation reasons", async () => {
-    apiClient.getVaccinationReadiness.mockResolvedValueOnce({
+    apiClient.getVaccinationReadiness.mockResolvedValue({
       success: true,
       data: {
         readinessStatus: "PENDING_CONFIRMATION",
@@ -532,13 +583,125 @@ describe("Guardian appointments weekend blocking and action order", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /john doe/i }));
 
-    expect(
-      await screen.findByText("Booking is blocked: Pending admin confirmation"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/booking is blocked:/i)).toHaveTextContent(
+      "Booking is blocked: Pending admin confirmation",
+    );
     expect(
       screen.queryByText(
         "Booking is blocked: Pending admin confirmation, Pending admin confirmation",
       ),
     ).not.toBeInTheDocument();
+  });
+
+  test("booking page reads guardian child sex from the canonical gender field when sex is missing", async () => {
+    apiClient.getInfantsByGuardian.mockResolvedValueOnce([
+      {
+        id: 1,
+        first_name: "John",
+        last_name: "Doe",
+        dob: "2023-01-01",
+        gender: "Male",
+        control_number: "CN-001",
+      },
+    ]);
+
+    render(
+      <MemoryRouter>
+        <GuardianAppointmentBooking />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /john doe/i }));
+
+    expect(await screen.findByText("Male")).toBeInTheDocument();
+    expect(screen.queryByText("N/A")).not.toBeInTheDocument();
+  });
+
+  test("booking page loads time slots when a future selected date makes the next dose eligible", async () => {
+    apiClient.getVaccinationReadiness
+      .mockResolvedValueOnce({
+        success: true,
+        data: {
+          readinessStatus: "UPCOMING",
+          dueVaccines: [],
+          overdueVaccines: [],
+          blockedVaccines: [],
+          nextAppointmentPrediction: null,
+        },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        data: {
+          readinessStatus: "OVERDUE",
+          dueVaccines: [],
+          overdueVaccines: [
+            {
+              vaccineId: 11,
+              label: "BCG (Dose 1)",
+              earliestDate: "2030-03-04",
+              recommendedDate: "2030-03-04",
+            },
+          ],
+          blockedVaccines: [],
+          nextAppointmentPrediction: {
+            date: "2030-03-04",
+            reason: "Earliest safe date for next eligible dose",
+          },
+        },
+      });
+
+    const { container } = render(
+      <MemoryRouter>
+        <GuardianAppointmentBooking />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /john doe/i }));
+
+    const dateInput = container.querySelector('input[type="date"]');
+    expect(dateInput).toBeInTheDocument();
+    fireEvent.change(dateInput, { target: { value: "2030-03-04" } });
+
+    await waitFor(() => {
+      expect(apiClient.getVaccinationReadiness).toHaveBeenLastCalledWith(1, {
+        scheduled_date: "2030-03-04",
+      });
+    });
+
+    await waitFor(() => {
+      expect(apiClient.getAppointmentTimeSlots).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scheduled_date: "2030-03-04",
+          vaccine_id: "11",
+        }),
+      );
+    });
+
+    expect(
+      within(screen.getByText(/appointment time \(8am - 4pm\)/i).parentElement).getByRole("combobox"),
+    ).not.toBeDisabled();
+  });
+
+  test("booking page shows slot availability feedback instead of silently failing", async () => {
+    apiClient.getAppointmentTimeSlots.mockResolvedValueOnce({
+      available: false,
+      message: "Selected vaccine is currently out of stock for this date.",
+      slots: [],
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/guardian/appointments/new?childId=1&date=2030-03-04"]}>
+        <GuardianAppointmentBooking />
+      </MemoryRouter>,
+    );
+
+    const appointmentTimeSection = await screen.findByText(/appointment time \(8am - 4pm\)/i);
+
+    expect(
+      await screen.findByText(/selected vaccine is currently out of stock for this date/i),
+    ).toBeInTheDocument();
+    expect(
+      within(appointmentTimeSection.parentElement).getByRole("combobox"),
+    ).toBeDisabled();
   });
 });

@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import apiClient, {
   clearAuthStorage,
+  getRememberMePreference,
   getStoredAccessToken,
   getStoredUserJson,
   persistAuthSession,
@@ -44,11 +45,178 @@ const HEALTHCARE_WORKER_ALIASES = new Set([
   "staff",
 ]);
 
+let authBootstrapPromise = null;
+let authBootstrapResult = null;
+
+const readStoredAuthUser = () => {
+  const storedUser = getStoredUserJson();
+  if (!storedUser) {
+    return {
+      user: null,
+      invalid: false,
+    };
+  }
+
+  try {
+    return {
+      user: normalizeAuthUser(JSON.parse(storedUser)),
+      invalid: false,
+    };
+  } catch {
+    return {
+      user: null,
+      invalid: true,
+    };
+  }
+};
+
+const isTerminalAuthFailure = (error) => {
+  const status = error?.status || error?.response?.status || null;
+  const code =
+    error?.code ||
+    error?.data?.code ||
+    error?.response?.data?.code ||
+    null;
+
+  return (
+    status === 401 ||
+    status === 403 ||
+    code === "SESSION_EXPIRED" ||
+    code === "NO_TOKEN" ||
+    code === "TOKEN_EXPIRED" ||
+    code === "INVALID_TOKEN" ||
+    code === "NO_REFRESH_TOKEN" ||
+    code === "USER_NOT_FOUND"
+  );
+};
+
+const resetAuthBootstrapCache = () => {
+  authBootstrapPromise = null;
+  authBootstrapResult = null;
+};
+
+const resolveInitialAuthState = async () => {
+  if (authBootstrapResult) {
+    return authBootstrapResult;
+  }
+
+  if (!authBootstrapPromise) {
+    authBootstrapPromise = (async () => {
+      const token = getStoredAccessToken();
+      const { user: hydratedUser, invalid } = readStoredAuthUser();
+
+      try {
+        const verifyResponse = await apiClient.verifySession();
+
+        if (verifyResponse.authenticated && verifyResponse.user) {
+          const verifiedUser = normalizeAuthUser(verifyResponse.user);
+          persistStoredUser(verifiedUser);
+
+          return {
+            user: verifiedUser,
+            forcePasswordChange: Boolean(verifiedUser.forcePasswordChange),
+          };
+        }
+
+        if (token || hydratedUser || invalid) {
+          clearAuthStorage();
+        }
+
+        return {
+          user: null,
+          forcePasswordChange: false,
+        };
+      } catch (error) {
+        if (isTerminalAuthFailure(error)) {
+          try {
+            const refreshResponse = await apiClient.refreshSession();
+            const refreshedUser = normalizeAuthUser(
+              refreshResponse?.user || refreshResponse?.data?.user || null,
+            );
+            const accessToken =
+              refreshResponse?.accessToken ||
+              refreshResponse?.token ||
+              refreshResponse?.data?.accessToken ||
+              refreshResponse?.data?.token ||
+              null;
+            const refreshToken =
+              refreshResponse?.refreshToken ||
+              refreshResponse?.data?.refreshToken ||
+              null;
+
+            if (accessToken && refreshedUser?.id) {
+              persistAuthSession({
+                accessToken,
+                refreshToken,
+                user: refreshedUser,
+                rememberMe: getRememberMePreference(),
+              });
+              persistStoredUser(refreshedUser);
+
+              return {
+                user: refreshedUser,
+                forcePasswordChange: Boolean(refreshedUser.forcePasswordChange),
+              };
+            }
+          } catch (refreshError) {
+            if (!isTerminalAuthFailure(refreshError)) {
+              const { user: refreshedStoredUser } = readStoredAuthUser();
+              console.warn(
+                "Auth refresh unavailable during reload, preserving stored session:",
+                refreshError?.message || refreshError,
+              );
+
+              return {
+                user: refreshedStoredUser || null,
+                forcePasswordChange: Boolean(
+                  refreshedStoredUser?.forcePasswordChange,
+                ),
+              };
+            }
+          }
+
+          clearAuthStorage();
+          return {
+            user: null,
+            forcePasswordChange: false,
+          };
+        }
+
+        console.warn(
+          "Auth verification unavailable, preserving stored session:",
+          error?.message || error,
+        );
+
+        return {
+          user: hydratedUser || null,
+          forcePasswordChange: Boolean(hydratedUser?.forcePasswordChange),
+        };
+      }
+    })()
+      .then((result) => {
+        authBootstrapResult = result;
+        return result;
+      })
+      .finally(() => {
+        authBootstrapPromise = null;
+      });
+  }
+
+  return authBootstrapPromise;
+};
+
+export const __resetAuthBootstrapCacheForTests = () => {
+  resetAuthBootstrapCache();
+};
+
 // AuthProvider component
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const initialStoredAuthState = useMemo(() => readStoredAuthUser(), []);
+  const [user, setUser] = useState(initialStoredAuthState.user);
   const [loading, setLoading] = useState(true);
-  const [forcePasswordChange, setForcePasswordChange] = useState(false);
+  const [forcePasswordChange, setForcePasswordChange] = useState(() =>
+    Boolean(initialStoredAuthState.user?.forcePasswordChange),
+  );
 
   // Check if user is authenticated on mount
   useEffect(() => {
@@ -56,55 +224,28 @@ export function AuthProvider({ children }) {
 
     const checkAuth = async () => {
       try {
-        const token = getStoredAccessToken();
-        const storedUser = getStoredUserJson();
+        const { user: hydratedUser, invalid } = readStoredAuthUser();
 
-        if (!token) {
+        if (invalid) {
+          if (mounted) {
+            setUser(null);
+            setForcePasswordChange(false);
+          }
+        }
+
+        if (hydratedUser && mounted) {
+          setUser(hydratedUser);
+          setForcePasswordChange(Boolean(hydratedUser.forcePasswordChange));
+        }
+
+        const resolvedAuthState = await resolveInitialAuthState();
+
+        if (!mounted) {
           return;
         }
 
-        if (storedUser) {
-          try {
-            JSON.parse(storedUser);
-          } catch {
-            clearAuthStorage();
-            return;
-          }
-        }
-
-        const verifyResponse = await apiClient.verifySession();
-
-        if (verifyResponse.authenticated && verifyResponse.user) {
-          const verifiedUser = normalizeAuthUser(verifyResponse.user);
-          if (!mounted) return;
-          setUser(verifiedUser);
-          persistStoredUser(verifiedUser);
-
-          if (
-            verifiedUser.role_type === CANONICAL_ROLES.GUARDIAN &&
-            verifiedUser.forcePasswordChange
-          ) {
-            if (!mounted) return;
-            setForcePasswordChange(true);
-          }
-        } else {
-          clearAuthStorage();
-        }
-      } catch (error) {
-        const isExpectedAuthExpiry =
-          error?.status === 401 ||
-          error?.code === "SESSION_EXPIRED" ||
-          error?.code === "NO_TOKEN" ||
-          error?.code === "TOKEN_EXPIRED";
-
-        if (!isExpectedAuthExpiry) {
-          console.error("Error checking authentication:", error);
-        }
-        clearAuthStorage();
-        if (mounted) {
-          setUser(null);
-          setForcePasswordChange(false);
-        }
+        setUser(resolvedAuthState.user || null);
+        setForcePasswordChange(Boolean(resolvedAuthState.forcePasswordChange));
       } finally {
         if (mounted) {
           setLoading(false);
@@ -123,6 +264,7 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (credentials) => {
     try {
       setLoading(true);
+      resetAuthBootstrapCache();
       console.log("[AuthContext] Starting login for:", credentials.username);
 
       // Use the apiClient login method which handles the proper endpoint
@@ -175,6 +317,7 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.warn("Logout request failed, clearing local auth state anyway:", error.message);
     } finally {
+      resetAuthBootstrapCache();
       clearAuthStorage();
       setUser(null);
       setForcePasswordChange(false);

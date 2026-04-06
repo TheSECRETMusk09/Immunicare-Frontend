@@ -5,6 +5,7 @@ import "@testing-library/jest-dom";
 
 import AdminLayout from "../components/AdminLayout";
 import Appointments from "../pages/Appointments";
+import apiClient from "../utils/api";
 
 const stableAppointments = [
   {
@@ -116,6 +117,31 @@ describe("admin appointments calendar scroll layout", () => {
       "min-h-0",
       "overflow-y-auto",
       "overflow-x-hidden",
+    );
+  });
+
+  test("calendar view reuses the appointments endpoint with month date filters", async () => {
+    render(
+      <MemoryRouter>
+        <AdminLayout>
+          <Appointments />
+        </AdminLayout>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /calendar/i }));
+
+    await waitFor(() => {
+      expect(apiClient.getAppointments).toHaveBeenCalled();
+    });
+
+    expect(apiClient.getAppointments).toHaveBeenCalledWith(
+      expect.objectContaining({
+        start_date: "2026-04-01",
+        end_date: "2026-04-30",
+        sort_field: "scheduled_date",
+        sort_direction: "asc",
+      }),
     );
   });
 });

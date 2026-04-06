@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Button, Input } from "./UI";
 
 const VISIT_TIME_MIN = "07:00";

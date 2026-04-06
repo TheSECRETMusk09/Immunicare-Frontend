@@ -28,37 +28,12 @@ import GuardianModuleHeader from '../components/GuardianModuleHeader';
 import { useAuth } from '../contexts/AuthContext';
 import apiClient from '../utils/api';
 import { triggerGuardianAddChildModal } from '../components/QuickActionFAB';
-import guardianNotificationService from '../services/guardianNotificationService';
+import useGuardianNotifications from '../hooks/useGuardianNotifications';
 import { trackEvent } from '../utils/telemetry';
 import ErrorBoundary from '../components/ErrorBoundary';
-import { unwrapApiPayload, normalizeArrayPayload } from '../utils/apiUtils';
+import { unwrapApiPayload } from '../utils/apiUtils';
 import { inferNotificationType } from '../utils/notificationUtils';
-import { APPOINTMENT_STATUS_META, TRANSFER_STATUS_META, getAppointmentStatusMeta } from '../constants/statusMappings';
-
-const buildDueVaccineIdentity = (child, vaccine, dueDate) => {
-  const vaccineId =
-    vaccine?.schedule?.vaccineId ||
-    vaccine?.vaccine?.id ||
-    vaccine?.id ||
-    vaccine?.vaccineId ||
-    vaccine?.name ||
-    'vaccine';
-  const doseNumber =
-    vaccine?.schedule?.doseNumber ||
-    vaccine?.dose?.number ||
-    vaccine?.doseNumber ||
-    vaccine?.dose_no ||
-    vaccine?.dose_number ||
-    'dose';
-  const dueDateKey =
-    dueDate ||
-    vaccine?.schedule?.dueDate ||
-    vaccine?.dueDate ||
-    vaccine?.scheduledDate ||
-    'no-date';
-
-  return `${child?.id || 'child'}-${vaccineId}-${doseNumber}-${dueDateKey}`;
-};
+import { TRANSFER_STATUS_META, getAppointmentStatusMeta } from '../constants/statusMappings';
 
 // ============================================
 // SKELETON LOADING COMPONENTS
@@ -364,119 +339,104 @@ const GuardianDashboard = () => {
   });
   const [children, setChildren] = useState([]);
   const [appointments, setAppointments] = useState([]);
-  const [notifications, setNotifications] = useState([]);
   const [dueVaccines, setDueVaccines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [dashboardWarnings, setDashboardWarnings] = useState([]);
+  const [dismissedNotificationIds, setDismissedNotificationIds] = useState([]);
   const hasTracked = React.useRef(false);
+  const {
+    notifications: guardianNotifications,
+    loading: notificationsLoading,
+    error: notificationsError,
+    markAsRead,
+    refresh: refreshNotifications,
+  } = useGuardianNotifications({
+    limit: 5,
+    pollingInterval: 60000,
+  });
 
   // Fetch data from API
   const fetchDashboardData = useCallback(async (isSilentRefresh = false) => {
+    if (!guardianId) {
+      setChildren([]);
+      setAppointments([]);
+      setDueVaccines([]);
+      setDashboardWarnings([]);
+      setStats({
+        childrenCount: 0,
+        nextAppointment: 'None',
+        vaccinatedCount: 0,
+        pendingCount: 0,
+        overdueCount: 0,
+        upcomingVaccines: 0,
+      });
+      setLoading(false);
+      return;
+    }
+
     if (!isSilentRefresh) {
       setLoading(true);
       setError(null);
     }
 
     try {
-      // Fetch all data in parallel
-      const [
-        childrenResponse,
-        appointmentsResponse,
-        notificationsResponse,
-        statsResponse,
-      ] = await Promise.allSettled([
-        // Backward-compatible fallback for test mocks or older API clients.
-        // Use empty notifications fallback instead of generic notifications
-        // endpoint to preserve guardian-only contract boundaries.
-        guardianId ? apiClient.getInfantsByGuardian(guardianId) : Promise.resolve({ data: [] }),
-        guardianId ? apiClient.getGuardianAppointments(guardianId, { status: 'upcoming', limit: 5 }) : Promise.resolve({ data: [] }),
-        !guardianId
-          ? Promise.resolve({ data: [] })
-          : typeof apiClient.getGuardianNotifications === 'function'
-            ? apiClient.getGuardianNotifications({ limit: 5 })
-            : Promise.resolve({ data: [] }),
-        guardianId ? apiClient.getGuardianStats(guardianId) : Promise.resolve({ data: {} }),
-      ]);
-
-      // Process children data
-      let childrenData = [];
-      if (childrenResponse.status === 'fulfilled') {
-        childrenData = normalizeArrayPayload(childrenResponse.value, ['infants', 'children']).map((child) => ({
-          ...child,
-          name: child.name || `${child.first_name || ''} ${child.last_name || ''}`.trim(),
-          dateOfBirth: child.dateOfBirth || child.dob || child.birth_date || null,
-          controlNumber: child.controlNumber || child.control_number || null,
-        }));
-      }
+      const overviewResponse = await apiClient.getGuardianDashboardOverview(guardianId, {
+        appointmentLimit: 5,
+        dueLimit: 6,
+      });
+      const overview = unwrapApiPayload(overviewResponse) || {};
+      const childrenData = Array.isArray(overview.children)
+        ? overview.children.map((child) => ({
+            ...child,
+            name: child.name || `${child.first_name || ''} ${child.last_name || ''}`.trim(),
+            dateOfBirth: child.dateOfBirth || child.dob || child.birth_date || null,
+            controlNumber: child.controlNumber || child.control_number || null,
+          }))
+        : [];
       setChildren(childrenData);
 
-      const vaccinationReadinessResponses = await Promise.allSettled(
-        childrenData.map((child) => apiClient.getVaccinationReadiness(child.id)),
-      );
-
-      const vaccinationReadinessMap = new Map();
-      vaccinationReadinessResponses.forEach((response, index) => {
-        const childId = childrenData[index]?.id;
-        if (!childId) {
-          return;
-        }
-
-        if (response.status === 'fulfilled') {
-          const readinessPayload =
-            unwrapApiPayload(response.value) ||
-            response.value?.data ||
-            response.value ||
-            null;
-          vaccinationReadinessMap.set(childId, readinessPayload);
-          return;
-        }
-
-        vaccinationReadinessMap.set(childId, null);
-      });
-
-      // Process appointments data
-      let appointmentsData = [];
-      if (appointmentsResponse.status === 'fulfilled') {
-        appointmentsData = normalizeArrayPayload(appointmentsResponse.value, ['appointments']).map((appointment) => ({
-          ...appointment,
-          scheduledDate:
-            appointment.scheduledDate ||
-            appointment.scheduled_date ||
-            appointment.date ||
-            null,
-          infantName:
-            appointment.infantName ||
-            `${appointment.first_name || ''} ${appointment.last_name || ''}`.trim(),
-          vaccineName:
-            appointment.vaccineName ||
-            appointment.vaccine_name ||
-            appointment.type ||
-            'Vaccination',
-          doctorName:
-            appointment.doctorName ||
-            appointment.provider_name ||
-            appointment.health_worker_name ||
-            null,
-        }));
-      }
+      const appointmentsData = Array.isArray(overview.appointments)
+        ? overview.appointments.map((appointment) => ({
+            ...appointment,
+            scheduledDate:
+              appointment.scheduledDate ||
+              appointment.scheduled_date ||
+              appointment.date ||
+              null,
+            infantName:
+              appointment.infantName ||
+              `${appointment.first_name || ''} ${appointment.last_name || ''}`.trim(),
+            vaccineName:
+              appointment.vaccineName ||
+              appointment.vaccine_name ||
+              appointment.type ||
+              'Vaccination',
+            doctorName:
+              appointment.doctorName ||
+              appointment.provider_name ||
+              appointment.health_worker_name ||
+              null,
+          }))
+        : [];
       setAppointments(appointmentsData);
 
-      // Process notifications data
-      let notificationsData = [];
-      if (notificationsResponse.status === 'fulfilled') {
-        notificationsData = normalizeArrayPayload(notificationsResponse.value, ['notifications']).map((notification) => ({
-          ...notification,
-          type: inferNotificationType(notification),
-          title: notification.title || 'Notification',
-        }));
-      }
-      setNotifications(notificationsData.slice(0, 5));
+      const dueVaccinesData = Array.isArray(overview.dueVaccines)
+        ? overview.dueVaccines.map((entry) => ({
+            ...entry,
+            id:
+              entry.id ||
+              `${entry.childId || entry.child_id || 'child'}-${entry.vaccineName || entry.vaccine_name || 'vaccine'}-${entry.dueDate || entry.due_date || 'no-date'}`,
+          }))
+        : [];
+      setDueVaccines(dueVaccinesData);
+      setDashboardWarnings(
+        Array.isArray(overview.diagnostics?.warnings)
+          ? overview.diagnostics.warnings.filter(Boolean)
+          : [],
+      );
 
-      // Process stats from API or calculate locally
-      const apiStats = statsResponse.status === 'fulfilled' ? (unwrapApiPayload(statsResponse.value) || {}) : {};
-
-      // Calculate stats locally if not available from API
-      const today = new Date();
+      const apiStats = overview.stats || {};
 
       const vaccinatedCount = apiStats.completedVaccinations ?? childrenData.reduce((acc, child) => {
         return acc + Number(child.completed_vaccinations || 0);
@@ -485,46 +445,6 @@ const GuardianDashboard = () => {
       const pendingCount = apiStats.pendingVaccinations ?? childrenData.reduce((acc, child) => {
         return acc + Number(child.pending_vaccinations || 0);
       }, 0);
-
-      // Calculate due/overdue vaccinations from authoritative readiness data
-      const dueVaccinesList = [];
-      const seenDueVaccines = new Set();
-      childrenData.forEach((child) => {
-        const readiness = vaccinationReadinessMap.get(child.id) || {};
-        const candidateVaccines = [
-          ...(Array.isArray(readiness.overdueVaccines) ? readiness.overdueVaccines : []),
-          ...(Array.isArray(readiness.dueVaccines) ? readiness.dueVaccines : []),
-        ];
-
-        candidateVaccines.forEach((vaccine) => {
-          const dueDate = vaccine.recommendedDate || vaccine.earliestDate || null;
-          if (!dueDate) {
-            return;
-          }
-
-          const daysUntil = Math.ceil((new Date(dueDate) - today) / (1000 * 60 * 60 * 24));
-          const dueVaccineId = buildDueVaccineIdentity(child, vaccine, dueDate);
-
-          if (seenDueVaccines.has(dueVaccineId)) {
-            return;
-          }
-
-          seenDueVaccines.add(dueVaccineId);
-          dueVaccinesList.push({
-            id: dueVaccineId,
-            childId: child.id,
-            childName: child.name || `${child.first_name} ${child.last_name}`.trim(),
-            vaccineName: vaccine.label || vaccine.vaccineName || vaccine.name || "Vaccination",
-            dueDate,
-            daysUntilDue: daysUntil,
-            status: daysUntil < 0 ? 'overdue' : daysUntil <= 7 ? 'due_soon' : 'upcoming',
-          });
-        });
-      });
-
-      // Sort by urgency
-      dueVaccinesList.sort((a, b) => a.daysUntilDue - b.daysUntilDue);
-      setDueVaccines(dueVaccinesList.slice(0, 5));
 
       const nextAppointmentDateSource =
         apiStats?.nextAppointment?.scheduled_date ||
@@ -545,8 +465,14 @@ const GuardianDashboard = () => {
          nextAppointment: nextAppointmentDate,
          vaccinatedCount: vaccinatedCount,
          pendingCount: pendingCount,
-         overdueCount: dueVaccinesList.filter(v => v.status === 'overdue').length,
-         upcomingVaccines: dueVaccinesList.filter(v => v.status === 'due_soon').length,
+         overdueCount: Number(
+           apiStats.overdueVaccinations ??
+             dueVaccinesData.filter((entry) => entry.status === 'overdue').length,
+         ),
+         upcomingVaccines: Number(
+           apiStats.upcomingVaccines ??
+             dueVaccinesData.filter((entry) => entry.status === 'due_soon').length,
+         ),
        });
 
     } catch (err) {
@@ -568,9 +494,18 @@ const GuardianDashboard = () => {
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       fetchDashboardData(true);
+      void refreshNotifications();
     }, 60000);
     return () => window.clearInterval(intervalId);
-  }, [fetchDashboardData]);
+  }, [fetchDashboardData, refreshNotifications]);
+
+  useEffect(() => {
+    setDismissedNotificationIds((previous) =>
+      previous.filter((notificationId) =>
+        guardianNotifications.some((notification) => notification.id === notificationId),
+      ),
+    );
+  }, [guardianNotifications]);
 
   // Accessibility: Focus main content when loaded
   useEffect(() => {
@@ -602,19 +537,55 @@ const GuardianDashboard = () => {
   // Handle retry
   const handleRetry = () => {
     fetchDashboardData(false);
+    void refreshNotifications();
   };
 
   // Handle notification dismiss
   const handleDismissNotification = async (notificationId) => {
-    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    setDismissedNotificationIds((previous) =>
+      previous.includes(notificationId)
+        ? previous
+        : [...previous, notificationId],
+    );
     try {
-      await guardianNotificationService.markAsRead(notificationId);
+      const marked = await markAsRead(notificationId);
+      if (!marked) {
+        setDismissedNotificationIds((previous) =>
+          previous.filter((id) => id !== notificationId),
+        );
+        return;
+      }
       trackEvent("notification_dismissed", { notificationId });
     } catch (err) {
       console.warn(`Failed to mark notification ${notificationId} as read:`, err);
-      // Optionally, add the notification back to the list on failure or show a toast.
+      setDismissedNotificationIds((previous) =>
+        previous.filter((id) => id !== notificationId),
+      );
     }
   };
+
+  const notifications = useMemo(
+    () =>
+      guardianNotifications
+        .filter((notification) => !dismissedNotificationIds.includes(notification.id))
+        .slice(0, 5)
+        .map((notification) => ({
+          ...notification,
+          type: inferNotificationType(notification),
+          title: notification.title || 'Notification',
+        })),
+    [dismissedNotificationIds, guardianNotifications],
+  );
+
+  const warningMessages = useMemo(() => {
+    const warnings = [...dashboardWarnings];
+    if (notificationsError) {
+      warnings.push(
+        'Notifications are temporarily unavailable. Dashboard cards are loaded, but recent alerts may be incomplete.',
+      );
+    }
+    return warnings;
+  }, [dashboardWarnings, notificationsError]);
 
   // Calculate vaccination progress
   const vaccinationProgress = useMemo(() => {
@@ -689,6 +660,23 @@ const GuardianDashboard = () => {
         {error && (
           <div className="pt-4">
             <ErrorState message={error} onRetry={handleRetry} />
+          </div>
+        )}
+
+        {!error && warningMessages.length > 0 && (
+          <div className="pt-4 space-y-3">
+            {warningMessages.map((warningMessage, index) => (
+              <div
+                key={`${warningMessage}-${index}`}
+                className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200"
+                role="status"
+              >
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <span>{warningMessage}</span>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -1138,7 +1126,7 @@ const GuardianDashboard = () => {
                 </button>
               </div>
 
-              {loading ? (
+              {loading || (notificationsLoading && notifications.length === 0) ? (
                 <div className="space-y-3">
                   <NotificationSkeleton />
                   <NotificationSkeleton />

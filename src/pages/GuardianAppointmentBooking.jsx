@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import apiClient from "../utils/api";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
@@ -32,7 +32,7 @@ import {
   triggerGuardianAddChildModal,
 } from "../components/QuickActionFAB";
 import { trackEvent } from "../utils/telemetry";
-import { isPhilippineHoliday, getMinBookingDate, isWeekend } from "../utils/holidays";
+import { isPhilippineHoliday, getMinBookingDate } from "../utils/holidays";
 import { formatTimeSlotLabel } from "../utils/dateUtils";
 import { normalizeArrayPayload } from "../utils/apiUtils";
 
@@ -102,11 +102,51 @@ const getBlockedBookingMessage = (readinessData) => {
   return `Booking is blocked: ${uniqueReasons.join(", ")}`;
 };
 
+const normalizeDatePrefill = (value) => {
+  if (!value) {
+    return "";
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
+    return String(value);
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const resolvePatientSexLabel = (patient) => {
+  const normalizedSex = String(patient?.sex || patient?.gender || "")
+    .trim()
+    .toLowerCase();
+
+  if (["m", "male"].includes(normalizedSex)) {
+    return "Male";
+  }
+
+  if (["f", "female"].includes(normalizedSex)) {
+    return "Female";
+  }
+
+  return "N/A";
+};
+
 export default function GuardianAppointmentBooking() {
   const { guardianId } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const childId = searchParams.get("childId");
+  const childId = searchParams.get("childId") || location.state?.childId || "";
+  const prefilledDate = normalizeDatePrefill(
+    searchParams.get("date") || location.state?.selectedDate || "",
+  );
 
   const [children, setChildren] = useState([]);
   const [selectedChild, setSelectedChild] = useState(null);
@@ -128,7 +168,7 @@ export default function GuardianAppointmentBooking() {
   const [formData, setFormData] = useState({
     infant_id: childId || "",
     vaccine_id: "",
-    scheduled_date: "",
+    scheduled_date: prefilledDate,
     scheduled_time: "",
     type: "Vaccination",
     notes: "",
@@ -146,16 +186,22 @@ export default function GuardianAppointmentBooking() {
       const data = await apiClient.getInfantsByGuardian(guardianId);
       const childrenData = normalizeArrayPayload(data, ["infants", "children", "patients"]);
       setChildren(childrenData);
+      setSelectedChild((currentSelectedChild) => {
+        const normalizedChildId = childId ? parseInt(childId, 10) : null;
+        const currentSelectedId = currentSelectedChild?.id
+          ? Number.parseInt(currentSelectedChild.id, 10)
+          : null;
+        const lookupId = normalizedChildId || currentSelectedId;
 
-      // Pre-select child if passed in URL
-      if (childId) {
-        const preselected = childrenData.find(
-          (c) => c.id === parseInt(childId),
-        );
-        if (preselected) {
-          setSelectedChild(preselected);
+        if (!lookupId) {
+          return currentSelectedChild;
         }
-      }
+
+        return (
+          childrenData.find((child) => Number.parseInt(child.id, 10) === lookupId) ||
+          currentSelectedChild
+        );
+      });
     } catch (err) {
       console.error("Error fetching children:", err);
       setError("Failed to load children data");
@@ -235,12 +281,14 @@ export default function GuardianAppointmentBooking() {
   }, [fetchTimeSlots]);
 
   // Fetch child readiness when a child is selected
-  const fetchChildReadiness = useCallback(async (infantId) => {
+  const fetchChildReadiness = useCallback(async (infantId, scheduledDate = null) => {
     if (!infantId) return;
 
     setReadinessLoading(true);
     try {
-      const result = await apiClient.getVaccinationReadiness(infantId);
+      const result = await apiClient.getVaccinationReadiness(infantId, {
+        scheduled_date: scheduledDate || undefined,
+      });
       if (result?.success && result?.data) {
         const readinessData = result.data;
         const nextRecommendedVaccine = resolveRecommendedVaccine(readinessData);
@@ -290,6 +338,34 @@ export default function GuardianAppointmentBooking() {
     }
   }, [guardianId]);
 
+  useEffect(() => {
+    if (!selectedChild?.id) {
+      return;
+    }
+
+    fetchChildReadiness(selectedChild.id, formData.scheduled_date || null);
+  }, [
+    fetchChildReadiness,
+    formData.scheduled_date,
+    selectedChild?.id,
+  ]);
+
+  useEffect(() => {
+    if (!selectedChild?.id) {
+      return;
+    }
+
+    fetchSuggestedAppointments(
+      selectedChild.id,
+      selectedChild?.clinic_id || selectedChild?.facility_id || null,
+    );
+  }, [
+    fetchSuggestedAppointments,
+    selectedChild?.clinic_id,
+    selectedChild?.facility_id,
+    selectedChild?.id,
+  ]);
+
   // Handle child selection
   const handleChildSelect = (infantId) => {
     const child = children.find((c) => c.id === parseInt(infantId));
@@ -298,7 +374,7 @@ export default function GuardianAppointmentBooking() {
       ...prev,
       infant_id: infantId,
       vaccine_id: "",
-      scheduled_date: "",
+      scheduled_date: prev.scheduled_date || prefilledDate || "",
       scheduled_time: "",
       type: "Vaccination",
     }));
@@ -310,9 +386,6 @@ export default function GuardianAppointmentBooking() {
     setChildReadiness(null);
     setSuggestedAppointments([]);
     setRecommendedVaccine(null);
-    // Fetch readiness and suggestions for the selected child
-    fetchChildReadiness(infantId);
-    fetchSuggestedAppointments(infantId, child?.clinic_id || child?.facility_id || null);
   };
 
   // Handle form field blur for real-time validation
@@ -496,11 +569,7 @@ export default function GuardianAppointmentBooking() {
                     <div>
                       <p className="text-gray-500 dark:text-gray-400">Sex</p>
                       <p className="font-medium text-gray-900 dark:text-white">
-                        {selectedChild.sex === "M"
-                          ? "Male"
-                          : selectedChild.sex === "F"
-                            ? "Female"
-                            : "N/A"}
+                        {resolvePatientSexLabel(selectedChild)}
                       </p>
                     </div>
                   </div>
@@ -961,11 +1030,7 @@ export default function GuardianAppointmentBooking() {
                         Sex
                       </span>
                       <span className="font-medium text-gray-900 dark:text-white">
-                        {selectedChild.sex === "M"
-                          ? "Male"
-                          : selectedChild.sex === "F"
-                            ? "Female"
-                            : "N/A"}
+                        {resolvePatientSexLabel(selectedChild)}
                       </span>
                     </div>
                     <div className="flex flex-col gap-1 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between">

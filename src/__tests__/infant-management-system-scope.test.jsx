@@ -1,7 +1,7 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 
 import InfantManagement from "../pages/InfantManagement";
 import infantService from "../services/infantService";
@@ -29,7 +29,16 @@ jest.mock("../components/VaccineScheduleBooklet", () => () => null);
 jest.mock("../components/ImmunizationRecordBooklet", () => () => null);
 jest.mock("../components/InfantPersonalRecord", () => () => null);
 jest.mock("../components/ImmunizationChart", () => () => null);
-jest.mock("../pages/TransferInCases", () => () => null);
+jest.mock("../pages/TransferInCases", () => {
+  const React = require("react");
+
+  return {
+    __esModule: true,
+    default: React.forwardRef((_props, _ref) => (
+      <div>Transfer-In Cases Panel</div>
+    )),
+  };
+});
 jest.mock("../components/AddInfantModal", () => () => null);
 jest.mock("../components/InjectVaccineModal", () => () => null);
 jest.mock("../components/VaccineReadinessManager", () => () => null);
@@ -71,6 +80,11 @@ describe("Infant management system scope loading", () => {
     });
   });
 
+  const LocationProbe = () => {
+    const location = useLocation();
+    return <div data-testid="location-probe">{location.search}</div>;
+  };
+
   test("requests full system infant scope for admin listings", async () => {
     render(
       <MemoryRouter initialEntries={["/infants"]}>
@@ -89,5 +103,22 @@ describe("Infant management system scope loading", () => {
     expect(await screen.findByText("5001")).toBeInTheDocument();
     expect(screen.getByText(/showing 20 of 5001 infants/i)).toBeInTheDocument();
     expect(screen.getByText(/christian samorin/i)).toBeInTheDocument();
+  });
+
+  test("opens the transfer-in cases view from the header button without leaving the infant workflow", async () => {
+    render(
+      <MemoryRouter initialEntries={["/infants"]}>
+        <InfantManagement />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText(/christian samorin/i);
+
+    fireEvent.click(screen.getByRole("button", { name: /transfer-in cases/i }));
+
+    expect(await screen.findByText("Transfer-In Cases Panel")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /back to infants/i })).toBeInTheDocument();
+    expect(screen.getByTestId("location-probe")).toHaveTextContent("?view=transfer-in");
   });
 });

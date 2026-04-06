@@ -383,6 +383,14 @@ function AppContent() {
             }
           />
           <Route
+            path="/transfer-in-cases"
+            element={
+              <ProtectedRoute requireSystemAdmin>
+                <Navigate to="/infants?view=transfer-in" replace />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/inventory"
             element={
               <ProtectedRoute adminOnly>

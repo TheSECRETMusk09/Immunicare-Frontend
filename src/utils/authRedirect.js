@@ -59,7 +59,7 @@ export const normalizeAuthUser = (rawUser) => {
 export const getDefaultAuthenticatedRouteFromRoleType = (roleType) => {
   const canonicalRoleType = resolveRoleType(roleType);
   if (canonicalRoleType === "GUARDIAN") return "/guardian/dashboard";
-  if (canonicalRoleType === "SYSTEM_ADMIN") return "/dashboard";
+  if (canonicalRoleType === "SYSTEM_ADMIN") return "/analytics";
   return "/login";
 };
 
@@ -73,6 +73,6 @@ export const getDefaultAuthenticatedRouteFromFlags = ({
   isAdmin,
 }) => {
   if (isGuardian) return "/guardian/dashboard";
-  if (isAdmin) return "/dashboard";
+  if (isAdmin) return "/analytics";
   return "/login";
 };

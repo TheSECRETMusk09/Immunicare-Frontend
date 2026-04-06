@@ -27,8 +27,7 @@ describe("DownloadCenter searchable infant selection", () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    apiClient.getDownloadHistory.mockResolvedValue({ data: [] });
-    apiClient.getInfants.mockResolvedValue({
+    const initialInfants = {
       data: [
         {
           id: 1,
@@ -45,7 +44,23 @@ describe("DownloadCenter searchable infant selection", () => {
           control_number: "DEMO30-INF-002391",
         },
       ],
-    });
+    };
+
+    apiClient.getDownloadHistory.mockResolvedValue({ data: [] });
+    apiClient.getInfants.mockResolvedValue(initialInfants);
+    apiClient.getInfants
+      .mockResolvedValueOnce(initialInfants)
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: 5001,
+            first_name: "Christian",
+            last_name: "Samorin",
+            dob: "2026-03-25T16:00:00.000Z",
+            control_number: "INF-2026-357447",
+          },
+        ],
+      });
     apiClient.getPaperTemplates.mockResolvedValue({
       data: [
         {
@@ -58,7 +73,7 @@ describe("DownloadCenter searchable infant selection", () => {
     apiClient.generateDocument.mockResolvedValue({ success: true });
   });
 
-  test("uses searchable infant selection and submits the selected infant for document generation", async () => {
+  test("searches infants from the backend so document generation can find records outside the initial preload", async () => {
     render(
       <MemoryRouter>
         <DownloadCenter />
@@ -80,13 +95,21 @@ describe("DownloadCenter searchable infant selection", () => {
     const searchInput = screen.getByPlaceholderText(
       /search by name, control number, or date of birth/i,
     );
-    fireEvent.change(searchInput, { target: { value: "DEMO30-INF-003867" } });
-
-    expect(screen.getAllByText("Alvin Torres").length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole("button", { name: /alvin torres/i }));
+    fireEvent.change(searchInput, { target: { value: "christian samorin" } });
 
     await waitFor(() => {
-      expect(screen.getAllByRole("button", { name: /alvin torres/i }).length).toBeGreaterThan(0);
+      expect(apiClient.getInfants).toHaveBeenCalledWith({
+        limit: 25,
+        search: "christian samorin",
+        scope: "system",
+      });
+    });
+
+    expect(await screen.findByText("Christian Samorin")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /christian samorin/i }));
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("button", { name: /christian samorin/i }).length).toBeGreaterThan(0);
     });
 
     fireEvent.change(screen.getByDisplayValue("Select Template"), {
@@ -97,7 +120,7 @@ describe("DownloadCenter searchable infant selection", () => {
 
     await waitFor(() => {
       expect(apiClient.generateDocument).toHaveBeenCalledWith("7", expect.objectContaining({
-        infant_id: "1",
+        infant_id: "5001",
         template_id: "7",
       }));
     });

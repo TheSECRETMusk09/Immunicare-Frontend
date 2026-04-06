@@ -44,8 +44,6 @@ import useUserManagementSocket from "../hooks/useUserManagementSocket";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { useDebounce } from "../hooks/usePerformance";
 
-const isSameEntityId = (left, right) => String(left) === String(right);
-
 const toComparableTimestamp = (value) => {
   if (!value) {
     return null;
@@ -591,7 +589,6 @@ export default function UserManagement() {
   );
 
   const admins = normalizedSystemUsers;
-  const filteredAdmins = normalizedSystemUsers;
   const filteredSystemUsers = normalizedSystemUsers;
   const paginatedAdmins = normalizedSystemUsers;
   const paginatedSystemUsers = normalizedSystemUsers;

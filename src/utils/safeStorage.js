@@ -127,9 +127,11 @@ export const hasPersistentStorage = () => {
   return safeLocalStorage.isAvailable || safeSessionStorage.isAvailable;
 };
 
-export default {
+const safeStorageUtils = {
   safeLocalStorage,
   safeSessionStorage,
   getBestAvailableStorage,
   hasPersistentStorage,
 };
+
+export default safeStorageUtils;

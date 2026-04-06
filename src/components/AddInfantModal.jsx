@@ -207,8 +207,7 @@ export default function AddInfantModal({
   }, [
     debouncedGuardianSearchQuery,
     isOpen,
-    selectedGuardianRecord?.id,
-    selectedGuardianRecord?.name,
+    selectedGuardianRecord,
   ]);
 
   const guardianOptions = [

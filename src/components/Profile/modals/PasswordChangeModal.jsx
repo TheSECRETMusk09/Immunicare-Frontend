@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Key, Eye, EyeOff, AlertCircle } from "lucide-react";
-import { Modal, Button, Input } from "../../UI";
+import { Modal, Button } from "../../UI";
 
 /**
  * PasswordChangeModal Component

@@ -73,6 +73,23 @@ export const CATEGORY_FILTER_OPTIONS = [
   { value: "general", label: "General" },
 ];
 
+export const GUARDIAN_CATEGORY_META = Object.freeze({
+  appointment: { label: "Appointments", icon: "📅" },
+  vaccination_update: { label: "Vaccination Updates", icon: "💉" },
+  reminder: { label: "Reminders", icon: "⏰" },
+  health_alert: { label: "Health Alerts", icon: "🚨" },
+  general: { label: "Announcements", icon: "🔔" },
+});
+
+export const GUARDIAN_CATEGORY_FILTER_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "unread", label: "Unread" },
+  ...Object.entries(GUARDIAN_CATEGORY_META).map(([value, meta]) => ({
+    value,
+    label: meta.label,
+  })),
+];
+
 const CATEGORY_ALIASES = Object.freeze({
   appointment: [
     "appointment",
@@ -148,6 +165,111 @@ const CATEGORY_ALIASES = Object.freeze({
   ],
   general: ["general", "notification", "auth", "security"],
 });
+
+const GUARDIAN_CATEGORY_ALIASES = Object.freeze({
+  appointment: [
+    "appointment",
+    "appointments",
+    "appointment_confirmation",
+    "appointment_confirmed",
+    "appointment_status",
+    "appointment_status_changed",
+    "appointment_update",
+    "appointment_updated",
+    "appointment_rescheduled",
+    "appointment_cancelled",
+    "appointment_suggested",
+    "sms_confirmation_sent",
+  ],
+  vaccination_update: [
+    "vaccine_administered",
+    "infant_registration",
+    "infant_registered",
+    "child_registration_success",
+    "child_registered",
+    "infant_created",
+    "transfer_in",
+    "transfer_in_submitted",
+  ],
+  reminder: [
+    "appointment_reminder",
+    "vaccination_reminder",
+    "vaccination_schedule",
+    "vaccination_due",
+    "immunization_schedule",
+    "schedule_due",
+    "vaccine_due",
+    "upcoming_vaccine",
+    "next_vaccine_computed",
+    "missed_schedule",
+    "missed_appointment",
+    "missed_vaccine",
+    "overdue_vaccination",
+    "vaccine_overdue",
+  ],
+  health_alert: ["health_alert"],
+  general: [
+    "system_announcement",
+    "announcement",
+    "admin_announcement",
+    "new_message",
+    "profile_update",
+    "general",
+    "notification",
+    "auth",
+    "security",
+  ],
+});
+
+const GUARDIAN_BLOCKED_ALIASES = Object.freeze([
+  "low_stock",
+  "inventory_low_stock",
+  "low_stock_alert",
+  "expiry_warning",
+  "expiry_critical",
+  "stock_warning",
+  "stock_alert",
+  "out_of_stock",
+  "inventory_out_of_stock",
+  "stock_unavailable",
+  "vaccine_non_availability",
+  "critical_stock_alert",
+  "out_of_stock_alert",
+  "guardian_registration",
+  "guardian_registered",
+  "guardian_account_created",
+  "report",
+  "report_ready",
+  "report_generated",
+  "report_exported",
+  "outbound_message_failed",
+  "sms_failed",
+  "email_failed",
+  "delivery_failed",
+  "failed_outbound_message",
+  "failed_sms",
+  "inventory_alert",
+  "supplier_update",
+  "analytics_alert",
+  "staff_action",
+  "system_alert",
+]);
+
+const GUARDIAN_APPOINTMENT_REMINDER_TYPES = new Set([
+  "appointment_reminder",
+  "missed_schedule",
+  "missed_appointment",
+]);
+
+const GUARDIAN_CHILD_RECORD_UPDATE_TYPES = new Set([
+  "infant_registration",
+  "infant_registered",
+  "child_registration_success",
+  "child_registered",
+  "infant_created",
+  "transfer_in",
+  "transfer_in_submitted",
+]);
 
 const buildNotificationSearchText = (raw = {}, sourceText = "") => {
   const { metadata, templateData, payload } = getMetadataPayload(raw);
@@ -325,7 +447,158 @@ export const inferNotificationCategoryFromText = (text = "") => {
   return "general";
 };
 
-export const resolveNotificationCategory = (raw, options = {}) => {
+const mapGuardianExplicitNotificationCategory = (value) => {
+  const normalized = normalizeCandidateValue(value);
+
+  if (!normalized) {
+    return null;
+  }
+
+  if (GUARDIAN_BLOCKED_ALIASES.includes(normalized)) {
+    return false;
+  }
+
+  for (const [category, aliases] of Object.entries(GUARDIAN_CATEGORY_ALIASES)) {
+    if (aliases.includes(normalized)) {
+      return category;
+    }
+  }
+
+  return null;
+};
+
+const inferGuardianNotificationCategoryFromText = (text = "") => {
+  const normalizedText = String(text || "").toLowerCase();
+
+  if (
+    includesAny(normalizedText, [
+      "low stock",
+      "out of stock",
+      "inventory alert",
+      "stock alert",
+      "failed outbound",
+      "delivery failure",
+      "report generated",
+      "report ready",
+      "guardian registration",
+      "new guardian",
+    ])
+  ) {
+    return null;
+  }
+
+  if (
+    includesAny(normalizedText, [
+      "health alert",
+      "seek immediate care",
+      "urgent health",
+      "emergency",
+      "adverse reaction",
+    ])
+  ) {
+    return "health_alert";
+  }
+
+  if (
+    includesAny(normalizedText, [
+      "vaccination reminder",
+      "vaccination due",
+      "due for vaccine",
+      "upcoming dose",
+      "next vaccine",
+      "missed schedule",
+      "missed appointment",
+      "overdue vaccine",
+      "reminder",
+    ])
+  ) {
+    return "reminder";
+  }
+
+  if (
+    includesAny(normalizedText, [
+      "vaccine administered",
+      "vaccination recorded",
+      "child registered",
+      "infant registration",
+      "transfer-in",
+      "transferred",
+    ])
+  ) {
+    return "vaccination_update";
+  }
+
+  if (
+    includesAny(normalizedText, [
+      "appointment",
+      "rescheduled",
+      "booked",
+      "confirmed",
+      "cancelled",
+    ])
+  ) {
+    return "appointment";
+  }
+
+  if (
+    includesAny(normalizedText, [
+      "announcement",
+      "system maintenance",
+      "system update",
+      "message from",
+      "profile updated",
+      "security",
+    ])
+  ) {
+    return "general";
+  }
+
+  return null;
+};
+
+export const resolveGuardianNotificationCategory = (raw, options = {}) => {
+  if (typeof raw === "string") {
+    const explicitCategory = mapGuardianExplicitNotificationCategory(raw);
+    if (explicitCategory !== null) {
+      return explicitCategory || null;
+    }
+
+    return inferGuardianNotificationCategoryFromText(options.sourceText || raw);
+  }
+
+  const sourceText = buildNotificationSearchText(raw, options.sourceText);
+  const explicitCandidates = [
+    raw?.category,
+    raw?.notification_type,
+    raw?.event_type,
+    raw?.type,
+  ];
+
+  for (const candidate of explicitCandidates) {
+    const explicitCategory = mapGuardianExplicitNotificationCategory(candidate);
+    if (explicitCategory !== null) {
+      return explicitCategory || null;
+    }
+  }
+
+  const ambiguousCategory = normalizeCandidateValue(raw?.category);
+  if (ambiguousCategory === "registration") {
+    if (includesAny(sourceText, ["infant", "child", "newborn", "baby", "transfer-in"])) {
+      return "vaccination_update";
+    }
+
+    if (includesAny(sourceText, ["guardian", "parent"])) {
+      return null;
+    }
+  }
+
+  return inferGuardianNotificationCategoryFromText(sourceText);
+};
+
+export const isGuardianVisibleNotification = (raw = {}) =>
+  Boolean(resolveGuardianNotificationCategory(raw, { isGuardian: true }));
+
+const resolveDefaultNotificationCategory = (raw, options = {}) => {
   if (typeof raw === "string") {
     return (
       mapExplicitNotificationCategory(raw) ||
@@ -358,6 +631,14 @@ export const resolveNotificationCategory = (raw, options = {}) => {
   }
 
   return inferNotificationCategoryFromText(sourceText);
+};
+
+export const resolveNotificationCategory = (raw, options = {}) => {
+  if (options.isGuardian) {
+    return resolveGuardianNotificationCategory(raw, options) || "general";
+  }
+
+  return resolveDefaultNotificationCategory(raw, options);
 };
 
 export const resolveExplicitNotificationUrl = (raw = {}) => {
@@ -451,30 +732,33 @@ export const resolveNotificationActionUrl = (raw, options = {}) => {
 
     switch (category) {
       case "appointment":
-      case "missed_schedule":
         if (relatedEntityType === "appointment" && relatedEntityId) {
           return `/guardian/appointments/${relatedEntityId}`;
         }
         return infantId
           ? `/guardian/appointments?childId=${infantId}`
           : "/guardian/appointments";
-      case "vaccination_schedule":
+      case "vaccination_update":
+        if (GUARDIAN_CHILD_RECORD_UPDATE_TYPES.has(notificationType)) {
+          return infantId ? `/guardian/children/${infantId}` : "/guardian/children";
+        }
         return infantId
           ? `/guardian/immunization-chart/${infantId}`
           : "/guardian/immunization-chart";
-      case "inventory_low_stock":
-      case "inventory_out_of_stock":
-        return "/guardian/appointments";
-      case "guardian_registration":
-        return "/guardian/profile";
-      case "infant_registration":
+      case "reminder":
+        if (
+          relatedEntityType === "appointment" ||
+          GUARDIAN_APPOINTMENT_REMINDER_TYPES.has(notificationType)
+        ) {
+          return infantId
+            ? `/guardian/appointments?childId=${infantId}`
+            : "/guardian/appointments";
+        }
+        return infantId
+          ? `/guardian/immunization-chart/${infantId}`
+          : "/guardian/immunization-chart";
+      case "health_alert":
         return infantId ? `/guardian/children/${infantId}` : "/guardian/children";
-      case "report":
-        return infantId
-          ? `/guardian/immunization-chart/${infantId}`
-          : "/guardian/immunization-chart";
-      case "system_announcement":
-      case "outbound_message_failed":
       case "general":
       default:
         return "/guardian/notifications";
@@ -509,10 +793,14 @@ export const resolveNotificationActionUrl = (raw, options = {}) => {
 const notificationRouting = {
   CATEGORY_META,
   CATEGORY_FILTER_OPTIONS,
+  GUARDIAN_CATEGORY_META,
+  GUARDIAN_CATEGORY_FILTER_OPTIONS,
   inferNotificationCategoryFromText,
+  isGuardianVisibleNotification,
   isExternalNotificationUrl,
   mapExplicitNotificationCategory,
   resolveExplicitNotificationUrl,
+  resolveGuardianNotificationCategory,
   resolveNotificationActionUrl,
   resolveNotificationCategory,
 };

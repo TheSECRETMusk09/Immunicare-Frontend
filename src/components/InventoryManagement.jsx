@@ -158,7 +158,7 @@ const PRINT_REPORT_COPY = {
   inventorySheetProcured: "Department of Health Procured",
   inventorySheetHealthCenterLabel: "HEALTH CENTER:",
   inventorySheetHealthCenterValue: "SAN NICOLAS HC",
-  inventorySheetInventoryLine: "Inventory of Vaccines and Other Logistics",
+  inventorySheetInventoryLine: "Inventory of Vaccines and Other Logistic",
   inventorySheetCodeLabel: "Code",
   inventorySheetMonthLine: "For the Month: JANUARY",
   dohLguTitle: "HEALTH FACILITY MONTHLY VACCINE STOCK INVENTORY REPORT",
@@ -381,6 +381,22 @@ const DOH_REPORT_SEAL_SRC = DOH_LGU_REPORT_LEFT_SEAL_SRC;
 const INVENTORY_SHEET_LEFT_LOGO_SRC = DOH_REPORT_SEAL_SRC;
 const INVENTORY_SHEET_RIGHT_LOGO_SRC = "/san-nicolas-logo.jpg";
 const INVENTORY_SHEET_ROWS_PER_PAGE = 18;
+const INVENTORY_SHEET_FRAME_MAX_WIDTH = "12in";
+const INVENTORY_SHEET_SURFACE_MAX_WIDTH = "11.86in";
+const INVENTORY_SHEET_PDF_FRAME_WIDTH_MM = 312;
+const INVENTORY_SHEET_PDF_FRAME_PADDING_MM = 6.5;
+const INVENTORY_SHEET_WORD_PAGE_CONFIG = Object.freeze({
+  ...PRINT_PAGE_PRESETS.legalLandscape,
+  margins: {
+    top: 720,
+    right: 720,
+    bottom: 720,
+    left: 720,
+    header: 360,
+    footer: 360,
+    gutter: 0,
+  },
+});
 const INVENTORY_SHEET_COLUMN_WIDTH_PERCENTAGES = Object.freeze([
   4, 20, 9, 9, 14, 7, 7, 8, 9, 7, 6,
 ]);
@@ -620,27 +636,6 @@ const normalizeInventoryNumber = (value, fallback = 0) => {
   return Number.isFinite(numeric) ? numeric : fallback;
 };
 
-const getInventoryActorDisplayName = (user = {}) => {
-  const fullName = [user.first_name, user.last_name]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
-
-  if (fullName) {
-    return fullName;
-  }
-
-  return (
-    String(
-      user.display_name ||
-        user.role_display_name ||
-        user.name ||
-        user.username ||
-        "",
-    ).trim() || null
-  );
-};
-
 const formatInventoryActorRole = (value) => {
   const normalized = String(value || "")
     .trim()
@@ -786,6 +781,7 @@ const normalizeInventoryMovementRecord = (row = {}) => {
       null,
     reference_number: referenceNumber || null,
     notes: notes || null,
+    transaction_date: row.transaction_date ?? row.date ?? null,
     created_at: row.created_at ?? row.transaction_date ?? row.date ?? null,
     performed_by_name: performedByName || null,
     performed_by_username: performedByUsername || null,
@@ -996,6 +992,34 @@ const summarizeStockMovements = (rows = []) =>
       wasted: 0,
     },
   );
+
+const normalizeInventoryMovementSummary = (summary = null) => {
+  if (!summary || typeof summary !== "object") {
+    return null;
+  }
+
+  return {
+    totalRecords: normalizeInventoryNumber(
+      summary.totalRecords ?? summary.total_records ?? summary.movement_records,
+      0,
+    ),
+    stockIn: normalizeInventoryNumber(
+      summary.stockIn ?? summary.stock_in,
+      0,
+    ),
+    stockOut: normalizeInventoryNumber(
+      summary.stockOut ?? summary.stock_out,
+      0,
+    ),
+    wasted: normalizeInventoryNumber(
+      summary.wasted ??
+        summary.wasted_expired ??
+        summary.wastedExpired ??
+        summary.wasted_expired_transactions,
+      0,
+    ),
+  };
+};
 
 function InventoryDisplayToolbarFilters({
   filters,
@@ -1346,15 +1370,17 @@ function InventoryPaginationFooter({
 
 function StockMovementsPanel({
   movements,
+  summaryOverride = null,
   loading,
   error,
   onRetry,
 }) {
   const [currentPage, setCurrentPage] = useState(1);
-  const summary = useMemo(
+  const derivedSummary = useMemo(
     () => summarizeStockMovements(movements),
     [movements],
   );
+  const summary = summaryOverride || derivedSummary;
   const totalPages = Math.max(
     1,
     Math.ceil(movements.length / INVENTORY_TABLE_PAGE_SIZE),
@@ -1521,7 +1547,9 @@ function StockMovementsPanel({
                         className="align-top hover:bg-gray-50 dark:hover:bg-gray-800/80"
                       >
                         <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                          {formatInventoryMovementDate(movement.created_at)}
+                          {formatInventoryMovementDate(
+                            movement.transaction_date || movement.created_at,
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <Badge variant={typeMeta.badgeVariant}>
@@ -3033,7 +3061,7 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
   }
 
   body.inventory-export--landscape {
-    padding: 0.08in 0.1in 0.1in;
+    padding: 0.08in 0.12in 0.1in;
   }
 
   body.inventory-export--portrait {
@@ -3431,16 +3459,19 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
 
   .inventory-sheet-summary-print-report {
     width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
 
   .inventory-sheet-summary-print-report__page {
     width: 100%;
-    max-width: 11.85in;
+    max-width: ${INVENTORY_SHEET_FRAME_MAX_WIDTH};
     min-height: 7.25in;
     margin: 0 auto;
-    padding: 0.02in 0 0.04in;
+    padding: 0.03in 0;
     display: flex;
-    flex-direction: column;
+    justify-content: center;
     page-break-after: always;
     break-after: page;
   }
@@ -3450,19 +3481,27 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
     break-after: auto;
   }
 
+  .inventory-sheet-summary-print-report__surface {
+    width: 100%;
+    max-width: ${INVENTORY_SHEET_SURFACE_MAX_WIDTH};
+    margin: 0 auto;
+    padding: 0.18in 0.22in 0.16in;
+    border: 1.45px solid #111827;
+    background: #ffffff;
+  }
+
   .inventory-sheet-summary-print-header {
     width: 100%;
-    max-width: 10.95in;
-    margin: 0 auto 0.28in;
-    padding: 0 0 0.18in;
-    border-bottom: 1.2px solid #cbd5e1;
+    margin: 0 auto 0.36in;
+    padding: 0 0 0.22in;
+    border-bottom: 1.35px solid #cbd5e1;
   }
 
   .inventory-sheet-summary-print-header__branding {
     display: grid;
-    grid-template-columns: 1.02in minmax(0, 1fr) 1.02in;
+    grid-template-columns: 1.16in minmax(0, 1fr) 1.16in;
     align-items: center;
-    gap: 0.26in;
+    gap: 0.32in;
   }
 
   .inventory-sheet-summary-print-header__branding-copy {
@@ -3476,8 +3515,8 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
   }
 
   .inventory-sheet-summary-print-header__logo {
-    width: 0.94in;
-    height: 0.94in;
+    width: 1in;
+    height: 1in;
     object-fit: contain;
     background: transparent;
   }
@@ -3488,34 +3527,33 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
   }
 
   .inventory-sheet-summary-print-header__line--government {
-    margin-bottom: 0.05in;
-    font-size: 9.4px;
+    margin-bottom: 0.06in;
+    font-size: 9.6px;
   }
 
   .inventory-sheet-summary-print-header__line--title {
-    margin-top: 0.03in;
-    font-size: 10.4px;
+    margin-top: 0.05in;
+    font-size: 10.8px;
     text-transform: none;
   }
 
   .inventory-sheet-summary-print-header__detail-row {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(1.7in, auto) minmax(0, 1fr) minmax(2.6in, auto);
     align-items: end;
-    gap: 0.22in;
+    gap: 0.26in;
     width: 100%;
-    max-width: 10.95in;
-    margin: 0.12in auto 0;
-    padding-top: 0.12in;
+    margin: 0.16in auto 0;
+    padding-top: 0.14in;
     border-top: 1px solid #e2e8f0;
   }
 
   .inventory-sheet-summary-print-header__detail--facility {
     justify-self: center;
     text-align: center;
-    font-size: 8.8px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
   }
 
@@ -3523,17 +3561,20 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
     justify-self: end;
   }
 
+  .inventory-sheet-summary-print-report__table-wrap {
+    width: 100%;
+    margin: 0.12in auto 0;
+  }
+
   .inventory-sheet-summary-print-table {
     width: 100%;
-    max-width: 10.95in;
     margin: 0 auto;
   }
 
   .inventory-sheet-summary-print-footer {
     width: 100%;
-    max-width: 10.95in;
-    margin: auto auto 0;
-    padding-top: 0.12in;
+    margin: 0.2in auto 0;
+    padding-top: 0.14in;
     border-top: 1px solid #d7deea;
     text-align: center;
     font-size: 8.2px;
@@ -3970,14 +4011,22 @@ const drawInventorySheetPdfHeader = ({
   leftLogoImage,
   rightLogoImage,
 }) => {
-  const contentWidth = Math.min(pageWidth - 36, 300);
-  const contentLeft = (pageWidth - contentWidth) / 2;
+  const frameWidth = Math.min(pageWidth - 20, INVENTORY_SHEET_PDF_FRAME_WIDTH_MM);
+  const frameLeft = (pageWidth - frameWidth) / 2;
+  const frameTop = margin.top - 1;
+  const frameHeight = pageHeight - (margin.top + margin.bottom) + 2;
+  const contentLeft = frameLeft + INVENTORY_SHEET_PDF_FRAME_PADDING_MM;
+  const contentWidth = frameWidth - INVENTORY_SHEET_PDF_FRAME_PADDING_MM * 2;
   const contentRight = contentLeft + contentWidth;
   const centerX = pageWidth / 2;
-  const logoSize = 18;
-  const logoY = margin.top + 1;
-  const leftLogoX = contentLeft + 8;
-  const rightLogoX = contentRight - logoSize - 8;
+  const logoSize = 22;
+  const logoY = frameTop + 5.5;
+  const leftLogoX = contentLeft + 2;
+  const rightLogoX = contentRight - logoSize - 2;
+
+  doc.setDrawColor(17, 24, 39);
+  doc.setLineWidth(0.35);
+  doc.rect(frameLeft, frameTop, frameWidth, frameHeight);
 
   if (leftLogoImage) {
     doc.addImage(
@@ -4001,7 +4050,7 @@ const drawInventorySheetPdfHeader = ({
     );
   }
 
-  let currentY = margin.top + 3;
+  let currentY = frameTop + 8;
 
   doc.setTextColor(17, 24, 39);
   doc.setFont("helvetica", "normal");
@@ -4053,7 +4102,7 @@ const drawInventorySheetPdfHeader = ({
   doc.setLineWidth(0.25);
   doc.line(contentLeft, currentY, contentRight, currentY);
 
-  currentY += 7.2;
+  currentY += 8.6;
   doc.setTextColor(17, 24, 39);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.6);
@@ -4066,7 +4115,7 @@ const drawInventorySheetPdfHeader = ({
     align: "right",
   });
 
-  const footerY = pageHeight - margin.bottom - 2.2;
+  const footerY = frameTop + frameHeight - 3.6;
   doc.setDrawColor(215, 222, 234);
   doc.setLineWidth(0.25);
   doc.line(contentLeft, footerY - 2, contentRight, footerY - 2);
@@ -4083,7 +4132,7 @@ const drawInventorySheetPdfHeader = ({
   );
 
   return {
-    tableStartY: currentY + 5.2,
+    tableStartY: currentY + 7.6,
     contentLeft,
     contentWidth,
   };
@@ -4338,151 +4387,155 @@ const InventorySheetSummaryPrintReport = ({
           className="inventory-sheet-summary-print-report__page"
           data-testid="inventory-sheet-print-page"
         >
-          <InventorySheetSummaryPrintHeader {...headerContext} />
+          <div className="inventory-sheet-summary-print-report__surface">
+            <InventorySheetSummaryPrintHeader {...headerContext} />
 
-          <table
-            className="inventory-sheet-summary-print-table"
-            data-testid="inventory-sheet-print-table"
-          >
-            <colgroup>
-              {INVENTORY_SHEET_COLUMN_WIDTH_PERCENTAGES.map((width, index) => (
-                <col
-                  key={`inventory-sheet-col-${index}`}
-                  style={{ width: `${width}%` }}
-                />
-              ))}
-            </colgroup>
-            <thead>
-              <tr>
-                <th rowSpan={2} className="print-col-base">
-                  A
-                </th>
-                <th rowSpan={2} className="print-col-base print-col-items">
-                  Items
-                </th>
-                <th rowSpan={2} className="print-col-base print-col-beginning">
-                  B
-                  <br />
-                  Beginning Balance
-                </th>
-                <th rowSpan={2} className="print-col-base print-col-received">
-                  C
-                  <br />
-                  Received
-                </th>
-                <th rowSpan={2} className="print-col-base print-col-lot">
-                  Lot / Batch Number
-                </th>
-                <th colSpan={2} className="print-col-base print-col-movement">
-                  Stock Movement In / Out
-                </th>
-                <th rowSpan={2} className="print-col-base print-col-expired">
-                  Expired / Wasted
-                </th>
-                <th rowSpan={2} className="print-col-base print-col-total">
-                  G
-                  <br />
-                  Total Available
-                </th>
-                <th rowSpan={2} className="print-col-base print-col-issued">
-                  H
-                  <br />
-                  Issued
-                </th>
-                <th rowSpan={2} className="print-col-base print-col-stock">
-                  I+J
-                  <br />
-                  Stock On Hand
-                </th>
-              </tr>
-              <tr>
-                <th className="print-col-base print-col-movement">In</th>
-                <th className="print-col-base print-col-movement">Out</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.map((item) => (
-                <tr key={`inventory-sheet-print-${pageIndex + 1}-${item.id}`}>
-                  <td className="print-col-base print-col-center">
-                    {item.rowNumber}
-                  </td>
-                  <td className="print-col-base print-col-items print-col-item-name">
-                    {item.itemName}
-                  </td>
-                  <td className="print-col-base print-col-beginning print-col-center">
-                    {item.beginningBalance}
-                  </td>
-                  <td className="print-col-base print-col-received print-col-center">
-                    {item.received}
-                  </td>
-                  <td className="print-col-base print-col-lot print-col-center">
-                    {item.lotBatchNumber}
-                  </td>
-                  <td className="print-col-base print-col-movement print-col-center">
-                    {item.transferredIn}
-                  </td>
-                  <td className="print-col-base print-col-movement print-col-center">
-                    {item.transferredOut}
-                  </td>
-                  <td className="print-col-base print-col-expired print-col-center">
-                    {item.expiredWasted}
-                  </td>
-                  <td className="print-col-base print-col-total print-col-center">
-                    {item.totalAvailable}
-                  </td>
-                  <td className="print-col-base print-col-issued print-col-center">
-                    {item.issued}
-                  </td>
-                  <td className="print-col-base print-col-stock print-col-center">
-                    {item.stockOnHand}
-                  </td>
-                </tr>
-              ))}
+            <div className="inventory-sheet-summary-print-report__table-wrap">
+              <table
+                className="inventory-sheet-summary-print-table"
+                data-testid="inventory-sheet-print-table"
+              >
+                <colgroup>
+                  {INVENTORY_SHEET_COLUMN_WIDTH_PERCENTAGES.map((width, index) => (
+                    <col
+                      key={`inventory-sheet-col-${index}`}
+                      style={{ width: `${width}%` }}
+                    />
+                  ))}
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th rowSpan={2} className="print-col-base">
+                      A
+                    </th>
+                    <th rowSpan={2} className="print-col-base print-col-items">
+                      Items
+                    </th>
+                    <th rowSpan={2} className="print-col-base print-col-beginning">
+                      B
+                      <br />
+                      Beginning Balance
+                    </th>
+                    <th rowSpan={2} className="print-col-base print-col-received">
+                      C
+                      <br />
+                      Received
+                    </th>
+                    <th rowSpan={2} className="print-col-base print-col-lot">
+                      Lot / Batch Number
+                    </th>
+                    <th colSpan={2} className="print-col-base print-col-movement">
+                      Stock Movement In / Out
+                    </th>
+                    <th rowSpan={2} className="print-col-base print-col-expired">
+                      Expired / Wasted
+                    </th>
+                    <th rowSpan={2} className="print-col-base print-col-total">
+                      G
+                      <br />
+                      Total Available
+                    </th>
+                    <th rowSpan={2} className="print-col-base print-col-issued">
+                      H
+                      <br />
+                      Issued
+                    </th>
+                    <th rowSpan={2} className="print-col-base print-col-stock">
+                      I+J
+                      <br />
+                      Stock On Hand
+                    </th>
+                  </tr>
+                  <tr>
+                    <th className="print-col-base print-col-movement">In</th>
+                    <th className="print-col-base print-col-movement">Out</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageRows.map((item) => (
+                    <tr key={`inventory-sheet-print-${pageIndex + 1}-${item.id}`}>
+                      <td className="print-col-base print-col-center">
+                        {item.rowNumber}
+                      </td>
+                      <td className="print-col-base print-col-items print-col-item-name">
+                        {item.itemName}
+                      </td>
+                      <td className="print-col-base print-col-beginning print-col-center">
+                        {item.beginningBalance}
+                      </td>
+                      <td className="print-col-base print-col-received print-col-center">
+                        {item.received}
+                      </td>
+                      <td className="print-col-base print-col-lot print-col-center">
+                        {item.lotBatchNumber}
+                      </td>
+                      <td className="print-col-base print-col-movement print-col-center">
+                        {item.transferredIn}
+                      </td>
+                      <td className="print-col-base print-col-movement print-col-center">
+                        {item.transferredOut}
+                      </td>
+                      <td className="print-col-base print-col-expired print-col-center">
+                        {item.expiredWasted}
+                      </td>
+                      <td className="print-col-base print-col-total print-col-center">
+                        {item.totalAvailable}
+                      </td>
+                      <td className="print-col-base print-col-issued print-col-center">
+                        {item.issued}
+                      </td>
+                      <td className="print-col-base print-col-stock print-col-center">
+                        {item.stockOnHand}
+                      </td>
+                    </tr>
+                  ))}
 
-              {pageIndex === pageGroups.length - 1 && (
-                <tr
-                  className="inventory-sheet-summary-print-total-row"
-                  data-testid="inventory-sheet-print-total-row"
-                >
-                  <td className="print-col-base print-col-total-label" colSpan={2}>
-                    TOTAL
-                  </td>
-                  <td className="print-col-base print-col-beginning print-col-center">
-                    {printTotals.beginningBalance}
-                  </td>
-                  <td className="print-col-base print-col-received print-col-center">
-                    {printTotals.received}
-                  </td>
-                  <td className="print-col-base print-col-lot print-col-center">
-                    -
-                  </td>
-                  <td className="print-col-base print-col-movement print-col-center">
-                    {printTotals.transferredIn}
-                  </td>
-                  <td className="print-col-base print-col-movement print-col-center">
-                    {printTotals.transferredOut}
-                  </td>
-                  <td className="print-col-base print-col-expired print-col-center">
-                    {printTotals.expiredWasted}
-                  </td>
-                  <td className="print-col-base print-col-total print-col-center">
-                    {printTotals.totalAvailable}
-                  </td>
-                  <td className="print-col-base print-col-issued print-col-center">
-                    {printTotals.issued}
-                  </td>
-                  <td className="print-col-base print-col-stock print-col-center">
-                    {printTotals.stockOnHand}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                  {pageIndex === pageGroups.length - 1 && (
+                    <tr
+                      className="inventory-sheet-summary-print-total-row"
+                      data-testid="inventory-sheet-print-total-row"
+                    >
+                      <td className="print-col-base print-col-total-label" colSpan={2}>
+                        TOTAL
+                      </td>
+                      <td className="print-col-base print-col-beginning print-col-center">
+                        {printTotals.beginningBalance}
+                      </td>
+                      <td className="print-col-base print-col-received print-col-center">
+                        {printTotals.received}
+                      </td>
+                      <td className="print-col-base print-col-lot print-col-center">
+                        -
+                      </td>
+                      <td className="print-col-base print-col-movement print-col-center">
+                        {printTotals.transferredIn}
+                      </td>
+                      <td className="print-col-base print-col-movement print-col-center">
+                        {printTotals.transferredOut}
+                      </td>
+                      <td className="print-col-base print-col-expired print-col-center">
+                        {printTotals.expiredWasted}
+                      </td>
+                      <td className="print-col-base print-col-total print-col-center">
+                        {printTotals.totalAvailable}
+                      </td>
+                      <td className="print-col-base print-col-issued print-col-center">
+                        {printTotals.issued}
+                      </td>
+                      <td className="print-col-base print-col-stock print-col-center">
+                        {printTotals.stockOnHand}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-          <InventorySheetSummaryPrintFooter
-            facilityName={headerContext.facilityName}
-            monthLine={headerContext.monthLine}
-          />
+            <InventorySheetSummaryPrintFooter
+              facilityName={headerContext.facilityName}
+              monthLine={headerContext.monthLine}
+            />
+          </div>
         </article>
       ))}
     </section>
@@ -5027,17 +5080,38 @@ export default function InventoryManagement() {
   const { user } = useAuth();
   const fallbackClinicId = user?.clinic_id || user?.facility_id || 1;
   const currentUserId = user?.id ?? null;
+  const currentUserFirstName = String(user?.first_name || "").trim() || null;
+  const currentUserLastName = String(user?.last_name || "").trim() || null;
   const currentUserUsername = String(user?.username || "").trim() || null;
   const currentUserRole =
     String(user?.role_type || user?.role || "").trim() || null;
+  const currentUserEmail = String(user?.email || "").trim() || null;
+  const currentUserFullName = String(user?.full_name || user?.name || "").trim() || null;
+  const currentUserMiddleName = String(user?.middle_name || "").trim() || null;
   const currentUserDisplayName = useMemo(
-    () => getInventoryActorDisplayName(user),
+    () => {
+      const fullName = [
+        currentUserFirstName,
+        currentUserMiddleName,
+        currentUserLastName,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+      if (fullName) {
+        return fullName;
+      }
+
+      return currentUserFullName || currentUserUsername || currentUserEmail;
+    },
     [
-      currentUserId,
-      currentUserRole,
+      currentUserEmail,
+      currentUserFirstName,
+      currentUserFullName,
+      currentUserLastName,
+      currentUserMiddleName,
       currentUserUsername,
-      user?.first_name,
-      user?.last_name,
     ],
   );
   const canManageStockAlertActions =
@@ -5076,6 +5150,7 @@ export default function InventoryManagement() {
   const [inventory, setInventory] = useState([]);
   const [inventoryReportSource, setInventoryReportSource] = useState([]);
   const [stockMovements, setStockMovements] = useState([]);
+  const [stockMovementSummaryData, setStockMovementSummaryData] = useState(null);
   const [inventoryDisplayFilters, setInventoryDisplayFilters] = useState(
     createDefaultInventoryDisplayFilters,
   );
@@ -5131,12 +5206,13 @@ export default function InventoryManagement() {
   const dateRangeStart = printDateRange.appliedStartDate;
   const dateRangeEnd = printDateRange.appliedEndDate;
   const isFiltering = printDateRange.hasAppliedDateRange;
+  const syncPrintDateRange = printDateRange.syncDateRange;
 
   useEffect(() => {
     const startDate = inventoryDisplayFilters.startDate;
     const endDate = inventoryDisplayFilters.endDate;
 
-    printDateRange.syncDateRange({
+    syncPrintDateRange({
       startDate,
       endDate,
       apply: Boolean(startDate && endDate),
@@ -5145,7 +5221,7 @@ export default function InventoryManagement() {
   }, [
     inventoryDisplayFilters.endDate,
     inventoryDisplayFilters.startDate,
-    printDateRange.syncDateRange,
+    syncPrintDateRange,
   ]);
 
   const requiresBatchSelection =
@@ -5318,8 +5394,14 @@ export default function InventoryManagement() {
   }, [canManageStockAlertActions, fallbackClinicId]);
 
   const loadStockMovements = useCallback(async () => {
-    if (typeof apiClient.getVaccineInventoryTransactions !== "function") {
+    const canUseSummaryEndpoint =
+      typeof apiClient.getInventoryStockMovements === "function";
+    const canUseLegacyEndpoint =
+      typeof apiClient.getVaccineInventoryTransactions === "function";
+
+    if (!canUseSummaryEndpoint && !canUseLegacyEndpoint) {
       setStockMovements([]);
+      setStockMovementSummaryData(null);
       setStockMovementsError(null);
       return [];
     }
@@ -5328,24 +5410,39 @@ export default function InventoryManagement() {
       setStockMovementsLoading(true);
       setStockMovementsError(null);
 
-      const response = await apiClient.getVaccineInventoryTransactions(null, {
-        clinic_id: fallbackClinicId,
-        limit: 250,
-      });
+      const response = canUseSummaryEndpoint
+        ? await apiClient.getInventoryStockMovements({
+          clinic_id: fallbackClinicId,
+          limit: 100000,
+        })
+        : await apiClient.getVaccineInventoryTransactions(null, {
+          clinic_id: fallbackClinicId,
+          limit: 100000,
+        });
 
       let movementRows = [];
+      let summarySource = null;
       if (response && response.success !== undefined) {
         if (Array.isArray(response.data)) {
           movementRows = response.data;
+        } else if (Array.isArray(response.data?.movements)) {
+          movementRows = response.data.movements;
         } else if (Array.isArray(response.transactions)) {
           movementRows = response.transactions;
         } else if (Array.isArray(response.data?.transactions)) {
           movementRows = response.data.transactions;
         }
+        summarySource =
+          response.data?.summary ??
+          response.summary ??
+          response.data?.data?.summary ??
+          null;
       } else if (Array.isArray(response)) {
         movementRows = response;
       } else if (Array.isArray(response?.transactions)) {
         movementRows = response.transactions;
+      } else if (Array.isArray(response?.movements)) {
+        movementRows = response.movements;
       }
 
       const normalizedMovements = movementRows
@@ -5380,11 +5477,15 @@ export default function InventoryManagement() {
 
           return movement;
         });
+      setStockMovementSummaryData(
+        normalizeInventoryMovementSummary(summarySource),
+      );
       setStockMovements(normalizedMovements);
       return normalizedMovements;
     } catch (movementErr) {
       console.error("Stock movement history load failed:", movementErr);
       setStockMovements([]);
+      setStockMovementSummaryData(null);
       setStockMovementsError(
         movementErr?.message || "Failed to load stock movement history.",
       );
@@ -6429,6 +6530,10 @@ export default function InventoryManagement() {
       }
 
       closeTransactionModal();
+      await Promise.all([
+        loadStockMovements(),
+        fetchPersistedStockAlerts(),
+      ]);
 
       // Broadcast event so other charts and dashboards update their inventory figures instantly
       window.dispatchEvent(new CustomEvent("inventory-update"));
@@ -6537,8 +6642,8 @@ export default function InventoryManagement() {
 
   const stockAlerts = getStockAlerts();
   const stockMovementSummary = useMemo(
-    () => summarizeStockMovements(stockMovements),
-    [stockMovements],
+    () => stockMovementSummaryData || summarizeStockMovements(stockMovements),
+    [stockMovementSummaryData, stockMovements],
   );
   const pendingPersistedStockAlerts = useMemo(
     () =>
@@ -6974,7 +7079,7 @@ export default function InventoryManagement() {
           title: PRINT_REPORT_COPY.inventorySheetTitle,
           headerText: "",
           footerText: "",
-          page: getInventoryReportWordPagePreset(reportType),
+          page: INVENTORY_SHEET_WORD_PAGE_CONFIG,
         });
         return;
       }
@@ -7859,7 +7964,7 @@ export default function InventoryManagement() {
                     Wasted / Expired
                   </p>
                   <p className="text-xl font-bold text-orange-600 dark:text-orange-400">
-                    {stockMovementSummary.wasted.toLocaleString()}
+                    {totals.expired_wasted.toLocaleString()}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     High items: {stockAlerts.wasted.length}
@@ -8093,6 +8198,7 @@ export default function InventoryManagement() {
         >
           <StockMovementsPanel
             movements={displayedStockMovements}
+            summaryOverride={hasActiveStockMovementFilters ? null : stockMovementSummary}
             loading={stockMovementsLoading}
             error={stockMovementsError}
             onRetry={loadStockMovements}
@@ -8663,13 +8769,18 @@ export default function InventoryManagement() {
           body.printing-inventory #inventory-print-root {
             display: block !important;
             width: 100% !important;
-            margin: 0 !important;
+            margin: 0 auto !important;
             padding: 0.16in !important;
             background: #ffffff !important;
+            box-sizing: border-box !important;
           }
 
           body.printing-inventory.printing-report-inventory-sheet #inventory-print-root {
-            padding: 0.1in 0.12in 0.12in !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            padding: 0.08in 0.12in 0.1in !important;
           }
 
           body.printing-inventory.printing-report-doh-lgu-stock-form #inventory-print-root {
@@ -8693,10 +8804,39 @@ export default function InventoryManagement() {
             box-sizing: border-box !important;
           }
 
+          body.printing-inventory.printing-report-inventory-sheet .inventory-sheet-summary-print-report {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+          }
+
           .inventory-sheet-summary-print-report__page,
           .doh-lgu-stock-print-report__page,
           .ris-word-report {
     width: 100%;
+  }
+
+  .inventory-sheet-summary-print-report__page {
+    max-width: ${INVENTORY_SHEET_FRAME_MAX_WIDTH};
+    margin: 0 auto;
+    padding: 0.03in 0;
+    display: flex;
+    justify-content: center;
+  }
+
+  .inventory-sheet-summary-print-report__surface {
+    width: 100%;
+    max-width: ${INVENTORY_SHEET_SURFACE_MAX_WIDTH};
+    margin: 0 auto;
+    padding: 0.18in 0.22in 0.16in;
+    border: 1.45px solid #111827;
+    background: #ffffff;
+    box-sizing: border-box;
+  }
+
+  .inventory-sheet-summary-print-report__table-wrap {
+    width: 100%;
+    margin: 0.12in auto 0;
   }
 
   .ris-word-report__page {
@@ -8806,13 +8946,13 @@ export default function InventoryManagement() {
           }
 
           .inventory-sheet-summary-print-report__page {
-            width: min(calc(100% - 0.08in), var(--inventory-print-page-width)) !important;
-            max-width: var(--inventory-print-page-width) !important;
+            width: 100% !important;
+            max-width: ${INVENTORY_SHEET_FRAME_MAX_WIDTH} !important;
             min-height: calc(var(--inventory-print-page-height) - 0.05in) !important;
             margin: 0 auto 0.08in !important;
-            padding: 0.02in 0 0.04in !important;
+            padding: 0.03in 0 !important;
             display: flex !important;
-            flex-direction: column !important;
+            justify-content: center !important;
             page-break-after: always !important;
             break-after: page !important;
           }
@@ -8945,10 +9085,9 @@ export default function InventoryManagement() {
             gap: 0.04cm !important;
             text-align: center !important;
             width: 100% !important;
-            max-width: 10.95in !important;
-            margin: 0 auto 0.3in !important;
-            padding: 0 0 0.18in !important;
-            border-bottom: 1.2px solid #cbd5e1 !important;
+            margin: 0 auto 0.36in !important;
+            padding: 0 0 0.22in !important;
+            border-bottom: 1.35px solid #cbd5e1 !important;
             color: #0f172a !important;
           }
 
@@ -9012,13 +9151,12 @@ export default function InventoryManagement() {
 
           .inventory-sheet-summary-print-header__detail-row {
             display: grid !important;
-            grid-template-columns: auto minmax(0, 1fr) auto !important;
+            grid-template-columns: minmax(1.7in, auto) minmax(0, 1fr) minmax(2.6in, auto) !important;
             width: 100% !important;
-            max-width: 10.95in !important;
             align-items: end !important;
-            gap: 0.22in !important;
-            margin: 0.12in auto 0 !important;
-            padding-top: 0.12in !important;
+            gap: 0.26in !important;
+            margin: 0.16in auto 0 !important;
+            padding-top: 0.14in !important;
             border-top: 1px solid #e2e8f0 !important;
           }
 
@@ -9047,7 +9185,6 @@ export default function InventoryManagement() {
 
           .inventory-sheet-summary-print-table {
             width: 100% !important;
-            max-width: 10.95in !important;
             margin: 0 auto !important;
             table-layout: fixed !important;
             border-collapse: collapse !important;
@@ -9168,9 +9305,9 @@ export default function InventoryManagement() {
 
           .inventory-sheet-summary-print-header__branding {
             display: grid !important;
-            grid-template-columns: 1.02in minmax(0, 1fr) 1.02in !important;
+            grid-template-columns: 1.16in minmax(0, 1fr) 1.16in !important;
             align-items: center !important;
-            gap: 0.26in !important;
+            gap: 0.32in !important;
           }
 
           .inventory-sheet-summary-print-header__branding-copy {
@@ -9184,8 +9321,8 @@ export default function InventoryManagement() {
           }
 
           .inventory-sheet-summary-print-header__logo {
-            width: 0.96in !important;
-            height: 0.96in !important;
+            width: 1in !important;
+            height: 1in !important;
             object-fit: contain !important;
             background: transparent !important;
           }
@@ -9221,9 +9358,8 @@ export default function InventoryManagement() {
 
           .inventory-sheet-summary-print-footer {
             width: 100% !important;
-            max-width: 10.95in !important;
-            margin: auto auto 0 !important;
-            padding-top: 0.12in !important;
+            margin: 0.2in auto 0 !important;
+            padding-top: 0.14in !important;
             border-top: 1px solid #d7deea !important;
             text-align: center !important;
             font-size: 8.2px !important;

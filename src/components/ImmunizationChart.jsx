@@ -327,6 +327,12 @@ const buildPrintDocumentStyles = (paperSize = DEFAULT_PRINT_PAPER_SIZE) => {
       mix-blend-mode: multiply;
     }
 
+    .immunization-chart-print__logo--shield {
+      border-radius: 0;
+      clip-path: none;
+      object-fit: contain;
+    }
+
     .immunization-chart-print__title-wrap {
       text-align: center;
       padding-top: 1.5mm;
@@ -696,6 +702,12 @@ const PRINTABLE_STYLES = `
     border: none;
     box-shadow: none;
     mix-blend-mode: multiply;
+  }
+
+  .immunization-chart__logo--shield {
+    border-radius: 0;
+    clip-path: none;
+    object-fit: contain;
   }
 
   .immunization-chart__title-wrap {
@@ -2307,7 +2319,7 @@ export default function ImmunizationChart({ infantId }) {
           hasDisplayValue(remarks),
       };
     });
-  }, [infant?.dob, printableAppointments, printableGrowthRecords, printableVaccinations]);
+  }, [growthRecords, infant?.dob, printableAppointments, printableGrowthRecords, printableVaccinations]);
 
   const leftColumnVisits = useMemo(
     () => visitSummaries.filter((summary) => summary.template.column === "left"),
@@ -2556,7 +2568,6 @@ export default function ImmunizationChart({ infantId }) {
         filename: `Immunization_Chart_${sanitizeFileSegment(fullName || infantId || "child")}.pdf`,
         title: "Immunization Chart",
         headerText: "Immunization Chart",
-        footerText: printDateRange.activeDateRangeLabel,
         page: getPrintPagePreset(printPaperSize),
         scale: 0.72,
       });
@@ -2584,7 +2595,6 @@ export default function ImmunizationChart({ infantId }) {
         filename: `Immunization_Chart_${sanitizeFileSegment(fullName || infantId || "child")}.docx`,
         title: "Immunization Chart",
         headerText: "Immunization Chart",
-        footerText: printDateRange.activeDateRangeLabel,
         page: getPrintPagePreset(printPaperSize),
       });
     } catch (downloadError) {
@@ -2778,9 +2788,9 @@ export default function ImmunizationChart({ infantId }) {
                   leftIcon={<FileText className="w-4 h-4" />}
                   onClick={handleDownloadWord}
                   data-print-action="immunization-chart-download-word"
-                >
-                  Download Word
-                </Button>
+                  aria-label="Download Word"
+                  title="Download Word"
+                />
               </div>
             </div>
 
@@ -2818,15 +2828,12 @@ export default function ImmunizationChart({ infantId }) {
                   <img
                     src={leftLogoSrc}
                     alt="Barangay San Nicolas logo"
-                    className="immunization-chart__logo"
+                    className="immunization-chart__logo immunization-chart__logo--shield"
                   />
                 </div>
 
                 <div className="immunization-chart__title-wrap">
                   <div className="immunization-chart__title">IMMUNIZATION CHART</div>
-                  <div className="immunization-chart__title-meta">
-                    {printDateRange.activeDateRangeLabel}
-                  </div>
                 </div>
 
                 <div className="immunization-chart__logo-wrap">
@@ -3039,15 +3046,12 @@ export default function ImmunizationChart({ infantId }) {
               <img
                 src={leftLogoSrc}
                 alt="Barangay San Nicolas logo"
-                className="immunization-chart-print__logo"
+                className="immunization-chart-print__logo immunization-chart-print__logo--shield"
               />
             </div>
 
             <div className="immunization-chart-print__title-wrap">
               <div className="immunization-chart-print__title">IMMUNIZATION CHART</div>
-              <div className="immunization-chart-print__title-meta">
-                {printDateRange.activeDateRangeLabel}
-              </div>
             </div>
 
             <div className="immunization-chart-print__logo-wrap">

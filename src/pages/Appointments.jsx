@@ -13,6 +13,7 @@ import {
   Input,
   Select,
 } from "../components/UI";
+import SearchableInfantSelect from "../components/SearchableInfantSelect";
 import { useAppointments, useInfants } from "../hooks/useDashboard";
 import apiClient from "../utils/api";
 import { isPhilippineHoliday } from "../utils/holidays";
@@ -180,6 +181,26 @@ const normalizeAppointmentCollection = (records) =>
         .filter(Boolean)
     : [];
 
+const formatAppointmentStatusLabel = (value) => {
+  const normalized = String(value || "")
+    .trim()
+    .replace(/[_-]+/g, " ")
+    .toLowerCase();
+
+  if (!normalized) {
+    return "Pending";
+  }
+
+  if (normalized === "completed") {
+    return "Attended";
+  }
+
+  return normalized.replace(/\b\w/g, (letter) => letter.toUpperCase());
+};
+
+const getAppointmentDisplayStatus = (appointment) =>
+  formatAppointmentStatusLabel(appointment?.raw_status || appointment?.status);
+
 const getAppointmentStatusVariant = (status) => {
   switch (normalizeAppointmentStatus(status)) {
     case "scheduled":
@@ -234,6 +255,7 @@ export default function Appointments() {
   const [rowAction, setRowAction] = useState({ id: null, action: null });
   const [statusFilter, setStatusFilter] = useState('all');
   const latestMonthKeyRef = useRef("");
+  const bookingInfantFallbackAttemptedRef = useRef(false);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -281,16 +303,91 @@ export default function Appointments() {
     enabled: view === "list",
     params: listQueryParams,
   });
-  const { infants } = useInfants({
+  const {
+    infants: dashboardInfants,
+    loading: infantsLoading,
+    error: infantsError,
+  } = useInfants({
     fetchAll: true,
     limit: 500,
     page: 1,
   });
+  const [fallbackInfants, setFallbackInfants] = useState([]);
+  const [fallbackInfantsLoading, setFallbackInfantsLoading] = useState(false);
+  const [fallbackInfantsError, setFallbackInfantsError] = useState(null);
+
+  const infants = useMemo(() => {
+    const infantMap = new Map();
+
+    [...dashboardInfants, ...fallbackInfants].forEach((infant) => {
+      const infantId = Number.parseInt(infant?.id, 10);
+      if (!Number.isFinite(infantId) || infantMap.has(infantId)) {
+        return;
+      }
+      infantMap.set(infantId, infant);
+    });
+
+    return Array.from(infantMap.values());
+  }, [dashboardInfants, fallbackInfants]);
+
+  const infantPickerLoading = infantsLoading || fallbackInfantsLoading;
+  const infantPickerError = fallbackInfantsError || infantsError;
+  const infantPickerEmptyMessage = infantPickerError
+    ? "Unable to load infants right now. Please refresh and try again."
+    : "No infants available";
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 350);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  useEffect(() => {
+    if (!showBookingModal) {
+      bookingInfantFallbackAttemptedRef.current = false;
+      return;
+    }
+
+    if (dashboardInfants.length > 0 || fallbackInfants.length > 0 || infantsLoading) {
+      return;
+    }
+
+    if (bookingInfantFallbackAttemptedRef.current || fallbackInfantsLoading) {
+      return;
+    }
+
+    bookingInfantFallbackAttemptedRef.current = true;
+    setFallbackInfantsLoading(true);
+    setFallbackInfantsError(null);
+
+    apiClient
+      .getInfants({
+        limit: 10000,
+        page: 1,
+      })
+      .then((response) => {
+        const responseInfants = Array.isArray(response?.data)
+          ? response.data
+          : Array.isArray(response)
+            ? response
+            : [];
+        setFallbackInfants(responseInfants);
+      })
+      .catch((loadError) => {
+        console.error("Failed to load appointment infants from direct infant records:", loadError);
+        setFallbackInfantsError(
+          loadError?.message || "Failed to load infants.",
+        );
+      })
+      .finally(() => {
+        setFallbackInfantsLoading(false);
+      });
+  }, [
+    dashboardInfants.length,
+    fallbackInfants.length,
+    fallbackInfantsLoading,
+    infantsLoading,
+    showBookingModal,
+  ]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -633,13 +730,13 @@ export default function Appointments() {
     {
       key: "status",
       label: "Status",
-      render: (val) => {
+      render: (val, row) => {
         return (
           <Badge
             variant={getAppointmentStatusVariant(val)}
             className="capitalize"
           >
-            {val}
+            {getAppointmentDisplayStatus(row)}
           </Badge>
         );
       },
@@ -1437,7 +1534,7 @@ export default function Appointments() {
                         <Badge
                           variant={getAppointmentStatusVariant(apt.status)}
                         >
-                          {apt.status}
+                          {getAppointmentDisplayStatus(apt)}
                         </Badge>
                       </div>
                     ))}
@@ -1475,8 +1572,11 @@ export default function Appointments() {
                 >
                   <option value="all">All Status</option>
                   <option value="scheduled">Scheduled</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="rescheduled">Rescheduled</option>
                   <option value="pending">Pending</option>
                   <option value="attended">Attended</option>
+                  <option value="no_show">No Show</option>
                   <option value="cancelled">Cancelled</option>
                 </select>
               </div>
@@ -1803,7 +1903,7 @@ export default function Appointments() {
                       variant={getAppointmentStatusVariant(appointment.status)}
                       className="text-[11px]"
                     >
-                      {appointment.status}
+                      {getAppointmentDisplayStatus(appointment)}
                     </Badge>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
@@ -1902,30 +2002,26 @@ export default function Appointments() {
             )}
 
           {/* Patient Selection */}
-          <div className="admin-field-group">
-            <label className="admin-field-label required">Select Infant</label>
-              <Select
-                value={createFormData.infant_id}
-                onChange={(e) => {
-                  setCreateFormData({
-                    ...createFormData,
-                    infant_id: e.target.value,
-                  });
-                  setFormErrors((prev) => ({ ...prev, infant_id: undefined }));
-                }}
-                error={formErrors.infant_id}
-                disabled={isSubmitting}
-                aria-required="true"
-                aria-invalid={formErrors.infant_id ? "true" : "false"}
-              >
-              <option value="">Choose an infant...</option>
-              {infants.map((infant) => (
-                <option key={infant.id} value={infant.id}>
-                  {infant.first_name} {infant.last_name} {infant.control_number ? `(${infant.control_number})` : ""}
-                </option>
-              ))}
-            </Select>
-          </div>
+          <SearchableInfantSelect
+            id="appointment-infant-select"
+            infants={infants}
+            value={createFormData.infant_id}
+            onChange={(e) => {
+              const infantId = e.target.value;
+              setCreateFormData((prev) => ({
+                ...prev,
+                infant_id: infantId,
+              }));
+              setFormErrors((prev) => ({ ...prev, infant_id: undefined }));
+            }}
+            label="Select Infant"
+            required
+            placeholder="Search by name, control number, or date of birth..."
+            disabled={isSubmitting}
+            error={formErrors.infant_id}
+            loading={infantPickerLoading}
+            emptyMessage={infantPickerEmptyMessage}
+          />
 
           {/* Auto-resolved Control Number */}
           <div className="admin-field-group">
@@ -2139,7 +2235,7 @@ export default function Appointments() {
                   )}
                   className="capitalize mt-1"
                 >
-                  {selectedAppointment.status || "Pending"}
+                  {getAppointmentDisplayStatus(selectedAppointment)}
                 </Badge>
               </div>
             </div>

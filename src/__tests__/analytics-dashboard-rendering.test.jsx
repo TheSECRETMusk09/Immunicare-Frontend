@@ -270,6 +270,24 @@ describe("Analytics dashboard rendering and filter stability", () => {
     expect(screen.queryByText(/no timeline points available/i)).not.toBeInTheDocument();
   });
 
+  test("does not force system scope into the default admin analytics dashboard request", async () => {
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalled();
+    });
+
+    const firstCallParams = apiClient.getAnalyticsDashboard.mock.calls[0][0];
+    expect(firstCallParams).toEqual(
+      expect.objectContaining({
+        period: "month",
+        vaccineType: "ALL",
+        vaccinationStatus: "all",
+      }),
+    );
+    expect(firstCallParams).not.toHaveProperty("scope");
+  });
+
   test("shows explicit zero-data demographics state when backend has no records", async () => {
     apiClient.getAnalyticsDashboard.mockResolvedValueOnce({
       success: true,
@@ -577,5 +595,70 @@ describe("Analytics dashboard rendering and filter stability", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  test("prefers live appointment and inventory sections over fallback validated metrics when summary fields are absent", async () => {
+    apiClient.getAnalyticsDashboard.mockResolvedValueOnce({
+      success: true,
+      data: buildDashboardPayload({
+        summary: {
+          totalRegisteredInfants: 22,
+          totalGuardians: 18,
+          vaccinationsCompletedToday: 4,
+          infantsDueForVaccination: 6,
+          overdueVaccinations: 2,
+        },
+        appointmentFollowup: {
+          totalInPeriod: 11,
+          today: 2,
+          attended: 5,
+          pending: 4,
+          cancelled: 1,
+          upcoming7Days: 3,
+          overdueFollowUps: 1,
+          followUpsToday: 1,
+          followUpsInPeriod: 3,
+          statusBreakdown: [
+            { status: "scheduled", count: 4 },
+            { status: "attended", count: 5 },
+          ],
+        },
+        inventory: {
+          totalItems: 7,
+          totalAvailableDoses: 120,
+          lowStockCount: 2,
+          criticalStockCount: 1,
+          outOfStockCount: 0,
+          byVaccine: [
+            {
+              vaccineKey: "BCG",
+              vaccineName: "BCG",
+              availableDoses: 120,
+              lowStock: false,
+              criticalStock: false,
+            },
+          ],
+        },
+        validatedMetrics: {
+          pendingAppointments: 97748,
+          availableDoses: 2870590,
+          lowStockVaccines: 227,
+        },
+      }),
+    });
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(screen.queryAllByText("4").length).toBeGreaterThan(0);
+    });
+
+    expect(screen.queryByText("97,748")).not.toBeInTheDocument();
+    expect(screen.queryByText("2,870,590")).not.toBeInTheDocument();
+    expect(screen.queryAllByText("120").length).toBeGreaterThan(0);
   });
 });

@@ -355,7 +355,7 @@ export default function VaccineScheduleBooklet({ infantId }) {
       console.error("Error generating vaccine schedule PDF:", downloadError);
       setError(downloadError.message || "Failed to generate vaccine schedule PDF.");
     }
-  }, [formatDate, infantId, printDateRange, printableSchedules, scheduleData]);
+  }, [infantId, printDateRange, printableSchedules, scheduleData]);
 
   const handleDownloadWord = useCallback(() => {
     if (!printDateRange.ensureReadyForPrint()) {

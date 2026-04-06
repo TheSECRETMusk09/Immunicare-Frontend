@@ -134,16 +134,6 @@ export function ThemeProvider({ children }) {
  * Creates a subtle flash effect during theme change
  */
 function ThemeTransitionOverlay({ isTransitioning, darkMode }) {
-  const [flash, setFlash] = useState(false);
-
-  useEffect(() => {
-    if (isTransitioning) {
-      setFlash(true);
-      const timer = setTimeout(() => setFlash(false), 200);
-      return () => clearTimeout(timer);
-    }
-  }, [isTransitioning, darkMode]);
-
   if (!isTransitioning) return null;
 
   return (

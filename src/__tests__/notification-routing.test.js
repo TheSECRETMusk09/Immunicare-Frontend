@@ -1,4 +1,5 @@
 import {
+  isGuardianVisibleNotification,
   resolveNotificationActionUrl,
   resolveNotificationCategory,
 } from "../utils/notificationRouting";
@@ -67,7 +68,7 @@ describe("notification routing", () => {
     };
 
     expect(resolveNotificationCategory(notification, { isGuardian: true })).toBe(
-      "infant_registration",
+      "vaccination_update",
     );
     expect(
       resolveNotificationActionUrl(notification, { isGuardian: true }),
@@ -87,7 +88,7 @@ describe("notification routing", () => {
     };
 
     expect(resolveNotificationCategory(notification, { isGuardian: true })).toBe(
-      "vaccination_schedule",
+      "reminder",
     );
     expect(
       resolveNotificationActionUrl(notification, { isGuardian: true }),
@@ -122,6 +123,33 @@ describe("notification routing", () => {
     expect(
       resolveNotificationActionUrl(notification, { isGuardian: true }),
     ).toBe("/guardian/messages");
+  });
+
+  test("hides guardian-inappropriate internal inventory notifications from the guardian view", () => {
+    const notification = {
+      notification_type: "low_stock_alert",
+      title: "Low stock warning",
+      message: "MMR doses are running low.",
+    };
+
+    expect(isGuardianVisibleNotification(notification)).toBe(false);
+  });
+
+  test("keeps guardian-targeted announcements visible to guardians", () => {
+    const notification = {
+      notification_type: "system_announcement",
+      target_role: "guardian",
+      title: "Clinic advisory",
+      message: "The clinic will open later tomorrow due to maintenance.",
+    };
+
+    expect(isGuardianVisibleNotification(notification)).toBe(true);
+    expect(resolveNotificationCategory(notification, { isGuardian: true })).toBe(
+      "general",
+    );
+    expect(
+      resolveNotificationActionUrl(notification, { isGuardian: true }),
+    ).toBe("/guardian/notifications");
   });
 
   test("maps failed outbound notifications to the failed delivery filter", () => {

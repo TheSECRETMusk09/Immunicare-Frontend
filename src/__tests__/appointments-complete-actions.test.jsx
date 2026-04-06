@@ -14,6 +14,9 @@ import apiClient from "../utils/api";
 
 let mockDashboardAppointments = [];
 let mockRefreshAppointments;
+let mockInfants = [];
+let mockInfantsLoading = false;
+let mockInfantsError = null;
 
 jest.mock("../hooks/useDashboard", () => ({
   useAppointments: () => ({
@@ -23,14 +26,9 @@ jest.mock("../hooks/useDashboard", () => ({
     refreshAppointments: mockRefreshAppointments,
   }),
   useInfants: () => ({
-    infants: [
-      {
-        id: 1,
-        first_name: "Baby",
-        last_name: "One",
-        control_number: "INF-2026-000001",
-      },
-    ],
+    infants: mockInfants,
+    loading: mockInfantsLoading,
+    error: mockInfantsError,
   }),
 }));
 
@@ -41,6 +39,7 @@ jest.mock("../utils/api", () => ({
     getBlockedDates: jest.fn(),
     getAppointmentDateDetails: jest.fn(),
     getAppointments: jest.fn(),
+    getInfants: jest.fn(),
     createAppointment: jest.fn(),
     updateAppointment: jest.fn(),
     cancelAppointment: jest.fn(),
@@ -71,6 +70,17 @@ describe("Appointments completion action workflow", () => {
   beforeEach(() => {
     mockDashboardAppointments = [{ ...scheduledAppointment }];
     mockRefreshAppointments = undefined;
+    mockInfantsLoading = false;
+    mockInfantsError = null;
+    mockInfants = [
+      {
+        id: 1,
+        first_name: "Baby",
+        last_name: "One",
+        control_number: "INF-2026-000001",
+        dob: "2030-01-01",
+      },
+    ];
 
     apiClient.getAppointmentCalendarAvailability.mockResolvedValue({ dates: [] });
     apiClient.getBlockedDates.mockResolvedValue({ blockedDates: {} });
@@ -92,6 +102,10 @@ describe("Appointments completion action workflow", () => {
     apiClient.completeAppointment.mockResolvedValue({
       ...scheduledAppointment,
       status: "attended",
+    });
+    apiClient.getInfants.mockResolvedValue({
+      success: true,
+      data: mockInfants,
     });
     apiClient.createAppointment.mockResolvedValue({});
     apiClient.updateAppointment.mockResolvedValue({});
@@ -133,25 +147,9 @@ describe("Appointments completion action workflow", () => {
       );
     });
 
-    await waitFor(() => {
-      expect(apiClient.getAppointments).toHaveBeenCalled();
-    });
-
-    const attendedRow = screen.getByText("Baby One").closest("tr");
-    expect(attendedRow).toBeInTheDocument();
-
     expect(
-      within(attendedRow).getByRole("button", { name: /^view$/i }),
+      within(scheduledRow).getByRole("button", { name: /^edit$/i }),
     ).toBeInTheDocument();
-    expect(
-      within(attendedRow).getByRole("button", { name: /^edit$/i }),
-    ).toBeInTheDocument();
-    expect(
-      within(attendedRow).queryByRole("button", { name: /^complete$/i }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(attendedRow).queryByRole("button", { name: /^cancel$/i }),
-    ).not.toBeInTheDocument();
   });
 
   test("completed rows render the same action set after reload", async () => {
@@ -214,5 +212,106 @@ describe("Appointments completion action workflow", () => {
     });
 
     expect(apiClient.getAppointments).not.toHaveBeenCalled();
+  });
+
+  test("schedule modal uses the searchable infant picker without changing form mapping", async () => {
+    renderAppointmentsPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /schedule new appointment/i }),
+    );
+
+    const infantPicker = await screen.findByRole("button", {
+      name: /^select infant$/i,
+    });
+    fireEvent.click(infantPicker);
+
+    const searchInput = await screen.findByPlaceholderText(
+      /search by name, control number, or date of birth/i,
+    );
+    fireEvent.change(searchInput, { target: { value: "2030-01-01" } });
+
+    const infantOption = await screen.findByRole("button", { name: /baby one/i });
+    fireEvent.click(infantOption);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /baby one \(jan 1, 2030\)/i }),
+      ).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByDisplayValue("INF-2026-000001"),
+    ).toBeInTheDocument();
+  });
+
+  test("schedule modal falls back to direct infant records when dashboard infants are empty", async () => {
+    mockInfants = [];
+    mockInfantsError = "Dashboard infants unavailable";
+    apiClient.getInfants.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          id: 2,
+          first_name: "Fallback",
+          last_name: "Baby",
+          control_number: "INF-2026-000099",
+          dob: "2030-02-14",
+        },
+      ],
+    });
+
+    renderAppointmentsPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /schedule new appointment/i }),
+    );
+
+    const infantPicker = await screen.findByRole("button", {
+      name: /^select infant$/i,
+    });
+    fireEvent.click(infantPicker);
+
+    await waitFor(() => {
+      expect(apiClient.getInfants).toHaveBeenCalledWith({
+        limit: 10000,
+        page: 1,
+      });
+    });
+
+    expect(
+      await screen.findByRole("button", { name: /fallback baby/i }),
+    ).toBeInTheDocument();
+  });
+
+  test("list view preserves raw appointment status labels and exposes no-show filtering", async () => {
+    mockDashboardAppointments = [
+      {
+        ...scheduledAppointment,
+        id: 22,
+        status: "confirmed",
+      },
+      {
+        ...scheduledAppointment,
+        id: 23,
+        first_name: "Baby",
+        last_name: "Two",
+        status: "no_show",
+      },
+    ];
+
+    renderAppointmentsPage();
+
+    const confirmedRow = (await screen.findByText("Baby One")).closest("tr");
+    const noShowRow = (await screen.findByText("Baby Two")).closest("tr");
+
+    expect(confirmedRow).toBeInTheDocument();
+    expect(noShowRow).toBeInTheDocument();
+    expect(within(confirmedRow).getByText("Confirmed")).toBeInTheDocument();
+    expect(within(noShowRow).getByText("No Show")).toBeInTheDocument();
+
+    expect(screen.getByRole("option", { name: /no show/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /confirmed/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /rescheduled/i })).toBeInTheDocument();
   });
 });

@@ -2,6 +2,15 @@ import React, { useState, useEffect } from "react";
 import { Bell, Mail, MessageSquare, Calendar, Syringe, Heart, Info } from "lucide-react";
 import { Modal, Button } from "../../UI";
 
+const DEFAULT_NOTIFICATION_SETTINGS = {
+  email_notifications: true,
+  sms_notifications: false,
+  appointment_reminders: true,
+  vaccination_alerts: true,
+  health_updates: false,
+  system_announcements: true,
+};
+
 /**
  * NotificationSettingsModal Component
  * Modal for managing notification preferences
@@ -20,22 +29,13 @@ const NotificationSettingsModal = ({
   initialSettings = {},
   loading = false,
 }) => {
-  const defaultSettings = {
-    email_notifications: true,
-    sms_notifications: false,
-    appointment_reminders: true,
-    vaccination_alerts: true,
-    health_updates: false,
-    system_announcements: true,
-  };
-
-  const [settings, setSettings] = useState(defaultSettings);
+  const [settings, setSettings] = useState(DEFAULT_NOTIFICATION_SETTINGS);
 
   useEffect(() => {
     if (isOpen) {
-      setSettings({ ...defaultSettings, ...initialSettings });
+      setSettings({ ...DEFAULT_NOTIFICATION_SETTINGS, ...initialSettings });
     }
-  }, [isOpen, initialSettings]);
+  }, [initialSettings, isOpen]);
 
   const handleToggle = (key) => {
     setSettings((prev) => ({

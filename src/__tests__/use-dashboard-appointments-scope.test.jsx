@@ -34,6 +34,27 @@ function AppointmentScopeProbe() {
   return <div>{appointments.length}</div>;
 }
 
+function FilteredAppointmentScopeProbe() {
+  const { appointments, loading } = useAppointments({
+    fetchAll: false,
+    params: {
+      page: 1,
+      limit: 20,
+      status: "no_show",
+      start_date: "2026-04-01",
+      end_date: "2026-04-30",
+      sort_field: "scheduled_date",
+      sort_direction: "asc",
+    },
+  });
+
+  if (loading) {
+    return <div>Loading filtered</div>;
+  }
+
+  return <div>{appointments.length}</div>;
+}
+
 describe("useAppointments admin scope loading", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -71,6 +92,38 @@ describe("useAppointments admin scope loading", () => {
       facility_id: 203,
       page: 2,
       limit: 200,
+    });
+  });
+
+  test("preserves facility scope while forwarding status and date filters for paged appointment loads", async () => {
+    apiClient.getAppointments.mockResolvedValueOnce({
+      data: [{ id: 3, status: "no_show" }],
+      metadata: {
+        page: 1,
+        limit: 20,
+        total: 1,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      },
+    });
+
+    render(<FilteredAppointmentScopeProbe />);
+
+    await waitFor(() => {
+      expect(screen.getByText("1")).toBeInTheDocument();
+    });
+
+    expect(apiClient.getAppointments).toHaveBeenCalledWith({
+      clinic_id: 1,
+      facility_id: 203,
+      page: 1,
+      limit: 20,
+      status: "no_show",
+      start_date: "2026-04-01",
+      end_date: "2026-04-30",
+      sort_field: "scheduled_date",
+      sort_direction: "asc",
     });
   });
 });

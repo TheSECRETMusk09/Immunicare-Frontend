@@ -1,7 +1,6 @@
-import React, { useState, useEffect, memo, useCallback, useRef } from "react";
+import React, { useState, useEffect, memo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { usePrefetchDashboard } from "../hooks/useCachedData";
 import { adminRoutePaths } from "../utils/routePaths";
 import {
   BarChart3,
@@ -22,9 +21,6 @@ import {
   Moon,
   User,
 } from "lucide-react";
-
-const PREFETCH_COOLDOWN_MS = 2 * 60 * 1000;
-
 const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
   const [expandedSections, setExpandedSections] = useState({
     healthAlerts: false,
@@ -35,30 +31,6 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout, user } = useAuth();
-  const { prefetchDashboardData } = usePrefetchDashboard();
-  const lastPrefetchAtRef = useRef(0);
-
-  // Prefetch data on hover with debouncing
-  const handleMouseEnter = useCallback(() => {
-    const now = Date.now();
-    if (now - lastPrefetchAtRef.current < PREFETCH_COOLDOWN_MS) {
-      return;
-    }
-
-    lastPrefetchAtRef.current = now;
-
-    // Use requestIdleCallback for non-blocking prefetch
-    if ("requestIdleCallback" in window) {
-      window.requestIdleCallback(
-        () => {
-          prefetchDashboardData();
-        },
-        { timeout: 2000 },
-      );
-    } else {
-      setTimeout(prefetchDashboardData, 100);
-    }
-  }, [prefetchDashboardData]);
 
   // Handle dark mode toggle - use the onToggleDarkMode prop if provided
   const handleToggleDarkMode = () => {
@@ -235,10 +207,7 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
         </div>
 
         {/* Navigation */}
-        <nav
-          className="flex-1 px-4 py-6 space-y-2 overflow-y-auto modern-scrollbar"
-          onMouseEnter={handleMouseEnter}
-        >
+        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto modern-scrollbar">
           {/* Live Date & Time Display */}
           <div
             className="admin-sidebar-datetime mb-4"

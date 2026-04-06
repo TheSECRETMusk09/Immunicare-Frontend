@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Button,
@@ -75,11 +75,31 @@ const formatDownloadDate = (value) => {
     : parsedDate.toLocaleString();
 };
 
+const mergeInfantOptions = (...collections) => {
+  const merged = [];
+  const seenIds = new Set();
+
+  collections.flat().forEach((infant) => {
+    const infantId = Number(infant?.id);
+    if (!infantId || seenIds.has(infantId)) {
+      return;
+    }
+
+    seenIds.add(infantId);
+    merged.push(infant);
+  });
+
+  return merged;
+};
+
 export default function DownloadCenter({ onRefresh }) {
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const [downloads, setDownloads] = useState([]);
   const [infants, setInfants] = useState([]);
+  const [generateInfantOptions, setGenerateInfantOptions] = useState([]);
+  const [generateInfantSearchQuery, setGenerateInfantSearchQuery] = useState("");
+  const [generateInfantLoading, setGenerateInfantLoading] = useState(false);
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -94,6 +114,14 @@ export default function DownloadCenter({ onRefresh }) {
     download_type: "PDF",
     download_reason: "USER_REQUEST",
   });
+
+  const selectedGenerateInfant = useMemo(
+    () =>
+      mergeInfantOptions(generateInfantOptions, infants).find(
+        (infant) => infant.id === Number(generateForm.infant_id),
+      ) || null,
+    [generateForm.infant_id, generateInfantOptions, infants],
+  );
 
   const fetchData = useCallback(async () => {
     try {
@@ -122,6 +150,75 @@ export default function DownloadCenter({ onRefresh }) {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    if (!showGenerateModal) {
+      setGenerateInfantSearchQuery("");
+      setGenerateInfantOptions([]);
+      setGenerateInfantLoading(false);
+      return undefined;
+    }
+
+    const selectedOption = selectedGenerateInfant ? [selectedGenerateInfant] : [];
+    const normalizedSearch = generateInfantSearchQuery.trim();
+
+    if (!normalizedSearch) {
+      setGenerateInfantOptions(
+        mergeInfantOptions(selectedOption, infants),
+      );
+      setGenerateInfantLoading(false);
+      return undefined;
+    }
+
+    let isCancelled = false;
+    setGenerateInfantLoading(true);
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const response = await apiClient.getInfants({
+          limit: 25,
+          search: normalizedSearch,
+          ...(isAdmin ? { scope: "system" } : {}),
+        });
+        const remoteInfants = normalizeInfantsResponse(response);
+
+        if (!isCancelled) {
+          setGenerateInfantOptions(
+            mergeInfantOptions(selectedOption, remoteInfants),
+          );
+        }
+      } catch (searchError) {
+        if (!isCancelled) {
+          console.error(
+            "[DownloadCenter] Failed to search infants for document generation:",
+            searchError,
+          );
+          setGenerateInfantOptions(selectedOption);
+        }
+      } finally {
+        if (!isCancelled) {
+          setGenerateInfantLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    generateInfantSearchQuery,
+    infants,
+    isAdmin,
+    selectedGenerateInfant,
+    showGenerateModal,
+  ]);
+
+  const closeGenerateModal = () => {
+    setShowGenerateModal(false);
+    setGenerateInfantSearchQuery("");
+    setGenerateInfantOptions([]);
+    setGenerateInfantLoading(false);
+  };
+
   const handleGenerateDocument = async (e) => {
     e.preventDefault();
     if (!generateForm.infant_id || !generateForm.template_id) {
@@ -131,7 +228,7 @@ export default function DownloadCenter({ onRefresh }) {
 
     try {
       await apiClient.generateDocument(generateForm.template_id, generateForm);
-      setShowGenerateModal(false);
+      closeGenerateModal();
       setGenerateForm({
         infant_id: "",
         template_id: "",
@@ -428,14 +525,14 @@ export default function DownloadCenter({ onRefresh }) {
       {/* Generate Document Modal */}
       <Modal
         isOpen={showGenerateModal}
-        onClose={() => setShowGenerateModal(false)}
+        onClose={closeGenerateModal}
         title="Generate Document"
         size="md"
         footer={
           <div className="flex justify-end gap-3">
             <Button
               variant="cancel"
-              onClick={() => setShowGenerateModal(false)}
+              onClick={closeGenerateModal}
             >
               Cancel
             </Button>
@@ -451,7 +548,7 @@ export default function DownloadCenter({ onRefresh }) {
           className="space-y-4"
         >
           <SearchableInfantSelect
-            infants={infants}
+            infants={generateInfantOptions}
             value={generateForm.infant_id}
             onChange={(e) =>
               setGenerateForm({ ...generateForm, infant_id: e.target.value })
@@ -459,6 +556,10 @@ export default function DownloadCenter({ onRefresh }) {
             label="Select Infant"
             required
             placeholder="Search by name, control number, or date of birth..."
+            loading={generateInfantLoading}
+            searchQuery={generateInfantSearchQuery}
+            onSearchQueryChange={setGenerateInfantSearchQuery}
+            selectedInfant={selectedGenerateInfant}
           />
 
           <div>

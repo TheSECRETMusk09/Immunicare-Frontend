@@ -56,7 +56,6 @@ import {
 import { format } from "date-fns";
 import { useLocation, useSearchParams } from "react-router-dom";
 import apiClient from "../utils/api";
-import { useAuth } from "../contexts/AuthContext";
 import { useSocket } from "../contexts/SocketContext";
 import { useTheme as useAppTheme } from "../contexts/ThemeContext";
 import { safeLocalStorage, safeSessionStorage } from "../utils/safeStorage";
@@ -1007,52 +1006,52 @@ const mapDashboardPayload = (payload) => {
   const summaryLowStock =
     summary.lowStockVaccines ??
     summary.lowStockCount ??
-    validatedMetrics.lowStockVaccines ??
     inventory.lowStockCount ??
-    inventory.lowStockVaccines;
+    inventory.lowStockVaccines ??
+    validatedMetrics.lowStockVaccines;
 
   const summaryAvailableDoses =
     summary.totalAvailableVaccineDoses ??
     summary.availableDoses ??
-    validatedMetrics.availableDoses ??
     inventory.totalAvailableDoses ??
-    inventory.availableDoses;
+    inventory.availableDoses ??
+    validatedMetrics.availableDoses;
 
   const summaryPendingAppointments =
     summary.pendingAppointments ??
     summary.pendingAppointmentCount ??
-    validatedMetrics.pendingAppointments ??
-    appointmentFollowup.pending;
+    appointmentFollowup.pending ??
+    validatedMetrics.pendingAppointments;
 
   const summaryVaccinationsToday =
     summary.vaccinationsCompletedToday ??
     summary.vaccinationsToday ??
-    validatedMetrics.vaccinationsToday ??
-    summary.completedToday;
+    summary.completedToday ??
+    validatedMetrics.vaccinationsToday;
 
   const summaryDueForVaccination =
     summary.infantsDueForVaccination ??
     summary.dueForVaccination ??
-    validatedMetrics.dueForVaccination ??
-    summary.vaccinationsDue;
+    summary.vaccinationsDue ??
+    validatedMetrics.dueForVaccination;
 
   const summaryOverdueVaccinations =
     summary.overdueVaccinations ??
     summary.overdueVaccinationCount ??
-    validatedMetrics.overdueVaccinations ??
-    summary.overdue;
+    summary.overdue ??
+    validatedMetrics.overdueVaccinations;
 
   const summaryTotalInfants =
     summary.totalRegisteredInfants ??
     summary.totalInfants ??
-    validatedMetrics.totalInfants ??
-    demographics?.coverage?.infants;
+    demographics?.coverage?.infants ??
+    validatedMetrics.totalInfants;
 
   const summaryTotalGuardians =
     summary.totalGuardians ??
     summary.guardians ??
-    validatedMetrics.totalGuardians ??
-    demographics?.coverage?.guardians;
+    demographics?.coverage?.guardians ??
+    validatedMetrics.totalGuardians;
 
   const kpis = {
     totalInfants: safeNum(summaryTotalInfants),
@@ -2955,16 +2954,12 @@ const SummaryMiniCard = ({ label, value, error = false, isDark = false }) => {
   );
 };
 
-const buildQueryParams = (filters, includeSystemScope = false) => {
+const buildQueryParams = (filters) => {
   const params = {
     period: filters.period,
     vaccineType: filters.vaccineType,
     vaccinationStatus: filters.vaccinationStatus,
   };
-
-  if (includeSystemScope) {
-    params.scope = "system";
-  }
 
   if (filters.period === "custom") {
     if (filters.startDate) {
@@ -3006,7 +3001,6 @@ const exportRowsToCsv = ({ data, filters }) => {
 };
 
 const AnalyticsDashboard = () => {
-  const { isAdminOrSuperAdmin } = useAuth();
   const theme = useTheme();
   const { darkMode } = useAppTheme();
   const isDark = darkMode;
@@ -3048,7 +3042,7 @@ const AnalyticsDashboard = () => {
         setError("");
       }
       setRefreshWarning("");
-      const params = buildQueryParams(filters, isAdminOrSuperAdmin);
+      const params = buildQueryParams(filters);
       const response = await apiClient.getAnalyticsDashboard(params);
 
       const normalizedPayload = normalizeResponsePayload(response);
@@ -3071,7 +3065,7 @@ const AnalyticsDashboard = () => {
         setLoading(false);
       }
     }
-  }, [filters, isAdminOrSuperAdmin]);
+  }, [filters]);
 
   useEffect(() => {
     fetchDashboard();

@@ -6,9 +6,11 @@ import { format, isToday, isYesterday, isThisWeek } from "date-fns";
 import GuardianTopHeader from "../components/GuardianTopHeader";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
 import {
-  CATEGORY_META,
+  GUARDIAN_CATEGORY_FILTER_OPTIONS,
+  GUARDIAN_CATEGORY_META,
+  isGuardianVisibleNotification,
   resolveNotificationActionUrl,
-  resolveNotificationCategory,
+  resolveGuardianNotificationCategory,
 } from "../utils/notificationRouting";
 import {
   Bell,
@@ -24,8 +26,7 @@ import {
   MoreVertical,
   MailOpen,
   RefreshCw,
-  User,
-  MessageSquare
+  User
 } from 'lucide-react';
 
 const NOTIFICATION_CATEGORY_CONFIG = {
@@ -34,65 +35,25 @@ const NOTIFICATION_CATEGORY_CONFIG = {
     label: "Appointments",
     bg: "bg-blue-100 text-blue-600"
   },
-  vaccination_schedule: {
+  vaccination_update: {
     icon: Syringe,
-    label: "Vaccination Schedules",
+    label: "Vaccination Updates",
     bg: "bg-purple-100 text-purple-600"
   },
-  missed_schedule: {
-    icon: AlertCircle,
-    label: "Missed Schedules",
-    bg: "bg-red-100 text-red-600"
-  },
-  inventory_low_stock: {
-    icon: CheckCheck,
-    label: "Low Vaccine Stock",
-    bg: "bg-violet-100 text-violet-600"
-  },
-  inventory_out_of_stock: {
-    icon: AlertCircle,
-    label: "Out-of-Stock Vaccines",
-    bg: "bg-red-100 text-red-600"
-  },
-  guardian_registration: {
-    icon: User,
-    label: "Guardian Registrations",
-    bg: "bg-emerald-100 text-emerald-600"
-  },
-  infant_registration: {
-    icon: User,
-    label: "Infant Registrations",
-    bg: "bg-pink-100 text-pink-600"
-  },
-  report: {
-    icon: CheckCheck,
-    label: "Reports",
-    bg: "bg-cyan-100 text-cyan-600"
-  },
-  system_announcement: {
-    icon: Info,
-    label: "System Announcements",
+  reminder: {
+    icon: Bell,
+    label: "Reminders",
     bg: "bg-amber-100 text-amber-600"
-  },
-  outbound_message_failed: {
-    icon: AlertCircle,
-    label: "Failed Outbound Messages",
-    bg: "bg-red-100 text-red-600"
-  },
-  profile_update: {
-    icon: User,
-    label: "Profile Update",
-    bg: "bg-gray-100 text-gray-600"
-  },
-  new_message: {
-    icon: MessageSquare,
-    label: "New Message",
-    bg: "bg-teal-100 text-teal-600"
   },
   health_alert: {
     icon: AlertCircle,
-    label: "Health Alert",
+    label: "Health Alerts",
     bg: "bg-red-100 text-red-600"
+  },
+  general: {
+    icon: Info,
+    label: "Announcements",
+    bg: "bg-amber-100 text-amber-600"
   },
   default: {
     icon: Bell,
@@ -101,23 +62,21 @@ const NOTIFICATION_CATEGORY_CONFIG = {
   },
 };
 
-const GUARDIAN_FILTER_TABS = [
-  { id: 'all', label: 'All' },
-  { id: 'unread', label: 'Unread' },
-  ...Object.entries(CATEGORY_META).map(([id, meta]) => ({
-    id,
-    label: meta.label,
-  })),
-];
+const GUARDIAN_FILTER_TABS = GUARDIAN_CATEGORY_FILTER_OPTIONS.map((option) => ({
+  id: option.value,
+  label: option.label,
+}));
 
 const normalizeGuardianNotification = (notification = {}) => {
-  const category = resolveNotificationCategory(notification, { isGuardian: true });
+  const category =
+    resolveGuardianNotificationCategory(notification, { isGuardian: true }) ||
+    "general";
 
   return {
     ...notification,
     category,
     category_label:
-      CATEGORY_META[category]?.label || CATEGORY_META.general.label,
+      GUARDIAN_CATEGORY_META[category]?.label || GUARDIAN_CATEGORY_META.general.label,
     action_url: resolveNotificationActionUrl(notification, { isGuardian: true }),
     created_at:
       notification.created_at ||
@@ -259,7 +218,7 @@ const GuardianNotificationsPage = () => {
 
     // Listen for new notifications
     const handleNewNotification = (data) => {
-      if (data?.notification) {
+      if (data?.notification && isGuardianVisibleNotification(data.notification)) {
         setSocketRealTimeNotifications(prev => [data.notification, ...prev]);
       }
     };
@@ -322,6 +281,7 @@ const GuardianNotificationsPage = () => {
   const normalizedNotifications = useMemo(
     () =>
       combinedNotifications
+        .filter((notification) => isGuardianVisibleNotification(notification))
         .map((notification) => normalizeGuardianNotification(notification))
         .sort(
           (left, right) =>
