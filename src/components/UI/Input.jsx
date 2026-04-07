@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import PasswordToggleButton from "./PasswordToggleButton";
+import PortalDatePicker from "./PortalDatePicker";
 
 /**
  * Healthcare Form Input Component
@@ -32,6 +33,21 @@ const Input = ({
   ...props
 }) => {
   const [internalShowPassword, setInternalShowPassword] = useState(false);
+
+  if (type === "date") {
+    return (
+      <PortalDatePicker
+        label={label}
+        error={error}
+        helpText={helpText}
+        className={className}
+        containerClassName={containerClassName}
+        required={required}
+        id={id}
+        {...props}
+      />
+    );
+  }
 
   const isPassword = type === "password";
   const showPassword =

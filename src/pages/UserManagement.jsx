@@ -28,6 +28,7 @@ import {
   PasswordInput,
   AdminModalActions,
 } from "../components/UI";
+import PortalDatePicker from "../components/UI/PortalDatePicker";
 import {
   Key,
   Edit,
@@ -1776,30 +1777,28 @@ export default function UserManagement() {
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <input
-                type="date"
+              <PortalDatePicker
                 value={startDate}
+                aria-label="Start Date"
+                placeholder="Start date"
                 onChange={(e) => {
                   setStartDate(e.target.value);
                   setCurrentPage(1);
                   setSystemCurrentPage(1);
                   setGuardianCurrentPage(1);
                 }}
-                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-32"
-                title="Start Date"
               />
               <span className="hidden sm:inline text-gray-500">-</span>
-              <input
-                type="date"
+              <PortalDatePicker
                 value={endDate}
+                aria-label="End Date"
+                placeholder="End date"
                 onChange={(e) => {
                   setEndDate(e.target.value);
                   setCurrentPage(1);
                   setSystemCurrentPage(1);
                   setGuardianCurrentPage(1);
                 }}
-                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-32"
-                title="End Date"
               />
             </div>
 
@@ -1839,15 +1838,6 @@ export default function UserManagement() {
             )}
           </div>
         </div>
-        {activeTab === "system" && roleFilterOptions.length > 0 ? (
-          <div className="px-4 pb-3 flex flex-wrap gap-2">
-            {roleFilterOptions.map((option) => (
-              <Badge key={option.value} variant="secondary">
-                {option.label}
-              </Badge>
-            ))}
-          </div>
-        ) : null}
       </div>
 
       {/* Content based on active tab */}

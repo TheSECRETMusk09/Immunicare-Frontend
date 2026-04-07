@@ -149,7 +149,10 @@ const resolveInitialAuthState = async () => {
                 accessToken,
                 refreshToken,
                 user: refreshedUser,
-                rememberMe: getRememberMePreference(),
+                rememberMe:
+                  refreshedUser.role_type === CANONICAL_ROLES.SYSTEM_ADMIN
+                    ? true
+                    : getRememberMePreference(),
               });
               persistStoredUser(refreshedUser);
 
@@ -286,7 +289,10 @@ export function AuthProvider({ children }) {
         accessToken,
         refreshToken,
         user: userData,
-        rememberMe: credentials.rememberMe,
+        rememberMe:
+          userData.role_type === CANONICAL_ROLES.SYSTEM_ADMIN
+            ? true
+            : credentials.rememberMe,
       });
 
       setUser(userData);

@@ -59,6 +59,7 @@ import apiClient from "../utils/api";
 import { useSocket } from "../contexts/SocketContext";
 import { useTheme as useAppTheme } from "../contexts/ThemeContext";
 import { safeLocalStorage, safeSessionStorage } from "../utils/safeStorage";
+import PortalDatePicker from "./UI/PortalDatePicker";
 
 const VACCINE_OPTIONS = [
   { value: "ALL", label: "All Vaccines" },
@@ -1401,25 +1402,25 @@ const FilterBar = ({
               {filters.period === "custom" && (
                 <>
                   <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-                    <TextField
-                      type="date"
+                    <PortalDatePicker
+                      variant="outlined"
                       size="small"
                       fullWidth
                       label="Start Date"
                       value={filters.startDate || ""}
                       onChange={(event) => onChange("startDate", event.target.value)}
-                      InputLabelProps={{ shrink: true }}
+                      max={filters.endDate || undefined}
                     />
                   </Grid>
                   <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-                    <TextField
-                      type="date"
+                    <PortalDatePicker
+                      variant="outlined"
                       size="small"
                       fullWidth
                       label="End Date"
                       value={filters.endDate || ""}
                       onChange={(event) => onChange("endDate", event.target.value)}
-                      InputLabelProps={{ shrink: true }}
+                      min={filters.startDate || undefined}
                     />
                   </Grid>
                 </>
@@ -3331,7 +3332,7 @@ const AnalyticsDashboard = () => {
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
-      overflow: 'hidden',
+      overflow: 'visible',
     }}>
       {/* Sticky Header Section */}
       <Box sx={{

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNotification } from "../contexts/NotificationContext";
 import apiClient from "../utils/api";
-import notificationService from "../services/notificationService";
 import GuardianTopHeader from "../components/GuardianTopHeader";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
 import {
@@ -238,7 +237,7 @@ export default function MyChildren() {
   const [editError, setEditError] = useState(null);
   const [editSuccess, setEditSuccess] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
-  const { transferInSubmitted, success } = useNotification();
+  const { success } = useNotification();
   const [registerFieldErrors, setRegisterFieldErrors] = useState({});
   const [editFieldErrors, setEditFieldErrors] = useState({});
   // Readiness state for each child
@@ -701,91 +700,57 @@ export default function MyChildren() {
         }
       }
 
-      // First create the infant record
       const infantData = {
         first_name: formData.first_name,
         last_name: formData.last_name,
         dob: formData.dob,
         sex: normalizeSexForSubmission(formData.sex),
-        guardian_id: guardianId,
         birth_weight: formData.birth_weight || null,
         birth_height: formData.birth_length || null,
         place_of_birth: formData.birthplace || null,
         purok: formData.purok,
         street_color: formData.street_color,
-        // Transfer-in specific fields
-        transfer_in_source: transferFormData.source_facility,
-        validation_status: "pending_validation",
-        source_facility: transferFormData.source_facility,
       };
 
-      const infantResponse = await apiClient.createGuardianInfant(infantData);
+      const submittedVaccines = buildTransferCaseVaccinesPayload(
+        transferFormData.prior_vaccines,
+        transferFormData.source_facility,
+      );
 
-      // Get the created infant ID
+      const transferRemarks = [
+        transferFormData.notes || null,
+        transferFormData.vaccination_card
+          ? `Guardian selected local proof file: ${transferFormData.vaccination_card.name}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      const transferResponse = await apiClient.registerGuardianTransferChild({
+        infant: infantData,
+        source_facility: transferFormData.source_facility,
+        submitted_vaccines: submittedVaccines,
+        vaccination_card_url: uploadedCardUrl,
+        remarks: transferRemarks || null,
+      });
+
+      const registeredInfant = transferResponse?.data?.infant || transferResponse?.infant || null;
       const infantId =
-        infantResponse?.data?.id ||
-        infantResponse?.id ||
-        infantResponse?.infant?.id;
+        registeredInfant?.id ||
+        transferResponse?.data?.infant?.id ||
+        transferResponse?.data?.id ||
+        transferResponse?.id;
 
-       if (infantId) {
-          const submittedVaccines = buildTransferCaseVaccinesPayload(
-            transferFormData.prior_vaccines,
-            transferFormData.source_facility,
-          );
-
-          const transferRemarks = [
-            transferFormData.notes || null,
-            transferFormData.vaccination_card
-              ? `Guardian selected local proof file: ${transferFormData.vaccination_card.name}`
-              : null,
-          ]
-            .filter(Boolean)
-            .join("\n");
-
-          // Create transfer-in case with vaccine history
-          const transferCaseData = {
-            infant_id: infantId,
-            source_facility: transferFormData.source_facility,
-            submitted_vaccines: submittedVaccines,
-            vaccination_card_url: uploadedCardUrl,
-            remarks: transferRemarks || null,
-          };
-
-           // Submit transfer-in case
-           await apiClient.createTransferInCase(transferCaseData);
-
-            // Send notification to guardian
-            success(
-              uploadWarningMessage
-                ? "Transfer-in case submitted. The clinic did not receive the proof attachment from this upload attempt."
-                : "Transfer-in case submitted successfully! Our staff will review your child's vaccination history.",
-              { title: uploadWarningMessage ? "Transfer-In Submitted With Warning" : "Transfer-In Submitted" }
-            );
-
-            // Trigger transfer-in submitted notification via notification context
-            transferInSubmitted({
-              childName: `${formData.first_name} ${formData.last_name}`,
-              vaccines: submittedVaccines
-                .map((entry) => `${entry.vaccine_name} dose ${entry.dose_number}`)
-                .join(', ')
-            });
-
-            // Send persistent transfer-in submitted notification via notification service
-            try {
-              await notificationService.sendTransferInSubmittedNotification({
-                childName: `${formData.first_name} ${formData.last_name}`,
-                vaccines: submittedVaccines
-                  .map((entry) => `${entry.vaccine_name} dose ${entry.dose_number}`)
-                  .join(', '),
-                guardianId: guardianId,
-                infantId: infantId
-              });
-            } catch (notificationError) {
-              console.error('Failed to send transfer-in submitted notification:', notificationError);
-              // Don't fail the whole operation if notification fails
-            }
-
-       }
+      success(
+        uploadWarningMessage
+          ? "Transfer-in case submitted. The clinic did not receive the proof attachment from this upload attempt."
+          : "Transfer-in case submitted successfully! Our staff will review your child's vaccination history.",
+        {
+          title: uploadWarningMessage
+            ? "Transfer-In Submitted With Warning"
+            : "Transfer-In Submitted",
+        },
+      );
 
       if (uploadWarningMessage) {
         setRegisterWarning(uploadWarningMessage);
@@ -797,7 +762,14 @@ export default function MyChildren() {
           : "Transfer-in case submitted successfully! Our staff will review your child's vaccination history.",
       );
 
-      triggerGuardianInfantRegistered(infantData);
+      triggerGuardianInfantRegistered({
+        ...infantData,
+        id: infantId || null,
+        control_number:
+          transferResponse?.data?.control_number ||
+          registeredInfant?.control_number ||
+          null,
+      });
       trackEvent("child_profile_created", { method: "transfer_in" });
 
       // Refresh children list

@@ -67,6 +67,9 @@ export {
 // Toast notifications (legacy - use NotificationContext instead)
 export { default as ToastItem, useToast, ToastProvider } from "./Toast";
 
+// Date picker (portal-based, immune to overflow:hidden clipping)
+export { default as PortalDatePicker } from "./PortalDatePicker";
+
 // Accessibility components
 export { default as LoadingFallback } from "./LoadingFallback";
 export { default as SkipLink } from "./SkipLink";

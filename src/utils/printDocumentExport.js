@@ -655,3 +655,107 @@ export const downloadPdfFromNode = async ({
     }
   }
 };
+
+export const downloadPdfFromHtml = async ({
+  html,
+  filename,
+  title = "",
+  page = DEFAULT_PAGE_CONFIG,
+  backgroundColor = "#ffffff",
+}) => {
+  if (!html || typeof document === "undefined") {
+    return;
+  }
+
+  const resolvedPage = resolvePdfPageConfig(page);
+  const widthPx = Math.round((resolvedPage.widthMm * 96) / 25.4);
+
+  const parser = new DOMParser();
+  const parsed = parser.parseFromString(html, "text/html");
+
+  const exportRoot = document.createElement("div");
+  exportRoot.className = "immunicare-pdf-html-root";
+  Object.assign(exportRoot.style, {
+    position: "fixed",
+    left: `-${widthPx + 100}px`,
+    top: "0",
+    width: `${widthPx}px`,
+    background: backgroundColor,
+    color: "#000000",
+    zIndex: "-1",
+    pointerEvents: "none",
+    overflow: "visible",
+    boxSizing: "border-box",
+  });
+
+  const styleEl = document.createElement("style");
+  styleEl.textContent = Array.from(parsed.querySelectorAll("style"))
+    .map((s) => s.textContent || "")
+    .join("\n")
+    .replace(/\bbody\s*\{/g, ".immunicare-pdf-html-root {");
+  exportRoot.appendChild(styleEl);
+
+  const contentWrapper = document.createElement("div");
+  contentWrapper.className = parsed.body.className || "";
+  contentWrapper.innerHTML = parsed.body.innerHTML;
+  exportRoot.appendChild(contentWrapper);
+
+  document.body.appendChild(exportRoot);
+
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const images = Array.from(exportRoot.querySelectorAll("img"));
+    await Promise.all(
+      images.map(
+        (img) =>
+          new Promise((resolve) => {
+            if (img.complete) {
+              resolve();
+              return;
+            }
+            img.addEventListener("load", resolve, { once: true });
+            img.addEventListener("error", resolve, { once: true });
+          }),
+      ),
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+      import("html2canvas"),
+      import("jspdf"),
+    ]);
+
+    const canvas = await html2canvas(exportRoot, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor,
+      logging: false,
+      windowWidth: widthPx,
+    });
+
+    const imgWidthMm = resolvedPage.widthMm;
+    const imgHeightMm = (canvas.height / canvas.width) * resolvedPage.widthMm;
+
+    const doc = new jsPDF({
+      orientation: resolvedPage.orientation,
+      unit: "mm",
+      format: [resolvedPage.widthMm, Math.max(resolvedPage.heightMm, imgHeightMm)],
+      compress: true,
+      putOnlyUsedFonts: true,
+    });
+
+    if (title) {
+      doc.setProperties({ title });
+    }
+
+    const imgData = canvas.toDataURL("image/jpeg", 0.95);
+    doc.addImage(imgData, "JPEG", 0, 0, imgWidthMm, imgHeightMm, undefined, "FAST");
+    doc.save(filename);
+  } finally {
+    if (exportRoot.parentNode) {
+      exportRoot.parentNode.removeChild(exportRoot);
+    }
+  }
+};

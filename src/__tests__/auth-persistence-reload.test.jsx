@@ -10,6 +10,7 @@ import {
 
 const mockVerifySession = jest.fn();
 const mockRefreshSession = jest.fn();
+const mockLoginApi = jest.fn();
 const mockClearAuthStorage = jest.fn();
 const mockGetStoredAccessToken = jest.fn();
 const mockGetStoredUserJson = jest.fn();
@@ -20,6 +21,7 @@ const mockGetRememberMePreference = jest.fn();
 jest.mock("../utils/api", () => ({
   __esModule: true,
   default: {
+    login: (...args) => mockLoginApi(...args),
     verifySession: (...args) => mockVerifySession(...args),
     refreshSession: (...args) => mockRefreshSession(...args),
   },
@@ -49,10 +51,23 @@ const AuthProbe = () => {
   );
 };
 
+const LoginProbe = ({ credentials }) => {
+  const { loading, login } = useAuth();
+
+  React.useEffect(() => {
+    if (!loading) {
+      void login(credentials);
+    }
+  }, [credentials, loading, login]);
+
+  return <div>{loading ? "loading" : "ready"}</div>;
+};
+
 describe("Auth reload persistence", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     __resetAuthBootstrapCacheForTests();
+    mockLoginApi.mockReset();
     mockGetStoredAccessToken.mockReturnValue(null);
     mockGetStoredUserJson.mockReturnValue(null);
     mockGetRememberMePreference.mockReturnValue(true);
@@ -195,5 +210,45 @@ describe("Auth reload persistence", () => {
     expect(mockVerifySession).toHaveBeenCalledTimes(1);
     expect(mockRefreshSession).toHaveBeenCalledTimes(1);
     expect(mockClearAuthStorage).not.toHaveBeenCalled();
+  });
+
+  test("persists admin login sessions durably even without an explicit remember-me choice", async () => {
+    mockVerifySession.mockResolvedValue({
+      authenticated: false,
+    });
+    mockGetRememberMePreference.mockReturnValue(false);
+    mockLoginApi.mockResolvedValue({
+      accessToken: "admin-access-token",
+      refreshToken: "admin-refresh-token",
+      user: {
+        id: 30,
+        username: "admin_user",
+        role: "SYSTEM_ADMIN",
+        role_type: "SYSTEM_ADMIN",
+      },
+    });
+
+    render(
+      <AuthProvider>
+        <LoginProbe
+          credentials={{
+            username: "admin_user",
+            password: "Immunicare2026!",
+            rememberMe: false,
+            expectedRole: "SYSTEM_ADMIN",
+          }}
+        />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mockPersistAuthSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accessToken: "admin-access-token",
+          refreshToken: "admin-refresh-token",
+          rememberMe: true,
+        }),
+      );
+    });
   });
 });

@@ -68,6 +68,17 @@ export const getDefaultAuthenticatedRouteFromUser = (user) => {
   return getDefaultAuthenticatedRouteFromRoleType(normalized?.role_type);
 };
 
+export const getLoginRouteFromPathname = (pathname = "") => {
+  const normalizedPathname =
+    typeof pathname === "string" ? pathname.trim() : "";
+
+  if (normalizedPathname.startsWith("/guardian")) {
+    return "/guardian/login";
+  }
+
+  return "/admin/login";
+};
+
 export const getDefaultAuthenticatedRouteFromFlags = ({
   isGuardian,
   isAdmin,

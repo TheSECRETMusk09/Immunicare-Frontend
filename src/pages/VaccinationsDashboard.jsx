@@ -16,6 +16,7 @@ import { useNavigate } from "react-router-dom";
 import apiClient from "../utils/api";
 import { useAuth } from "../contexts/AuthContext";
 import useVaccinationSocket from "../hooks/useVaccinationSocket";
+import SearchableInfantSelect from "../components/SearchableInfantSelect";
 import {
   normalizeVaccinationRecordsResponse,
   normalizeVaccinationSchedulesResponse,
@@ -175,6 +176,7 @@ const VaccinationsDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [recordsHydrationLoading, setRecordsHydrationLoading] = useState(false);
+  const [infantsLoading, setInfantsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -1510,25 +1512,16 @@ const VaccinationsDashboard = () => {
             <>
               <div className="mb-4 flex flex-col sm:flex-row gap-4 items-start sm:items-end flex-shrink-0">
                 <div className="w-full sm:max-w-md">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Focus by infant
-                  </label>
-                  <select
+                  <SearchableInfantSelect
+                    infants={infants}
                     value={selectedInfantId || ""}
-                    onChange={(e) =>
-                      setSelectedInfantId(
-                        e.target.value ? Number(e.target.value) : null,
-                      )
-                    }
-                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 bg-white dark:bg-gray-800"
-                  >
-                    <option value="">All infants</option>
-                    {infants.map((infant) => (
-                      <option key={infant.id} value={infant.id}>
-                        {infant.first_name} {infant.last_name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(e) => setSelectedInfantId(e.target.value ? Number(e.target.value) : null)}
+                    label="Focus by infant"
+                    placeholder="Search by name, control number, or date of birth..."
+                    emptyMessage="No infants available"
+                    loading={infantsLoading}
+                    required={false}
+                  />
                 </div>
                 <div className="w-full sm:w-[150px]">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

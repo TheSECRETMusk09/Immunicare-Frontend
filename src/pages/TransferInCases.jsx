@@ -403,7 +403,17 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
     {
       key: "created_at",
       label: "Submitted Date",
-      type: "date",
+      render: (val) => {
+        if (!val) return "N/A";
+        // Convert ISO string to readable format
+        const date = new Date(val);
+        if (Number.isNaN(date.getTime())) return val;
+        return date.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric"
+        });
+      },
     },
   ];
 

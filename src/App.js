@@ -23,7 +23,10 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import AdminLayout from "./components/AdminLayout";
 import GuardianIntroduction from "./components/GuardianIntroduction";
 import QueryProvider from "./providers/QueryProvider"; // Guardian introduction page
-import { getDefaultAuthenticatedRouteFromFlags } from "./utils/authRedirect";
+import {
+  getDefaultAuthenticatedRouteFromFlags,
+  getLoginRouteFromPathname,
+} from "./utils/authRedirect";
 import { legacyRouteRedirects } from "./utils/routePaths";
 
 // Lazy load components for better performance
@@ -169,6 +172,7 @@ function AppContent() {
     isGuardian,
     isAdmin,
   });
+  const unauthenticatedLoginRoute = getLoginRouteFromPathname(location.pathname);
 
   const loginRedirectElement = useMemo(
     () => <Navigate to="/guardian/login" replace />,
@@ -201,7 +205,7 @@ function AppContent() {
   // If not authenticated and not on a public route, redirect to login
   // But prevent redirect loops by checking if we're already on login page
   if (!isAuthenticated && !isPublicRoute && location.pathname !== "/login") {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={unauthenticatedLoginRoute} replace />;
   }
 
   return (
@@ -679,7 +683,7 @@ function AppContent() {
               isAuthenticated ? (
                 <Navigate to={authenticatedDefaultRoute} replace />
               ) : (
-                <Navigate to="/login" replace />
+                <Navigate to={unauthenticatedLoginRoute} replace />
               )
             }
           />

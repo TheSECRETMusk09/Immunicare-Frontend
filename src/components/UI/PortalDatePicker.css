@@ -1,0 +1,524 @@
+/* ============================================================
+   PortalDatePicker — portal-rendered calendar popup
+   Immune to parent overflow:hidden / z-index stacking issues
+   ============================================================ */
+
+/* --- Container --- */
+.pdp-container {
+  display: inline-block;
+  vertical-align: top;
+}
+.pdp-container.pdp-full-width {
+  display: block;
+  width: 100%;
+}
+
+/* --- Label (default variant) --- */
+.pdp-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.375rem;
+}
+.pdp-label-dark {
+  color: #fff !important;
+}
+.pdp-label.pdp-required::after {
+  content: '*';
+  color: #ef4444;
+  margin-left: 0.25rem;
+}
+
+/* --- Trigger (shared) --- */
+.pdp-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  min-height: 40px;
+  outline: none;
+  user-select: none;
+  box-sizing: border-box;
+  color: #111827;
+}
+.pdp-trigger:hover:not(.pdp-disabled) {
+  border-color: #6366f1;
+}
+.pdp-trigger:focus:not(.pdp-disabled) {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+/* Small size */
+.pdp-trigger.pdp-small {
+  padding: 0.25rem 0.625rem;
+  min-height: 32px;
+  font-size: 0.8125rem;
+}
+
+/* Outlined variant (MUI-like) */
+.pdp-trigger.pdp-outlined {
+  border-radius: 4px;
+  border-color: rgba(148, 163, 184, 0.45);
+  background: transparent;
+}
+.pdp-trigger.pdp-outlined:hover:not(.pdp-disabled) {
+  border-color: rgba(100, 116, 139, 0.56);
+}
+.pdp-trigger.pdp-outlined:focus:not(.pdp-disabled) {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.18);
+}
+
+/* Dark mode — default */
+.pdp-trigger.pdp-dark {
+  border-color: #4b5563;
+  background: #374151;
+  color: #f3f4f6;
+}
+.pdp-trigger.pdp-dark:hover:not(.pdp-disabled) {
+  border-color: #818cf8;
+}
+.pdp-trigger.pdp-dark:focus:not(.pdp-disabled) {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.18);
+}
+
+/* Dark mode — outlined */
+.pdp-trigger.pdp-outlined.pdp-dark {
+  border-color: rgba(100, 116, 139, 0.45);
+  background: rgba(15, 23, 42, 0.3);
+  color: #e2e8f0;
+}
+.pdp-trigger.pdp-outlined.pdp-dark:hover:not(.pdp-disabled) {
+  border-color: rgba(191, 219, 254, 0.42);
+}
+.pdp-trigger.pdp-outlined.pdp-dark:focus:not(.pdp-disabled) {
+  border-color: #60a5fa;
+}
+
+/* Error state */
+.pdp-trigger.pdp-has-error {
+  border-color: #f87171;
+  background: #fef2f2;
+}
+.pdp-trigger.pdp-has-error.pdp-dark {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: #f87171;
+}
+
+/* Disabled */
+.pdp-trigger.pdp-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Floating label (outlined variant) */
+.pdp-floating-label {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+  font-size: 0.8125rem;
+  color: #64748b;
+  pointer-events: none;
+  transition: all 0.15s ease;
+  padding: 0 3px;
+  white-space: nowrap;
+}
+.pdp-floating-label.pdp-float-active {
+  top: 0;
+  font-size: 0.6875rem;
+  background: #fff;
+  transform: translateY(-50%);
+  color: #475569;
+}
+.pdp-floating-label.pdp-float-dark {
+  color: #94a3b8;
+}
+.pdp-floating-label.pdp-float-active.pdp-float-dark {
+  background: #1e293b;
+  color: #93c5fd;
+}
+
+/* Value / placeholder inside trigger */
+.pdp-display-value {
+  flex: 1;
+  color: inherit;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pdp-display-placeholder {
+  flex: 1;
+  color: #9ca3af;
+  font-size: inherit;
+  white-space: nowrap;
+}
+.pdp-trigger.pdp-dark .pdp-display-placeholder,
+.pdp-trigger.pdp-outlined.pdp-dark .pdp-display-placeholder {
+  color: #6b7280;
+}
+
+/* Icon row */
+.pdp-icon-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+.pdp-icon-row svg.pdp-cal-icon {
+  width: 15px;
+  height: 15px;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+.pdp-clear-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  padding: 2px;
+  border-radius: 50%;
+  line-height: 1;
+  transition: color 0.12s;
+}
+.pdp-clear-btn:hover {
+  color: #4b5563;
+}
+.pdp-trigger.pdp-dark .pdp-clear-btn:hover {
+  color: #d1d5db;
+}
+
+/* Help / error text */
+.pdp-help-text {
+  margin-top: 0.375rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+.pdp-help-text.pdp-help-dark {
+  color: #9ca3af;
+}
+.pdp-error-text {
+  margin-top: 0.375rem;
+  font-size: 0.75rem;
+  color: #dc2626;
+}
+
+/* ============================================================
+   Portal Popup
+   ============================================================ */
+.pdp-popup {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  width: 280px;
+  max-width: 280px;
+  /* Ensure the popup never stretches like a modal container */
+  height: fit-content;
+  max-height: none;
+}
+.pdp-popup.pdp-popup-dark {
+  background: #1e293b;
+  border-color: #334155;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.pdp-calendar-loading {
+  padding: 12px;
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+.pdp-popup.pdp-popup-dark .pdp-calendar-loading {
+  color: #94a3b8;
+}
+
+/* ============================================================
+   react-calendar overrides — light
+   Targets react-calendar v6 (CSS Grid + aspect-ratio:1 tiles)
+   ============================================================ */
+/* Neutralise v6 CSS custom properties that can impose tile sizes */
+.pdp-popup .react-calendar {
+  --react-calendar-width: 280px;
+  --react-calendar-tile-height: auto;
+  --react-calendar-tile-size: auto;
+  --react-calendar-month-year-label-font-size: 0.875rem;
+  --react-calendar-navigation-button-min-width: 24px;
+}
+.pdp-popup .react-calendar {
+  width: 280px !important;
+  max-width: 280px !important;
+  border: none !important;
+  background: transparent !important;
+  font-family: inherit !important;
+  padding: 4px 6px 2px !important;
+  box-sizing: border-box !important;
+  height: auto !important;
+  min-height: unset !important;
+  line-height: normal !important;
+}
+
+/* Force all calendar containers to auto height (v6 uses CSS Grid) */
+.pdp-popup .react-calendar__viewContainer,
+.pdp-popup .react-calendar__month-view,
+.pdp-popup .react-calendar__month-view__days,
+.pdp-popup .react-calendar__year-view,
+.pdp-popup .react-calendar__decade-view,
+.pdp-popup .react-calendar__century-view {
+  height: auto !important;
+  min-height: unset !important;
+}
+.pdp-popup .react-calendar__month-view__days {
+  display: grid !important;
+  grid-template-columns: repeat(7, 1fr) !important;
+  grid-auto-rows: auto !important;
+}
+
+/* Navigation */
+.pdp-popup .react-calendar__navigation {
+  display: flex !important;
+  align-items: center !important;
+  margin-bottom: 6px !important;
+  height: auto !important;
+  min-height: unset !important;
+}
+.pdp-popup .react-calendar__navigation button {
+  background: none !important;
+  border: none !important;
+  padding: 4px 6px !important;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #111827;
+  min-width: 24px !important;
+  line-height: 1 !important;
+  transition: background 0.12s;
+}
+.pdp-popup .react-calendar__navigation__label {
+  flex: 1;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #111827;
+}
+.pdp-popup .react-calendar__navigation button:enabled:hover {
+  background: #f3f4f6;
+}
+.pdp-popup .react-calendar__navigation button:disabled {
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* Weekday headers — v6 may use grid here too; columns must match the days grid */
+.pdp-popup .react-calendar__month-view__weekdays {
+  text-align: center;
+  margin-bottom: 1px;
+  display: grid !important;
+  grid-template-columns: repeat(7, 1fr) !important;
+}
+.pdp-popup .react-calendar__month-view__weekdays__weekday {
+  padding: 2px 0 !important;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #6b7280;
+  text-align: center;
+  text-transform: uppercase;
+  aspect-ratio: unset !important;
+  height: auto !important;
+  overflow: hidden;
+}
+.pdp-popup .react-calendar__month-view__weekdays__weekday abbr {
+  text-decoration: none;
+  border: none;
+  cursor: default;
+}
+
+/* Date tiles — aspect-ratio:unset is critical for react-calendar v6
+   (v6 default is aspect-ratio:1 which makes each 40px-wide cell 40px tall,
+   producing 240px of cells alone for a 6-row month) */
+.pdp-popup .react-calendar__tile {
+  background: none !important;
+  border: none !important;
+  border-radius: 6px;
+  padding: 4px 2px !important;
+  font-size: 0.75rem !important;
+  cursor: pointer;
+  color: #374151;
+  transition: background 0.1s, color 0.1s;
+  text-align: center !important;
+  line-height: 1.4 !important;
+  aspect-ratio: unset !important;
+  height: auto !important;
+  min-height: unset !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+.pdp-popup .react-calendar__tile:enabled:hover {
+  background: #eff6ff;
+  color: #2563eb;
+}
+.pdp-popup .react-calendar__tile:enabled:focus {
+  background: #dbeafe;
+}
+.pdp-popup .react-calendar__tile--now {
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+.pdp-popup .react-calendar__tile--now:enabled:hover {
+  background: #bfdbfe;
+  color: #1d4ed8;
+}
+.pdp-popup .react-calendar__tile--active,
+.pdp-popup .react-calendar__tile--active:enabled:hover,
+.pdp-popup .react-calendar__tile--active:enabled:focus {
+  background: #2563eb !important;
+  color: #fff !important;
+  border-radius: 50%;
+}
+.pdp-popup .react-calendar__tile--now.react-calendar__tile--active {
+  background: #2563eb !important;
+  color: #fff !important;
+}
+.pdp-popup .react-calendar__tile:disabled {
+  color: #d1d5db;
+  cursor: not-allowed;
+  background: none;
+}
+.pdp-popup .react-calendar__month-view__days__day--neighboringMonth {
+  color: #d1d5db;
+}
+.pdp-popup .react-calendar__month-view__days__day--weekend {
+  color: #ef4444;
+}
+.pdp-popup .react-calendar__tile--active.react-calendar__month-view__days__day--weekend {
+  color: #fff !important;
+}
+
+/* Year / decade / century views — use 3-column grid, compact tiles */
+.pdp-popup .react-calendar__year-view__months,
+.pdp-popup .react-calendar__decade-view__years,
+.pdp-popup .react-calendar__century-view__decades {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  grid-auto-rows: auto !important;
+  height: auto !important;
+}
+.pdp-popup .react-calendar__year-view .react-calendar__tile,
+.pdp-popup .react-calendar__decade-view .react-calendar__tile,
+.pdp-popup .react-calendar__century-view .react-calendar__tile {
+  padding: 8px 2px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+}
+
+/* ============================================================
+   react-calendar overrides — dark
+   ============================================================ */
+.pdp-popup.pdp-popup-dark .react-calendar__navigation button {
+  color: #e2e8f0;
+}
+.pdp-popup.pdp-popup-dark .react-calendar__navigation__label {
+  color: #e2e8f0;
+}
+.pdp-popup.pdp-popup-dark .react-calendar__navigation button:enabled:hover {
+  background: #334155;
+}
+.pdp-popup.pdp-popup-dark .react-calendar__navigation button:disabled {
+  color: #4b5563;
+}
+.pdp-popup.pdp-popup-dark .react-calendar__month-view__weekdays__weekday {
+  color: #64748b;
+}
+.pdp-popup.pdp-popup-dark .react-calendar__tile {
+  color: #cbd5e1;
+}
+.pdp-popup.pdp-popup-dark .react-calendar__tile:enabled:hover {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+}
+.pdp-popup.pdp-popup-dark .react-calendar__tile:enabled:focus {
+  background: rgba(59, 130, 246, 0.2);
+}
+.pdp-popup.pdp-popup-dark .react-calendar__tile--now {
+  background: rgba(30, 58, 138, 0.35);
+  color: #93c5fd;
+  font-weight: 700;
+}
+.pdp-popup.pdp-popup-dark .react-calendar__tile--now:enabled:hover {
+  background: rgba(30, 58, 138, 0.5);
+  color: #93c5fd;
+}
+.pdp-popup.pdp-popup-dark .react-calendar__tile--active,
+.pdp-popup.pdp-popup-dark .react-calendar__tile--active:enabled:hover,
+.pdp-popup.pdp-popup-dark .react-calendar__tile--active:enabled:focus {
+  background: #3b82f6 !important;
+  color: #fff !important;
+}
+.pdp-popup.pdp-popup-dark .react-calendar__tile:disabled {
+  color: #334155;
+}
+.pdp-popup.pdp-popup-dark .react-calendar__month-view__days__day--neighboringMonth {
+  color: #334155;
+}
+.pdp-popup.pdp-popup-dark .react-calendar__month-view__days__day--weekend {
+  color: #fca5a5;
+}
+.pdp-popup.pdp-popup-dark .react-calendar__tile--active.react-calendar__month-view__days__day--weekend {
+  color: #fff !important;
+}
+
+/* ============================================================
+   Popup footer (Clear button)
+   ============================================================ */
+.pdp-popup-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 10px 8px;
+  border-top: 1px solid #e5e7eb;
+}
+.pdp-popup.pdp-popup-dark .pdp-popup-footer {
+  border-top-color: #334155;
+}
+.pdp-popup-clear-btn {
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 4px;
+  transition: background 0.12s;
+  line-height: 1.25;
+}
+.pdp-popup-clear-btn:hover {
+  background: #eff6ff;
+}
+.pdp-popup.pdp-popup-dark .pdp-popup-clear-btn {
+  color: #60a5fa;
+}
+.pdp-popup.pdp-popup-dark .pdp-popup-clear-btn:hover {
+  background: rgba(59, 130, 246, 0.12);
+}

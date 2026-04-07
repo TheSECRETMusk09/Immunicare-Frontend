@@ -2,6 +2,7 @@ import axios from "axios";
 import axiosRetry from "axios-retry";
 import { safeLocalStorage, safeSessionStorage } from "./safeStorage";
 import { API_BASE_URL } from "./apiConfig";
+import { getLoginRouteFromPathname } from "./authRedirect";
 
 const PUBLIC_AUTH_ROUTES = [
   "/",
@@ -21,8 +22,34 @@ let proactiveRefreshTerminalFailure = false;
 const inFlightGetRequests = new Map();
 const DEFAULT_REFRESH_RATE_LIMIT_COOLDOWN_MS = 30 * 1000;
 
-const getRememberMePreference = () =>
-  safeLocalStorage.getItem("rememberMe") === "true";
+const hasStoredAuthState = (storage) =>
+  Boolean(
+    storage.getItem("token") ||
+      storage.getItem("refreshToken") ||
+      storage.getItem("user"),
+  );
+
+const resolveRememberMePreference = (rememberMe) => {
+  if (typeof rememberMe === "boolean") {
+    return rememberMe;
+  }
+
+  if (safeLocalStorage.getItem("rememberMe") === "true") {
+    return true;
+  }
+
+  if (hasStoredAuthState(safeLocalStorage)) {
+    return true;
+  }
+
+  if (hasStoredAuthState(safeSessionStorage)) {
+    return false;
+  }
+
+  return true;
+};
+
+const getRememberMePreference = () => resolveRememberMePreference();
 
 const getStoredAccessToken = () =>
   safeLocalStorage.getItem("token") || safeSessionStorage.getItem("token");
@@ -35,11 +62,11 @@ const getStoredUserJson = () =>
   safeLocalStorage.getItem("user") || safeSessionStorage.getItem("user");
 
 const getPreferredAuthStorage = () => {
-  if (safeLocalStorage.getItem("token")) {
+  if (hasStoredAuthState(safeLocalStorage)) {
     return safeLocalStorage;
   }
 
-  if (safeSessionStorage.getItem("token")) {
+  if (hasStoredAuthState(safeSessionStorage)) {
     return safeSessionStorage;
   }
 
@@ -224,19 +251,20 @@ const persistAuthSession = ({
   accessToken,
   refreshToken,
   user,
-  rememberMe = false,
+  rememberMe,
 } = {}) => {
   clearRefreshCooldown();
   clearProactiveRefreshTerminalFailure();
 
-  const targetStorage = rememberMe ? safeLocalStorage : safeSessionStorage;
-  const secondaryStorage = rememberMe ? safeSessionStorage : safeLocalStorage;
+  const persistDurably = resolveRememberMePreference(rememberMe);
+  const targetStorage = persistDurably ? safeLocalStorage : safeSessionStorage;
+  const secondaryStorage = persistDurably ? safeSessionStorage : safeLocalStorage;
 
   secondaryStorage.removeItem("token");
   secondaryStorage.removeItem("refreshToken");
   secondaryStorage.removeItem("user");
 
-  if (rememberMe) {
+  if (persistDurably) {
     safeLocalStorage.setItem("rememberMe", "true");
   } else {
     safeLocalStorage.removeItem("rememberMe");
@@ -277,9 +305,7 @@ const redirectToLoginIfNeeded = () => {
   if (typeof window === "undefined") return;
   const pathname = getCurrentPath();
   if (!isPublicAuthRoute(pathname)) {
-    window.location.href = pathname.startsWith("/guardian")
-      ? "/guardian/login"
-      : "/admin/login";
+    window.location.href = getLoginRouteFromPathname(pathname);
   }
 };
 

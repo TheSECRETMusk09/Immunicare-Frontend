@@ -18,6 +18,7 @@ import { useAppointments, useInfants } from "../hooks/useDashboard";
 import apiClient from "../utils/api";
 import { isPhilippineHoliday } from "../utils/holidays";
 import { CalendarDays, ChevronLeft, ChevronRight, Plus, Search, ArrowUp, ArrowDown } from "lucide-react";
+import PortalDatePicker from "../components/UI/PortalDatePicker";
 import {
   hasFieldErrors,
   sanitizeText,
@@ -270,14 +271,35 @@ export default function Appointments() {
   // Sorting state
   const [sortField, setSortField] = useState("scheduled_date");
   const [sortDirection, setSortDirection] = useState("desc");
+  // Helper function to get default date range when no filters are set
+  const getDefaultDateRange = () => {
+    if (dateFilterStart || dateFilterEnd) {
+      return {
+        ...(dateFilterStart ? { start_date: dateFilterStart } : {}),
+        ...(dateFilterEnd ? { end_date: dateFilterEnd } : {}),
+      };
+    }
+
+    // Set default range: past 30 days to next 30 days
+    const today = new Date();
+    const pastDate = new Date(today);
+    pastDate.setDate(today.getDate() - 30);
+    const futureDate = new Date(today);
+    futureDate.setDate(today.getDate() + 30);
+
+    return {
+      start_date: pastDate.toISOString().split('T')[0],
+      end_date: futureDate.toISOString().split('T')[0],
+    };
+  };
+
   const listQueryParams = useMemo(
     () => ({
       page: currentPage,
       limit: itemsPerPage,
       ...(debouncedSearchQuery ? { search: debouncedSearchQuery } : {}),
       ...(statusFilter !== "all" ? { status: statusFilter } : {}),
-      ...(dateFilterStart ? { start_date: dateFilterStart } : {}),
-      ...(dateFilterEnd ? { end_date: dateFilterEnd } : {}),
+      ...getDefaultDateRange(),
       sort_field: sortField,
       sort_direction: sortDirection,
     }),
@@ -550,7 +572,11 @@ export default function Appointments() {
         let hasNext = true;
         const scopedAppointments = [];
 
+        console.log('Fetching calendar appointments for month:', toMonthKey(monthCursor));
+        console.log('Date range:', toDateKey(monthStart), 'to', toDateKey(monthEnd));
+
         while (hasNext) {
+          console.log('Fetching page', page);
           const response = await apiClient.getAppointments({
             start_date: toDateKey(monthStart),
             end_date: toDateKey(monthEnd),
@@ -560,6 +586,8 @@ export default function Appointments() {
             limit: 200,
           });
 
+          console.log('API Response for page', page, ':', response);
+
           const pageRows = Array.isArray(response?.data)
             ? response.data
             : Array.isArray(response)
@@ -567,10 +595,15 @@ export default function Appointments() {
               : [];
           const pagination = response?.metadata || response?.pagination || null;
 
+          console.log('Page', page, 'rows:', pageRows.length, 'pagination:', pagination);
+
           scopedAppointments.push(...pageRows);
           hasNext = Boolean(pagination?.hasNext);
           page += 1;
         }
+
+        console.log('Total appointments fetched:', scopedAppointments.length);
+        console.log('Normalized appointments:', normalizeAppointmentCollection(scopedAppointments));
 
         if (latestMonthKeyRef.current === toMonthKey(monthCursor)) {
           setAppointments(normalizeAppointmentCollection(scopedAppointments));
@@ -1583,12 +1616,11 @@ export default function Appointments() {
 
               {/* 3. Date Range Start */}
               <div className="flex-shrink-0">
-                <input
-                  type="date"
+                <PortalDatePicker
                   value={dateFilterStart}
                   onChange={(e) => setDateFilterStart(e.target.value)}
-                  className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-36"
                   aria-label="Start date"
+                  placeholder="Start date"
                 />
               </div>
 
@@ -1597,12 +1629,11 @@ export default function Appointments() {
 
               {/* 5. Date Range End */}
               <div className="flex-shrink-0">
-                <input
-                  type="date"
+                <PortalDatePicker
                   value={dateFilterEnd}
                   onChange={(e) => setDateFilterEnd(e.target.value)}
-                  className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-36"
                   aria-label="End date"
+                  placeholder="End date"
                 />
               </div>
 

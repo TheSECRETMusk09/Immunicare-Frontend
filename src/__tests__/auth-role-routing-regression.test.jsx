@@ -11,6 +11,7 @@ import {
   normalizeAuthUser,
   getDefaultAuthenticatedRouteFromRoleType,
   getDefaultAuthenticatedRouteFromUser,
+  getLoginRouteFromPathname,
 } from "../utils/authRedirect";
 
 const mockNavigate = jest.fn();
@@ -128,7 +129,7 @@ describe("Auth + role routing regression", () => {
       );
     });
 
-    expect(mockNavigate).toHaveBeenCalledWith("/dashboard", { replace: true });
+    expect(mockNavigate).toHaveBeenCalledWith("/analytics", { replace: true });
     expect(mockNavigate).not.toHaveBeenCalledWith("/guardian/dashboard", {
       replace: true,
     });
@@ -183,13 +184,13 @@ describe("Auth + role routing regression", () => {
               </ProtectedRoute>
             }
           />
-          <Route path="/dashboard" element={<div>Dashboard</div>} />
+          <Route path="/analytics" element={<div>Analytics</div>} />
         </Routes>
       </MemoryRouter>,
     );
 
     expect(screen.queryByText("Guardian Secret")).not.toBeInTheDocument();
-    expect(screen.getByText(/dashboard/i)).toBeInTheDocument();
+    expect(screen.getByText(/analytics/i)).toBeInTheDocument();
   });
 
   test("role normalization and routes stay canonical", () => {
@@ -207,7 +208,7 @@ describe("Auth + role routing regression", () => {
       "/guardian/dashboard",
     );
     expect(getDefaultAuthenticatedRouteFromRoleType("SYSTEM_ADMIN")).toBe(
-      "/dashboard",
+      "/analytics",
     );
     expect(getDefaultAuthenticatedRouteFromRoleType("unknown_role")).toBe(
       "/login",
@@ -216,6 +217,18 @@ describe("Auth + role routing regression", () => {
     expect(getDefaultAuthenticatedRouteFromUser(guardianUser)).toBe(
       "/guardian/dashboard",
     );
-    expect(getDefaultAuthenticatedRouteFromUser(adminUser)).toBe("/dashboard");
+    expect(getDefaultAuthenticatedRouteFromUser(adminUser)).toBe("/analytics");
+  });
+
+  test("reload fallbacks keep admin and guardian login routes separate", () => {
+    expect(getLoginRouteFromPathname("/guardian/dashboard")).toBe(
+      "/guardian/login",
+    );
+    expect(getLoginRouteFromPathname("/guardian/appointments")).toBe(
+      "/guardian/login",
+    );
+    expect(getLoginRouteFromPathname("/analytics")).toBe("/admin/login");
+    expect(getLoginRouteFromPathname("/dashboard")).toBe("/admin/login");
+    expect(getLoginRouteFromPathname("/unknown-route")).toBe("/admin/login");
   });
 });

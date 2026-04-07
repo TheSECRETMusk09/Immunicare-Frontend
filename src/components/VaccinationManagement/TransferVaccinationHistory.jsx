@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import apiClient from '../../utils/api';
+import PortalDatePicker from '../UI/PortalDatePicker';
 import { APPROVED_VACCINE_NAMES } from '../../constants/approvedVaccines';
 import {
   buildTransferCaseVaccinesPayload,
@@ -312,13 +313,13 @@ const TransferVaccinationHistory = ({ infantId, infantName, onClose, onSuccess }
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Date Administered <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="date"
+                    <PortalDatePicker
                       value={entry.dateAdministered}
                       onChange={(e) =>
                         updateVaccineEntry(entry.id, 'dateAdministered', e.target.value)
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      fullWidth
+                      required
                     />
                   </div>
 

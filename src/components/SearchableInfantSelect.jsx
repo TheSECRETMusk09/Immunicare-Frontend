@@ -219,18 +219,18 @@ const SearchableInfantSelect = ({
           aria-haspopup="listbox"
           aria-expanded={isOpen ? "true" : "false"}
           aria-describedby={ariaDescribedBy}
-          className={`
-            w-full px-4 py-2.5 text-left
-            bg-gray-700 dark:bg-gray-800
-            border ${error ? "border-red-500 dark:border-red-400" : "border-gray-600 dark:border-gray-700"}
-            rounded-lg
-            text-gray-100 dark:text-gray-200
-            hover:bg-gray-600 dark:hover:bg-gray-750
-            focus:outline-none focus:ring-2 ${error ? "focus:ring-red-500" : "focus:ring-blue-500"}
-            transition-colors
-            flex items-center justify-between
-            ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-          `}
+      className={`
+        w-full px-4 py-2.5 text-left
+        bg-white dark:bg-gray-800
+        border ${error ? "border-red-500 dark:border-red-400" : "border-gray-300 dark:border-gray-700"}
+        rounded-lg
+        text-gray-900 dark:text-gray-100
+        hover:bg-gray-50 dark:hover:bg-gray-750
+        focus:outline-none focus:ring-2 ${error ? "focus:ring-red-500" : "focus:ring-blue-500"}
+        transition-colors
+        flex items-center justify-between
+        ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+      `}
         >
           <span className={!selectedInfant ? "text-gray-400" : ""}>
             {displayText}
@@ -253,9 +253,9 @@ const SearchableInfantSelect = ({
         {isOpen && (
           <div
             role="listbox"
-            className="absolute z-50 w-full mt-1 bg-gray-700 dark:bg-gray-800 border border-gray-600 dark:border-gray-700 rounded-lg shadow-xl max-h-96 flex flex-col"
+            className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-xl max-h-96 flex flex-col"
           >
-            <div className="p-3 border-b border-gray-600 dark:border-gray-700">
+            <div className="p-3 border-b border-gray-300 dark:border-gray-700">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input

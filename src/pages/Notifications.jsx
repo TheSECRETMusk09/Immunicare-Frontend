@@ -5,6 +5,7 @@ import apiClient from "../utils/api";
 import { useAuth } from "../contexts/AuthContext";
 import guardianNotificationService from "../services/guardianNotificationService";
 import { Bell } from "lucide-react";
+import PortalDatePicker from "../components/UI/PortalDatePicker";
 import {
   CATEGORY_FILTER_OPTIONS,
   CATEGORY_META,
@@ -796,12 +797,11 @@ const Notifications = () => {
                   >
                     Start Date
                   </label>
-                  <input
-                    type="date"
+                  <PortalDatePicker
                     id="notifications-start-date"
                     value={startDate}
                     onChange={(event) => setStartDate(event.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                    fullWidth
                   />
                 </div>
 
@@ -812,12 +812,11 @@ const Notifications = () => {
                   >
                     End Date
                   </label>
-                  <input
-                    type="date"
+                  <PortalDatePicker
                     id="notifications-end-date"
                     value={endDate}
                     onChange={(event) => setEndDate(event.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                    fullWidth
                   />
                 </div>
               </div>

@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { FileText, Printer } from "lucide-react";
 import apiClient from "../utils/api";
 import { Button, Modal, Select } from "./UI";
-import PrintDateRangeControls from "./PrintDateRangeControls";
 import VisitRecordingForm from "./VisitRecordingForm";
 import {
   normalizeInfantResponse,
@@ -16,7 +15,6 @@ import {
   formatPrintDateValue,
 } from "../utils/printDateRange";
 import {
-  downloadPdfFromNode,
   downloadWordDocument,
   PRINT_PAGE_PRESETS,
 } from "../utils/printDocumentExport";
@@ -2530,6 +2528,206 @@ export default function ImmunizationChart({ infantId }) {
 </html>`;
   }, [fullName, leftLogoSrc, printPaperSize, rightLogoSrc]);
 
+  const buildWordDocument = useCallback(async () => {
+    const printPaperConfig = getPrintPaperConfig(printPaperSize);
+
+    const [embeddedLeftLogoSrc, embeddedRightLogoSrc] = await Promise.all([
+      toEmbeddedAssetUrl(leftLogoSrc),
+      toEmbeddedAssetUrl(rightLogoSrc),
+    ]);
+
+    const safeTitle = fullName || "Infant";
+    const ch = (checked) => `(${checked ? "\u2713" : "\u00a0"})`;
+
+    const lbl = (text) =>
+      `<td style="white-space:nowrap;font-weight:bold;font-size:7.5pt;padding-right:1mm;vertical-align:bottom;">${text}</td>`;
+
+    const val = (text, width) => {
+      const display =
+        text !== null && text !== undefined && String(text).trim() !== ""
+          ? String(text)
+          : "\u00a0";
+      return `<td style="border-bottom:1px solid #000;font-size:7.5pt;padding:0 1mm 0.2mm;vertical-align:bottom;${width ? `width:${width};` : ""}">${display}</td>`;
+    };
+
+    const vitalsBlock = (growth) =>
+      `<table style="border-collapse:collapse;width:100%;">
+        <tr><td colspan="2" style="font-size:7pt;font-weight:bold;text-transform:uppercase;font-family:Arial,sans-serif;padding-bottom:0.8mm;">VITAL SIGNS:</td></tr>
+        <tr>${lbl("HR:")}${val(formatMeasurement(growth?.heart_rate), "14mm")}</tr>
+        <tr>${lbl("RR:")}${val(formatMeasurement(growth?.respiratory_rate), "14mm")}</tr>
+        <tr>${lbl("Temp:")}${val(formatMeasurement(growth?.temperature_celsius), "14mm")}</tr>
+        <tr>${lbl("HT:")}${val(formatMeasurement(growth?.length_cm), "14mm")}</tr>
+        <tr>${lbl("WT:")}${val(formatMeasurement(growth?.weight_kg), "14mm")}</tr>
+      </table>`;
+
+    const visitBlock = (summary) => {
+      const { template, visitDate, growth, vaccineRows, remarks, breastfeeding, tcb } = summary;
+      const isSixMonths = template.layout === "sixMonths" || template.age === "6 MONTHS";
+      const showBf = ["6 WEEKS", "10 WEEKS", "14 WEEKS"].includes(template.age);
+      const showTcb = template.age !== "12 MONTHS";
+
+      const detailsRows = isSixMonths
+        ? `${showTcb ? `<tr>${lbl("TCB:")}${val(tcb, "20mm")}</tr>` : ""}
+          <tr>${lbl("DATE:")}${val(formatDate(visitDate), "20mm")}</tr>
+          ${vaccineRows.map((v) => `<tr><td colspan="2" style="font-size:7.5pt;padding:0.2mm 0;"><b>${v.label}</b>&nbsp;${ch(v.checked)}</td></tr>`).join("")}
+          <tr>${lbl("BREASTFEEDING? (Y/N):")}${val(breastfeeding, "10mm")}</tr>
+          <tr>${lbl("OTHERS/REMARKS:")}${val(remarks, "")}</tr>`
+        : `<tr>${lbl("DATE:")}${val(formatDate(visitDate), "20mm")}</tr>
+          <tr><td colspan="2" style="font-size:7pt;font-weight:bold;text-transform:uppercase;font-family:Arial,sans-serif;padding:0.3mm 0;">VACCINES:</td></tr>
+          ${vaccineRows.map((v) => `<tr><td colspan="2" style="font-size:7.5pt;padding:0.2mm 0;"><b>${v.label}</b>&nbsp;${ch(v.checked)}</td></tr>`).join("")}
+          <tr>${lbl("OTHERS/REMARKS:")}${val(remarks, "")}</tr>
+          ${showBf ? `<tr>${lbl("BREASTFEEDING? (Y/N):")}${val(breastfeeding, "10mm")}</tr>` : ""}
+          ${showTcb ? `<tr>${lbl("TCB:")}${val(tcb, "20mm")}</tr>` : ""}`;
+
+      return `
+        <p style="margin:0 0 1mm;font-family:Arial,sans-serif;font-size:8.5pt;font-weight:bold;text-transform:uppercase;">${template.age}</p>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:3mm;">
+          <tr>
+            <td style="vertical-align:top;width:62%;padding-right:1.5mm;">
+              <table style="border-collapse:collapse;width:100%;">${detailsRows}</table>
+            </td>
+            <td style="vertical-align:top;">${vitalsBlock(growth)}</td>
+          </tr>
+        </table>`;
+    };
+
+    const catchUpRows = [0, 1, 2, 3, 4]
+      .map(
+        (i) =>
+          `<tr><td style="border-bottom:1px solid #000;font-size:7.5pt;padding:0 0.5mm 0.2mm;">${catchUpData.lines[i] || "\u00a0"}</td></tr>`,
+      )
+      .join("");
+
+    return `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="utf-8"/>
+  <title>Immunization Chart - ${safeTitle}</title>
+  <!--[if gte mso 9]><xml>
+    <w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument>
+  </xml><![endif]-->
+  <style>
+    @page WordSection1 { size: ${printPaperConfig.pageSize}; margin: ${printPaperConfig.pageMargin}; }
+    div.WordSection1 { page: WordSection1; }
+    body { font-family: 'Times New Roman', Times, serif; font-size: 9pt; margin: 0; padding: 0; color: #000; }
+    p { margin: 0; padding: 0; }
+    b { font-weight: bold; }
+    table { border-collapse: collapse; }
+  </style>
+</head>
+<body>
+<div class="WordSection1">
+  <table style="width:100%;border-collapse:collapse;margin-bottom:3mm;">
+    <tr>
+      <td style="width:22mm;vertical-align:top;">
+        <img src="${embeddedLeftLogoSrc}" width="83" height="83" style="width:83px;height:83px;display:block;" alt=""/>
+      </td>
+      <td style="text-align:center;vertical-align:middle;padding:2mm 4mm;">
+        <p style="font-family:Arial,sans-serif;font-size:14pt;font-weight:bold;margin:0;">IMMUNIZATION CHART</p>
+      </td>
+      <td style="width:22mm;vertical-align:top;text-align:right;">
+        <img src="${embeddedRightLogoSrc}" width="83" height="83" style="width:83px;height:83px;display:block;margin-left:auto;" alt=""/>
+      </td>
+    </tr>
+  </table>
+  <p style="font-family:Arial,sans-serif;font-size:9pt;font-weight:bold;margin:0 0 2mm;text-transform:uppercase;">PERSONAL INFORMATION</p>
+  <table style="width:100%;border-collapse:collapse;margin-bottom:3mm;">
+    <tr>
+      <td style="width:50%;vertical-align:top;padding-right:4mm;">
+        <table style="border-collapse:collapse;width:100%;">
+          <tr>${lbl("NAME:")}${val(fullName, "")}</tr>
+          <tr><td colspan="2" style="font-size:6.5pt;font-style:italic;padding:0.2mm 0 1mm;">&nbsp;&nbsp;&nbsp;(Last, First, MI)</td></tr>
+          <tr>${lbl("ADDRESS:")}${val(address, "")}</tr>
+          <tr><td style="height:1.5mm;" colspan="2"></td></tr>
+          <tr>${lbl("DATE OF BIRTH:")}${val(formatDate(infant?.dob), "")}</tr>
+          <tr>
+            ${lbl("BIRTH WEIGHT:")}
+            ${val(formatMeasurement(infant?.birth_weight), "12mm")}
+            <td style="font-weight:bold;font-size:7.5pt;white-space:nowrap;padding:0 1mm;vertical-align:bottom;">KG</td>
+            ${val(formatMeasurement(infant?.birth_height), "12mm")}
+            <td style="font-weight:bold;font-size:7.5pt;white-space:nowrap;padding-left:1mm;vertical-align:bottom;">CM</td>
+          </tr>
+          <tr>${lbl("PLACE OF BIRTH:")}${val(infant?.place_of_birth, "")}</tr>
+          <tr>${lbl("MOTHER'S NAME:")}${val(infant?.mother_name, "")}</tr>
+          <tr>${lbl("AGE:")}${val(ageDisplay, "")}</tr>
+          <tr>${lbl("BCG:")}${val(formatDate(bcgRecord?.admin_date), "28mm")}</tr>
+          <tr>${lbl("HEPA B:")}${val(formatDate(hepaBRecord?.admin_date), "28mm")}</tr>
+        </table>
+      </td>
+      <td style="width:50%;vertical-align:top;padding-left:4mm;">
+        <table style="border-collapse:collapse;width:100%;">
+          <tr>
+            <td colspan="2" style="font-size:7.5pt;padding-bottom:1.5mm;">
+              <b>GENDER:</b>&nbsp;<b>FEMALE</b>&nbsp;${ch(sexValue === "female" || sexValue === "f")}&nbsp;&nbsp;<b>MALE</b>&nbsp;${ch(sexValue === "male" || sexValue === "m")}
+            </td>
+          </tr>
+          <tr>${lbl("TIME OF DELIVERY:")}${val(formatTimeOfDelivery(infant?.time_of_delivery), "25mm")}</tr>
+          <tr>
+            <td colspan="2" style="font-size:7.5pt;padding:1mm 0;">
+              <b>DOCTOR</b>&nbsp;${ch(attendant.includes("doctor"))}&nbsp;
+              <b>MIDWIFE</b>&nbsp;${ch(attendant.includes("midwife"))}&nbsp;
+              <b>NURSE</b>&nbsp;${ch(attendant.includes("nurse"))}&nbsp;
+              <b>HILOT</b>&nbsp;${ch(attendant.includes("hilot"))}
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" style="font-size:7.5pt;padding-bottom:1mm;">
+              <b>TYPE OF DELIVERY:</b>&nbsp;
+              <b>NSD</b>&nbsp;${ch(deliveryType.includes("nsd") || deliveryType.includes("normal"))}&nbsp;
+              <b>CS</b>&nbsp;${ch(deliveryType.includes("cs") || deliveryType.includes("c-section") || deliveryType.includes("caesarean"))}
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" style="font-size:7.5pt;padding-bottom:1mm;">
+              <b>NBS:</b>&nbsp;<b>YES</b>&nbsp;${ch(nbsDone === true)}&nbsp;<b>NO</b>&nbsp;${ch(nbsDone === false)}
+            </td>
+          </tr>
+          <tr>${lbl("DATE:")}${val(formatDate(infant?.nbs_date), "25mm")}</tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+  <p style="font-family:Arial,sans-serif;font-size:9pt;font-weight:bold;margin:0 0 2mm;text-transform:uppercase;">VACCINATION:</p>
+  <table style="width:100%;border-collapse:collapse;">
+    <tr>
+      <td style="width:50%;vertical-align:top;padding-right:4mm;">
+        ${leftColumnVisits.map(visitBlock).join("")}
+      </td>
+      <td style="width:50%;vertical-align:top;padding-left:4mm;">
+        ${rightColumnVisits.map(visitBlock).join("")}
+        <p style="margin:1mm 0 0.8mm;font-size:9pt;font-weight:bold;font-family:'Times New Roman',serif;">CATCH UP:</p>
+        <table style="border-collapse:collapse;width:100%;margin-bottom:2mm;">${catchUpRows}</table>
+        <table style="border-collapse:collapse;width:100%;">
+          <tr>${lbl("BREASTFEEDING? (Y/N)")}${val(catchUpData.breastfeeding, "10mm")}</tr>
+          <tr>${lbl("OTHERS/REMARKS:")}${val(catchUpData.remarks, "")}</tr>
+          <tr>${lbl("HT:")}${val(catchUpData.height, "12mm")}</tr>
+          <tr>${lbl("TEMP:")}${val(catchUpData.temperature, "12mm")}</tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</div>
+</body>
+</html>`;
+  }, [
+    ageDisplay,
+    address,
+    attendant,
+    bcgRecord,
+    catchUpData,
+    deliveryType,
+    fullName,
+    hepaBRecord,
+    infant,
+    leftColumnVisits,
+    leftLogoSrc,
+    nbsDone,
+    printPaperSize,
+    rightColumnVisits,
+    rightLogoSrc,
+    sexValue,
+  ]);
+
   const handlePrintPdf = useCallback(async () => {
     if (!printDateRange.ensureReadyForPrint()) {
       return;
@@ -2557,25 +2755,91 @@ export default function ImmunizationChart({ infantId }) {
     if (!printDateRange.ensureReadyForPrint()) {
       return;
     }
-
     if (!printAreaRef.current) {
       return;
     }
 
+    const printEl = printAreaRef.current;
+    const wrapperEl = printEl.closest(".immunization-chart__print-only");
+    const paperCfg = getPrintPaperConfig(printPaperSize);
+    const pagePreset = getPrintPagePreset(printPaperSize);
+    const twipsToMm = (t) => (t * 25.4) / 1440;
+    const pageWidthMm = twipsToMm(pagePreset.widthTwips);
+    const pageHeightMm = twipsToMm(pagePreset.heightTwips);
+    const contentWidthMm = parseFloat(paperCfg.documentWidth);
+    const pageWidthPx = Math.round((pageWidthMm * 96) / 25.4);
+
+    let prevWrapperStyle = null;
+
     try {
-      await downloadPdfFromNode({
-        node: printAreaRef.current,
-        filename: `Immunization_Chart_${sanitizeFileSegment(fullName || infantId || "child")}.pdf`,
-        title: "Immunization Chart",
-        headerText: "Immunization Chart",
-        page: getPrintPagePreset(printPaperSize),
-        scale: 0.72,
+      if (wrapperEl) {
+        prevWrapperStyle = wrapperEl.getAttribute("style") || "";
+        wrapperEl.setAttribute(
+          "style",
+          `display:block;position:fixed;left:-${pageWidthPx + 100}px;top:0;width:${pageWidthPx}px;z-index:-1;pointer-events:none;overflow:visible;`,
+        );
+      }
+
+      const images = Array.from(printEl.querySelectorAll("img"));
+      await Promise.all(
+        images.map(
+          (img) =>
+            new Promise((resolve) => {
+              if (img.complete) {
+                resolve();
+              } else {
+                img.addEventListener("load", resolve, { once: true });
+                img.addEventListener("error", resolve, { once: true });
+              }
+            }),
+        ),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+
+      const canvas = await html2canvas(printEl, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
       });
+
+      const imgWidthMm = contentWidthMm;
+      const imgHeightMm = (canvas.height / canvas.width) * contentWidthMm;
+      const leftMarginMm = (pageWidthMm - contentWidthMm) / 2;
+
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: [pageWidthMm, Math.max(pageHeightMm, imgHeightMm)],
+        compress: true,
+        putOnlyUsedFonts: true,
+      });
+
+      doc.setProperties({ title: "Immunization Chart" });
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      doc.addImage(imgData, "JPEG", leftMarginMm, 0, imgWidthMm, imgHeightMm, undefined, "FAST");
+      doc.save(
+        `Immunization_Chart_${sanitizeFileSegment(fullName || infantId || "child")}.pdf`,
+      );
     } catch (downloadError) {
       console.error("Error generating immunization chart PDF:", downloadError);
       setLoadError(
         downloadError.message || "Failed to generate the immunization chart PDF.",
       );
+    } finally {
+      if (wrapperEl && prevWrapperStyle !== null) {
+        if (prevWrapperStyle) {
+          wrapperEl.setAttribute("style", prevWrapperStyle);
+        } else {
+          wrapperEl.removeAttribute("style");
+        }
+      }
     }
   }, [fullName, infantId, printDateRange, printPaperSize]);
 
@@ -2585,17 +2849,33 @@ export default function ImmunizationChart({ infantId }) {
     }
 
     try {
-      const printableHtml = await buildPrintableDocument();
-      if (!printableHtml) {
+      const wordHtml = await buildWordDocument();
+      if (!wordHtml) {
         return;
       }
 
+      const paperCfg = getPrintPaperConfig(printPaperSize);
+      const mmToTwips = (mm) => Math.round((parseFloat(mm) * 1440) / 25.4);
+      const [marginTop, marginSide, marginBottom] = paperCfg.pageMargin
+        .trim()
+        .split(/\s+/)
+        .map((v) => mmToTwips(v));
       downloadWordDocument({
-        html: printableHtml,
+        html: wordHtml,
         filename: `Immunization_Chart_${sanitizeFileSegment(fullName || infantId || "child")}.docx`,
         title: "Immunization Chart",
-        headerText: "Immunization Chart",
-        page: getPrintPagePreset(printPaperSize),
+        page: {
+          ...getPrintPagePreset(printPaperSize),
+          margins: {
+            top: marginTop,
+            bottom: marginBottom,
+            left: marginSide,
+            right: marginSide,
+            header: 360,
+            footer: 360,
+            gutter: 0,
+          },
+        },
       });
     } catch (downloadError) {
       console.error("Error generating immunization chart Word document:", downloadError);
@@ -2604,7 +2884,7 @@ export default function ImmunizationChart({ infantId }) {
           "Failed to generate the immunization chart Word document.",
       );
     }
-  }, [buildPrintableDocument, fullName, infantId, printDateRange, printPaperSize]);
+  }, [buildWordDocument, fullName, infantId, printDateRange, printPaperSize]);
 
   const openVisitModal = (visit) => {
     setSelectedVisit(visit);
@@ -2792,10 +3072,6 @@ export default function ImmunizationChart({ infantId }) {
                   title="Download Word"
                 />
               </div>
-            </div>
-
-            <div className="mt-4">
-              <PrintDateRangeControls controller={printDateRange} />
             </div>
 
             {saveSuccess && (
