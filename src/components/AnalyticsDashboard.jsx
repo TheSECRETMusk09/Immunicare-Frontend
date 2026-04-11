@@ -1628,7 +1628,7 @@ const KpiSummaryGrid = ({ data, loading, isDark }) => {
         <KpiCard
           title="Vaccinations Completed Today"
           value={kpis.vaccinationsToday}
-          subtitle="Completed or attended"
+          subtitle="Unique children vaccinated"
           icon={LocalHospital}
           color="success"
           loading={loading}
@@ -2504,7 +2504,7 @@ const TrendsSection = ({ data, loading, chartAppearance }) => {
       <Grid size={{ xs: 12, md: 6 }}>
         <ChartCard
           title="Vaccination Trend"
-          subtitle="Daily administered records within selected period"
+          subtitle="Total doses administered daily"
           loading={loading}
           empty={vaxTrend.length === 0}
           emptyMessage="No timeline points available for the selected date range."

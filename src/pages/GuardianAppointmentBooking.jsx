@@ -32,7 +32,7 @@ import {
   triggerGuardianAddChildModal,
 } from "../components/QuickActionFAB";
 import { trackEvent } from "../utils/telemetry";
-import { isPhilippineHoliday, getMinBookingDate } from "../utils/holidays";
+import { isDateAvailableForBooking, getMinBookingDate } from "../utils/holidays";
 import { formatTimeSlotLabel } from "../utils/dateUtils";
 import { normalizeArrayPayload } from "../utils/apiUtils";
 
@@ -42,28 +42,18 @@ const getMinDate = () => {
 };
 
 // Validate date selection
-const validateDateSelection = (dateStr) => {
+const validateDateSelection = (dateStr, blockedDates = {}) => {
   if (!dateStr) return { valid: false, message: "Please select a date" };
 
-  const selectedDate = new Date(dateStr);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  if (selectedDate < today) {
+  const availability = isDateAvailableForBooking(dateStr, { blockedDates });
+  if (!availability.isAvailable) {
     return {
       valid: false,
-      message: "Cannot schedule appointments in the past",
+      message: availability.reason,
+      code: availability.code,
+      holiday: availability.holiday || null,
+      blockedDate: availability.blockedDate || null,
     };
-  }
-
-  const day = selectedDate.getDay();
-  if (day === 6)
-    return { valid: false, message: "Saturdays are not available" };
-  if (day === 0) return { valid: false, message: "Sundays are not available" };
-
-  const holiday = isPhilippineHoliday(dateStr);
-  if (holiday) {
-    return { valid: false, message: `${holiday.name} - Not available` };
   }
 
   return { valid: true, message: "Date is available" };
@@ -158,6 +148,7 @@ export default function GuardianAppointmentBooking() {
   const [timeSlotsLoading, setTimeSlotsLoading] = useState(false);
   const [timeSlots, setTimeSlots] = useState([]);
   const [timeSlotsFeedback, setTimeSlotsFeedback] = useState(null);
+  const [blockedDates, setBlockedDates] = useState({});
 
   // Readiness state for automation
   const [childReadiness, setChildReadiness] = useState(null);
@@ -177,6 +168,8 @@ export default function GuardianAppointmentBooking() {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const blockedBookingMessage = getBlockedBookingMessage(childReadiness);
+  const bookingClinicId = selectedChild?.clinic_id || selectedChild?.facility_id || null;
+  const bookingMonthKey = formData.scheduled_date ? String(formData.scheduled_date).slice(0, 7) : "";
 
   // Fetch children for this guardian
   const fetchChildren = useCallback(async () => {
@@ -239,6 +232,22 @@ export default function GuardianAppointmentBooking() {
       return;
     }
 
+    const dateAvailability = isDateAvailableForBooking(formData.scheduled_date, {
+      blockedDates,
+    });
+    if (!dateAvailability.isAvailable) {
+      setTimeSlots([]);
+      setTimeSlotsFeedback({
+        available: false,
+        code: dateAvailability.code,
+        message: dateAvailability.reason,
+        holiday: dateAvailability.holiday || null,
+        blockedDate: dateAvailability.blockedDate || null,
+      });
+      setFormData((previous) => ({ ...previous, scheduled_time: "" }));
+      return;
+    }
+
     setTimeSlotsLoading(true);
     setTimeSlotsFeedback(null);
 
@@ -274,6 +283,7 @@ export default function GuardianAppointmentBooking() {
     formData.vaccine_id,
     selectedChild?.clinic_id,
     selectedChild?.facility_id,
+    blockedDates,
   ]);
 
   useEffect(() => {
@@ -366,6 +376,50 @@ export default function GuardianAppointmentBooking() {
     selectedChild?.id,
   ]);
 
+  useEffect(() => {
+    if (!bookingMonthKey || !bookingClinicId) {
+      setBlockedDates({});
+      return;
+    }
+
+    const abortController = new AbortController();
+    let active = true;
+
+    const fetchBlockedDates = async () => {
+      try {
+        const result = await apiClient.getBlockedDates(
+          {
+            month: bookingMonthKey,
+            clinic_id: bookingClinicId,
+          },
+          { signal: abortController.signal },
+        );
+
+        if (!active) {
+          return;
+        }
+
+        setBlockedDates(result?.blockedDates || {});
+      } catch (err) {
+        if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED") {
+          return;
+        }
+
+        console.error("Error fetching blocked dates:", err);
+        if (active) {
+          setBlockedDates({});
+        }
+      }
+    };
+
+    fetchBlockedDates();
+
+    return () => {
+      active = false;
+      abortController.abort();
+    };
+  }, [bookingClinicId, bookingMonthKey]);
+
   // Handle child selection
   const handleChildSelect = (infantId) => {
     const child = children.find((c) => c.id === parseInt(infantId));
@@ -402,7 +456,7 @@ export default function GuardianAppointmentBooking() {
     } else if (fieldName === "scheduled_date") {
       if (!formData.scheduled_date) error = "Please select a date";
       else {
-        const dateValidation = validateDateSelection(formData.scheduled_date);
+        const dateValidation = validateDateSelection(formData.scheduled_date, blockedDates);
         if (!dateValidation.valid) error = dateValidation.message;
       }
     } else if (fieldName === "scheduled_time") {
@@ -891,6 +945,9 @@ export default function GuardianAppointmentBooking() {
                         type="date"
                         value={formData.scheduled_date}
                         min={getMinDate()}
+                        shouldDisableDate={(date) =>
+                          !isDateAvailableForBooking(date, { blockedDates }).isAvailable
+                        }
                         onChange={(e) =>
                           setFormData((prev) => ({
                             ...prev,
@@ -903,7 +960,7 @@ export default function GuardianAppointmentBooking() {
                         className="w-full guardian-input"
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        Weekdays only (Mon-Fri). Holidays not available.
+                        Weekdays only (Mon-Fri). Holidays and blocked dates are not available.
                       </p>
                     </div>
 
@@ -1196,6 +1253,7 @@ export default function GuardianAppointmentBooking() {
                 !selectedChild ||
                 !formData.vaccine_id ||
                 !formData.scheduled_date ||
+                !isDateAvailableForBooking(formData.scheduled_date, { blockedDates }).isAvailable ||
                 !formData.scheduled_time ||
                 (childReadiness && childReadiness.readinessStatus === 'PENDING_CONFIRMATION')
               }

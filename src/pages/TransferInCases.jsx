@@ -74,6 +74,8 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
   const [statusFilter, setStatusFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
   const [triageFilter, setTriageFilter] = useState("");
+  const [startDateFilter, setStartDateFilter] = useState("");
+  const [endDateFilter, setEndDateFilter] = useState("");
 
   const [selectedCase, setSelectedCase] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -116,6 +118,8 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
         const response = await apiClient.getTransferInCases({
           limit: pageSize,
           offset,
+          ...(startDateFilter ? { start_date: startDateFilter } : {}),
+          ...(endDateFilter ? { end_date: endDateFilter } : {}),
         });
 
         if (!response.success) {
@@ -154,7 +158,7 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [startDateFilter, endDateFilter]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -187,9 +191,31 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
       result = result.filter((caseItem) => caseItem.triage_category === triageFilter);
     }
 
+    if (startDateFilter) {
+      result = result.filter((caseItem) => {
+        const submittedDate = String(caseItem.created_at || "").slice(0, 10);
+        return submittedDate && submittedDate >= startDateFilter;
+      });
+    }
+
+    if (endDateFilter) {
+      result = result.filter((caseItem) => {
+        const submittedDate = String(caseItem.created_at || "").slice(0, 10);
+        return submittedDate && submittedDate <= endDateFilter;
+      });
+    }
+
     setFilteredCases(result);
     setCurrentPage(1);
-  }, [cases, searchQuery, statusFilter, priorityFilter, triageFilter]);
+  }, [
+    cases,
+    searchQuery,
+    statusFilter,
+    priorityFilter,
+    triageFilter,
+    startDateFilter,
+    endDateFilter,
+  ]);
 
   useEffect(() => {
     onRefreshStateChange?.(refreshing);
@@ -509,10 +535,27 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
     );
   }
 
+  const pageHorizontalPaddingClass = showHeader ? "px-4 sm:px-6" : "";
+  const stickyBleedClass = showHeader
+    ? "-mx-4 sm:-mx-6 px-4 sm:px-6"
+    : "";
+  const contentBleedClass = showHeader
+    ? "px-4 sm:px-6 -mx-4 sm:-mx-6"
+    : "";
+  const filterCardPaddingClass = showHeader ? "p-4" : "p-4 sm:p-5";
+  const sectionPaddingClass = showHeader ? "px-4 py-4" : "px-5 py-4";
+  const paginationPaddingClass = showHeader
+    ? "px-4 py-4"
+    : "px-5 py-4";
+
   return (
-    <div className="flex h-full min-h-0 flex-col gap-8 px-6">
+    <div
+      className={`flex h-full min-h-0 flex-col gap-6 ${pageHorizontalPaddingClass}`.trim()}
+    >
       {showHeader && (
-        <div className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6 -mx-6 -mt-6">
+        <div
+          className={`sticky top-0 z-30 -mt-6 border-b border-gray-200 bg-white pb-4 pt-6 dark:border-gray-700 dark:bg-gray-900 ${stickyBleedClass}`.trim()}
+        >
           <PageHeader
             title="Transfer-In Cases Validation"
             subtitle="Review and validate transfer-in cases from other health centers"
@@ -536,9 +579,11 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
 
       {/* Filters - Sticky below header */}
       <div
-        className={`sticky ${showHeader ? "top-[88px]" : "top-0"} z-20 bg-white dark:bg-gray-900 -mx-6 px-6`}
+        className={`sticky ${showHeader ? "top-[88px]" : "top-0"} z-20 bg-white dark:bg-gray-900 ${stickyBleedClass}`.trim()}
       >
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
+        <div
+          className={`rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800 ${filterCardPaddingClass}`.trim()}
+        >
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -549,6 +594,22 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
                 className="pl-10"
               />
             </div>
+
+            <Input
+              type="date"
+              value={startDateFilter}
+              onChange={(e) => setStartDateFilter(e.target.value)}
+              title="Filter by Submitted Start Date"
+              className="w-48"
+            />
+
+            <Input
+              type="date"
+              value={endDateFilter}
+              onChange={(e) => setEndDateFilter(e.target.value)}
+              title="Filter by Submitted End Date"
+              className="w-48"
+            />
 
             <Select
               placeholder="Filter by status"
@@ -600,9 +661,13 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
         </div>
       </div>
 
-      <div className="animate-fade-in px-6 -mx-6 flex-1 min-h-0 flex flex-col">
+      <div
+        className={`animate-fade-in flex-1 min-h-0 flex flex-col ${contentBleedClass}`.trim()}
+      >
         <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between gap-4 flex-shrink-0">
+          <div
+            className={`border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50 flex items-center justify-between gap-4 flex-shrink-0 ${sectionPaddingClass}`.trim()}
+          >
             <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
               Transfer-In Cases - Click to View Details
             </h3>
@@ -673,7 +738,9 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
             </table>
           </div>
           {filteredCases.length > itemsPerPage && (
-            <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
+            <div
+              className={`flex-shrink-0 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800 ${paginationPaddingClass}`.trim()}
+            >
               <div className="text-sm text-gray-500 dark:text-gray-400">
                 Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
                 {Math.min(currentPage * itemsPerPage, filteredCases.length)} of{" "}

@@ -662,6 +662,24 @@ class ApiClient {
     this.client = axiosClient;
   }
 
+  normalizeQueryParamValue(key, value) {
+    if (value === undefined || value === null || value === "") {
+      return null;
+    }
+
+    const normalizedKey = String(key || "").trim().toLowerCase();
+    if (["page", "limit", "offset"].includes(normalizedKey)) {
+      const parsed = Number.parseInt(value, 10);
+      return Number.isFinite(parsed) && parsed >= 0 ? String(parsed) : null;
+    }
+
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+
+    return String(value);
+  }
+
   async request(endpoint, options = {}) {
     const requestConfig = {
       url: endpoint,
@@ -905,8 +923,9 @@ class ApiClient {
     const queryParams = new URLSearchParams();
 
     Object.entries(params || {}).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== "") {
-        queryParams.append(key, String(value));
+      const normalizedValue = this.normalizeQueryParamValue(key, value);
+      if (normalizedValue !== null) {
+        queryParams.append(key, normalizedValue);
       }
     });
 
@@ -956,9 +975,12 @@ class ApiClient {
     return this.request(`/infants/${infantId}/activities?limit=${limit}`);
   }
 
-  async getDashboardInfants(params = {}) {
+  async getDashboardInfants(params = {}, config = {}) {
     const suffix = this.buildQuerySuffix(params);
-    return this.request(`/dashboard/infants${suffix}`);
+    return this.request(`/dashboard/infants${suffix}`, {
+      method: "GET",
+      ...config,
+    });
   }
 
   async getDashboardGuardians(params = {}, config = {}) {
@@ -1172,9 +1194,12 @@ class ApiClient {
   }
 
   // Infants Management endpoints
-  async getInfants(params = {}) {
+  async getInfants(params = {}, config = {}) {
     const suffix = this.buildQuerySuffix(params);
-    return this.request(`/infants${suffix}`);
+    return this.request(`/infants${suffix}`, {
+      method: "GET",
+      ...config,
+    });
   }
 
   async getInfant(id) {
@@ -1261,7 +1286,7 @@ class ApiClient {
   }
 
   async searchInfants(query) {
-    return this.request(`/infants/search/${query}`);
+    return this.request(`/infants/search/${encodeURIComponent(String(query ?? ""))}`);
   }
 
   async getInfantsByGuardian(guardianId) {
@@ -1270,7 +1295,7 @@ class ApiClient {
 
   // Infant Age Management endpoints
   async getInfantAges(limit = 100, offset = 0) {
-    return this.request(`/infant-ages?limit=${limit}&offset=${offset}`);
+    return this.request(`/infant-ages${this.buildQuerySuffix({ limit, offset })}`);
   }
 
   async getInfantAgeStats() {
@@ -1305,14 +1330,20 @@ class ApiClient {
     return this.request("/vaccinations/records");
   }
 
-  async getVaccinationRecords(params = {}) {
+  async getVaccinationRecords(params = {}, config = {}) {
     const suffix = this.buildQuerySuffix(params);
-    return this.request(`/vaccinations/records${suffix}`);
+    return this.request(`/vaccinations/records${suffix}`, {
+      method: "GET",
+      ...config,
+    });
   }
 
-  async getVaccinationReconciliationRecords(params = {}) {
+  async getVaccinationReconciliationRecords(params = {}, config = {}) {
     const suffix = this.buildQuerySuffix(params);
-    return this.request(`/vaccinations/records/reconciliation${suffix}`);
+    return this.request(`/vaccinations/records/reconciliation${suffix}`, {
+      method: "GET",
+      ...config,
+    });
   }
 
   async getVaccinationRecordsByInfant(infantId) {
@@ -1365,12 +1396,19 @@ class ApiClient {
     });
   }
 
-  async getVaccines() {
-    return this.request("/vaccinations/vaccines");
+  async getVaccines(config = {}) {
+    return this.request("/vaccinations/vaccines", {
+      method: "GET",
+      ...config,
+    });
   }
 
-  async getVaccinationSchedules() {
-    return this.request("/vaccinations/schedules");
+  async getVaccinationSchedules(params = {}, config = {}) {
+    const suffix = this.buildQuerySuffix(params);
+    return this.request(`/vaccinations/schedules${suffix}`, {
+      method: "GET",
+      ...config,
+    });
   }
 
   async getVaccinationSchedulesByInfant(infantId) {
@@ -1483,9 +1521,20 @@ class ApiClient {
     });
   }
 
-   async getVaccineInventoryStatus(vaccineId) {
-     return this.request(`/vaccinations/inventory-status/${vaccineId}`);
-   }
+  async getVaccineInventoryStatus(vaccineId) {
+    return this.request(`/vaccinations/inventory-status/${vaccineId}`);
+  }
+
+  async getValidVaccineInventory(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        query.append(key, String(value));
+      }
+    });
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    return this.request(`/vaccinations/inventory/valid${suffix}`);
+  }
 
   async getAppointmentSuggestions(input, legacyGuardianId = null, legacyClinicId = null, options = {}) {
      const normalizedInput =

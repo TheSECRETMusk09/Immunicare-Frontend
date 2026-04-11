@@ -74,10 +74,10 @@ export default function ManagementDashboard() {
     fetchInfants();
   };
 
-  // Fetch infants on component mount
+  // Fetch infants on component mount - stable dependencies
   useEffect(() => {
     fetchInfants();
-  }, [fetchInfants]);
+  }, []); // Empty dependency array since fetchInfants is stable
 
   const renderSection = () => {
     // If an infant is selected, show the infant details view with action buttons

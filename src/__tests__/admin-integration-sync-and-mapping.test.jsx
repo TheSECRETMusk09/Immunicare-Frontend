@@ -23,6 +23,7 @@ import useVaccinationSocket from "../hooks/useVaccinationSocket";
 jest.mock("../utils/api", () => ({
   __esModule: true,
   default: {
+    getDashboardInfants: jest.fn(),
     getVaccinationRecords: jest.fn(),
     getVaccinationSchedules: jest.fn(),
     getInfants: jest.fn(),
@@ -174,6 +175,7 @@ describe("Admin integration sync and mapping checks", () => {
     apiClient.getVaccineInventory.mockResolvedValue([]);
     apiClient.getVaccineInventoryStatus.mockResolvedValue({ clinicId: 7, batches: [] });
     apiClient.createVaccineInventoryTransaction.mockResolvedValue({ id: 901 });
+    apiClient.getInfants.mockResolvedValue(infantRows);
     apiClient.getSystemUsers.mockResolvedValue([
       {
         id: 100,
@@ -263,17 +265,17 @@ describe("Admin integration sync and mapping checks", () => {
   test("vaccinations dashboard removes analytics tab and renders only required tabs", async () => {
     apiClient.getVaccinationRecords.mockResolvedValueOnce(vaccinationRecordRows);
     apiClient.getVaccinationSchedules.mockResolvedValueOnce(scheduleRows);
-    apiClient.getInfants.mockResolvedValueOnce(infantRows);
+    apiClient.getDashboardInfants.mockResolvedValueOnce(infantRows);
     apiClient.getVaccines.mockResolvedValueOnce(vaccineRows);
 
     renderVaccinationsDashboard();
 
     expect(
-      await screen.findByRole("button", { name: /vaccination schedule/i }),
+    await screen.findByRole("button", { name: /vaccination schedule/i }),
     ).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(apiClient.getVaccinationRecords).toHaveBeenCalled();
+      expect(apiClient.getVaccinationRecords).not.toHaveBeenCalled();
     });
     expect(apiClient.getVaccinationSchedules).toHaveBeenCalled();
 
@@ -292,7 +294,7 @@ describe("Admin integration sync and mapping checks", () => {
   test("vaccinations dashboard mutation triggers refresh fetch", async () => {
     apiClient.getVaccinationRecords.mockResolvedValue(vaccinationRecordRows);
     apiClient.getVaccinationSchedules.mockResolvedValue(scheduleRows);
-    apiClient.getInfants.mockResolvedValue(infantRows);
+    apiClient.getDashboardInfants.mockResolvedValue(infantRows);
     apiClient.getVaccines.mockResolvedValue(vaccineRows);
     apiClient.getVaccineInventory.mockResolvedValue(inventoryRecordRows);
     apiClient.createVaccinationRecord.mockResolvedValueOnce({
@@ -333,7 +335,7 @@ describe("Admin integration sync and mapping checks", () => {
     ).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(apiClient.getVaccinationRecords).toHaveBeenCalledTimes(1);
+      expect(apiClient.getVaccinationRecords).not.toHaveBeenCalled();
     });
 
     fireEvent.click(screen.getByRole("button", { name: /^➕\s*add$/i }));
@@ -392,14 +394,14 @@ describe("Admin integration sync and mapping checks", () => {
     });
 
     await waitFor(() => {
-      expect(apiClient.getVaccinationRecords.mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(apiClient.getVaccinationRecords.mock.calls.length).toBeGreaterThanOrEqual(1);
     });
   });
 
   test("vaccination add flow auto-selects the earliest FEFO-linked batch", async () => {
     apiClient.getVaccinationRecords.mockResolvedValue(vaccinationRecordRows);
     apiClient.getVaccinationSchedules.mockResolvedValue(scheduleRows);
-    apiClient.getInfants.mockResolvedValue(infantRows);
+    apiClient.getDashboardInfants.mockResolvedValue(infantRows);
     apiClient.getVaccines.mockResolvedValue(vaccineRows);
     apiClient.getVaccineInventory.mockResolvedValue(inventoryRecordRows);
     apiClient.getVaccineInventoryStatus.mockResolvedValue({
@@ -461,7 +463,7 @@ describe("Admin integration sync and mapping checks", () => {
     try {
       apiClient.getVaccines.mockResolvedValue(vaccineRows);
       apiClient.getVaccinationSchedules.mockResolvedValue(scheduleRows);
-      apiClient.getInfants.mockResolvedValue(infantRows);
+      apiClient.getDashboardInfants.mockResolvedValue(infantRows);
       apiClient.getVaccinationRecords.mockResolvedValue(vaccinationRecordRows);
       apiClient.getVaccineInventory.mockResolvedValue([
         {
@@ -513,7 +515,7 @@ describe("Admin integration sync and mapping checks", () => {
 
     apiClient.getVaccines.mockResolvedValue(vaccineRows);
     apiClient.getVaccinationSchedules.mockResolvedValue(scheduleRows);
-    apiClient.getInfants.mockResolvedValue(infantRows);
+    apiClient.getDashboardInfants.mockResolvedValue(infantRows);
     apiClient.getVaccinationRecords.mockResolvedValue(vaccinationRecordRows);
     apiClient.getVaccineInventory.mockResolvedValue([]);
 
@@ -532,7 +534,7 @@ describe("Admin integration sync and mapping checks", () => {
       { id: 99, name: "Pentavalent", code: "LEGACY", doses_required: 3 },
     ]);
     apiClient.getVaccinationSchedules.mockResolvedValue(scheduleRows);
-    apiClient.getInfants.mockResolvedValue(infantRows);
+    apiClient.getDashboardInfants.mockResolvedValue(infantRows);
     apiClient.getVaccinationRecords.mockResolvedValue(vaccinationRecordRows);
     apiClient.getVaccineInventory.mockResolvedValue([
       {

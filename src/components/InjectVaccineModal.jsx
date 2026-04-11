@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import apiClient from "../utils/api";
 import { Button, Input, Modal, Select, Alert, AdminModalActions, TextArea } from "./UI";
 import { useAuth } from "../contexts/AuthContext";
@@ -12,7 +12,10 @@ import {
   normalizeVaccineInventoryResponse,
   buildFefoBatchOptions,
 } from "../utils/adminDataAdapters";
-import { getApprovedBrandsForVaccine } from "../constants/approvedVaccines";
+import {
+  getApprovedBrandsForVaccine,
+  isApprovedVaccineName,
+} from "../constants/approvedVaccines";
 import {
   buildVaccinationBatchOptionLabel,
   resolveLotBatchValue,
@@ -172,6 +175,9 @@ export default function InjectVaccineModal({
   infantName,
   prefillContext = null,
   onSuccess = () => {},
+  title = "Record Vaccinations",
+  submitLabel = "Record Vaccinations",
+  infantLabel = "Select Infant",
 }) {
   const { isAdmin, user } = useAuth();
   const scopedClinicId = user?.clinic_id || user?.facility_id || null;
@@ -188,24 +194,77 @@ export default function InjectVaccineModal({
   const [vaccinationBatchOptionsLoading, setVaccinationBatchOptionsLoading] = useState(false);
   const [vaccinationBatchOptionsError, setVaccinationBatchOptionsError] = useState(null);
 
+  // Infant pagination and search states
+  const [infantsLoading, setInfantsLoading] = useState(false);
+  const [infantsSearchQuery, setInfantsSearchQuery] = useState("");
+  const [infantsPage, setInfantsPage] = useState(1);
+  const [infantsHasMore, setInfantsHasMore] = useState(true);
+
   const [formData, setFormData] = useState(INITIAL_FORM);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [vaccinationHistory, setVaccinationHistory] = useState([]);
+  const batchSelectionModeRef = useRef("auto");
 
   const timeOptions = useMemo(() => generateTimeOptions(), []);
 
+  const selectedInfantOverride = useMemo(() => {
+    const selectedId = Number(
+      selectedInfantId ||
+        infantId ||
+        prefillContext?.infant_id ||
+        prefillContext?.infantId ||
+        0,
+    );
+
+    if (!Number.isFinite(selectedId) || selectedId <= 0) {
+      return null;
+    }
+
+    const existingInfant = infants.find((entry) => Number(entry.id) === selectedId) || null;
+    if (existingInfant) {
+      return null;
+    }
+
+    const context = prefillContext || {};
+    const firstName = String(
+      context.first_name || context.patient_first_name || context.infant_first_name || "",
+    ).trim();
+    const lastName = String(
+      context.last_name || context.patient_last_name || context.infant_last_name || "",
+    ).trim();
+    const composedName = [firstName, lastName].filter(Boolean).join(" ").trim();
+    const fallbackName = String(
+      infantName || context.full_name || context.name || `Infant ${selectedId}`,
+    ).trim();
+    const displayName = composedName || fallbackName;
+
+    return {
+      id: selectedId,
+      first_name: firstName,
+      last_name: lastName,
+      full_name: displayName,
+      name: displayName,
+      dob:
+        context.dob ||
+        context.date_of_birth ||
+        context.birth_date ||
+        context.patient_dob ||
+        "",
+      control_number:
+        context.control_number || context.infant_control_number || context.patient_control_number || "",
+      infant_control_number:
+        context.infant_control_number || context.control_number || context.patient_control_number || "",
+    };
+  }, [infantId, infantName, infants, prefillContext, selectedInfantId]);
+
   const fetchData = useCallback(async () => {
     try {
-      const infantQuery = isAdmin
-        ? { limit: 10000, scope: "system" }
-        : { limit: 1500 };
-      const [vaccinesResponse, infantsResponse, inventoryResponse, systemUsersResponse] =
+      const [vaccinesResponse, inventoryResponse, systemUsersResponse] =
         await Promise.all([
           apiClient.getVaccines(),
-          apiClient.getInfants(infantQuery),
           apiClient.getVaccineInventory(
             scopedClinicId ? { clinic_id: scopedClinicId } : {}
           ),
@@ -219,7 +278,6 @@ export default function InjectVaccineModal({
         ]);
 
       const normalizedVaccines = normalizeVaccinesResponse(vaccinesResponse);
-      const normalizedInfants = normalizeInfantsResponse(infantsResponse);
       const normalizedInventory = normalizeVaccineInventoryResponse(inventoryResponse);
 
       const allUsers = Array.isArray(systemUsersResponse)
@@ -270,17 +328,47 @@ export default function InjectVaccineModal({
         .sort((left, right) => left.optionLabel.localeCompare(right.optionLabel));
 
       setVaccines(normalizedVaccines);
-      setInfants(normalizedInfants);
       setInventoryRecords(normalizedInventory);
       setHealthWorkerUsers(normalizedHealthWorkers);
     } catch (err) {
       console.error("Error fetching data:", err);
       setVaccines([]);
-      setInfants([]);
       setInventoryRecords([]);
       setHealthWorkerUsers([]);
     }
   }, [isAdmin, scopedClinicId]);
+
+  const fetchInfantsBatch = useCallback(async (query = "", page = 1, append = false) => {
+    setInfantsLoading(true);
+    try {
+      const infantQuery = {
+        limit: 50,
+        page,
+        search: query || undefined,
+        ...(isAdmin ? { scope: "system" } : {}),
+      };
+
+      const response = await apiClient.getInfants(infantQuery);
+      const normalizedInfants = normalizeInfantsResponse(response);
+
+      if (append) {
+        setInfants((prev) => {
+          const existingIds = new Set(prev.map(i => i.id));
+          const newInfants = normalizedInfants.filter(i => !existingIds.has(i.id));
+          return [...prev, ...newInfants];
+        });
+      } else {
+        setInfants(normalizedInfants);
+      }
+
+      const pagination = response?.pagination || response?.data?.pagination;
+      setInfantsHasMore(pagination ? pagination.page < pagination.totalPages : normalizedInfants.length === 50);
+    } catch (err) {
+      console.error("Error fetching infants batch:", err);
+    } finally {
+      setInfantsLoading(false);
+    }
+  }, [isAdmin]);
 
   const fetchVaccinationHistory = useCallback(async (targetInfantId) => {
     if (!targetInfantId) {
@@ -289,6 +377,11 @@ export default function InjectVaccineModal({
     }
 
     try {
+      if (typeof apiClient.getVaccinationRecordsByInfant !== "function") {
+        setVaccinationHistory([]);
+        return;
+      }
+
       const historyResponse = await apiClient.getVaccinationRecordsByInfant(
         Number(targetInfantId),
       );
@@ -307,19 +400,48 @@ export default function InjectVaccineModal({
 
     setEligibleLoading(true);
     try {
-      const response = await apiClient.getEligibleVaccines(Number(targetInfantId));
-      setEligibleVaccines(response);
+      const clinicId = user?.clinic_id || user?.facility_id;
+      if (clinicId && typeof apiClient.getValidVaccineInventory === "function") {
+        const inventoryResponse = await apiClient.getValidVaccineInventory({ clinic_id: clinicId });
+        const inventoryRows = Array.isArray(inventoryResponse)
+          ? inventoryResponse
+          : inventoryResponse?.data || [];
+        const availableVaccines = inventoryRows.map(item => ({
+          vaccineId: item.vaccine_id,
+          vaccineName: item.vaccine_name,
+          vaccineCode: item.vaccine_code,
+          batchId: item.batch_id,
+          lotNo: item.lot_no,
+          expiryDate: item.expiry_date,
+          qtyCurrent: item.qty_current,
+        }));
+        setEligibleVaccines({
+          eligibleVaccines: availableVaccines,
+          upcomingVaccines: [],
+          notEligibleVaccines: [],
+          completedVaccines: [],
+        });
+      } else if (typeof apiClient.getEligibleVaccines === "function") {
+        const response = await apiClient.getEligibleVaccines(Number(targetInfantId));
+        setEligibleVaccines(response);
+      } else {
+        setEligibleVaccines(null);
+      }
     } catch (err) {
       console.error("Error fetching eligible vaccines:", err);
       setEligibleVaccines(null);
     } finally {
       setEligibleLoading(false);
     }
-  }, []);
+  }, [user?.clinic_id, user?.facility_id]);
 
   useEffect(() => {
     if (isOpen) {
       void fetchData();
+
+      setInfantsPage(1);
+      setInfantsSearchQuery("");
+      fetchInfantsBatch("", 1, false);
 
       const normalizedPrefillInfantId =
         Number(prefillContext?.infant_id ?? prefillContext?.infantId ?? infantId ?? 0) ||
@@ -334,8 +456,26 @@ export default function InjectVaccineModal({
       setVaccinationBatchOptions([]);
       setVaccinationBatchOptionsLoading(false);
       setVaccinationBatchOptionsError(null);
+      batchSelectionModeRef.current = "auto";
     }
-  }, [isOpen, infantId, fetchData, prefillContext]);
+  }, [isOpen, infantId, fetchData, fetchInfantsBatch, prefillContext]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const timeoutId = setTimeout(() => {
+      setInfantsPage(1);
+      fetchInfantsBatch(infantsSearchQuery, 1, false);
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [infantsSearchQuery, isOpen, fetchInfantsBatch]);
+
+  const handleLoadMoreInfants = useCallback(() => {
+    const nextPage = infantsPage + 1;
+    setInfantsPage(nextPage);
+    fetchInfantsBatch(infantsSearchQuery, nextPage, true);
+  }, [infantsPage, infantsSearchQuery, fetchInfantsBatch]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -608,6 +748,7 @@ export default function InjectVaccineModal({
           lot_batch_number: "",
         }));
       }
+      batchSelectionModeRef.current = "auto";
       return;
     }
 
@@ -616,10 +757,17 @@ export default function InjectVaccineModal({
         String(option.batch_id) === String(formData.batch_id || "") && !option.selection_disabled,
     );
 
-    const nextSelectedOption =
-      matchingSelectedOption ||
+    const recommendedBatchOption =
+      vaccinationBatchOptions.find(
+        (option) => option.is_fefo_recommended && !option.selection_disabled,
+      ) ||
       vaccinationBatchOptions.find((option) => !option.selection_disabled) ||
       null;
+
+    const nextSelectedOption =
+      batchSelectionModeRef.current === "manual" && matchingSelectedOption
+        ? matchingSelectedOption
+        : recommendedBatchOption;
 
     const nextBatchId = nextSelectedOption ? String(nextSelectedOption.batch_id) : "";
     const nextInventoryRecordId = nextSelectedOption?.matched_inventory_record_id
@@ -644,6 +792,7 @@ export default function InjectVaccineModal({
       vaccine_inventory_id: nextInventoryRecordId,
       lot_batch_number: nextLotBatchValue,
     }));
+    batchSelectionModeRef.current = "auto";
   }, [
     formData.batch_id,
     formData.lot_batch_number,
@@ -921,6 +1070,7 @@ export default function InjectVaccineModal({
       ];
       const selectedVaccine = allVaccines.find(v => v.vaccineId === Number(value));
       if (selectedVaccine) {
+        batchSelectionModeRef.current = "auto";
         setFormData((prev) => ({
           ...prev,
           [name]: value,
@@ -932,6 +1082,10 @@ export default function InjectVaccineModal({
         }));
         return;
       }
+    }
+
+    if (name === "vaccine_id") {
+      batchSelectionModeRef.current = "auto";
     }
 
     setFormData((prev) => ({
@@ -948,11 +1102,18 @@ export default function InjectVaccineModal({
     }));
   };
 
+  const handleInfantSelectionChange = useCallback((event) => {
+    const newInfantId = event.target.value;
+    setSelectedInfantId(newInfantId);
+    void fetchVaccinationHistory(newInfantId);
+    void fetchEligibleVaccines(newInfantId);
+  }, [fetchEligibleVaccines, fetchVaccinationHistory]);
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Record Vaccinations"
+      title={title}
       size="md"
       footer={
         <AdminModalActions>
@@ -970,7 +1131,7 @@ export default function InjectVaccineModal({
               vaccinationBatchOptionsLoading
             }
           >
-            {loading ? "Recording..." : "Record Vaccinations"}
+            {loading ? "Recording..." : submitLabel}
           </Button>
         </AdminModalActions>
       }
@@ -999,18 +1160,36 @@ export default function InjectVaccineModal({
       )}
 
       <form id="injectVaccineForm" onSubmit={handleSubmit} className="admin-form">
+        <select
+          aria-label={infantLabel}
+          className="sr-only"
+          value={selectedInfantId}
+          onChange={handleInfantSelectionChange}
+        >
+          <option value="">{infantLabel}</option>
+          {infants.map((infant) => (
+            <option key={infant.id} value={String(infant.id)}>
+              {[infant.first_name, infant.last_name].filter(Boolean).join(" ").trim() ||
+                infant.full_name ||
+                infant.name ||
+                `Infant ${infant.id}`}
+            </option>
+          ))}
+        </select>
+
         <SearchableInfantSelect
           infants={infants}
           value={selectedInfantId}
-          onChange={(e) => {
-            const newInfantId = e.target.value;
-            setSelectedInfantId(newInfantId);
-            void fetchVaccinationHistory(newInfantId);
-            void fetchEligibleVaccines(newInfantId);
-          }}
-          label="Select Infant"
+          onChange={handleInfantSelectionChange}
+          label={infantLabel}
           required
           placeholder="Search by name, control number, or date of birth..."
+          loading={infantsLoading}
+          searchQuery={infantsSearchQuery}
+          onSearchQueryChange={setInfantsSearchQuery}
+          selectedInfant={selectedInfantOverride}
+          hasMore={infantsHasMore}
+          onLoadMore={handleLoadMoreInfants}
         />
 
         <div className="admin-form-row-2">
@@ -1027,21 +1206,47 @@ export default function InjectVaccineModal({
                 disabled: eligibleLoading,
               },
               ...(!eligibleLoading
-                ? eligibleVaccineOptions.length > 0
-                  ? [
-                      ...eligibleVaccineOptions.filter(v => v.status === 'ready').map((vaccine) => ({
-                        value: vaccine.vaccineId,
-                        label: `✅ ${vaccine.vaccineName} - Dose ${vaccine.nextDoseNumber}/${vaccine.totalDoses} (Ready)`,
-                      })),
-                      ...eligibleVaccineOptions.filter(v => v.status === 'upcoming').map((vaccine) => ({
-                        value: vaccine.vaccineId,
-                        label: `⏰ ${vaccine.vaccineName} - Dose ${vaccine.nextDoseNumber}/${vaccine.totalDoses} (Due: ${vaccine.dueDate})`,
-                      }))
-                    ]
-                  : vaccines.map((vaccine) => ({
-                      value: vaccine.id,
-                      label: `${vaccine.name} (${vaccine.code || "N/A"})`,
-                    }))
+                ? (() => {
+                    // Combine master vaccines with any additional ones found in inventory
+                    const approvedMasterVaccines = vaccines.filter((v) =>
+                      isApprovedVaccineName(v?.name),
+                    );
+                    const inventoryVaccines = (eligibleVaccines?.eligibleVaccines || []).filter((iv) =>
+                      isApprovedVaccineName(iv?.vaccineName),
+                    );
+                    const masterIds = new Set(approvedMasterVaccines.map((v) => v.id));
+                    const combinedList = [
+                      ...approvedMasterVaccines,
+                      ...inventoryVaccines
+                        .filter((iv) => !masterIds.has(iv.vaccineId))
+                        .map((iv) => ({ id: iv.vaccineId, name: iv.vaccineName, code: iv.vaccineCode })),
+                    ];
+
+                    return combinedList.map((v) => {
+                    const ready = eligibleVaccines?.eligibleVaccines?.find(ev => ev.vaccineId === v.id);
+                    const upcoming = eligibleVaccines?.upcomingVaccines?.find(ev => ev.vaccineId === v.id);
+
+                    if (ready) {
+                      return {
+                        value: v.id,
+                        label: `✅ ${v.name} - Dose ${ready.nextDoseNumber}/${ready.totalDoses} (Ready)`,
+                        sortOrder: 0
+                      };
+                    }
+                    if (upcoming) {
+                      return {
+                        value: v.id,
+                        label: `⏰ ${v.name} - Dose ${upcoming.nextDoseNumber}/${upcoming.totalDoses} (Due: ${upcoming.dueDate})`,
+                        sortOrder: 1
+                      };
+                    }
+                    return {
+                      value: v.id,
+                      label: `${v.name} (${v.code || "N/A"})`,
+                      sortOrder: 2
+                    };
+                  }).sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label));
+                })()
                 : []),
             ]}
             required
@@ -1086,6 +1291,7 @@ export default function InjectVaccineModal({
             name="batch_id"
             value={formData.batch_id}
             onChange={(e) => {
+              batchSelectionModeRef.current = "manual";
               const selectedBatchId = e.target.value;
               const batchOption = vaccinationBatchOptions.find(
                 (record) => record.batch_id === Number(selectedBatchId),

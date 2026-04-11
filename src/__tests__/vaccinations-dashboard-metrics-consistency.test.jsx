@@ -10,6 +10,7 @@ import useVaccinationSocket from "../hooks/useVaccinationSocket";
 jest.mock("../utils/api", () => ({
   __esModule: true,
   default: {
+    getDashboardInfants: jest.fn(),
     getVaccinationRecords: jest.fn(),
     getVaccinationReconciliationRecords: jest.fn(),
     getVaccinationSchedules: jest.fn(),
@@ -52,6 +53,7 @@ describe("Vaccinations dashboard metric consistency", () => {
     apiClient.getSystemUsers.mockResolvedValue([]);
     apiClient.getAnalyticsDashboard.mockResolvedValue(null);
     apiClient.getVaccinationReconciliationRecords.mockResolvedValue([]);
+    apiClient.getDashboardInfants.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -109,7 +111,7 @@ describe("Vaccinations dashboard metric consistency", () => {
       },
     ]);
 
-    apiClient.getInfants.mockResolvedValue([
+    apiClient.getDashboardInfants.mockResolvedValue([
       {
         id: 1,
         first_name: "Baby",
@@ -131,6 +133,13 @@ describe("Vaccinations dashboard metric consistency", () => {
         dob: "2026-01-31",
         sex: "female",
       },
+      {
+        id: 4,
+        first_name: "Future",
+        last_name: "Seed",
+        dob: "2030-06-01",
+        sex: "male",
+      },
     ]);
 
     apiClient.getVaccines.mockResolvedValue([
@@ -148,13 +157,13 @@ describe("Vaccinations dashboard metric consistency", () => {
       expect(apiClient.getVaccinationReconciliationRecords).toHaveBeenCalledWith({
         scope: "system",
       });
-      expect(apiClient.getVaccinationRecords).toHaveBeenCalledWith({
+      expect(apiClient.getVaccinationRecords).not.toHaveBeenCalled();
+      expect(apiClient.getDashboardInfants).toHaveBeenCalledWith({
+        scope: "system",
+        exclude_future_dob: true,
+        fields: "lite",
         page: 1,
-        limit: 1,
-        scope: "system",
-      });
-      expect(apiClient.getInfants).toHaveBeenCalledWith({
-        scope: "system",
+        limit: 10000,
       });
     });
 
@@ -162,5 +171,6 @@ describe("Vaccinations dashboard metric consistency", () => {
     expect(readMetricValue("Due Soon (7 Days)")).toBe("1");
     expect(readMetricValue("Overdue Vaccinations")).toBe("2");
     expect(readMetricValue("Children Tracked")).toBe("3");
+    expect(screen.queryByText(/future seed/i)).not.toBeInTheDocument();
   });
 });

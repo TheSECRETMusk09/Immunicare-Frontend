@@ -156,4 +156,38 @@ describe("Phase 6 FEFO batch helpers", () => {
       selection_disabled: false,
     });
   });
+
+  test("keeps available-lots responses selectable when the backend omits vaccine_id", () => {
+    const options = buildFefoBatchOptions({
+      vaccineId: 4,
+      clinicId: 203,
+      referenceDate: "2026-04-10",
+      inventoryRecords: [
+        {
+          id: 88,
+          vaccine_id: 4,
+          clinic_id: 203,
+          lot_batch_number: "PENTA-FEFO-004",
+          stock_on_hand: 12,
+        },
+      ],
+      batches: [
+        {
+          batch_id: 501,
+          lot_number: "PENTA-FEFO-004",
+          available_quantity: 12,
+          expiry_date: "2026-07-01",
+        },
+      ],
+    });
+
+    expect(options).toHaveLength(1);
+    expect(options[0]).toMatchObject({
+      batch_id: 501,
+      vaccine_id: 4,
+      matched_inventory_record_id: 88,
+      selection_disabled: false,
+      is_fefo_recommended: true,
+    });
+  });
 });

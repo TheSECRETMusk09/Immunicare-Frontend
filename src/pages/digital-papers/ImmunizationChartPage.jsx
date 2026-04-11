@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import {
   Button,
@@ -12,15 +12,19 @@ import ImmunizationChart from "../../components/ImmunizationChart";
 import InfantPersonalRecord from "../../components/InfantPersonalRecord";
 import apiClient from "../../utils/api";
 import { normalizeInfantResponse } from "../../utils/adminDataAdapters";
-import { BarChart3 } from "lucide-react";
+import { ArrowLeft, BarChart3 } from "lucide-react";
 
 export default function ImmunizationChartPage() {
   const { infantId } = useParams();
   const { isGuardian, isAdmin } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [infant, setInfant] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeSection, setActiveSection] = useState("chart");
+  const returnTo =
+    location.state?.returnTo || "/digital-papers?tab=download_center";
 
   const fetchInfant = useCallback(async () => {
     if (!infantId) {
@@ -77,6 +81,16 @@ export default function ImmunizationChartPage() {
               : "Detailed visit records with vital signs and vaccines"
           }
           icon={<BarChart3 className="w-6 h-6" />}
+          actions={
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate(returnTo)}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" /> Back to List
+            </Button>
+          }
         />
       </div>
 

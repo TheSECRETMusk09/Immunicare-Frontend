@@ -520,6 +520,7 @@ export const downloadPdfFromNode = async ({
   marginsMm = {},
   scale = 0.75,
   backgroundColor = "#ffffff",
+  stylesText = "",
   onClone,
   autoPaging = "text",
 }) => {
@@ -554,7 +555,7 @@ export const downloadPdfFromNode = async ({
   exportRoot.className = "immunicare-print-export-root";
   Object.assign(exportRoot.style, {
     position: "fixed",
-    left: "-100000px",
+    left: "0",
     top: "0",
     width: `${resolvedPage.widthMm - pageMargins.left - pageMargins.right}mm`,
     padding: "0",
@@ -576,6 +577,12 @@ export const downloadPdfFromNode = async ({
     }
   `;
   exportRoot.appendChild(exportStyle);
+
+  if (String(stylesText || "").trim()) {
+    const customStyle = document.createElement("style");
+    customStyle.textContent = String(stylesText);
+    exportRoot.appendChild(customStyle);
+  }
 
   const clone = toVisibleExportClone(node);
   if (typeof onClone === "function") {

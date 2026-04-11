@@ -109,12 +109,19 @@ export default function DigitalPapersDashboard() {
     try {
       setLoading(true);
       setError(null);
-      const [templatesResult, recentDownloadsResult, allDownloadsResult, completionsResult] =
+      const [
+        templatesResult,
+        recentDownloadsResult,
+        allDownloadsResult,
+        completionsResult,
+        reportsSummaryResult,
+      ] =
         await Promise.allSettled([
           apiClient.getPaperTemplates(),
           apiClient.getDownloadHistory({ limit: 10 }),
           apiClient.getDownloadHistory(), // Fetch absolute totals to prevent artificial shrinkage
           apiClient.getDocumentAlerts({ status: "PENDING", limit: 5 }),
+          apiClient.request("/reports/admin/summary"),
         ]);
 
       const templates =
@@ -127,10 +134,23 @@ export default function DigitalPapersDashboard() {
         allDownloadsResult.status === "fulfilled" ? allDownloadsResult.value : null;
       const completions =
         completionsResult.status === "fulfilled" ? completionsResult.value : null;
+      const reportsSummary =
+        reportsSummaryResult.status === "fulfilled"
+          ? reportsSummaryResult.value?.data?.data ||
+            reportsSummaryResult.value?.data ||
+            reportsSummaryResult.value ||
+            null
+          : null;
+      const truthSourceDownloads = Number(
+        reportsSummary?.reports?.total_downloads,
+      );
 
       setStats({
         totalTemplates: templates?.data?.length || 0,
         totalDownloads:
+          (Number.isFinite(truthSourceDownloads) && truthSourceDownloads > 0
+            ? truthSourceDownloads
+            : null) ||
           allDownloads?.pagination?.total ||
           allDownloads?.total ||
           allDownloads?.data?.length ||

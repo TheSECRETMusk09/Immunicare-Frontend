@@ -82,7 +82,9 @@ describe("InjectVaccineModal infant dropdown labels", () => {
     const infantSelect = await screen.findByRole("button", { name: /select infant/i });
 
     expect(apiClient.getInfants).toHaveBeenCalledWith({
-      limit: 10000,
+      limit: 50,
+      page: 1,
+      search: "2026",
       scope: "system",
     });
 

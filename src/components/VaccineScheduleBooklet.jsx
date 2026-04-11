@@ -8,6 +8,7 @@ import {
   formatPrintDateValue,
 } from "../utils/printDateRange";
 import {
+  downloadPdfFromNode,
   downloadWordDocument,
   PRINT_PAGE_PRESETS,
 } from "../utils/printDocumentExport";
@@ -69,6 +70,176 @@ const formatDays = (days) => {
   return `${Math.abs(days)} day${Math.abs(days) > 1 ? 's' : ''} until due`;
 };
 
+const VACCINE_SCHEDULE_EXPORT_PAGE = {
+  ...PRINT_PAGE_PRESETS.legalLandscape,
+};
+
+const VACCINE_SCHEDULE_PRINTABLE_STYLES = `
+  @page {
+    size: legal landscape;
+    margin: 0.35in;
+  }
+
+  body {
+    margin: 0;
+    color: #111827;
+    background: #ffffff;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  .schedule-booklet-export {
+    width: 100%;
+    color: #111827;
+    box-sizing: border-box;
+  }
+
+  .schedule-booklet-export__header {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: flex-start;
+    border-bottom: 2px solid #1f2937;
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+  }
+
+  .schedule-booklet-export__title {
+    margin: 0 0 4px;
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  .schedule-booklet-export__subtitle {
+    margin: 0;
+    font-size: 12px;
+    color: #475569;
+  }
+
+  .schedule-booklet-export__meta {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 18px;
+    margin-top: 12px;
+    font-size: 11px;
+  }
+
+  .schedule-booklet-export__meta strong {
+    display: inline-block;
+    min-width: 90px;
+  }
+
+  .schedule-booklet-export__summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin: 12px 0;
+  }
+
+  .schedule-booklet-export__summary-card {
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 8px 10px;
+    background: #f8fafc;
+  }
+
+  .schedule-booklet-export__summary-label {
+    margin: 0 0 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .schedule-booklet-export__summary-value {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .schedule-booklet-export__table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 10px;
+  }
+
+  .schedule-booklet-export__table th,
+  .schedule-booklet-export__table td {
+    border: 1px solid #cbd5e1;
+    padding: 6px 8px;
+    vertical-align: middle;
+  }
+
+  .schedule-booklet-export__table th {
+    background: #e2e8f0;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .schedule-booklet-export__vaccine {
+    font-weight: 700;
+  }
+
+  .schedule-booklet-export__age {
+    display: block;
+    margin-top: 2px;
+    font-size: 9px;
+    color: #64748b;
+  }
+
+  .schedule-booklet-export__status {
+    display: inline-block;
+    min-width: 78px;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 9px;
+    font-weight: 700;
+    text-align: center;
+    box-sizing: border-box;
+  }
+
+  .schedule-booklet-export__status--completed {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .schedule-booklet-export__status--overdue {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+
+  .schedule-booklet-export__status--upcoming {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .schedule-booklet-export__status--future,
+  .schedule-booklet-export__status--pending {
+    background: #e2e8f0;
+    color: #334155;
+  }
+
+  .schedule-booklet-export__signatures {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 32px;
+    margin-top: 18px;
+  }
+
+  .schedule-booklet-export__signature-label {
+    margin: 0 0 20px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .schedule-booklet-export__signature-line {
+    border-top: 1px solid #1f2937;
+    height: 1px;
+  }
+`;
+
 export default function VaccineScheduleBooklet({ infantId }) {
   const [scheduleData, setScheduleData] = useState(null);
   const [loading, setLoading] = useState(Boolean(infantId));
@@ -80,6 +251,7 @@ export default function VaccineScheduleBooklet({ infantId }) {
 
   const isMountedRef = useRef(true);
   const requestIdRef = useRef(0);
+  const printAreaRef = useRef(null);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -146,18 +318,6 @@ export default function VaccineScheduleBooklet({ infantId }) {
   }, [infantId, fetchData]);
 
   useEffect(() => {
-    if (!infantId) {
-      return undefined;
-    }
-
-    const intervalId = window.setInterval(() => {
-      void fetchData();
-    }, 60000); // Refresh every minute
-
-    return () => window.clearInterval(intervalId);
-  }, [infantId, fetchData]);
-
-  useEffect(() => {
     if (!infantId) return;
 
     const handleUpdate = (e) => {
@@ -194,28 +354,30 @@ export default function VaccineScheduleBooklet({ infantId }) {
   ]);
 
   const buildPrintableDocument = useCallback(() => {
-    const printContent = document.getElementById("vaccine-schedule-print");
-    if (!printContent) {
+    const printableNode =
+      printAreaRef.current?.querySelector(".schedule-booklet-export");
+    if (!printableNode) {
       return "";
     }
+
+    const infantDetails = scheduleData?.infantInfo || {};
+    const safeTitle =
+      `${infantDetails.firstName || ""} ${infantDetails.lastName || ""}`.trim() ||
+      "Child Immunization Schedule Booklet";
 
     return `<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Vaccine Schedule</title>
-    <style>
-      body { margin: 0; padding: 24px; font-family: Arial, sans-serif; background: #ffffff; color: #111827; }
-      table { border-collapse: collapse; width: 100%; }
-      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-      th { background-color: #f2f2f2; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vaccine Schedule - ${safeTitle}</title>
+    <style>${VACCINE_SCHEDULE_PRINTABLE_STYLES}</style>
   </head>
   <body>
-    ${printContent.innerHTML}
+    ${printableNode.outerHTML}
   </body>
 </html>`;
-  }, []);
+  }, [scheduleData]);
 
   const handlePrint = () => {
     if (!printDateRange.ensureReadyForPrint()) {
@@ -244,118 +406,32 @@ export default function VaccineScheduleBooklet({ infantId }) {
       return;
     }
 
+    const printableNode =
+      printAreaRef.current?.querySelector(".schedule-booklet-print");
+    if (!printableNode) {
+      return;
+    }
+
     try {
-      const [{ default: jsPDF }] = await Promise.all([
-        import("jspdf"),
-        import("jspdf-autotable"),
-      ]);
-
-      const doc = new jsPDF({
-        orientation: "landscape",
-        unit: "mm",
-        format: "legal",
+      await downloadPdfFromNode({
+        node: printableNode,
+        filename: `Vaccine_Schedule_${infantId || "child"}.pdf`,
+        title: "Child Immunization Schedule Booklet",
+        page: VACCINE_SCHEDULE_EXPORT_PAGE,
+        marginsMm: {
+          top: 4,
+          right: 4,
+          bottom: 4,
+          left: 4,
+        },
+        scale: 0.82,
+        autoPaging: false,
       });
-      const infantDetails = scheduleData?.infantInfo || {};
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const footerText = printDateRange.activeDateRangeLabel;
-      const childName = `${infantDetails.firstName || ""} ${infantDetails.lastName || ""}`.trim() || "N/A";
-
-      const renderPdfHeader = () => {
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(14);
-        doc.setTextColor(17, 24, 39);
-        doc.text("Child Immunization Schedule Booklet", pageWidth / 2, 12, {
-          align: "center",
-        });
-
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8.5);
-        doc.text(`Name: ${childName}`, 10, 19);
-        doc.text(
-          `Control Number: ${infantDetails.controlNumber || "N/A"}`,
-          10,
-          24,
-        );
-        doc.text(
-          `Date of Birth: ${formatDate(infantDetails.dateOfBirth)}`,
-          10,
-          29,
-        );
-        doc.text(footerText, 10, 34);
-      };
-
-      doc.autoTable({
-        startY: 39,
-        margin: { top: 39, left: 10, right: 10, bottom: 12 },
-        head: [[
-          "Vaccine",
-          "Dose",
-          "Age Window",
-          "Due Date",
-          "Admin Date",
-          "Status",
-          "Days",
-        ]],
-        body: printableSchedules.map((schedule) => [
-          schedule.vaccineName || "",
-          schedule.doseNumber || "",
-          schedule.ageDescription || "",
-          formatDate(schedule.dueDate),
-          formatDate(schedule.adminDate),
-          getStatusLabel(schedule.status),
-          formatDays(schedule.daysOverdue) || "-",
-        ]),
-        styles: {
-          font: "helvetica",
-          fontSize: 8,
-          cellPadding: 1,
-          lineColor: [17, 24, 39],
-          lineWidth: 0.2,
-          valign: "middle",
-        },
-        headStyles: {
-          fillColor: [243, 244, 246],
-          textColor: [17, 24, 39],
-          fontStyle: "bold",
-        },
-        didDrawPage: () => {
-          renderPdfHeader();
-        },
-        columnStyles: {
-          0: { cellWidth: 52 },
-          1: { cellWidth: 14, halign: "center" },
-          2: { cellWidth: 34 },
-          3: { cellWidth: 24 },
-          4: { cellWidth: 24 },
-          5: { cellWidth: 22 },
-          6: { cellWidth: 34 },
-        },
-      });
-
-      const totalPages = doc.getNumberOfPages();
-      for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
-        doc.setPage(pageNumber);
-        doc.setDrawColor(203, 213, 225);
-        doc.line(10, pageHeight - 7, pageWidth - 10, pageHeight - 7);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
-        doc.setTextColor(71, 85, 105);
-        doc.text(footerText, 10, pageHeight - 3.5);
-        doc.text(
-          `Page ${pageNumber} of ${totalPages}`,
-          pageWidth - 10,
-          pageHeight - 3.5,
-          { align: "right" },
-        );
-      }
-
-      doc.save(`Vaccine_Schedule_${infantId || "child"}.pdf`);
     } catch (downloadError) {
       console.error("Error generating vaccine schedule PDF:", downloadError);
       setError(downloadError.message || "Failed to generate vaccine schedule PDF.");
     }
-  }, [infantId, printDateRange, printableSchedules, scheduleData]);
+  }, [infantId, printDateRange]);
 
   const handleDownloadWord = useCallback(() => {
     if (!printDateRange.ensureReadyForPrint()) {
@@ -373,29 +449,9 @@ export default function VaccineScheduleBooklet({ infantId }) {
       title: "Child Immunization Schedule Booklet",
       headerText: "Child Immunization Schedule Booklet",
       footerText: printDateRange.activeDateRangeLabel,
-      page: PRINT_PAGE_PRESETS.legalLandscape,
+      page: VACCINE_SCHEDULE_EXPORT_PAGE,
     });
   }, [buildPrintableDocument, infantId, printDateRange]);
-
-  // Group schedules by vaccine
-  const rowsByVaccine = printableSchedules.reduce((acc, entry) => {
-    const key = `${entry.vaccineId}-${entry.vaccineName}`;
-    if (!acc[key]) {
-      acc[key] = {
-        key,
-        vaccineName: entry.vaccineName,
-        vaccineId: entry.vaccineId,
-        doses: [],
-      };
-    }
-    acc[key].doses.push(entry);
-    return acc;
-  }, {});
-
-  const scheduleRows = rowsByVaccine ? Object.values(rowsByVaccine).map((row) => ({
-    ...row,
-    doses: row.doses.sort((a, b) => a.ageMonths - b.ageMonths),
-  })) : [];
 
   const printableSummary = useMemo(
     () => ({
@@ -434,7 +490,7 @@ export default function VaccineScheduleBooklet({ infantId }) {
     );
   }
 
-  if (!scheduleData || scheduleRows.length === 0) {
+  if (!scheduleData || printableSchedules.length === 0) {
     return (
       <Alert variant="info" title="No vaccination schedule found">
         No schedule entries are currently available for this infant.
@@ -444,21 +500,9 @@ export default function VaccineScheduleBooklet({ infantId }) {
 
   const infantInfo = scheduleData?.infantInfo || {};
   const summary = scheduleData?.summary || {};
-
-  const renderPrintHeader = () => (
-    <div className="mb-6 p-4 border-b">
-      <h2 className="text-xl font-bold">Child Immunization Schedule Booklet</h2>
-      {infantInfo && (
-        <div className="mt-2 text-sm">
-          <p><strong>Name:</strong> {infantInfo.firstName} {infantInfo.lastName}</p>
-          <p><strong>Control Number:</strong> {infantInfo.controlNumber}</p>
-          <p><strong>Date of Birth:</strong> {formatDate(infantInfo.dateOfBirth)}</p>
-          <p><strong>Guardian:</strong> {infantInfo.guardianName}</p>
-          <p><strong>{printDateRange.activeDateRangeLabel}</strong></p>
-        </div>
-      )}
-    </div>
-  );
+  const childName =
+    `${infantInfo.firstName || ""} ${infantInfo.lastName || ""}`.trim() ||
+    "Child";
 
   const renderScheduleTable = () => (
     <>
@@ -582,22 +626,123 @@ export default function VaccineScheduleBooklet({ infantId }) {
 
   return (
     <div className="space-y-6">
-      {/* Hidden printable version */}
-      <div id="vaccine-schedule-print" className="hidden print:block">
-        <div className="bg-white rounded-xl p-6">
-          {renderPrintHeader()}
-          <div className="overflow-x-auto">{renderScheduleTable()}</div>
-
-          {/* Signature section for print */}
-          <div className="mt-8 pt-4 border-t">
-            <div className="flex justify-between">
+      <div ref={printAreaRef} className="hidden" aria-hidden="true">
+        <style>{VACCINE_SCHEDULE_PRINTABLE_STYLES}</style>
+        <div className="schedule-booklet-print">
+          <div className="schedule-booklet-export">
+            <div className="schedule-booklet-export__header">
               <div>
-                <p className="text-sm">Health Worker Signature:</p>
-                <div className="h-12 border-b border-gray-400 w-48 mt-4"></div>
+                <h1 className="schedule-booklet-export__title">
+                  Child Immunization Schedule Booklet
+                </h1>
+                <p className="schedule-booklet-export__subtitle">
+                  Vaccine schedule summary sourced from the live readiness and vaccination timeline.
+                </p>
+                <div className="schedule-booklet-export__meta">
+                  <p><strong>Name:</strong> {childName}</p>
+                  <p><strong>Control No.:</strong> {infantInfo.controlNumber || "N/A"}</p>
+                  <p><strong>Date of Birth:</strong> {formatDate(infantInfo.dateOfBirth)}</p>
+                  <p><strong>Guardian:</strong> {infantInfo.guardianName || "N/A"}</p>
+                </div>
               </div>
               <div>
-                <p className="text-sm">Guardian Signature:</p>
-                <div className="h-12 border-b border-gray-400 w-48 mt-4"></div>
+                <p className="schedule-booklet-export__subtitle">
+                  {printDateRange.activeDateRangeLabel}
+                </p>
+              </div>
+            </div>
+
+            <div className="schedule-booklet-export__summary">
+              <div className="schedule-booklet-export__summary-card">
+                <p className="schedule-booklet-export__summary-label">Total</p>
+                <p className="schedule-booklet-export__summary-value">
+                  {printDateRange.hasAppliedDateRange
+                    ? printableSummary.totalScheduled
+                    : (summary.totalScheduled || 0)}
+                </p>
+              </div>
+              <div className="schedule-booklet-export__summary-card">
+                <p className="schedule-booklet-export__summary-label">Completed</p>
+                <p className="schedule-booklet-export__summary-value">
+                  {printDateRange.hasAppliedDateRange
+                    ? printableSummary.completedCount
+                    : (summary.completedCount || 0)}
+                </p>
+              </div>
+              <div className="schedule-booklet-export__summary-card">
+                <p className="schedule-booklet-export__summary-label">Overdue</p>
+                <p className="schedule-booklet-export__summary-value">
+                  {printDateRange.hasAppliedDateRange
+                    ? printableSummary.overdueCount
+                    : (summary.overdueCount || 0)}
+                </p>
+              </div>
+              <div className="schedule-booklet-export__summary-card">
+                <p className="schedule-booklet-export__summary-label">Upcoming</p>
+                <p className="schedule-booklet-export__summary-value">
+                  {printDateRange.hasAppliedDateRange
+                    ? printableSummary.upcomingCount
+                    : (summary.upcomingCount || 0)}
+                </p>
+              </div>
+            </div>
+
+            <table className="schedule-booklet-export__table">
+              <thead>
+                <tr>
+                  <th style={{ width: "26%" }}>Vaccine</th>
+                  <th style={{ width: "9%" }}>Dose</th>
+                  <th style={{ width: "17%" }}>Status</th>
+                  <th style={{ width: "14%" }}>Due Date</th>
+                  <th style={{ width: "14%" }}>Admin Date</th>
+                  <th style={{ width: "20%" }}>Days</th>
+                </tr>
+              </thead>
+              <tbody>
+                {printableSchedules.map((schedule) => (
+                  <tr
+                    key={`${schedule.vaccineId}-${schedule.doseNumber}-${schedule.dueDate || schedule.adminDate || "row"}`}
+                  >
+                    <td>
+                      <span className="schedule-booklet-export__vaccine">
+                        {schedule.vaccineName}
+                      </span>
+                      <span className="schedule-booklet-export__age">
+                        {schedule.ageDescription}
+                      </span>
+                    </td>
+                    <td>
+                      {schedule.doseNumber}/{schedule.totalDoses}
+                    </td>
+                    <td>
+                      <span
+                        className={`schedule-booklet-export__status schedule-booklet-export__status--${
+                          schedule.status || "pending"
+                        }`}
+                      >
+                        {getStatusLabel(schedule.status)}
+                      </span>
+                    </td>
+                    <td>{formatDate(schedule.dueDate)}</td>
+                    <td>{formatDate(schedule.adminDate)}</td>
+                    <td>{formatDays(schedule.daysOverdue) || "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="schedule-booklet-export__signatures">
+              <div>
+                <p className="schedule-booklet-export__signature-label">
+                  Health Worker Signature
+                </p>
+                <div className="schedule-booklet-export__signature-line" />
+              </div>
+              <div>
+                <p className="schedule-booklet-export__signature-label">
+                  Guardian Signature
+                </p>
+                <div className="schedule-booklet-export__signature-line" />
               </div>
             </div>
           </div>
@@ -607,38 +752,15 @@ export default function VaccineScheduleBooklet({ infantId }) {
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
         {/* Header with infant info and summary */}
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
-                Child Immunization Schedule Booklet
-              </h3>
-              {infantInfo && (
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  {infantInfo.firstName} {infantInfo.lastName} • DOB: {formatDate(infantInfo.dateOfBirth)}
-                </p>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button
-                onClick={handleDownload}
-                variant="secondary"
-                size="sm"
-                data-print-action="vaccine-schedule-download"
-              >
-                Download PDF
-              </Button>
-              <Button
-                onClick={handleDownloadWord}
-                variant="secondary"
-                size="sm"
-                data-print-action="vaccine-schedule-download-word"
-              >
-                Download Word
-              </Button>
-              <Button onClick={handlePrint} size="sm" data-print-action="vaccine-schedule-print">
-                📄 Print
-              </Button>
-            </div>
+          <div>
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
+              Child Immunization Schedule Booklet
+            </h3>
+            {infantInfo && (
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                {infantInfo.firstName} {infantInfo.lastName} • DOB: {formatDate(infantInfo.dateOfBirth)}
+              </p>
+            )}
           </div>
 
           <div className="mt-4">

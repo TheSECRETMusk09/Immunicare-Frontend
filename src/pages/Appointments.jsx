@@ -1,4 +1,10 @@
-import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import React, {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
 import moment from "moment";
 import {
   AdminModalActions,
@@ -14,11 +20,18 @@ import {
   Select,
 } from "../components/UI";
 import SearchableInfantSelect from "../components/SearchableInfantSelect";
-import { useAppointments, useInfants } from "../hooks/useDashboard";
+import { useAppointments } from "../hooks/useDashboard";
 import apiClient from "../utils/api";
-import { isPhilippineHoliday } from "../utils/holidays";
+import {
+  isDateAvailableForBooking,
+  isPhilippineHoliday,
+  getMinBookingDate,
+  isWeekend,
+} from "../utils/holidays";
 import { CalendarDays, ChevronLeft, ChevronRight, Plus, Search, ArrowUp, ArrowDown } from "lucide-react";
 import PortalDatePicker from "../components/UI/PortalDatePicker";
+import { useAuth } from "../contexts/AuthContext";
+import { normalizeInfantsResponse } from "../utils/adminDataAdapters";
 import {
   hasFieldErrors,
   sanitizeText,
@@ -39,10 +52,34 @@ const formatControlNumberDisplay = (controlNumber, dateValue) => {
   return `${base}-${parsedDate.getMonth() + 1}/${parsedDate.getDate()}/${parsedDate.getFullYear()}`;
 };
 
+const mergeInfantLookupResults = (...collections) => {
+  const merged = [];
+  const seenIds = new Set();
+
+  collections.flat().forEach((infant) => {
+    const infantId = Number.parseInt(infant?.id, 10);
+    if (!Number.isFinite(infantId) || seenIds.has(infantId)) {
+      return;
+    }
+
+    seenIds.add(infantId);
+    merged.push(infant);
+  });
+
+  return merged;
+};
+
 // Calendar utility functions (matching GuardianAppointmentsPage)
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const toDateKey = (value) => {
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+      return normalized;
+    }
+  }
+
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   const year = date.getFullYear();
@@ -76,54 +113,25 @@ const buildCalendarGrid = (monthDate) => {
   return cells;
 };
 
-const isWeekend = (date) => {
-  const d = date instanceof Date ? date : new Date(date);
-  const day = d.getDay();
-  return day === 0 || day === 6; // 0 = Sunday, 6 = Saturday
-};
-
 // Get minimum booking date (today)
-const getMinDate = () => {
-  const today = new Date();
-  return today.toISOString().split("T")[0];
-};
+const getMinDate = () => getMinBookingDate();
 
 // Validate date selection - returns { valid: boolean, message: string }
-const validateDateSelection = (dateStr) => {
+const validateDateSelection = (dateStr, { blockedDate = null, allowPast = false } = {}) => {
   if (!dateStr) return { valid: false, message: "Please select a date" };
 
-  const selectedDate = new Date(dateStr);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const availability = isDateAvailableForBooking(dateStr, {
+    allowPast,
+    blockedDate,
+  });
 
-  if (selectedDate < today) {
+  if (!availability.isAvailable) {
     return {
       valid: false,
-      message: "Cannot schedule appointments in the past",
-    };
-  }
-
-  // Check for weekend
-  const day = selectedDate.getDay();
-  if (day === 6) {
-    return {
-      valid: false,
-      message: "Saturdays are not available for appointments",
-    };
-  }
-  if (day === 0) {
-    return {
-      valid: false,
-      message: "Sundays are not available for appointments",
-    };
-  }
-
-  // Check for Philippine holidays
-  const holiday = isPhilippineHoliday(selectedDate);
-  if (holiday) {
-    return {
-      valid: false,
-      message: `${holiday.name} (${holiday.type === "regular" ? "Regular Holiday" : "Special Holiday"}) - Not available for appointments`,
+      message: availability.reason,
+      code: availability.code,
+      holiday: availability.holiday || null,
+      blockedDate: availability.blockedDate || null,
     };
   }
 
@@ -175,12 +183,72 @@ const normalizeAppointmentRecord = (appointment) => {
   };
 };
 
+const getAppointmentIdentityKey = (appointment) => {
+  const appointmentId = Number.parseInt(appointment?.id, 10);
+  if (Number.isFinite(appointmentId)) {
+    return `id:${appointmentId}`;
+  }
+
+  return [
+    "fallback",
+    appointment?.infant_id ?? appointment?.patient_id ?? "na",
+    appointment?.scheduled_date ?? "na",
+    appointment?.type ?? "na",
+    appointment?.status ?? "na",
+  ].join(":");
+};
+
 const normalizeAppointmentCollection = (records) =>
   Array.isArray(records)
-    ? records
-        .map((record) => normalizeAppointmentRecord(record))
-        .filter(Boolean)
+    ? records.reduce((normalizedRecords, record) => {
+        const normalizedRecord = normalizeAppointmentRecord(record);
+        if (!normalizedRecord) {
+          return normalizedRecords;
+        }
+
+        const identityKey = getAppointmentIdentityKey(normalizedRecord);
+        if (normalizedRecords.seen.has(identityKey)) {
+          return normalizedRecords;
+        }
+
+        normalizedRecords.seen.add(identityKey);
+        normalizedRecords.rows.push(normalizedRecord);
+        return normalizedRecords;
+      }, { rows: [], seen: new Set() }).rows
     : [];
+
+const buildAppointmentSummary = (appointments) =>
+  normalizeAppointmentCollection(appointments).reduce(
+    (summary, appointment) => {
+      const normalizedStatus = appointment?.status || "unknown";
+      summary.total += 1;
+      summary.byStatus[normalizedStatus] =
+        (summary.byStatus[normalizedStatus] || 0) + 1;
+      return summary;
+    },
+    { total: 0, byStatus: {} },
+  );
+
+const normalizeAppointmentDateDetails = (details) => {
+  if (!details || typeof details !== "object") {
+    return null;
+  }
+
+  const normalizedAppointments = normalizeAppointmentCollection(
+    details.appointments,
+  );
+  const isUnavailable =
+    details?.availability?.available === false ||
+    Boolean(details?.holiday) ||
+    Boolean(details?.isWeekend);
+  const visibleAppointments = isUnavailable ? [] : normalizedAppointments;
+
+  return {
+    ...details,
+    appointments: visibleAppointments,
+    summary: buildAppointmentSummary(visibleAppointments),
+  };
+};
 
 const formatAppointmentStatusLabel = (value) => {
   const normalized = String(value || "")
@@ -231,6 +299,7 @@ const canCancelAppointment = (status) =>
   ["pending", "scheduled"].includes(normalizeAppointmentStatus(status));
 
 export default function Appointments() {
+  const { isAdmin } = useAuth();
   const [view, setView] = useState("list");
   const [appointments, setAppointments] = useState([]);
   const [error, setError] = useState(null);
@@ -239,6 +308,7 @@ export default function Appointments() {
   const [monthCursor, setMonthCursor] = useState(new Date());
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [blockedDates, setBlockedDates] = useState({});
+  const [calendarAvailabilityByDate, setCalendarAvailabilityByDate] = useState({});
   const [selectedDate, setSelectedDate] = useState(toDateKey(new Date()));
   const [selectedDateDetails, setSelectedDateDetails] = useState(null);
   const [showDateDetailsModal, setShowDateDetailsModal] = useState(false);
@@ -256,7 +326,11 @@ export default function Appointments() {
   const [rowAction, setRowAction] = useState({ id: null, action: null });
   const [statusFilter, setStatusFilter] = useState('all');
   const latestMonthKeyRef = useRef("");
-  const bookingInfantFallbackAttemptedRef = useRef(false);
+  const [bookingInfantSearchQuery, setBookingInfantSearchQuery] = useState("");
+  const [bookingInfantOptions, setBookingInfantOptions] = useState([]);
+  const [bookingInfantCache, setBookingInfantCache] = useState([]);
+  const [bookingInfantLoading, setBookingInfantLoading] = useState(false);
+  const [bookingInfantError, setBookingInfantError] = useState("");
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -272,7 +346,7 @@ export default function Appointments() {
   const [sortField, setSortField] = useState("scheduled_date");
   const [sortDirection, setSortDirection] = useState("desc");
   // Helper function to get default date range when no filters are set
-  const getDefaultDateRange = () => {
+  const getDefaultDateRange = useCallback(() => {
     if (dateFilterStart || dateFilterEnd) {
       return {
         ...(dateFilterStart ? { start_date: dateFilterStart } : {}),
@@ -280,18 +354,16 @@ export default function Appointments() {
       };
     }
 
-    // Set default range: past 30 days to next 30 days
     const today = new Date();
-    const pastDate = new Date(today);
-    pastDate.setDate(today.getDate() - 30);
-    const futureDate = new Date(today);
-    futureDate.setDate(today.getDate() + 30);
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
+    // Match the Analytics dashboard default "This Month" window so both modules
+    // resolve the same appointment counts unless the user explicitly changes filters.
     return {
-      start_date: pastDate.toISOString().split('T')[0],
-      end_date: futureDate.toISOString().split('T')[0],
+      start_date: toDateKey(monthStart),
+      end_date: toDateKey(today),
     };
-  };
+  }, [dateFilterStart, dateFilterEnd]);
 
   const listQueryParams = useMemo(
     () => ({
@@ -308,8 +380,7 @@ export default function Appointments() {
       itemsPerPage,
       debouncedSearchQuery,
       statusFilter,
-      dateFilterStart,
-      dateFilterEnd,
+      getDefaultDateRange,
       sortField,
       sortDirection,
     ],
@@ -325,37 +396,35 @@ export default function Appointments() {
     enabled: view === "list",
     params: listQueryParams,
   });
-  const {
-    infants: dashboardInfants,
-    loading: infantsLoading,
-    error: infantsError,
-  } = useInfants({
-    fetchAll: true,
-    limit: 500,
-    page: 1,
+  const [createFormData, setCreateFormData] = useState({
+    infant_id: "",
+    scheduled_date: "",
+    scheduled_time: "",
+    type: "",
+    notes: "",
   });
-  const [fallbackInfants, setFallbackInfants] = useState([]);
-  const [fallbackInfantsLoading, setFallbackInfantsLoading] = useState(false);
-  const [fallbackInfantsError, setFallbackInfantsError] = useState(null);
-
-  const infants = useMemo(() => {
-    const infantMap = new Map();
-
-    [...dashboardInfants, ...fallbackInfants].forEach((infant) => {
-      const infantId = Number.parseInt(infant?.id, 10);
-      if (!Number.isFinite(infantId) || infantMap.has(infantId)) {
-        return;
-      }
-      infantMap.set(infantId, infant);
-    });
-
-    return Array.from(infantMap.values());
-  }, [dashboardInfants, fallbackInfants]);
-
-  const infantPickerLoading = infantsLoading || fallbackInfantsLoading;
-  const infantPickerError = fallbackInfantsError || infantsError;
-  const infantPickerEmptyMessage = infantPickerError
-    ? "Unable to load infants right now. Please refresh and try again."
+  const infantLookupScope = useMemo(
+    () => (isAdmin ? { scope: "system" } : {}),
+    [isAdmin],
+  );
+  const selectedBookingInfant = useMemo(
+    () =>
+      bookingInfantCache.find(
+        (infant) => Number.parseInt(infant?.id, 10) === Number.parseInt(createFormData.infant_id, 10),
+      ) || null,
+    [bookingInfantCache, createFormData.infant_id],
+  );
+  const infants = useMemo(
+    () =>
+      mergeInfantLookupResults(
+        selectedBookingInfant ? [selectedBookingInfant] : [],
+        bookingInfantOptions,
+      ),
+    [bookingInfantOptions, selectedBookingInfant],
+  );
+  const infantPickerLoading = bookingInfantLoading;
+  const infantPickerEmptyMessage = bookingInfantSearchQuery.trim()
+    ? "No matching infant found"
     : "No infants available";
 
   useEffect(() => {
@@ -365,49 +434,70 @@ export default function Appointments() {
 
   useEffect(() => {
     if (!showBookingModal) {
-      bookingInfantFallbackAttemptedRef.current = false;
-      return;
+      setBookingInfantSearchQuery("");
+      setBookingInfantOptions(
+        selectedBookingInfant ? [selectedBookingInfant] : [],
+      );
+      setBookingInfantLoading(false);
+      setBookingInfantError("");
+      return undefined;
     }
 
-    if (dashboardInfants.length > 0 || fallbackInfants.length > 0 || infantsLoading) {
-      return;
-    }
+    const normalizedSearch = bookingInfantSearchQuery.trim();
+    let isCancelled = false;
+    setBookingInfantLoading(true);
+    setBookingInfantError("");
 
-    if (bookingInfantFallbackAttemptedRef.current || fallbackInfantsLoading) {
-      return;
-    }
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const response = await apiClient.getInfants({
+          limit: normalizedSearch ? 25 : 50,
+          page: 1,
+          ...infantLookupScope,
+          ...(normalizedSearch ? { search: normalizedSearch } : {}),
+        });
+        const remoteInfants = normalizeInfantsResponse(response);
 
-    bookingInfantFallbackAttemptedRef.current = true;
-    setFallbackInfantsLoading(true);
-    setFallbackInfantsError(null);
+        if (!isCancelled) {
+          setBookingInfantOptions(
+            mergeInfantLookupResults(
+              selectedBookingInfant ? [selectedBookingInfant] : [],
+              remoteInfants,
+            ),
+          );
+          setBookingInfantCache((previous) =>
+            mergeInfantLookupResults(
+              previous,
+              selectedBookingInfant ? [selectedBookingInfant] : [],
+              remoteInfants,
+            ),
+          );
+        }
+      } catch (loadError) {
+        if (!isCancelled) {
+          console.error("Failed to load infants for appointment booking:", loadError);
+          setBookingInfantOptions(
+            selectedBookingInfant ? [selectedBookingInfant] : [],
+          );
+          setBookingInfantError(
+            loadError?.message || "Unable to load infants right now.",
+          );
+        }
+      } finally {
+        if (!isCancelled) {
+          setBookingInfantLoading(false);
+        }
+      }
+    }, normalizedSearch ? 250 : 0);
 
-    apiClient
-      .getInfants({
-        limit: 10000,
-        page: 1,
-      })
-      .then((response) => {
-        const responseInfants = Array.isArray(response?.data)
-          ? response.data
-          : Array.isArray(response)
-            ? response
-            : [];
-        setFallbackInfants(responseInfants);
-      })
-      .catch((loadError) => {
-        console.error("Failed to load appointment infants from direct infant records:", loadError);
-        setFallbackInfantsError(
-          loadError?.message || "Failed to load infants.",
-        );
-      })
-      .finally(() => {
-        setFallbackInfantsLoading(false);
-      });
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
   }, [
-    dashboardInfants.length,
-    fallbackInfants.length,
-    fallbackInfantsLoading,
-    infantsLoading,
+    bookingInfantSearchQuery,
+    infantLookupScope,
+    selectedBookingInfant,
     showBookingModal,
   ]);
 
@@ -439,15 +529,6 @@ export default function Appointments() {
   const [timeSlots, setTimeSlots] = useState([]);
   const [timeSlotsFeedback, setTimeSlotsFeedback] = useState(null);
 
-  // Form states
-  const [createFormData, setCreateFormData] = useState({
-    infant_id: "",
-    scheduled_date: "",
-    scheduled_time: "",
-    type: "",
-    notes: "",
-  });
-
   const [bookingDateDetails, setBookingDateDetails] = useState(null);
 
   const [formErrors, setFormErrors] = useState({});
@@ -461,6 +542,30 @@ export default function Appointments() {
     notes: "",
   });
 
+  const resolveDateAvailability = useCallback(
+    (dateValue, { allowPast = true } = {}) => {
+      const dateKey = toDateKey(dateValue);
+      if (!dateKey) {
+        return {
+          isAvailable: false,
+          code: "INVALID_DATE",
+          reason: "Invalid date provided",
+        };
+      }
+
+      return isDateAvailableForBooking(dateKey, {
+        allowPast,
+        blockedDate: blockedDates[dateKey] || null,
+      });
+    },
+    [blockedDates],
+  );
+
+  const shouldDisableDate = useCallback(
+    (date) => !resolveDateAvailability(date, { allowPast: false }).isAvailable,
+    [resolveDateAvailability],
+  );
+
   const fetchTimeSlots = useCallback(async (date, excludeId = undefined, signal) => {
     if (!showBookingModal && !showEditModal) {
       setTimeSlots([]);
@@ -471,6 +576,19 @@ export default function Appointments() {
     if (!date) {
       setTimeSlots([]);
       setTimeSlotsFeedback(null);
+      return;
+    }
+
+    const dateAvailability = resolveDateAvailability(date, { allowPast: false });
+    if (!dateAvailability.isAvailable) {
+      setTimeSlots([]);
+      setTimeSlotsFeedback({
+        available: false,
+        code: dateAvailability.code,
+        message: dateAvailability.reason,
+        holiday: dateAvailability.holiday || null,
+        blockedDate: dateAvailability.blockedDate || null,
+      });
       return;
     }
 
@@ -496,7 +614,7 @@ export default function Appointments() {
     } finally {
       setTimeSlotsLoading(false);
     }
-  }, [showBookingModal, showEditModal]);
+  }, [resolveDateAvailability, showBookingModal, showEditModal]);
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -516,10 +634,12 @@ export default function Appointments() {
 
   const getSelectedInfantControlNumber = useCallback(
     (infantId) => {
-      const selectedInfant = infants.find((infant) => infant.id === parseInt(infantId, 10));
+      const selectedInfant = bookingInfantCache.find(
+        (infant) => Number.parseInt(infant?.id, 10) === Number.parseInt(infantId, 10),
+      );
       return selectedInfant?.control_number || "";
     },
-    [infants],
+    [bookingInfantCache],
   );
 
   // Keep track of the latest month key to prevent race conditions during rapid navigation
@@ -533,22 +653,32 @@ export default function Appointments() {
     const monthKey = toMonthKey(monthCursor);
 
     try {
-      const [, blockedRes] = await Promise.allSettled([
-        apiClient.getAppointmentCalendarAvailability({ month: monthKey }, { signal }),
-        apiClient.getBlockedDates({ month: monthKey }, { signal })
-      ]);
+      const calendarResult = await apiClient.getAppointmentCalendarAvailability(
+        { month: monthKey },
+        { signal },
+      );
 
       // Drop stale responses if the user rapidly changed the month
       if (latestMonthKeyRef.current !== monthKey) return;
 
-      if (blockedRes.status === 'fulfilled') {
-        setBlockedDates(blockedRes.value?.blockedDates || {});
-      } else {
-        setBlockedDates({});
-      }
+      const calendarDates = Array.isArray(calendarResult?.dates)
+        ? calendarResult.dates
+        : [];
+      const availabilityByDate = calendarDates.reduce((accumulator, entry) => {
+        if (entry?.date) {
+          accumulator[entry.date] = entry;
+        }
+        return accumulator;
+      }, {});
+
+      setCalendarAvailabilityByDate(availabilityByDate);
+      setBlockedDates(calendarResult?.blockedDates || {});
     } catch (err) {
       if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
-      if (latestMonthKeyRef.current === monthKey) setBlockedDates({});
+      if (latestMonthKeyRef.current === monthKey) {
+        setCalendarAvailabilityByDate({});
+        setBlockedDates({});
+      }
     } finally {
       if (latestMonthKeyRef.current === monthKey) setCalendarLoading(false);
     }
@@ -572,11 +702,7 @@ export default function Appointments() {
         let hasNext = true;
         const scopedAppointments = [];
 
-        console.log('Fetching calendar appointments for month:', toMonthKey(monthCursor));
-        console.log('Date range:', toDateKey(monthStart), 'to', toDateKey(monthEnd));
-
         while (hasNext) {
-          console.log('Fetching page', page);
           const response = await apiClient.getAppointments({
             start_date: toDateKey(monthStart),
             end_date: toDateKey(monthEnd),
@@ -586,8 +712,6 @@ export default function Appointments() {
             limit: 200,
           });
 
-          console.log('API Response for page', page, ':', response);
-
           const pageRows = Array.isArray(response?.data)
             ? response.data
             : Array.isArray(response)
@@ -595,15 +719,10 @@ export default function Appointments() {
               : [];
           const pagination = response?.metadata || response?.pagination || null;
 
-          console.log('Page', page, 'rows:', pageRows.length, 'pagination:', pagination);
-
           scopedAppointments.push(...pageRows);
           hasNext = Boolean(pagination?.hasNext);
           page += 1;
         }
-
-        console.log('Total appointments fetched:', scopedAppointments.length);
-        console.log('Normalized appointments:', normalizeAppointmentCollection(scopedAppointments));
 
         if (latestMonthKeyRef.current === toMonthKey(monthCursor)) {
           setAppointments(normalizeAppointmentCollection(scopedAppointments));
@@ -638,10 +757,14 @@ export default function Appointments() {
 
   // Fetch calendar availability when month changes
   useEffect(() => {
+    if (view !== "calendar") {
+      return undefined;
+    }
+
     const abortController = new AbortController();
     fetchCalendarData(abortController.signal);
     return () => abortController.abort();
-  }, [fetchCalendarData]);
+  }, [fetchCalendarData, view]);
 
   useEffect(() => {
     if (view !== "calendar") {
@@ -665,7 +788,7 @@ export default function Appointments() {
           createFormData.scheduled_date,
           {}, { signal: abortController.signal }
         );
-        setBookingDateDetails(details || null);
+        setBookingDateDetails(normalizeAppointmentDateDetails(details));
       } catch (err) {
         if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
         setBookingDateDetails(null);
@@ -678,6 +801,10 @@ export default function Appointments() {
 
   // Handle date cell click
   const handleDateCellClick = (dateKey) => {
+    if (!dateKey) {
+      return;
+    }
+
     setSelectedDate(dateKey);
     setSelectedSlot(new Date(dateKey));
     setShowDateDetailsModal(true);
@@ -693,7 +820,7 @@ export default function Appointments() {
       try {
         setDateDetailsLoading(true);
         const details = await apiClient.getAppointmentDateDetails(selectedDate, {}, { signal: abortController.signal });
-        setSelectedDateDetails(details || null);
+        setSelectedDateDetails(normalizeAppointmentDateDetails(details));
       } catch (err) {
         if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
         setSelectedDateDetails(null);
@@ -707,13 +834,23 @@ export default function Appointments() {
   }, [selectedDate, showDateDetailsModal]);
 
   // Get appointments for a specific date
-  const getAppointmentsForDate = (dateKey) => {
+  const getAppointmentsForDate = useCallback((dateKey) => {
+    const normalizedDateKey = toDateKey(dateKey);
+    if (!normalizedDateKey) {
+      return [];
+    }
+
+    const availability = resolveDateAvailability(normalizedDateKey, { allowPast: true });
+    if (!availability.isAvailable) {
+      return [];
+    }
+
     return appointments.filter((apt) => {
       if (!apt.scheduled_date) return false;
       const aptDateKey = toDateKey(apt.scheduled_date);
-      return aptDateKey === dateKey;
+      return aptDateKey === normalizedDateKey;
     });
-  };
+  }, [appointments, resolveDateAvailability]);
 
   // Refresh appointments from API
   const refreshAppointments = useCallback(async () => {
@@ -1033,28 +1170,25 @@ export default function Appointments() {
     }
 
     const selectedDateDetails = bookingDateDetails;
-    if (
-      selectedDateDetails &&
-      (selectedDateDetails.isWeekend || Boolean(selectedDateDetails.holiday))
-    ) {
-      setCreateFormError(
-        selectedDateDetails.holiday
-          ? `${selectedDateDetails.holiday.name} is a holiday. Please choose another date.`
-          : "Appointments can only be booked on weekdays (Monday-Friday).",
-      );
+    if (selectedDateDetails?.availability && !selectedDateDetails.availability.available) {
+      setCreateFormError(selectedDateDetails.availability.reason);
       return;
     }
 
-    // Validate date is not weekend or holiday
-    const dateValidation = validateDateSelection(createFormData.scheduled_date);
+    // Validate date selection with the shared booking rules
+    const dateValidation = validateDateSelection(createFormData.scheduled_date, {
+      blockedDate: blockedDates[createFormData.scheduled_date] || null,
+    });
     if (!dateValidation.valid) {
       setCreateFormError(dateValidation.message);
       return;
     }
 
     // Find the selected infant
-    const selectedInfant = infants.find(
-      (i) => i.id === parseInt(createFormData.infant_id),
+    const selectedInfant = bookingInfantCache.find(
+      (infant) =>
+        Number.parseInt(infant?.id, 10) ===
+        Number.parseInt(createFormData.infant_id, 10),
     );
     if (!selectedInfant) {
       setCreateFormError("Infant not found");
@@ -1159,7 +1293,9 @@ export default function Appointments() {
     }
 
     // Validate date is not weekend or holiday
-    const dateValidation = validateDateSelection(editFormData.scheduled_date);
+    const dateValidation = validateDateSelection(editFormData.scheduled_date, {
+      blockedDate: blockedDates[editFormData.scheduled_date] || null,
+    });
     if (!dateValidation.valid) {
       setEditFormErrors({
         scheduled_date: dateValidation.message,
@@ -1393,12 +1529,28 @@ export default function Appointments() {
                 {/* Calendar Cells */}
                 <div className="grid grid-cols-7 gap-1 sm:gap-2 p-2 sm:p-4 min-h-[360px] sm:min-h-[420px]">
                   {calendarCells.map((cell) => {
-                    const isBlocked = blockedDates[cell.dateKey]?.is_blocked;
+                    const availability = calendarAvailabilityByDate[cell.dateKey] || null;
+                    const isBlocked =
+                      availability?.isAdminBlocked ??
+                      blockedDates[cell.dateKey]?.is_blocked ??
+                      false;
                     const isCurrentMonth = cell.isCurrentMonth;
                     const dayAppointments = getAppointmentsForDate(cell.dateKey);
                     const hasAppointments = dayAppointments.length > 0;
-                    const isWeekendDay = isWeekend(cell.date);
-                    const holiday = isPhilippineHoliday(cell.date);
+                    const isWeekendDay = availability?.isWeekend ?? isWeekend(cell.date);
+                    const holiday =
+                      availability?.isHoliday
+                        ? {
+                            name: availability.holidayName || "Holiday",
+                            type: "regular",
+                          }
+                        : isPhilippineHoliday(cell.date);
+                    const dateAvailability = resolveDateAvailability(cell.dateKey, {
+                      allowPast: true,
+                    });
+                    const isUnavailableDay =
+                      availability?.blocked === true || !dateAvailability.isAvailable;
+                    const showAppointmentsInCell = hasAppointments && !isUnavailableDay;
 
                     // Determine cell styling
                     let cellClass = "relative flex flex-col justify-start items-stretch min-h-[60px] sm:min-h-[70px] p-1.5 sm:p-2 rounded-lg border transition-all ";
@@ -1415,6 +1567,9 @@ export default function Appointments() {
                     } else if (isWeekendDay) {
                       // Weekend - Saturday or Sunday
                       cellClass += "border-gray-300 bg-gray-100 dark:border-gray-700 dark:bg-gray-800 ";
+                    } else if (isUnavailableDay) {
+                      // Unavailable for other operational reasons
+                      cellClass += "border-yellow-300 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20 ";
                     } else {
                       // Regular weekday
                       cellClass += "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 hover:shadow-md ";
@@ -1429,17 +1584,17 @@ export default function Appointments() {
                         key={cell.dateKey}
                         type="button"
                         onClick={() => {
-                          if (isCurrentMonth && !isWeekendDay && !holiday) {
-                            // If clicking on a weekday, toggle blocked status for admins
-                            handleToggleBlockedDate(cell.dateKey);
-                          } else {
-                            // Otherwise show date details
+                          if (isCurrentMonth) {
                             handleDateCellClick(cell.dateKey);
                           }
                         }}
                         disabled={!isCurrentMonth}
-                        className={cellClass}
-                        aria-label={`${isCurrentMonth ? (isBlocked ? 'Unblock' : 'Block') : 'Date from other month'} ${cell.dateKey}`}
+                        className={`${cellClass} ${isCurrentMonth ? "cursor-pointer" : ""}`}
+                        aria-label={`${!isCurrentMonth
+                          ? "Date from other month"
+                          : isUnavailableDay
+                            ? "Open unavailable date details for"
+                            : "Open date details for"} ${cell.dateKey}`}
                       >
                         <div className="flex items-center justify-between">
                           <span
@@ -1462,7 +1617,7 @@ export default function Appointments() {
                               {isBlocked && (
                                 <span className="w-2 h-2 rounded-full bg-red-500" title="Blocked by Admin" />
                               )}
-                              {hasAppointments && (
+                              {showAppointmentsInCell && (
                                 <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary-600 text-white">
                                   {dayAppointments.length}
                                 </span>
@@ -1487,7 +1642,12 @@ export default function Appointments() {
                               Weekend
                             </p>
                           )}
-                          {isCurrentMonth && hasAppointments && (
+                          {isCurrentMonth && isUnavailableDay && !isBlocked && !holiday && !isWeekendDay && (
+                            <p className="text-[9px] sm:text-[10px] font-semibold text-yellow-700 dark:text-yellow-300 truncate">
+                              Unavailable
+                            </p>
+                          )}
+                          {isCurrentMonth && showAppointmentsInCell && (
                             <div className="space-y-0.5">
                               {dayAppointments.slice(0, 2).map((apt, idx) => (
                                 <p key={idx} className="text-[9px] sm:text-[10px] text-gray-600 dark:text-gray-400 truncate">
@@ -1541,7 +1701,17 @@ export default function Appointments() {
                 Appointments for {new Date(selectedDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
               </h4>
               {(() => {
+                const dayAvailability = resolveDateAvailability(selectedDate, {
+                  allowPast: true,
+                });
                 const dayAppointments = getAppointmentsForDate(selectedDate);
+                if (!dayAvailability.isAvailable) {
+                  return (
+                    <Alert variant="warning">
+                      This date is unavailable for booking. Appointment entries are hidden.
+                    </Alert>
+                  );
+                }
                 if (dayAppointments.length === 0) {
                   return (
                     <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -1551,9 +1721,9 @@ export default function Appointments() {
                 }
                 return (
                   <div className="space-y-2">
-                    {dayAppointments.map((apt) => (
+                    {dayAppointments.map((apt, idx) => (
                       <div
-                        key={apt.id}
+                        key={`apt-${apt.id}-${idx}`}
                         className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
                       >
                         <div>
@@ -1809,6 +1979,22 @@ export default function Appointments() {
             </Button>
             <Button
               type="button"
+              variant={blockedDates[selectedDate]?.is_blocked ? "secondary" : "danger"}
+              onClick={() => {
+                if (selectedDate) {
+                  handleToggleBlockedDate(selectedDate);
+                }
+              }}
+              disabled={
+                dateDetailsLoading ||
+                !selectedDate ||
+                !resolveDateAvailability(selectedDate, { allowPast: true }).isAvailable
+              }
+            >
+              {blockedDates[selectedDate]?.is_blocked ? "Unblock Date" : "Block Date"}
+            </Button>
+            <Button
+              type="button"
               onClick={() => {
                 setShowDateDetailsModal(false);
                 setShowBookingModal(true);
@@ -1821,14 +2007,7 @@ export default function Appointments() {
               }}
               disabled={
                 dateDetailsLoading ||
-                (selectedDateDetails
-                  ? selectedDateDetails.isWeekend ||
-                    Boolean(selectedDateDetails.holiday) ||
-                    blockedDates[selectedDate]?.is_blocked
-                  : selectedDate &&
-                    (isWeekend(selectedDate) ||
-                      Boolean(isPhilippineHoliday(selectedDate)) ||
-                      blockedDates[selectedDate]?.is_blocked))
+                Boolean(selectedDate && !resolveDateAvailability(selectedDate, { allowPast: true }).isAvailable)
               }
             >
               Book Appointment
@@ -1846,8 +2025,9 @@ export default function Appointments() {
           {/* Availability Info */}
           {selectedDate && (() => {
             const holiday = selectedDateDetails?.holiday || isPhilippineHoliday(selectedDate);
-            const isWeekendDay =
-              selectedDateDetails?.isWeekend ?? isWeekend(selectedDate);
+            const selectedDateAvailability = resolveDateAvailability(selectedDate, {
+              allowPast: true,
+            });
             const isBlocked = blockedDates[selectedDate]?.is_blocked;
 
             if (isBlocked) {
@@ -1857,17 +2037,24 @@ export default function Appointments() {
                 </Alert>
               );
             }
-            if (holiday) {
+            if (!selectedDateAvailability.isAvailable && holiday) {
               return (
                 <Alert variant="warning">
                   <strong>{holiday.name}</strong> - This is a Philippine {holiday.type || 'regular'} holiday. Appointments cannot be scheduled on holidays.
                 </Alert>
               );
             }
-            if (isWeekendDay) {
+            if (!selectedDateAvailability.isAvailable && selectedDateAvailability.code === "WEEKEND_RESTRICTED") {
               return (
                 <Alert variant="warning">
                   This date falls on a weekend (Saturday or Sunday). Appointments are only available on weekdays (Monday-Friday).
+                </Alert>
+              );
+            }
+            if (!selectedDateAvailability.isAvailable) {
+              return (
+                <Alert variant="warning">
+                  {selectedDateAvailability.reason || "This date is unavailable for booking."}
                 </Alert>
               );
             }
@@ -1898,13 +2085,29 @@ export default function Appointments() {
             <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
               <p className="text-xs text-gray-500">Status</p>
               <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                {(blockedDates[selectedDate]?.is_blocked)
-                  ? "Blocked by Admin"
-                    : (selectedDateDetails?.holiday || (selectedDate && isPhilippineHoliday(selectedDate)))
-                      ? "Holiday"
-                      : (selectedDateDetails?.isWeekend ?? (selectedDate && isWeekend(selectedDate)))
-                        ? "Weekend (Sat/Sun)"
-                        : "Available"}
+                {(() => {
+                  const selectedDateAvailability = resolveDateAvailability(selectedDate, {
+                    allowPast: true,
+                  });
+
+                  if (blockedDates[selectedDate]?.is_blocked) {
+                    return "Blocked by Admin";
+                  }
+
+                  if (!selectedDateAvailability.isAvailable && (selectedDateDetails?.holiday || (selectedDate && isPhilippineHoliday(selectedDate)))) {
+                    return "Holiday";
+                  }
+
+                  if (!selectedDateAvailability.isAvailable && (selectedDateDetails?.isWeekend ?? (selectedDate && isWeekend(selectedDate)))) {
+                    return "Weekend (Sat/Sun)";
+                  }
+
+                  if (!selectedDateAvailability.isAvailable) {
+                    return "Unavailable";
+                  }
+
+                  return "Available";
+                })()}
               </p>
             </div>
           </div>
@@ -1914,16 +2117,20 @@ export default function Appointments() {
             <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
               Appointments for this date:
             </h4>
-            {(selectedDateDetails?.appointments ||
+            {selectedDateDetails?.availability?.available === false ? (
+              <Alert variant="warning">
+                Appointment entries are hidden for unavailable dates.
+              </Alert>
+            ) : ((selectedDateDetails?.appointments ||
               (selectedDate && getAppointmentsForDate(selectedDate)) ||
               []).length === 0 ? (
               <p className="text-sm text-gray-500">No appointments scheduled for this date.</p>
             ) : (
               (selectedDateDetails?.appointments ||
                 (selectedDate && getAppointmentsForDate(selectedDate)) ||
-                []).map((appointment) => (
+                []).map((appointment, index) => (
                 <div
-                  key={appointment.id}
+                  key={`appointment-${appointment.id}-${index}`}
                   className="rounded-xl border border-gray-200 dark:border-gray-700 p-3"
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -1945,7 +2152,7 @@ export default function Appointments() {
                   </p>
                 </div>
               ))
-            )}
+            ))}
           </div>
           </div>
         )}
@@ -2016,21 +2223,11 @@ export default function Appointments() {
             </div>
           )}
 
-          {createFormData.scheduled_date && (bookingDateDetails?.holiday || isPhilippineHoliday(createFormData.scheduled_date)) && (
+          {createFormData.scheduled_date && bookingDateDetails?.availability && !bookingDateDetails.availability.available && (
             <Alert variant="warning" className="mb-3">
-              {(bookingDateDetails?.holiday || isPhilippineHoliday(createFormData.scheduled_date)).name} is a holiday. Appointments are
-              not available on this date.
+              {bookingDateDetails.availability.reason}
             </Alert>
           )}
-
-          {createFormData.scheduled_date &&
-            !(bookingDateDetails?.holiday || isPhilippineHoliday(createFormData.scheduled_date)) &&
-            (bookingDateDetails?.isWeekend || isWeekend(createFormData.scheduled_date)) && (
-              <Alert variant="warning" className="mb-3">
-                This selected date is a weekend. Appointments are available on
-                weekdays only.
-              </Alert>
-            )}
 
           {/* Patient Selection */}
           <SearchableInfantSelect
@@ -2039,6 +2236,16 @@ export default function Appointments() {
             value={createFormData.infant_id}
             onChange={(e) => {
               const infantId = e.target.value;
+              const nextSelectedInfant = infants.find(
+                (infant) => Number.parseInt(infant?.id, 10) === Number.parseInt(infantId, 10),
+              );
+
+              if (nextSelectedInfant) {
+                setBookingInfantCache((previous) =>
+                  mergeInfantLookupResults(previous, [nextSelectedInfant]),
+                );
+              }
+
               setCreateFormData((prev) => ({
                 ...prev,
                 infant_id: infantId,
@@ -2049,9 +2256,17 @@ export default function Appointments() {
             required
             placeholder="Search by name, control number, or date of birth..."
             disabled={isSubmitting}
-            error={formErrors.infant_id}
+            error={
+              formErrors.infant_id ||
+              (bookingInfantError
+                ? "Unable to load infants right now. Please try again."
+                : "")
+            }
             loading={infantPickerLoading}
             emptyMessage={infantPickerEmptyMessage}
+            searchQuery={bookingInfantSearchQuery}
+            onSearchQueryChange={setBookingInfantSearchQuery}
+            selectedInfant={selectedBookingInfant}
           />
 
           {/* Auto-resolved Control Number */}
@@ -2079,6 +2294,7 @@ export default function Appointments() {
                 type="date"
                 value={createFormData.scheduled_date}
                 min={getMinDate()}
+                shouldDisableDate={shouldDisableDate}
                 onChange={(e) => {
                   setCreateFormData({
                     ...createFormData,
@@ -2307,21 +2523,13 @@ export default function Appointments() {
             >
               {isSubmitting ? "Updating..." : "Update Appointment"}
             </Button>
-          </AdminModalActions>
-        }
+        </AdminModalActions>
+      }
       >
         <form id="appointmentEditForm" className="admin-form" onSubmit={handleUpdateAppointment}>
-          {editFormData.scheduled_date && isPhilippineHoliday(editFormData.scheduled_date) && (
+          {editFormData.scheduled_date && resolveDateAvailability(editFormData.scheduled_date, { allowPast: false }) && !resolveDateAvailability(editFormData.scheduled_date, { allowPast: false }).isAvailable && (
             <Alert variant="warning" className="mb-3">
-              {isPhilippineHoliday(editFormData.scheduled_date).name} is a holiday. Appointments are
-              not available on this date.
-            </Alert>
-          )}
-
-          {editFormData.scheduled_date && !isPhilippineHoliday(editFormData.scheduled_date) && isWeekend(editFormData.scheduled_date) && (
-            <Alert variant="warning" className="mb-3">
-              This selected date is a weekend. Appointments are available on
-              weekdays only.
+              {resolveDateAvailability(editFormData.scheduled_date, { allowPast: false }).reason}
             </Alert>
           )}
 
@@ -2363,6 +2571,7 @@ export default function Appointments() {
                 type="date"
                 value={editFormData.scheduled_date}
                 min={getMinDate()}
+                shouldDisableDate={shouldDisableDate}
                 onChange={(e) => {
                   setEditFormData({
                     ...editFormData,

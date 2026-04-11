@@ -48,6 +48,27 @@ const getEventColor = (status) => {
 const canMutateAppointment = (status) => !["completed", "attended", "cancelled"].includes(status);
 const CALENDAR_WEEK_START = 0; // Sunday-first column order (Sun ... Sat)
 
+const normalizeAppointmentDateDetails = (details) => {
+  if (!details || typeof details !== "object") {
+    return null;
+  }
+
+  const appointments = Array.isArray(details.appointments) ? details.appointments : [];
+  const isUnavailable =
+    details?.availability?.available === false ||
+    Boolean(details?.holiday) ||
+    Boolean(details?.isWeekend);
+
+  return {
+    ...details,
+    appointments: isUnavailable ? [] : appointments,
+    summary: {
+      ...(details.summary || {}),
+      total: isUnavailable ? 0 : (details?.summary?.total ?? appointments.length),
+    },
+  };
+};
+
 export default function GuardianAppointmentsPage() {
   const navigate = useNavigate();
   const { guardianId } = useAuth();
@@ -67,6 +88,8 @@ export default function GuardianAppointmentsPage() {
   const [monthCursor, setMonthCursor] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(toDateKey(new Date()));
   const [selectedDateDetails, setSelectedDateDetails] = useState(null);
+  const [blockedDates, setBlockedDates] = useState({});
+  const [calendarAvailabilityByDate, setCalendarAvailabilityByDate] = useState({});
 
   const [pageLoading, setPageLoading] = useState(true);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
@@ -171,6 +194,19 @@ export default function GuardianAppointmentsPage() {
   // Transform appointments for FullCalendar
   const transformAppointmentsForCalendar = (appointments) => {
     return appointments
+      .filter((appointment) => {
+        const scheduledDate = appointment?.scheduled_date;
+        if (!scheduledDate) {
+          return false;
+        }
+
+        const dateAvailability = isDateAvailableForBooking(scheduledDate, {
+          allowPast: true,
+          blockedDate: blockedDates[toDateKey(scheduledDate)] || null,
+        });
+
+        return dateAvailability.isAvailable;
+      })
       .map((appointment) => {
         const dateStr = appointment.scheduled_date;
         const timeStr = appointment.scheduled_time || "09:00";
@@ -317,18 +353,9 @@ export default function GuardianAppointmentsPage() {
 
     setSelectedDate(clickedDate);
 
-    const holiday = isPhilippineHoliday(info.date);
-    if (holiday) {
-      setCalendarGuardFeedback(`${holiday.name} is a holiday. Appointments cannot be scheduled.`);
-      return;
-    }
-
-    if (isWeekendDate(info.date)) {
-      setCalendarGuardFeedback("Appointments can only be booked on weekdays (Monday-Friday).");
-      return;
-    }
-
-    const availability = isDateAvailableForBooking(info.date);
+    const availability = isDateAvailableForBooking(info.date, {
+      blockedDate: blockedDates[clickedDate] || null,
+    });
     if (!availability.isAvailable) {
       setCalendarGuardFeedback(availability.reason);
       return;
@@ -352,6 +379,9 @@ export default function GuardianAppointmentsPage() {
 
   const getDayCellClassNames = useCallback((args) => {
     const classNames = [];
+    const dateKey = toDateKey(args.date);
+    const availability = calendarAvailabilityByDate[dateKey] || null;
+    const blockedDate = blockedDates[dateKey];
 
     if (isWeekendDate(args.date)) {
       classNames.push("guardian-appointments-calendar-day--weekend");
@@ -362,12 +392,20 @@ export default function GuardianAppointmentsPage() {
       classNames.push(getHolidayTypeClass(holiday.type));
     }
 
-    if (toDateKey(args.date) === toDateKey(new Date())) {
+    if (blockedDate?.is_blocked) {
+      classNames.push("guardian-appointments-calendar-day--blocked");
+    }
+
+    if (availability?.blocked && !holiday && !isWeekendDate(args.date) && !blockedDate?.is_blocked) {
+      classNames.push("guardian-appointments-calendar-day--unavailable");
+    }
+
+    if (dateKey === toDateKey(new Date())) {
       classNames.push("guardian-appointments-calendar-day--today");
     }
 
     return classNames;
-  }, []);
+  }, [blockedDates, calendarAvailabilityByDate]);
 
   const getDayHeaderClassNames = useCallback(
     (args) =>
@@ -431,11 +469,24 @@ export default function GuardianAppointmentsPage() {
 
     setCalendarLoading(true);
     try {
-      await apiClient.getAppointmentCalendarAvailability({
+      const result = await apiClient.getAppointmentCalendarAvailability({
         month: toMonthKey(monthCursor),
       }, { signal });
+
+      const calendarDates = Array.isArray(result?.dates) ? result.dates : [];
+      const availabilityByDate = calendarDates.reduce((accumulator, entry) => {
+        if (entry?.date) {
+          accumulator[entry.date] = entry;
+        }
+        return accumulator;
+      }, {});
+
+      setCalendarAvailabilityByDate(availabilityByDate);
+      setBlockedDates(result?.blockedDates || {});
     } catch (err) {
       if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
+      setCalendarAvailabilityByDate({});
+      setBlockedDates({});
     } finally {
       setCalendarLoading(false);
     }
@@ -450,7 +501,7 @@ export default function GuardianAppointmentsPage() {
     setDateDetailsLoading(true);
     try {
       const details = await apiClient.getAppointmentDateDetails(selectedDate, {}, { signal });
-      setSelectedDateDetails(details || null);
+      setSelectedDateDetails(normalizeAppointmentDateDetails(details));
     } catch (err) {
       if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       setSelectedDateDetails(null);
@@ -513,6 +564,20 @@ export default function GuardianAppointmentsPage() {
         return;
       }
 
+      const dateAvailability = isDateAvailableForBooking(formData.scheduled_date, {
+        blockedDate: blockedDates[formData.scheduled_date] || null,
+      });
+      if (!dateAvailability.isAvailable) {
+        setAvailabilityFeedback({
+          available: false,
+          code: dateAvailability.code,
+          message: dateAvailability.reason,
+          holiday: dateAvailability.holiday || null,
+          blockedDate: dateAvailability.blockedDate || null,
+        });
+        return;
+      }
+
       setAvailabilityChecking(true);
       const abortController = new AbortController();
       try {
@@ -531,12 +596,27 @@ export default function GuardianAppointmentsPage() {
     };
 
     runAvailabilityCheck();
-  }, [guardianId, formData.scheduled_date, formData.vaccine_id]);
+  }, [guardianId, formData.scheduled_date, formData.vaccine_id, blockedDates]);
 
   const fetchTimeSlots = useCallback(async (signal) => {
     if (!guardianId || !showBookingModal || !formData.scheduled_date) {
       setTimeSlots([]);
       setTimeSlotsFeedback(null);
+      return;
+    }
+
+    const dateAvailability = isDateAvailableForBooking(formData.scheduled_date, {
+      blockedDate: blockedDates[formData.scheduled_date] || null,
+    });
+    if (!dateAvailability.isAvailable) {
+      setTimeSlots([]);
+      setTimeSlotsFeedback({
+        available: false,
+        code: dateAvailability.code,
+        message: dateAvailability.reason,
+        holiday: dateAvailability.holiday || null,
+        blockedDate: dateAvailability.blockedDate || null,
+      });
       return;
     }
 
@@ -570,7 +650,7 @@ export default function GuardianAppointmentsPage() {
     } finally {
       setTimeSlotsLoading(false);
     }
-  }, [guardianId, showBookingModal, formData.scheduled_date, formData.vaccine_id, editingAppointment?.id]);
+  }, [blockedDates, guardianId, showBookingModal, formData.scheduled_date, formData.vaccine_id, editingAppointment?.id]);
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -630,14 +710,11 @@ export default function GuardianAppointmentsPage() {
       return;
     }
 
-    if (isWeekendDate(formData.scheduled_date)) {
-      setError("Appointments can only be booked on weekdays (Monday-Friday).");
-      return;
-    }
-
-    const holiday = isPhilippineHoliday(formData.scheduled_date);
-    if (holiday) {
-      setError(`${holiday.name} is a holiday. Appointments cannot be scheduled.`);
+    const dateAvailability = isDateAvailableForBooking(formData.scheduled_date, {
+      blockedDate: blockedDates[formData.scheduled_date] || null,
+    });
+    if (!dateAvailability.isAvailable) {
+      setError(dateAvailability.reason);
       return;
     }
 
@@ -896,7 +973,15 @@ export default function GuardianAppointmentsPage() {
                 dayHeaderClassNames={getDayHeaderClassNames}
                 dayHeaderContent={renderDayHeaderContent}
                 dayCellContent={(arg) => {
+                  const dateKey = toDateKey(arg.date);
                   const holiday = isPhilippineHoliday(arg.date);
+                  const availability = calendarAvailabilityByDate[dateKey] || null;
+                  const blockedDate = blockedDates[dateKey];
+                  const isUnavailable =
+                    availability?.blocked === true ||
+                    Boolean(blockedDate?.is_blocked) ||
+                    Boolean(holiday) ||
+                    isWeekendDate(arg.date);
                   return (
                     <div className="flex flex-col w-full h-full min-h-[4rem]">
                       <div className="text-right p-1 text-sm">{arg.dayNumberText}</div>
@@ -905,10 +990,24 @@ export default function GuardianAppointmentsPage() {
                           {holiday.name}
                         </div>
                       )}
+                      {!holiday && blockedDate?.is_blocked && (
+                        <div className="text-[10px] font-semibold text-red-700 dark:text-red-300 truncate px-1 text-right bg-red-50 dark:bg-red-900/20 rounded mx-1 mb-1">
+                          Blocked
+                        </div>
+                      )}
+                      {!holiday && !blockedDate?.is_blocked && isUnavailable && (
+                        <div className="text-[10px] font-semibold text-yellow-700 dark:text-yellow-300 truncate px-1 text-right bg-yellow-50 dark:bg-yellow-900/20 rounded mx-1 mb-1">
+                          Unavailable
+                        </div>
+                      )}
                     </div>
                   );
                 }}
-                selectAllow={(selectInfo) => !isWeekendDate(selectInfo.start)}
+                selectAllow={(selectInfo) =>
+                  isDateAvailableForBooking(selectInfo.start, {
+                    blockedDate: blockedDates[toDateKey(selectInfo.start)] || null,
+                  }).isAvailable
+                }
                 headerToolbar={false}
                 height="auto"
                 aspectRatio={1.8}
@@ -1179,9 +1278,13 @@ export default function GuardianAppointmentsPage() {
               ))}
             </Select>
 
-            {isPhilippineHoliday(formData.scheduled_date) && (
+            {formData.scheduled_date && !isDateAvailableForBooking(formData.scheduled_date, {
+              blockedDate: blockedDates[formData.scheduled_date] || null,
+            }).isAvailable && (
               <Alert variant="warning">
-                {isPhilippineHoliday(formData.scheduled_date).name} is a holiday. Appointments cannot be scheduled on this date.
+                {isDateAvailableForBooking(formData.scheduled_date, {
+                  blockedDate: blockedDates[formData.scheduled_date] || null,
+                }).reason}
               </Alert>
             )}
 
@@ -1191,6 +1294,11 @@ export default function GuardianAppointmentsPage() {
                 label="Date"
                 value={formData.scheduled_date}
                 min={toDateKey(new Date())}
+                shouldDisableDate={(date) =>
+                  !isDateAvailableForBooking(date, {
+                    blockedDate: blockedDates[toDateKey(date)] || null,
+                  }).isAvailable
+                }
                 onChange={(event) =>
                   setFormData((previous) => ({ ...previous, scheduled_date: event.target.value }))
                 }
@@ -1278,7 +1386,9 @@ export default function GuardianAppointmentsPage() {
                   (availabilityFeedback ? !availabilityFeedback.available : false) ||
                   timeSlotsLoading ||
                   (timeSlotsFeedback ? !timeSlotsFeedback.available : false) ||
-                  Boolean(isPhilippineHoliday(formData.scheduled_date))
+                  Boolean(formData.scheduled_date && !isDateAvailableForBooking(formData.scheduled_date, {
+                    blockedDate: blockedDates[formData.scheduled_date] || null,
+                  }).isAvailable)
                 }
                 className="guardian-form-actions__primary ui-form-action-btn ui-form-action-btn--primary"
                 data-testid="guardian-booking-submit-btn"

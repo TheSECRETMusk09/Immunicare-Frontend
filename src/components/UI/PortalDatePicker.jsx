@@ -62,6 +62,7 @@ const PortalDatePicker = ({
   max,
   placeholder = "mm/dd/yyyy",
   required = false,
+  shouldDisableDate = null,
   id,
   name,
   size,
@@ -90,8 +91,8 @@ const PortalDatePicker = ({
   const computePos = useCallback(() => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    const POPUP_H = 240;
-    const POPUP_W = 280;
+    const POPUP_H = 272;
+    const POPUP_W = Math.min(320, Math.max(304, rect.width));
     const vh = window.innerHeight;
     const vw = window.innerWidth;
 
@@ -120,10 +121,33 @@ const PortalDatePicker = ({
 
   const handleSelect = useCallback(
     (date) => {
+      if (typeof shouldDisableDate === "function" && shouldDisableDate(date)) {
+        return;
+      }
+
       onChange?.({ target: { value: toYMD(date), name: name || id } });
       setOpen(false);
     },
-    [onChange, name, id],
+    [onChange, name, id, shouldDisableDate],
+  );
+
+  const isTileDisabled = useCallback(
+    ({ date, view }) => {
+      if (view !== "month") {
+        return false;
+      }
+
+      if (minDate && date < minDate) {
+        return true;
+      }
+
+      if (maxDate && date > maxDate) {
+        return true;
+      }
+
+      return typeof shouldDisableDate === "function" ? shouldDisableDate(date) : false;
+    },
+    [minDate, maxDate, shouldDisableDate],
   );
 
   const handleClear = useCallback(
@@ -204,6 +228,18 @@ const PortalDatePicker = ({
     .filter(Boolean)
     .join(" ");
 
+  const handleNativeChange = useCallback(
+    (event) => {
+      onChange?.({
+        target: {
+          value: event.target.value,
+          name: name || id,
+        },
+      });
+    },
+    [id, name, onChange],
+  );
+
   return (
     <>
       <div
@@ -221,12 +257,21 @@ const PortalDatePicker = ({
           </label>
         )}
 
+        <input
+          id={inputId}
+          type="date"
+          className="sr-only"
+          value={value}
+          onChange={handleNativeChange}
+          disabled={disabled}
+          aria-label={ariaLabel || label || "Select date"}
+        />
+
         <div
           ref={triggerRef}
-          id={inputId}
           role="button"
           tabIndex={disabled ? -1 : 0}
-          aria-label={ariaLabel || label || "Select date"}
+          aria-label="Open date picker"
           aria-expanded={open}
           aria-haspopup="grid"
           onClick={handleOpen}
@@ -307,6 +352,10 @@ const PortalDatePicker = ({
                 maxDate={maxDate}
                 locale="en-US"
                 showFixedNumberOfWeeks={false}
+                tileDisabled={isTileDisabled}
+                tileClassName={({ date, view }) =>
+                  view === "month" && isTileDisabled({ date, view }) ? "pdp-tile-unavailable" : ""
+                }
               />
             ) : (
               <div className="pdp-calendar-loading" aria-live="polite">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -10,6 +10,8 @@ import { Button, Input, Select } from "./UI";
 import apiClient from "../utils/api";
 import VaccineEligibilityIndicator, { VaccineEligibilityList } from "./VaccineEligibilityIndicator";
 import { useAuth } from "../contexts/AuthContext";
+import { fromDateKey, toDateKey } from "../utils/dateUtils";
+import { isDateAvailableForBooking, getMinBookingDate } from "../utils/holidays";
 
 export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
   const { user, guardianId } = useAuth();
@@ -25,9 +27,16 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
   const [suggestionError, setSuggestionError] = useState(null);
   const [eligibleVaccines, setEligibleVaccines] = useState(null);
   const [eligibleLoading, setEligibleLoading] = useState(false);
+  const [blockedDates, setBlockedDates] = useState({});
+  const bookingClinicId = user?.clinic_id || user?.facility_id || null;
+  const bookingMonthKey = toDateKey(selectedDate)?.slice(0, 7) || "";
 
   // Generate available time slots
-  const generateTimeSlots = (date) => {
+  const generateTimeSlots = useCallback((date) => {
+    if (!isDateAvailableForBooking(date, { allowPast: true, blockedDates }).isAvailable) {
+      return [];
+    }
+
     const slots = [];
     const startHour = 8; // 8 AM
     const endHour = 17; // 5 PM
@@ -43,11 +52,55 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
     }
 
     return slots;
-  };
+  }, [blockedDates]);
 
   useEffect(() => {
     setAvailableSlots(generateTimeSlots(selectedDate));
-  }, [selectedDate]);
+  }, [selectedDate, generateTimeSlots]);
+
+  useEffect(() => {
+    if (!bookingMonthKey || !bookingClinicId) {
+      setBlockedDates({});
+      return;
+    }
+
+    const abortController = new AbortController();
+    let active = true;
+
+    const fetchBlockedDates = async () => {
+      try {
+        const result = await apiClient.getBlockedDates(
+          {
+            month: bookingMonthKey,
+            clinic_id: bookingClinicId,
+          },
+          { signal: abortController.signal },
+        );
+
+        if (!active) {
+          return;
+        }
+
+        setBlockedDates(result?.blockedDates || {});
+      } catch (err) {
+        if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED") {
+          return;
+        }
+
+        console.error("Error fetching blocked dates:", err);
+        if (active) {
+          setBlockedDates({});
+        }
+      }
+    };
+
+    fetchBlockedDates();
+
+    return () => {
+      active = false;
+      abortController.abort();
+    };
+  }, [bookingClinicId, bookingMonthKey]);
 
   // Fetch eligible vaccines when infantId changes
   useEffect(() => {
@@ -114,10 +167,20 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
   const handleDateChange = (date) => {
     setSelectedDate(date);
     setSelectedTime("");
+    setError(null);
   };
 
   const handleBooking = async (e) => {
     e.preventDefault();
+
+    const dateAvailability = isDateAvailableForBooking(selectedDate, {
+      allowPast: true,
+      blockedDates,
+    });
+    if (!dateAvailability.isAvailable) {
+      setError(dateAvailability.reason);
+      return;
+    }
 
     // If a suggested time is selected, use it; otherwise use the manually selected time
     const timeToUse = selectedTime || (suggestedSlots.length > 0 ? suggestedSlots[0].time : "");
@@ -188,9 +251,12 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
           <div className="flex items-center space-x-4">
             <Input
               type="date"
-              value={selectedDate.toISOString().split("T")[0]}
-              onChange={(e) => handleDateChange(new Date(e.target.value))}
-              min={new Date().toISOString().split("T")[0]}
+              value={toDateKey(selectedDate)}
+              onChange={(e) => handleDateChange(fromDateKey(e.target.value) || new Date(e.target.value))}
+              min={getMinBookingDate()}
+              shouldDisableDate={(date) =>
+                !isDateAvailableForBooking(date, { allowPast: false, blockedDates }).isAvailable
+              }
               className="flex-1"
             />
             <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -202,6 +268,11 @@ export default function AppointmentBooking({ infantId, onAppointmentBooked }) {
               })}
             </span>
           </div>
+          {!isDateAvailableForBooking(selectedDate, { allowPast: true, blockedDates }).isAvailable && (
+            <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+              {isDateAvailableForBooking(selectedDate, { allowPast: true, blockedDates }).reason}
+            </div>
+          )}
         </div>
 
         {/* Appointment Suggestions Section */}

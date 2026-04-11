@@ -151,6 +151,44 @@ const INVENTORY_VACCINE_MATCH_ALIASES = Object.freeze({
   "IPV multi dose": ["ipv multi dose", "inactivated polio vaccine", "ipv"],
 });
 
+const normalizeInventoryDisplayVaccineName = (value) => {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) {
+    return "";
+  }
+
+  const normalizedValue = rawValue.toLowerCase().replace(/\s+/g, " ");
+  const alphanumericValue = normalizedValue.replace(/[^a-z0-9]/g, "");
+
+  if (normalizedValue.includes("diluent")) {
+    if (normalizedValue.includes("bcg")) {
+      return "BCG";
+    }
+    if (normalizedValue.includes("mmr") || normalizedValue.includes("measles")) {
+      return "MMR";
+    }
+  }
+
+  const matchedEntry = Object.entries(INVENTORY_VACCINE_MATCH_ALIASES).find(
+    ([canonicalName, aliases]) => {
+      const normalizedCanonical = canonicalName.toLowerCase();
+      return (
+        normalizedValue === normalizedCanonical ||
+        aliases.some((alias) => {
+          const normalizedAlias = alias.toLowerCase();
+          const normalizedAliasKey = normalizedAlias.replace(/[^a-z0-9]/g, "");
+          return (
+            normalizedValue === normalizedAlias ||
+            alphanumericValue === normalizedAliasKey
+          );
+        })
+      );
+    },
+  );
+
+  return matchedEntry?.[0] || rawValue;
+};
+
 const PRINT_REPORT_COPY = {
   inventorySheetTitle: "EPI VACCINE AND OTHER LOGISTICS INVENTORY FORM",
   inventorySheetDepartment: "DEPARTMENT OF HEALTH (DOH)",
@@ -709,7 +747,11 @@ const decodeInventoryHtmlEntities = (value, maxPasses = 3) => {
 
 const normalizeInventoryMovementType = (value) => {
   const normalized = String(value || "").trim().toUpperCase();
-  return normalized || "UNKNOWN";
+  if (!normalized) {
+    return "UNKNOWN";
+  }
+
+  return normalized === "WASTAGE" ? "WASTE" : normalized;
 };
 
 const INVENTORY_MOVEMENT_TYPE_META = Object.freeze({
@@ -717,7 +759,6 @@ const INVENTORY_MOVEMENT_TYPE_META = Object.freeze({
   RECEIPT: { label: "Receipt", badgeVariant: "success", accentClass: "text-green-700 dark:text-green-300", quantityPrefix: "+" },
   ISSUE: { label: "Issue", badgeVariant: "info", accentClass: "text-blue-700 dark:text-blue-300", quantityPrefix: "-" },
   WASTE: { label: "Waste", badgeVariant: "danger", accentClass: "text-red-700 dark:text-red-300", quantityPrefix: "-" },
-  WASTAGE: { label: "Wastage", badgeVariant: "danger", accentClass: "text-red-700 dark:text-red-300", quantityPrefix: "-" },
   EXPIRE: { label: "Expired", badgeVariant: "danger", accentClass: "text-red-700 dark:text-red-300", quantityPrefix: "-" },
   TRANSFER_IN: { label: "Transfer In", badgeVariant: "primary", accentClass: "text-purple-700 dark:text-purple-300", quantityPrefix: "+" },
   TRANSFER_OUT: { label: "Transfer Out", badgeVariant: "warning", accentClass: "text-orange-700 dark:text-orange-300", quantityPrefix: "-" },
@@ -772,7 +813,9 @@ const normalizeInventoryMovementRecord = (row = {}) => {
     previous_balance: previousBalance,
     new_balance: newBalance,
     vaccine_name:
-      row.vaccine_name ?? row.product_name ?? row.name ?? "Unknown vaccine",
+      normalizeInventoryDisplayVaccineName(
+        row.vaccine_name ?? row.product_name ?? row.name,
+      ) || "Unknown vaccine",
     lot_batch_number:
       row.lot_batch_number ??
       row.batch_number ??
@@ -975,7 +1018,6 @@ const summarizeStockMovements = (rows = []) =>
           result.stockOut += quantity;
           break;
         case "WASTE":
-        case "WASTAGE":
         case "EXPIRE":
           result.wasted += quantity;
           break;
@@ -5191,6 +5233,7 @@ export default function InventoryManagement() {
   );
   const [isGenerateReportModalOpen, setIsGenerateReportModalOpen] =
     useState(false);
+  const hasLoadedInventoryDataRef = useRef(false);
   const activePrintReportTypeRef = useRef(null);
   const printPageStyleRef = useRef(null);
 
@@ -5503,7 +5546,8 @@ export default function InventoryManagement() {
 
   // Fetch data
   const fetchData = useCallback(async ({ background = false } = {}) => {
-    const shouldShowBlockingLoader = !background && inventory.length === 0;
+    const shouldShowBlockingLoader =
+      !background && !hasLoadedInventoryDataRef.current;
 
     try {
       if (shouldShowBlockingLoader) {
@@ -5620,16 +5664,17 @@ export default function InventoryManagement() {
       if (shouldShowBlockingLoader) {
         setLoading(false);
       }
+      hasLoadedInventoryDataRef.current = true;
     } catch (err) {
       setError(err.message);
       if (shouldShowBlockingLoader) {
         setLoading(false);
       }
+      hasLoadedInventoryDataRef.current = true;
     }
   }, [
     fallbackClinicId,
     fetchPersistedStockAlerts,
-    inventory.length,
     inventoryDisplayFilters.endDate,
     inventoryDisplayFilters.startDate,
     initializeInventory,
@@ -5902,9 +5947,12 @@ export default function InventoryManagement() {
   const stockMovementTypeOptions = useMemo(() => {
     const uniqueTypes = Array.from(
       new Set(
-        stockMovements
-          .map((movement) => normalizeInventoryMovementType(movement.transaction_type))
-          .filter(Boolean),
+        [
+          ...stockMovements.map((movement) =>
+            normalizeInventoryMovementType(movement.transaction_type),
+          ),
+          "EXPIRE",
+        ].filter(Boolean),
       ),
     ).sort((left, right) =>
       getInventoryMovementTypeMeta(left).label.localeCompare(
@@ -5925,7 +5973,7 @@ export default function InventoryManagement() {
     const vaccineNames = Array.from(
       new Set(
         stockMovements
-          .map((movement) => String(movement?.vaccine_name || "").trim())
+          .map((movement) => normalizeInventoryDisplayVaccineName(movement?.vaccine_name))
           .filter(Boolean),
       ),
     ).sort((left, right) => left.localeCompare(right));
@@ -6007,7 +6055,8 @@ export default function InventoryManagement() {
         normalizedType === stockMovementFilters.type;
       const matchesVaccineFilter =
         stockMovementFilters.vaccine === "all" ||
-        movement.vaccine_name === stockMovementFilters.vaccine;
+        normalizeInventoryDisplayVaccineName(movement.vaccine_name) ===
+          stockMovementFilters.vaccine;
 
       return matchesDateFilter && matchesTypeFilter && matchesVaccineFilter;
     });
@@ -7261,7 +7310,7 @@ export default function InventoryManagement() {
         {/* Tab Navigation */}
         <div className="mt-4 rounded-xl border border-gray-200 bg-white/90 p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/90">
           <div className="flex flex-wrap items-end gap-3">
-            <div className="hidden">
+            <div className="hidden" hidden aria-hidden="true">
               <div className="inline-flex min-w-max gap-2 rounded-xl bg-gray-100 p-1.5 dark:bg-gray-900/70">
                 <button
             onClick={() => handleTabChange("inventory_sheet")}

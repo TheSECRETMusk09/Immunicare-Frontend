@@ -9,16 +9,18 @@ import { Search, X, ChevronDown } from "lucide-react";
 
 const normalizeSearchTerm = (value) => String(value || "").trim().toLowerCase();
 
+const infantDateFormatter = new Intl.DateTimeFormat("en-PH", {
+  timeZone: "Asia/Manila",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+
 const formatInfantDate = (value) => {
   if (!value) return "";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
-  return new Intl.DateTimeFormat("en-PH", {
-    timeZone: "Asia/Manila",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(parsed);
+  return infantDateFormatter.format(parsed);
 };
 
 const buildInfantDateSearchTokens = (value) => {
@@ -78,6 +80,8 @@ const SearchableInfantSelect = ({
   onSearchQueryChange,
   onOpenChange,
   selectedInfant: selectedInfantOverride = null,
+  hasMore = false,
+  onLoadMore,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [internalSearchQuery, setInternalSearchQuery] = useState("");
@@ -150,13 +154,15 @@ const SearchableInfantSelect = ({
   );
 
   const filteredInfants = useMemo(() => {
+    if (onSearchQueryChange) return infantsWithSearchData;
+
     if (!deferredSearchQuery.trim()) return infantsWithSearchData;
 
     const normalizedQuery = normalizeSearchTerm(deferredSearchQuery);
     return infantsWithSearchData.filter((infant) =>
       infant.searchText.includes(normalizedQuery)
     );
-  }, [deferredSearchQuery, infantsWithSearchData]);
+  }, [deferredSearchQuery, infantsWithSearchData, onSearchQueryChange]);
 
   const selectedInfant = useMemo(() => {
     const selectedId = Number(value);
@@ -225,7 +231,7 @@ const SearchableInfantSelect = ({
         border ${error ? "border-red-500 dark:border-red-400" : "border-gray-300 dark:border-gray-700"}
         rounded-lg
         text-gray-900 dark:text-gray-100
-        hover:bg-gray-50 dark:hover:bg-gray-750
+        hover:bg-gray-50 dark:hover:bg-gray-700
         focus:outline-none focus:ring-2 ${error ? "focus:ring-red-500" : "focus:ring-blue-500"}
         transition-colors
         flex items-center justify-between
@@ -279,7 +285,7 @@ const SearchableInfantSelect = ({
             </div>
 
             <div className="overflow-y-auto max-h-80 modern-scrollbar">
-              {loading ? (
+              {loading && filteredInfants.length === 0 ? (
                 <div className="p-4 text-center text-gray-400 text-sm">
                   Loading infants...
                 </div>
@@ -296,7 +302,7 @@ const SearchableInfantSelect = ({
                       onClick={() => handleSelect(infant)}
                       className={`
                         w-full px-4 py-2.5 text-left
-                        hover:bg-gray-600 dark:hover:bg-gray-750
+                        hover:bg-gray-600 dark:hover:bg-gray-700
                         transition-colors
                         ${
                           infant.id === Number(value)
@@ -321,6 +327,19 @@ const SearchableInfantSelect = ({
                       </div>
                     </button>
                   ))}
+                  {hasMore && (
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onLoadMore && onLoadMore();
+                      }}
+                      className="w-full py-3 text-sm text-blue-500 hover:bg-gray-600 dark:hover:bg-gray-700 font-medium transition-colors border-t border-gray-600 dark:border-gray-700 disabled:opacity-50"
+                    >
+                      {loading ? "Loading more..." : "Load more infants..."}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

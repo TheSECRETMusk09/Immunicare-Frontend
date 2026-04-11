@@ -1,1 +1,1 @@
-export { default as VaccinationRecordsManager } from "./VaccinationRecordsManager";
+export { default as VaccinationRecordsManager } from "./VaccinationRecordsManager";     

@@ -45,18 +45,14 @@ import {
   endOfWeek,
   isSameDay,
   parseISO,
-  isBefore,
-  startOfDay,
 } from "date-fns";
 import { useForm, Controller } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { appointmentSchema } from "../../utils/validation";
 import { apiClient as api } from "../../utils/api";
 import {
-  isWeekend,
   isPhilippineHoliday,
-  getUpcomingHolidays,
-  formatHoliday,
+  isDateAvailableForBooking,
 } from "../../utils/holidays";
 
 const steps = [
@@ -198,34 +194,11 @@ const EnhancedAppointmentBooking = ({
 
   const handleDateSelect = (selectInfo) => {
     const selected = selectInfo.start;
-
-    // Check for past dates
-    if (isBefore(startOfDay(selected), startOfDay(new Date()))) {
+    const availability = isDateAvailableForBooking(selected);
+    if (!availability.isAvailable) {
       setSnackbar({
         open: true,
-        message: "Cannot book appointments in the past",
-        severity: "warning",
-      });
-      return;
-    }
-
-    // Check for weekend
-    if (isWeekend(selected)) {
-      setSnackbar({
-        open: true,
-        message:
-          "Weekends are not available for appointments. Please select a weekday.",
-        severity: "warning",
-      });
-      return;
-    }
-
-    // Check for Philippine holidays
-    const holiday = isPhilippineHoliday(selected);
-    if (holiday) {
-      setSnackbar({
-        open: true,
-        message: `${holiday.name} (${holiday.type === "regular" ? "Regular Holiday" : "Special Holiday"}) is not available for appointments.`,
+        message: availability.reason,
         severity: "warning",
       });
       return;
@@ -303,7 +276,9 @@ const EnhancedAppointmentBooking = ({
   };
 
   const getCalendarEvents = () => {
-    return appointments.map((apt) => ({
+    return appointments
+      .filter((apt) => isDateAvailableForBooking(apt.scheduled_date, { allowPast: true }).isAvailable)
+      .map((apt) => ({
       id: apt.id,
       title: `${apt.type} - ${apt.first_name} ${apt.last_name}`,
       start: apt.scheduled_date,
@@ -321,7 +296,7 @@ const EnhancedAppointmentBooking = ({
         status: apt.status,
         infantName: `${apt.first_name} ${apt.last_name}`,
       },
-    }));
+      }));
   };
 
   const renderStepContent = (step) => {
@@ -346,8 +321,31 @@ const EnhancedAppointmentBooking = ({
                     right: "dayGridMonth,timeGridWeek",
                   }}
                   height={400}
+                  selectAllow={(selectInfo) =>
+                    isDateAvailableForBooking(selectInfo.start).isAvailable
+                  }
                   validRange={{
                     start: new Date(),
+                  }}
+                  dayCellContent={(arg) => {
+                    const availability = isDateAvailableForBooking(arg.date, { allowPast: true });
+                    const holiday = isPhilippineHoliday(arg.date);
+
+                    return (
+                      <div className="flex flex-col w-full h-full min-h-[4rem]">
+                        <div className="text-right p-1 text-sm">{arg.dayNumberText}</div>
+                        {holiday && (
+                          <div className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 truncate px-1 text-right bg-amber-50 dark:bg-amber-900/20 rounded mx-1 mb-1">
+                            {holiday.name}
+                          </div>
+                        )}
+                        {!holiday && !availability.isAvailable && (
+                          <div className="text-[10px] font-semibold text-yellow-700 dark:text-yellow-300 truncate px-1 text-right bg-yellow-50 dark:bg-yellow-900/20 rounded mx-1 mb-1">
+                            Unavailable
+                          </div>
+                        )}
+                      </div>
+                    );
                   }}
                 />
               </Paper>

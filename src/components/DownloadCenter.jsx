@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Button,
   Input,
@@ -36,6 +36,11 @@ const DIGITAL_PAPER_SHORTCUTS = [
     buildPath: (infantId) => `/digital-papers/vaccine-schedule/${infantId}`,
   },
 ];
+
+const OPERATIONAL_DOCUMENT_PERIOD = {
+  start_date: "2026-01-01",
+  end_date: "2026-12-31",
+};
 
 const normalizeDownloadRecord = (record = {}) => ({
   ...record,
@@ -95,6 +100,7 @@ const mergeInfantOptions = (...collections) => {
 export default function DownloadCenter({ onRefresh }) {
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [downloads, setDownloads] = useState([]);
   const [infants, setInfants] = useState([]);
   const [generateInfantOptions, setGenerateInfantOptions] = useState([]);
@@ -102,6 +108,7 @@ export default function DownloadCenter({ onRefresh }) {
   const [generateInfantLoading, setGenerateInfantLoading] = useState(false);
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [shortcutInfantsLoading, setShortcutInfantsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
@@ -126,18 +133,12 @@ export default function DownloadCenter({ onRefresh }) {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const infantQuery = isAdmin
-        ? { limit: 10000, scope: "system" }
-        : { limit: 10000 };
-
-      const [downloadsData, infantsData, templatesData] = await Promise.all([
-        apiClient.getDownloadHistory({ limit: 50 }),
-        apiClient.getInfants(infantQuery),
+      const [downloadsData, templatesData] = await Promise.all([
+        apiClient.getDownloadHistory({ limit: 50, ...OPERATIONAL_DOCUMENT_PERIOD }),
         apiClient.getPaperTemplates(),
       ]);
 
       setDownloads((toArrayPayload(downloadsData) || []).map(normalizeDownloadRecord));
-      setInfants(normalizeInfantsResponse(infantsData));
       setTemplates(templatesData?.data || templatesData || []);
     } catch (err) {
       setError(err.message);
@@ -149,6 +150,45 @@ export default function DownloadCenter({ onRefresh }) {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    let isCancelled = false;
+    const normalizedSearch = searchQuery.trim();
+    setShortcutInfantsLoading(true);
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const response = await apiClient.getInfants({
+          limit: normalizedSearch ? 25 : 50,
+          page: 1,
+          ...(isAdmin ? { scope: "system" } : {}),
+          ...(normalizedSearch ? { search: normalizedSearch } : {}),
+        });
+        const remoteInfants = normalizeInfantsResponse(response);
+
+        if (!isCancelled) {
+          setInfants(remoteInfants);
+        }
+      } catch (lookupError) {
+        if (!isCancelled) {
+          console.error(
+            "[DownloadCenter] Failed to load operational document infants:",
+            lookupError,
+          );
+          setInfants([]);
+        }
+      } finally {
+        if (!isCancelled) {
+          setShortcutInfantsLoading(false);
+        }
+      }
+    }, normalizedSearch ? 250 : 0);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [isAdmin, searchQuery]);
 
   useEffect(() => {
     if (!showGenerateModal) {
@@ -287,7 +327,12 @@ export default function DownloadCenter({ onRefresh }) {
   });
 
   const handleOpenOperationalDocument = (path) => {
-    navigate(path);
+    navigate(path, {
+      state: {
+        returnTo: `${location.pathname}${location.search}`,
+        returnLabel: "Download Center",
+      },
+    });
   };
 
   if (loading && downloads.length === 0) {
@@ -349,7 +394,11 @@ export default function DownloadCenter({ onRefresh }) {
           </p>
         </div>
 
-        {filteredInfants.length === 0 ? (
+        {shortcutInfantsLoading && filteredInfants.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+            Loading children for operational documents...
+          </div>
+        ) : filteredInfants.length === 0 ? (
           <EmptyState
             title="No infants available for operational documents"
             description="Register a child first to open their immunization chart, record booklet, or vaccine schedule."
@@ -358,8 +407,8 @@ export default function DownloadCenter({ onRefresh }) {
           />
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            {filteredInfants.slice(0, 8).map((infant) => (
-              <Card key={`digital-paper-shortcuts-${infant.id}`} className="p-4 space-y-4 border border-gray-200 dark:border-gray-700">
+            {filteredInfants.slice(0, 8).map((infant, index) => (
+              <Card key={`digital-paper-shortcuts-${infant.id}-${index}`} className="p-4 space-y-4 border border-gray-200 dark:border-gray-700">
                 <div>
                   <h5 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                     {infant.first_name} {infant.last_name}
@@ -370,9 +419,9 @@ export default function DownloadCenter({ onRefresh }) {
                 </div>
 
                 <div className="space-y-3">
-                  {DIGITAL_PAPER_SHORTCUTS.map((shortcut) => (
+                  {DIGITAL_PAPER_SHORTCUTS.map((shortcut, index) => (
                     <div
-                      key={`${infant.id}-${shortcut.key}`}
+                      key={`${infant.id}-${shortcut.key}-${index}`}
                       className="rounded-lg border border-gray-200 dark:border-gray-700 p-3"
                     >
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -432,9 +481,9 @@ export default function DownloadCenter({ onRefresh }) {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredDownloads.map((download) => (
+              {filteredDownloads.map((download, index) => (
                 <tr
-                  key={download.id}
+                  key={`${download.id}-${index}`}
                   className="hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
                   <td className="px-6 py-4 whitespace-nowrap">

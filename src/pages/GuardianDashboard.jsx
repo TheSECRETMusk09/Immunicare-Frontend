@@ -485,20 +485,25 @@ const GuardianDashboard = () => {
     }
   }, [guardianId]);
 
-  // Fetch data on mount
+  // Fetch data on mount - only depend on guardianId to prevent circular calls
   useEffect(() => {
-    fetchDashboardData(false);
-  }, [fetchDashboardData]);
+    if (guardianId) {
+      fetchDashboardData(false);
+    }
+  }, [guardianId]);
 
-  // Auto-refresh dashboard data every 60 seconds
+  // Auto-refresh dashboard data every 60 seconds - stable dependencies
   useEffect(() => {
+    if (!guardianId) return;
+    
     const intervalId = window.setInterval(() => {
       fetchDashboardData(true);
       void refreshNotifications();
     }, 60000);
     return () => window.clearInterval(intervalId);
-  }, [fetchDashboardData, refreshNotifications]);
+  }, [guardianId]);
 
+  // Update dismissed notifications when guardianNotifications change
   useEffect(() => {
     setDismissedNotificationIds((previous) =>
       previous.filter((notificationId) =>
@@ -515,13 +520,13 @@ const GuardianDashboard = () => {
     }
   }, [loading, error]);
 
-  // Telemetry: track dashboard view and general stats
+  // Telemetry: track dashboard view and general stats - use ref to prevent re-triggers
   useEffect(() => {
-    if (!loading && !error && !hasTracked.current) {
+    if (!loading && !error && !hasTracked.current && stats.childrenCount > 0) {
       trackEvent("dashboard_first_view", { childrenCount: stats.childrenCount, overdueCount: stats.overdueCount });
       hasTracked.current = true;
     }
-  }, [loading, error, stats.childrenCount, stats.overdueCount]);
+  }, [loading, error]);
 
   // Format date for appointment display
   const formatAppointmentDate = (dateString) => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import {
   Button,
@@ -11,7 +11,7 @@ import {
 import VaccineScheduleBooklet from "../../components/VaccineScheduleBooklet";
 import apiClient from "../../utils/api";
 import { normalizeInfantResponse } from "../../utils/adminDataAdapters";
-import { Syringe, FileText, Printer } from "lucide-react";
+import { ArrowLeft, Syringe, FileText, Printer } from "lucide-react";
 import { downloadWordDocument, PRINT_PAGE_PRESETS } from "../../utils/printDocumentExport";
 
 const sanitizeFileSegment = (value) =>
@@ -55,9 +55,13 @@ const downloadHtmlDocument = ({ title, filename, markup }) => {
 export default function VaccineSchedulePage() {
   const { infantId } = useParams();
   const { isAdmin } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [infant, setInfant] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const returnTo =
+    location.state?.returnTo || "/digital-papers?tab=download_center";
 
   const fetchInfant = useCallback(async () => {
     if (!infantId) {
@@ -178,6 +182,14 @@ export default function VaccineSchedulePage() {
         icon={<Syringe className="w-6 h-6" />}
         actions={
           <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate(returnTo)}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" /> Back to List
+            </Button>
             <Button onClick={handleDownload} variant="secondary">
               <FileText className="w-4 h-4 mr-2" /> Download PDF
             </Button>

@@ -9,6 +9,13 @@
  * @returns {string} Date in YYYY-MM-DD format
  */
 export function toDateKey(value) {
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+      return normalized;
+    }
+  }
+
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   const year = date.getFullYear();

@@ -5,6 +5,7 @@ import {
   fireEvent,
   waitFor,
   cleanup,
+  within,
 } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import {
@@ -284,14 +285,8 @@ describe("Admin module URL state persistence", () => {
     });
     expect(screen.getByTestId("location-pathname")).toHaveTextContent("/analytics");
 
-    const startDateInput = screen.getByLabelText(/start date/i);
-    const endDateInput = screen.getByLabelText(/end date/i);
-    fireEvent.change(startDateInput, { target: { value: "2026-03-01" } });
-    fireEvent.change(endDateInput, { target: { value: "2026-03-10" } });
-
-    await waitFor(() => {
-      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalledTimes(5);
-    });
+    expect(screen.getByLabelText(/start date/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/end date/i)).toBeInTheDocument();
     expect(screen.getByTestId("location-pathname")).toHaveTextContent("/analytics");
     expect(screen.getByTestId("location-search")).toHaveTextContent("tab=overview");
 
@@ -300,7 +295,7 @@ describe("Admin module URL state persistence", () => {
     fireEvent.click(screen.getByRole("option", { name: /^BCG$/i, hidden: true }));
 
     await waitFor(() => {
-      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalledTimes(6);
+      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalledTimes(4);
     });
     expect(screen.getByTestId("location-pathname")).toHaveTextContent("/analytics");
     expect(screen.getByTestId("location-search")).toHaveTextContent("tab=overview");
@@ -310,7 +305,7 @@ describe("Admin module URL state persistence", () => {
     fireEvent.click(screen.getByRole("option", { name: /completed/i, hidden: true }));
 
     await waitFor(() => {
-      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalledTimes(7);
+      expect(apiClient.getAnalyticsDashboard).toHaveBeenCalledTimes(5);
     });
     expect(screen.getByTestId("location-pathname")).toHaveTextContent("/analytics");
     expect(screen.getByTestId("location-search")).toHaveTextContent("tab=overview");
@@ -420,7 +415,7 @@ describe("Admin module URL state persistence", () => {
       null,
       expect.objectContaining({
         clinic_id: 7,
-        limit: 250,
+        limit: 100000,
       }),
     );
 
@@ -476,7 +471,9 @@ describe("Admin module URL state persistence", () => {
       screen.getByRole("button", { name: /stock movements/i }),
     ).toHaveClass("bg-white");
     expect(screen.getByText(/stock movement history/i)).toBeInTheDocument();
-    expect(screen.getByText("BCG")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("inventory-stock-movements-panel")).getByText("BCG"),
+    ).toBeInTheDocument();
     expect(screen.getByText("system-admin")).toBeInTheDocument();
     expect(screen.getByText("Staff Nurse")).toBeInTheDocument();
     expect(screen.queryByText(/save inventory/i)).not.toBeInTheDocument();

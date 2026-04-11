@@ -1,3 +1,5 @@
+import { normalizeApprovedVaccineName } from "../constants/approvedVaccines";
+
 const NUMBER_FALLBACK = null;
 
 const toNumber = (value, fallback = NUMBER_FALLBACK) => {
@@ -96,6 +98,41 @@ const toValidDate = (value) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
 };
+
+const toStartOfDayDate = (value) => {
+  const date = toValidDate(value);
+  if (!date) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+export const isFutureDatedDate = (value, referenceDate = new Date()) => {
+  const candidate = toStartOfDayDate(value);
+  const reference = toStartOfDayDate(referenceDate) || new Date();
+
+  if (!candidate || Number.isNaN(reference.getTime())) {
+    return false;
+  }
+
+  return candidate.getTime() > reference.getTime();
+};
+
+export const isCurrentVaccinationInfant = (infant = {}, referenceDate = new Date()) => {
+  const dob = infant?.dob ?? infant?.date_of_birth ?? infant?.birth_date ?? null;
+  const dobDate = toStartOfDayDate(dob);
+  const reference = toStartOfDayDate(referenceDate) || new Date();
+
+  if (!dobDate || Number.isNaN(reference.getTime())) {
+    return false;
+  }
+
+  return dobDate.getTime() <= reference.getTime();
+};
+
+export const filterCurrentVaccinationInfants = (infants = [], referenceDate = new Date()) =>
+  (Array.isArray(infants) ? infants : []).filter((infant) =>
+    isCurrentVaccinationInfant(infant, referenceDate),
+  );
 
 const toDateString = (value) => {
   const validDate = toValidDate(value);
@@ -204,8 +241,9 @@ export const normalizeInfant = (row = {}) => {
 export const normalizeVaccinationRecord = (row = {}) => {
   const patientId = toNumber(row.patient_id ?? row.infant_id ?? row.child_id);
   const adminDate = row.admin_date ?? row.date_administered ?? row.date_given ?? null;
-  const vaccineName =
+  const rawVaccineName =
     row.vaccine_name ?? row.vaccine?.name ?? row.vaccine ?? row.vaccine_code ?? "";
+  const vaccineName = normalizeApprovedVaccineName(rawVaccineName) || rawVaccineName;
   const lotBatchNumber =
     row.lot_batch_number ?? row.batch_number ?? row.lot_number ?? row.lot_no ?? null;
 
@@ -262,6 +300,7 @@ export const normalizeVaccinationRecord = (row = {}) => {
 };
 
 export const normalizeVaccinationSchedule = (row = {}) => {
+  const rawVaccineName = row.vaccine_name ?? row.name ?? "";
   const ageInMonths = toNumber(
     row.age_in_months,
     row.target_age_weeks !== undefined
@@ -278,7 +317,7 @@ export const normalizeVaccinationSchedule = (row = {}) => {
     ...row,
     id: toNumber(row.id),
     vaccine_id: toNumber(row.vaccine_id),
-    vaccine_name: row.vaccine_name ?? row.name ?? "",
+    vaccine_name: normalizeApprovedVaccineName(rawVaccineName) || rawVaccineName,
     disease_prevented:
       row.disease_prevented ?? row.description ?? row.recommended_age ?? "",
     age_in_months: ageInMonths,
@@ -294,6 +333,7 @@ export const normalizeVaccinationSchedule = (row = {}) => {
 };
 
 export const normalizeVaccine = (row = {}) => {
+  const rawName = row.name ?? row.vaccine_name ?? "";
   const currentStock = toNumber(
     row.current_stock ?? row.stock_on_hand ?? row.stock ?? row.qty_current,
     0,
@@ -303,7 +343,7 @@ export const normalizeVaccine = (row = {}) => {
   return {
     ...row,
     id: toNumber(row.id),
-    name: row.name ?? row.vaccine_name ?? "",
+    name: normalizeApprovedVaccineName(rawName) || rawName,
     code: row.code ?? row.vaccine_code ?? "",
     doses_required: toNumber(row.doses_required ?? row.total_doses, 1),
     manufacturer: row.manufacturer ?? null,
@@ -359,11 +399,14 @@ export const normalizeVaccineInventoryRecord = (row = {}) => {
 
 export const normalizeVaccineInventoryTransaction = (row = {}) => ({
   ...row,
+  transaction_type:
+    toStringSafe(row.transaction_type).toUpperCase() === "WASTAGE"
+      ? "WASTE"
+      : toStringSafe(row.transaction_type).toUpperCase(),
   id: toNumber(row.id),
   vaccine_inventory_id: toNumber(row.vaccine_inventory_id),
   vaccine_id: toNumber(row.vaccine_id),
   clinic_id: toNumber(row.clinic_id ?? row.facility_id),
-  transaction_type: toStringSafe(row.transaction_type).toUpperCase(),
   quantity: toNumber(row.quantity, 0),
   previous_balance: toNumber(row.previous_balance, 0),
   new_balance: toNumber(row.new_balance, 0),
@@ -429,7 +472,7 @@ export const buildFefoBatchOptions = ({
   inventoryRecords = [],
   vaccineId = null,
   clinicId = null,
-  referenceDate = new Date(),
+  referenceDate = null,
 }) => {
   const effectiveClinicId = toNumber(clinicId);
   const normalizedVaccineId = toNumber(vaccineId);
@@ -437,8 +480,10 @@ export const buildFefoBatchOptions = ({
     ? inventoryRecords.map((row) => normalizeVaccineInventoryRecord(row || {}))
     : normalizeVaccineInventoryResponse(inventoryRecords);
 
-  const referenceDay = toValidDate(referenceDate) || new Date();
-  referenceDay.setHours(0, 0, 0, 0);
+  const referenceDay = referenceDate ? toValidDate(referenceDate) || new Date() : null;
+  if (referenceDay) {
+    referenceDay.setHours(0, 0, 0, 0);
+  }
 
   const relevantInventoryRecords = normalizedInventoryRecords.filter((record) => {
     if (normalizedVaccineId && Number(record.vaccine_id) !== normalizedVaccineId) {
@@ -460,18 +505,32 @@ export const buildFefoBatchOptions = ({
     relevantInventoryRecords.length === 1 ? relevantInventoryRecords[0] : null;
 
   const sortedOptions = toArrayPayload(batches, ["batches"])
-    .map((row) => normalizeVaccineBatch(row || {}, effectiveClinicId))
+    .map((row) => {
+      const normalizedBatch = normalizeVaccineBatch(row || {}, effectiveClinicId);
+      if (!normalizedBatch.vaccine_id && normalizedVaccineId) {
+        return {
+          ...normalizedBatch,
+          vaccine_id: normalizedVaccineId,
+        };
+      }
+
+      return normalizedBatch;
+    })
     .filter((batch) => {
       if (!batch.batch_id || batch.stock_on_hand <= 0) {
         return false;
       }
 
-      if (normalizedVaccineId && Number(batch.vaccine_id) !== normalizedVaccineId) {
+      if (
+        normalizedVaccineId &&
+        Number(batch.vaccine_id || 0) > 0 &&
+        Number(batch.vaccine_id) !== normalizedVaccineId
+      ) {
         return false;
       }
 
       const expiryDate = toValidDate(batch.expiry_date);
-      if (expiryDate) {
+      if (referenceDay && expiryDate) {
         expiryDate.setHours(0, 0, 0, 0);
         if (expiryDate < referenceDay) {
           return false;
@@ -494,7 +553,7 @@ export const buildFefoBatchOptions = ({
         null;
 
       const expiryDate = toValidDate(batch.expiry_date);
-      const daysUntilExpiry = expiryDate
+      const daysUntilExpiry = referenceDay && expiryDate
         ? Math.ceil((expiryDate.getTime() - referenceDay.getTime()) / (24 * 60 * 60 * 1000))
         : null;
 
@@ -641,6 +700,7 @@ export const buildVaccinationScheduleTimeline = ({
   records = [],
   infantDob,
   referenceDate = new Date(),
+  includeFutureSeedData = false,
 }) => {
   const normalizedSchedules = mapArray(
     Array.isArray(schedules) ? schedules : [],
@@ -669,9 +729,19 @@ export const buildVaccinationScheduleTimeline = ({
     }
   });
 
-  const now = toValidDate(referenceDate) || new Date();
+  const now = toStartOfDayDate(referenceDate) || new Date();
   const dueSoonThreshold = new Date(now);
   dueSoonThreshold.setDate(dueSoonThreshold.getDate() + 14);
+  dueSoonThreshold.setHours(0, 0, 0, 0);
+
+  const birthDate = toStartOfDayDate(infantDob);
+  if (!birthDate) {
+    return [];
+  }
+
+  if (!includeFutureSeedData && birthDate.getTime() > now.getTime()) {
+    return [];
+  }
 
   return normalizedSchedules
     .map((schedule) => {
@@ -680,12 +750,10 @@ export const buildVaccinationScheduleTimeline = ({
       const matchedRecord = recordByDoseKey.get(recordKey) || null;
 
       let dueDate = null;
-      if (infantDob && schedule.age_in_months !== null && schedule.age_in_months !== undefined) {
-        const birthDate = toValidDate(infantDob);
-        if (birthDate) {
-          dueDate = new Date(birthDate);
-          dueDate.setMonth(dueDate.getMonth() + Number(schedule.age_in_months || 0));
-        }
+      if (schedule.age_in_months !== null && schedule.age_in_months !== undefined) {
+        dueDate = new Date(birthDate);
+        dueDate.setMonth(dueDate.getMonth() + Number(schedule.age_in_months || 0));
+        dueDate.setHours(0, 0, 0, 0);
       }
 
       const explicitStatus = normalizeStatus(matchedRecord?.status, "");
@@ -699,9 +767,9 @@ export const buildVaccinationScheduleTimeline = ({
         explicitStatus !== "scheduled"
       ) {
         status = explicitStatus;
-      } else if (dueDate && dueDate < now) {
+      } else if (dueDate && dueDate.getTime() < now.getTime()) {
         status = "overdue";
-      } else if (dueDate && dueDate <= dueSoonThreshold) {
+      } else if (dueDate && dueDate.getTime() <= dueSoonThreshold.getTime()) {
         status = "due";
       }
 
@@ -769,12 +837,14 @@ export const computeVaccinationComplianceSummary = ({
   records = [],
   infantDob,
   referenceDate = new Date(),
+  includeFutureSeedData = false,
 }) => {
   const timeline = buildVaccinationScheduleTimeline({
     schedules,
     records,
     infantDob,
     referenceDate,
+    includeFutureSeedData,
   });
 
   const currentAgeMonths = calculateAgeInMonths(infantDob, referenceDate);

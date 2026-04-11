@@ -120,7 +120,8 @@ export default function InfantManagement() {
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
-  const [dateFilter, setDateFilter] = useState("");
+  const [startDateFilter, setStartDateFilter] = useState("");
+  const [endDateFilter, setEndDateFilter] = useState("");
   const [transferCasesRefreshing, setTransferCasesRefreshing] = useState(false);
   const [infantPagination, setInfantPagination] = useState({
     page: 1,
@@ -141,6 +142,18 @@ export default function InfantManagement() {
   const fetchRequestIdRef = useRef(0);
   const transferInCasesRef = useRef(null);
 
+  const openRecordVaccinationsModal = useCallback((targetInfant = null) => {
+    setRecordVaccinationPrefill(
+      targetInfant
+        ? {
+            infant_id: targetInfant.id,
+            infantId: targetInfant.id,
+          }
+        : null,
+    );
+    setShowInjectModal(true);
+  }, []);
+
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 350);
     return () => clearTimeout(timer);
@@ -148,7 +161,7 @@ export default function InfantManagement() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchQuery, dateFilter]);
+  }, [debouncedSearchQuery, startDateFilter, endDateFilter]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -222,7 +235,8 @@ export default function InfantManagement() {
         limit: itemsPerPage,
         ...(isAdmin ? { scope: "system" } : {}),
         ...(debouncedSearchQuery ? { search: debouncedSearchQuery } : {}),
-        ...(dateFilter ? { date_of_birth: dateFilter } : {}),
+        ...(startDateFilter ? { start_date: startDateFilter } : {}),
+        ...(endDateFilter ? { end_date: endDateFilter } : {}),
       });
       const infantsData = normalizeInfantsResponse(result?.data ?? result);
       const nextPagination = normalizePaginationState(
@@ -293,7 +307,8 @@ export default function InfantManagement() {
     }
   }, [
     currentPage,
-    dateFilter,
+    startDateFilter,
+    endDateFilter,
     debouncedSearchQuery,
     hasLoadedInitialData,
     isAdmin,
@@ -376,15 +391,20 @@ export default function InfantManagement() {
     totalInfants > 0
       ? Math.min(currentPage * itemsPerPage, totalInfants)
       : 0;
+  const contentShellClassName = "flex w-full flex-col";
+  const actionButtonClassName =
+    "gap-1 whitespace-nowrap rounded-md px-2.5 shadow-none";
+  const actionsColumnWidth = "21rem";
 
   const columns = [
     {
       key: "name",
       label: "Name",
-      headerClassName: "w-auto whitespace-nowrap",
-      cellClassName: "whitespace-normal min-w-[10rem]",
+      width: "11.5rem",
+      headerClassName: "whitespace-nowrap",
+      cellClassName: "whitespace-normal break-words",
       render: (val, row) => (
-        <div className="font-medium text-gray-900 dark:text-gray-100">
+        <div className="font-semibold leading-5 text-gray-900 dark:text-gray-100">
           {row.first_name} {row.last_name}
         </div>
       ),
@@ -392,10 +412,11 @@ export default function InfantManagement() {
     {
       key: "control_number",
       label: "Infant Control Number",
-      headerClassName: "w-px whitespace-nowrap",
-      cellClassName: "w-px whitespace-nowrap",
+      width: "13rem",
+      headerClassName: "whitespace-nowrap",
+      cellClassName: "whitespace-nowrap",
       render: (val, row) => (
-        <span className="font-mono text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-gray-600 dark:text-gray-300">
+        <span className="inline-flex max-w-full overflow-hidden rounded-md bg-gray-100 px-2 py-1 font-mono text-[11px] text-gray-600 dark:bg-gray-700 dark:text-gray-300">
           {formatControlNumberDisplay(val, row.dob)}
         </span>
       ),
@@ -403,15 +424,17 @@ export default function InfantManagement() {
     {
       key: "dob",
       label: "Date of Birth",
-      headerClassName: "w-px whitespace-nowrap",
-      cellClassName: "w-px whitespace-nowrap",
+      width: "7rem",
+      headerClassName: "whitespace-nowrap",
+      cellClassName: "whitespace-nowrap",
       type: "date",
     },
     {
       key: "sex",
       label: "Gender",
-      headerClassName: "w-px whitespace-nowrap",
-      cellClassName: "w-px whitespace-nowrap",
+      width: "5.5rem",
+      headerClassName: "whitespace-nowrap",
+      cellClassName: "whitespace-nowrap",
       render: (val) => {
         // Handle both 'M'/'F' and 'male'/'female' formats
         const isMale =
@@ -428,8 +451,9 @@ export default function InfantManagement() {
     {
       key: "parents",
       label: "Parents/Guardian",
-      headerClassName: "w-auto whitespace-nowrap",
-      cellClassName: "whitespace-normal min-w-[14rem]",
+      width: "18.5rem",
+      headerClassName: "whitespace-nowrap",
+      cellClassName: "whitespace-normal break-words",
       render: (val, row) => {
         const parents = [];
         if (row.mother_name) parents.push(`Mother: ${row.mother_name}`);
@@ -439,7 +463,7 @@ export default function InfantManagement() {
           parents.push(row.guardian_name);
         }
         return (
-          <div className="text-sm">
+          <div className="space-y-0.5 text-[13px] leading-5">
             {parents.length > 0 ? (
               parents.map((p, i) => (
                 <div key={i} className="text-gray-700 dark:text-gray-300">
@@ -456,10 +480,11 @@ export default function InfantManagement() {
     {
       key: "contact",
       label: "Contact",
-      headerClassName: "w-px whitespace-nowrap",
-      cellClassName: "w-px whitespace-nowrap",
+      width: "8rem",
+      headerClassName: "whitespace-nowrap",
+      cellClassName: "whitespace-nowrap",
       render: (val, row) => (
-        <div className="text-sm text-gray-700 dark:text-gray-300">
+        <div className="text-[13px] leading-5 text-gray-700 dark:text-gray-300">
           {row.cellphone_number || row.guardian_phone || "Not specified"}
         </div>
       ),
@@ -467,8 +492,9 @@ export default function InfantManagement() {
     {
       key: "workflow_status",
       label: "Workflow",
-      headerClassName: "w-px whitespace-nowrap",
-      cellClassName: "w-px whitespace-nowrap",
+      width: "8rem",
+      headerClassName: "whitespace-nowrap",
+      cellClassName: "whitespace-nowrap",
       render: (val, row) => {
         const workflowMeta =
           WORKFLOW_STATUS_META[row.workflow_status] || WORKFLOW_STATUS_META.up_to_date;
@@ -496,10 +522,11 @@ export default function InfantManagement() {
     {
       key: "vaccination_progress",
       label: "Vaccination Progress",
-      headerClassName: "w-px whitespace-nowrap",
-      cellClassName: "w-px whitespace-nowrap",
+      width: "10rem",
+      headerClassName: "whitespace-nowrap",
+      cellClassName: "whitespace-nowrap",
       render: (val, row) => (
-        <div className="text-sm text-gray-700 dark:text-gray-300 space-y-1">
+        <div className="space-y-0.5 text-[13px] leading-5 text-gray-700 dark:text-gray-300">
           <div>Completed: {Number(row.completed_vaccinations || 0)}</div>
           <div>Pending: {Number(row.pending_vaccinations || 0)}</div>
           <div>Imported: {Number(row.imported_vaccinations || 0)}</div>
@@ -509,10 +536,11 @@ export default function InfantManagement() {
     {
       key: "latest_transfer_source_facility",
       label: "Transfer Source",
-      headerClassName: "w-auto whitespace-nowrap",
-      cellClassName: "whitespace-normal min-w-[12rem]",
+      width: "9rem",
+      headerClassName: "whitespace-nowrap",
+      cellClassName: "whitespace-normal break-words",
       render: (val) => (
-        <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-normal break-words">
+        <div className="text-[13px] leading-5 text-gray-700 dark:text-gray-300 whitespace-normal break-words">
           {val || "—"}
         </div>
       ),
@@ -520,48 +548,48 @@ export default function InfantManagement() {
   ];
 
   const tableActions = (row) => (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="ml-auto flex max-w-[21rem] flex-row flex-wrap items-center justify-end gap-1.5">
       <Button
         variant="primary"
-        size="sm"
+        size="xs"
         onClick={() => handleViewBooklet(row, "personal")}
-        className="gap-1.5"
+        className={actionButtonClassName}
         title="Personal Information Record"
       >
-        <User className="w-4 h-4" /> Personal
+        <User className="h-3.5 w-3.5" /> Personal
       </Button>
       <Button
         variant="success"
-        size="sm"
+        size="xs"
         onClick={() => handleViewBooklet(row, "schedule")}
-        className="gap-1.5"
+        className={actionButtonClassName}
         title="Vaccine Schedule Booklet"
       >
-        <Calendar className="w-4 h-4" /> Schedule
+        <Calendar className="h-3.5 w-3.5" /> Schedule
       </Button>
       <Button
         variant="info"
-        size="sm"
+        size="xs"
         onClick={() => handleViewBooklet(row, "records")}
-        className="gap-1.5"
+        className={actionButtonClassName}
         title="Immunization Record Booklet"
       >
-        <BookOpen className="w-4 h-4" /> Records
+        <BookOpen className="h-3.5 w-3.5" /> Records
       </Button>
       <Button
         variant="warning"
-        size="sm"
+        size="xs"
         onClick={() => handleViewBooklet(row, "chart")}
-        className="gap-1.5"
+        className={actionButtonClassName}
         title="Immunization Chart"
       >
-        <BarChart2 className="w-4 h-4" /> Chart
+        <BarChart2 className="h-3.5 w-3.5" /> Chart
       </Button>
       <Button
         variant="secondary"
-        size="sm"
+        size="xs"
         onClick={() => openReadinessManager(row)}
-        className="gap-1.5"
+        className={actionButtonClassName}
         title="Manage vaccine readiness"
       >
         Ready
@@ -752,10 +780,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
         {/* Inject Vaccine Button */}
         <div className="fixed bottom-6 right-6">
           <Button
-            onClick={() => {
-              setRecordVaccinationPrefill(null);
-              setShowInjectModal(true);
-            }}
+            onClick={() => openRecordVaccinationsModal(selectedInfant)}
             variant="primary"
             className="flex items-center gap-2 shadow-lg"
             size="lg"
@@ -771,75 +796,74 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
     <div className="flex flex-col h-screen overflow-hidden">
       {/* Sticky Header Section - Stays fixed at top while scrolling */}
       <div className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6">
-        <PageHeader
-          title={activeView === "transfer-in" ? "Transfer-In Cases" : "Infant Management"}
-          subtitle={activeView === "transfer-in" ? "Manage and validate infant vaccination records transferred from other facilities" : "Digital booklets and records for pediatric patients"}
-          icon={activeView === "transfer-in" ? <BookOpen className="w-6 h-6" /> : <Baby className="w-6 h-6" />}
-          actions={
-            <div className="flex flex-wrap gap-2">
-              {activeView === "transfer-in" ? (
-                <>
-                  <Button
-                    onClick={() => {
-                      setTransferCasesRefreshing(false);
-                      setSelectedInfant(null);
-                      setActiveView("list");
-                      navigate("/infants", {
-                        replace: true,
-                        state: location.state,
-                      });
-                    }}
-                    variant="secondary"
-                    className="flex items-center gap-2"
-                  >
-                    <ArrowLeft className="w-4 h-4" /> Back to Infants
-                  </Button>
-                  <Button
-                    onClick={() => transferInCasesRef.current?.fetchCases(true)}
-                    variant="secondary"
-                    disabled={transferCasesRefreshing}
-                    className="flex items-center gap-2"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${transferCasesRefreshing ? "animate-spin" : ""}`} />
-                    {transferCasesRefreshing ? "Refreshing..." : "Refresh"}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    onClick={() => {
-                      setSelectedInfant(null);
-                      navigate("/infants?view=transfer-in", {
-                        state: location.state,
-                      });
-                    }}
-                    variant="info"
-                    className="flex items-center gap-2"
-                  >
-                    <BookOpen className="w-4 h-4" /> Transfer-In Cases
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setRecordVaccinationPrefill(null);
-                      setShowInjectModal(true);
-                    }}
-                    variant="success"
-                    className="flex items-center gap-2"
-                  >
-                    <Syringe className="w-4 h-4" /> Record Vaccinations
-                  </Button>
-                  <Button
-                    onClick={() => setShowAddModal(true)}
-                    variant="primary"
-                    className="flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" /> Add New Infant
-                  </Button>
-                </>
-              )}
-            </div>
-          }
-        />
+        <div className={activeView === "transfer-in" ? "w-full" : contentShellClassName}>
+          <PageHeader
+            title={activeView === "transfer-in" ? "Transfer-In Cases" : "Infant Management"}
+            subtitle={activeView === "transfer-in" ? "Manage and validate infant vaccination records transferred from other facilities" : "Digital booklets and records for pediatric patients"}
+            icon={activeView === "transfer-in" ? <BookOpen className="w-6 h-6" /> : <Baby className="w-6 h-6" />}
+            actions={
+              <div className="flex flex-wrap gap-2">
+                {activeView === "transfer-in" ? (
+                  <>
+                    <Button
+                      onClick={() => {
+                        setTransferCasesRefreshing(false);
+                        setSelectedInfant(null);
+                        setActiveView("list");
+                        navigate("/infants", {
+                          replace: true,
+                          state: location.state,
+                        });
+                      }}
+                      variant="secondary"
+                      className="flex items-center gap-2"
+                    >
+                      <ArrowLeft className="w-4 h-4" /> Back to Infants
+                    </Button>
+                    <Button
+                      onClick={() => transferInCasesRef.current?.fetchCases(true)}
+                      variant="secondary"
+                      disabled={transferCasesRefreshing}
+                      className="flex items-center gap-2"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${transferCasesRefreshing ? "animate-spin" : ""}`} />
+                      {transferCasesRefreshing ? "Refreshing..." : "Refresh"}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      onClick={() => {
+                        setSelectedInfant(null);
+                        navigate("/infants?view=transfer-in", {
+                          state: location.state,
+                        });
+                      }}
+                      variant="info"
+                      className="flex items-center gap-2"
+                    >
+                      <BookOpen className="w-4 h-4" /> Transfer-In Cases
+                    </Button>
+                    <Button
+                      onClick={() => openRecordVaccinationsModal(null)}
+                      variant="success"
+                      className="flex items-center gap-2"
+                    >
+                      <Syringe className="w-4 h-4" /> Record Vaccinations
+                    </Button>
+                    <Button
+                      onClick={() => setShowAddModal(true)}
+                      variant="primary"
+                      className="flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" /> Add New Infant
+                    </Button>
+                  </>
+                )}
+              </div>
+            }
+          />
+        </div>
       </div>
 
       <div className="flex-1 flex flex-col p-4 sm:px-6 sm:pb-6 pt-3 overflow-hidden">
@@ -852,30 +876,31 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
             />
           </div>
         ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-4">
-              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <div className={`${contentShellClassName} flex-1 min-h-0`}>
+            <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3.5">
             <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Visible Infants</p>
             <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">{infantSummary.total}</p>
           </div>
-          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3.5">
             <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Needs Review</p>
             <p className="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">{infantSummary.needsReview}</p>
           </div>
-          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3.5">
             <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Transfer-In Cases</p>
             <p className="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-400">{infantSummary.withImportedHistory}</p>
           </div>
-          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3.5">
             <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Pending Doses</p>
             <p className="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">{infantSummary.pendingVaccinations}</p>
           </div>
         </div>
 
         {/* Search Bar */}
-        <div className="flex-shrink-0 z-20 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4 mb-3">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-3 sm:gap-4">
-            <div className="relative flex-1 w-full lg:max-w-md">
+        <div className="z-20 mb-3 flex-shrink-0 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="relative w-full lg:max-w-[26rem]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <Input
                   placeholder="Search by name, control no, or contact..."
@@ -887,12 +912,21 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
             <div className="w-full sm:w-auto sm:max-w-[200px]">
               <Input
                 type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                title="Filter by Date of Birth"
+                value={startDateFilter}
+                onChange={(e) => setStartDateFilter(e.target.value)}
+                title="Filter by Start Date of Birth"
               />
             </div>
-            <div className="flex items-center justify-between sm:justify-start gap-3 w-full lg:w-auto">
+            <div className="w-full sm:w-auto sm:max-w-[200px]">
+              <Input
+                type="date"
+                value={endDateFilter}
+                onChange={(e) => setEndDateFilter(e.target.value)}
+                title="Filter by End Date of Birth"
+              />
+            </div>
+            </div>
+            <div className="flex items-center justify-between gap-3 sm:justify-start">
               {refreshing && (
                 <span className="text-xs text-gray-500 dark:text-gray-400">Refreshing...</span>
               )}
@@ -905,35 +939,41 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
               >
                 <span className="mr-1">🔄</span> {refreshing ? 'Refreshing...' : 'Refresh'}
               </Button>
-              <div className="text-sm text-gray-600 dark:text-gray-400 self-center">
+              <div className="self-center whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                 Showing {visibleInfantEnd} of {totalInfants} infants
               </div>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-fade-in">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 animate-fade-in">
+          <div className="flex-shrink-0 border-b border-gray-200 bg-gray-50 px-5 py-3 dark:border-gray-700 dark:bg-gray-800/50">
+            <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 sm:text-lg">
               Registered Infants - Click to View Digital Booklets
             </h3>
           </div>
           <div className="flex-1 overflow-auto auto-hide-scrollbar">
-            <table className="min-w-full w-full table-auto divide-y divide-gray-200 dark:divide-gray-700 relative">
+            <table className="relative min-w-[1320px] w-full table-fixed divide-y divide-gray-200 dark:divide-gray-700">
+              <colgroup>
+                {columns.map((col) => (
+                  <col key={col.key} style={col.width ? { width: col.width } : undefined} />
+                ))}
+                <col style={{ width: actionsColumnWidth }} />
+              </colgroup>
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                 <tr>
                   {columns.map((col) => (
                     <th
                       key={col.key}
                       scope="col"
-                      className={`px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 ${col.headerClassName || ""}`}
+                      className={`bg-gray-50 px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500 dark:bg-gray-700 dark:text-gray-300 ${col.headerClassName || ""}`}
                     >
                       {col.label}
                     </th>
                   ))}
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 w-px whitespace-nowrap"
+                    className="bg-gray-50 px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500 dark:bg-gray-700 dark:text-gray-300 whitespace-nowrap"
                   >
                     Actions
                   </th>
@@ -942,7 +982,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredInfants.length === 0 ? (
                   <tr>
-                    <td colSpan={columns.length + 1} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan={columns.length + 1} className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
                       <div className="flex flex-col items-center justify-center">
                         <span className="text-4xl mb-3">👶</span>
                         <p className="text-lg font-medium">No infants registered yet.</p>
@@ -955,7 +995,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                       {columns.map((col, colIndex) => (
                         <td
                           key={col.key || colIndex}
-                          className={`px-4 py-4 align-top text-sm text-gray-900 dark:text-gray-100 ${col.cellClassName || "whitespace-nowrap"}`}
+                          className={`px-3 py-3 align-top text-sm text-gray-900 dark:text-gray-100 ${col.cellClassName || "whitespace-nowrap"}`}
                         >
                           {col.render
                             ? col.render(row[col.key], row)
@@ -964,7 +1004,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                               : row[col.key]}
                         </td>
                       ))}
-                      <td className="px-4 py-4 align-top whitespace-nowrap text-sm font-medium w-px">
+                      <td className="px-3 py-3 align-middle text-right text-sm font-medium">
                         {tableActions(row)}
                       </td>
                     </tr>
@@ -975,7 +1015,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
           </div>
 
           {totalPages > 1 && (
-            <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
+            <div className="flex flex-shrink-0 items-center justify-between border-t border-gray-200 bg-white px-5 py-3 dark:border-gray-700 dark:bg-gray-800">
               <div className="text-sm text-gray-500">
                 Showing {visibleInfantStart} to {visibleInfantEnd} of {totalInfants} infants
               </div>
@@ -1003,7 +1043,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
             </div>
           )}
         </div>
-          </>
+          </div>
         )}
       </div>
 
