@@ -13,6 +13,7 @@ import {
   downloadWordDocument,
   PRINT_PAGE_PRESETS,
 } from "../utils/printDocumentExport";
+import { toArrayPayload } from "../utils/adminDataAdapters";
 
 export default function VaccineInventoryLogbook() {
   const { isAdmin } = useAuth();
@@ -78,9 +79,9 @@ export default function VaccineInventoryLogbook() {
         }),
       ]);
 
-      setInventory(inventoryData);
-      setVaccines(vaccinesData);
-      setAlerts(alertsData);
+      setInventory(toArrayPayload(inventoryData, ["inventory", "items", "records"]));
+      setVaccines(toArrayPayload(vaccinesData, ["vaccines", "items", "records"]));
+      setAlerts(toArrayPayload(alertsData, ["alerts", "items", "records"]));
     } catch (err) {
       console.error("Error fetching inventory data:", err);
       setError(err.message || "Failed to load inventory data");
@@ -107,33 +108,40 @@ export default function VaccineInventoryLogbook() {
     };
   }, [isAdmin, fetchAllData]);
 
-  const calculateTotals = () => {
-    return inventory.reduce(
-      (totals, item) => ({
-        beginning_balance: totals.beginning_balance + item.beginning_balance,
-        received_during_period:
-          totals.received_during_period + item.received_during_period,
-        transferred_in: totals.transferred_in + item.transferred_in,
-        transferred_out: totals.transferred_out + item.transferred_out,
-        expired_wasted: totals.expired_wasted + item.expired_wasted,
-        total_available: totals.total_available + item.total_available,
-        issuance: totals.issuance + item.issuance,
-        stock_on_hand: totals.stock_on_hand + item.stock_on_hand,
-      }),
-      {
-        beginning_balance: 0,
-        received_during_period: 0,
-        transferred_in: 0,
-        transferred_out: 0,
-        expired_wasted: 0,
-        total_available: 0,
-        issuance: 0,
-        stock_on_hand: 0,
-      },
-    );
-  };
-
-  const totals = useMemo(() => calculateTotals(), [inventory]);
+  const totals = useMemo(
+    () =>
+      inventory.reduce(
+        (accumulator, item) => ({
+          beginning_balance:
+            accumulator.beginning_balance + (item.beginning_balance || 0),
+          received_during_period:
+            accumulator.received_during_period +
+            (item.received_during_period || 0),
+          transferred_in:
+            accumulator.transferred_in + (item.transferred_in || 0),
+          transferred_out:
+            accumulator.transferred_out + (item.transferred_out || 0),
+          expired_wasted:
+            accumulator.expired_wasted + (item.expired_wasted || 0),
+          total_available:
+            accumulator.total_available + (item.total_available || 0),
+          issuance: accumulator.issuance + (item.issuance || 0),
+          stock_on_hand:
+            accumulator.stock_on_hand + (item.stock_on_hand || 0),
+        }),
+        {
+          beginning_balance: 0,
+          received_during_period: 0,
+          transferred_in: 0,
+          transferred_out: 0,
+          expired_wasted: 0,
+          total_available: 0,
+          issuance: 0,
+          stock_on_hand: 0,
+        },
+      ),
+    [inventory],
+  );
   const activePeriodLabel = useMemo(
     () =>
       formatPrintDateRangeLabel({
@@ -211,40 +219,6 @@ export default function VaccineInventoryLogbook() {
       setError(err.message);
     }
   };
-
-  if (!isAdmin) {
-    return (
-      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-        <div className="flex">
-          <div className="flex-shrink-0">
-            <svg
-              className="h-5 w-5 text-yellow-400"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </div>
-          <div className="ml-3">
-            <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-              Insufficient Permissions
-            </h3>
-            <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
-              <p>
-                You do not have permission to access vaccine inventory
-                management. Please contact an administrator if you believe this
-                is an error.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   const buildPrintableDocument = useCallback(() => {
     const printContent = document.getElementById("vaccine-inventory-print");
@@ -384,6 +358,40 @@ export default function VaccineInventoryLogbook() {
       page: PRINT_PAGE_PRESETS.legalLandscape,
     });
   }, [activePeriodLabel, buildPrintableDocument, printDateRange]);
+
+  if (!isAdmin) {
+    return (
+      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <svg
+              className="h-5 w-5 text-yellow-400"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+              Insufficient Permissions
+            </h3>
+            <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
+              <p>
+                You do not have permission to access vaccine inventory
+                management. Please contact an administrator if you believe this
+                is an error.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

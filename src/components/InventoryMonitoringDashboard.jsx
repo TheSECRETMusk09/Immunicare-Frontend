@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import apiClient from "../utils/api";
 import { Button, Card } from "./UI";
 import { useAuth } from "../contexts/AuthContext";
+import { toArrayPayload } from "../utils/adminDataAdapters";
 
 export default function InventoryMonitoringDashboard() {
   const { isAdmin, user } = useAuth();
@@ -24,9 +25,9 @@ export default function InventoryMonitoringDashboard() {
           apiClient.getVaccineStockAlerts({ clinic_id: clinicId, status: "ACTIVE" }).catch(() => ({ data: [] })),
         ]);
 
-      const inventoryList = inventoryRes?.data || inventoryRes?.inventory || inventoryRes || [];
-      const vaccinesList = vaccinesRes?.data || vaccinesRes || [];
-      const alertsList = alertsRes?.data || alertsRes || [];
+      const inventoryList = toArrayPayload(inventoryRes, ["inventory", "items", "records"]);
+      const vaccinesList = toArrayPayload(vaccinesRes, ["vaccines", "items", "records"]);
+      const alertsList = toArrayPayload(alertsRes, ["alerts", "items", "records"]);
 
       setInventory(inventoryList);
       setVaccines(vaccinesList);

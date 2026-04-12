@@ -1,4 +1,4 @@
-import React, { useState, memo } from "react";
+import React, { useState, memo, useLayoutEffect } from "react";
 import Sidebar from "./Sidebar";
 import { useTheme } from "../contexts/ThemeContext";
 import ErrorBoundary from "./ErrorBoundary";
@@ -7,6 +7,18 @@ const AdminLayout = memo(({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   // Use centralized theme context for consistent dark mode across the app
   const { darkMode, toggleDarkMode } = useTheme();
+
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+
+    root.classList.add("admin-dashboard-compact");
+    document.body.classList.add("admin-dashboard-compact");
+
+    return () => {
+      root.classList.remove("admin-dashboard-compact");
+      document.body.classList.remove("admin-dashboard-compact");
+    };
+  }, []);
 
   return (
     <ErrorBoundary>

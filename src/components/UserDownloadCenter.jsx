@@ -6,6 +6,7 @@ import {
   normalizeGuardianChildren,
   normalizeDownloadHistory,
 } from "../utils/guardianDataNormalizers";
+import { normalizePaperTemplateList } from "../utils/paperTemplateFields";
 
 const normalizeDownloadRecord = (record = {}) => ({
   ...record,
@@ -70,7 +71,7 @@ export default function UserDownloadCenter() {
 
       setDownloads(normalizeDownloadHistory(downloadsData).map(normalizeDownloadRecord));
       setInfants(normalizeGuardianChildren(infantsData));
-      setTemplates(templatesData?.data || templatesData || []);
+      setTemplates(normalizePaperTemplateList(templatesData?.data ?? templatesData));
     } catch (err) {
       setError(err.message);
     } finally {

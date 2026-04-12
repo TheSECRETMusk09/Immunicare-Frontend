@@ -83,7 +83,8 @@ describe("DownloadCenter searchable infant selection", () => {
     expect(await screen.findByText("Download Center")).toBeInTheDocument();
 
     expect(apiClient.getInfants).toHaveBeenCalledWith({
-      limit: 10000,
+      limit: 50,
+      page: 1,
       scope: "system",
     });
 

@@ -9,6 +9,11 @@ import {
   Alert,
 } from "./UI";
 import apiClient from "../utils/api";
+import {
+  normalizePaperTemplateFields,
+  normalizePaperTemplateList,
+  normalizePaperTemplateRecord,
+} from "../utils/paperTemplateFields";
 
 export default function DocumentTemplates({ onRefresh }) {
   const [templates, setTemplates] = useState([]);
@@ -26,7 +31,7 @@ export default function DocumentTemplates({ onRefresh }) {
     try {
       setLoading(true);
       const response = await apiClient.getPaperTemplates();
-      setTemplates(response.data || []);
+      setTemplates(normalizePaperTemplateList(response?.data ?? response));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -45,14 +50,22 @@ export default function DocumentTemplates({ onRefresh }) {
   };
 
   const handleViewDetails = (template) => {
-    setSelectedTemplate(template);
+    setSelectedTemplate(normalizePaperTemplateRecord(template));
     setShowDetailsModal(true);
   };
 
-  const filteredTemplates = templates.filter(
+  const normalizedTemplates = templates.map((template) =>
+    normalizePaperTemplateRecord(template),
+  );
+
+  const filteredTemplates = normalizedTemplates.filter(
     (template) =>
-      template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      template.template_type.toLowerCase().includes(searchQuery.toLowerCase()),
+      String(template.name || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
+      String(template.template_type || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()),
   );
 
   if (loading && templates.length === 0) {
@@ -148,7 +161,7 @@ export default function DocumentTemplates({ onRefresh }) {
                     Fields
                   </label>
                   <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {template.fields?.length || 0} configured
+                    {normalizePaperTemplateFields(template.fields).length} configured
                   </p>
                 </div>
                 <div>
@@ -243,12 +256,14 @@ export default function DocumentTemplates({ onRefresh }) {
             {/* Fields Configuration */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Fields Configuration ({selectedTemplate.fields?.length || 0}{" "}
+                Fields Configuration ({normalizePaperTemplateFields(selectedTemplate.fields).length}{" "}
                 fields)
               </label>
               <div className="space-y-2">
-                {selectedTemplate.fields?.length > 0 ? (
-                  selectedTemplate.fields.map((field, index) => (
+                {normalizePaperTemplateFields(selectedTemplate.fields).length >
+                0 ? (
+                  normalizePaperTemplateFields(selectedTemplate.fields).map(
+                    (field, index) => (
                     <Card key={index} className="p-3">
                       <div className="grid grid-cols-4 gap-2 text-sm">
                         <div>
@@ -282,7 +297,8 @@ export default function DocumentTemplates({ onRefresh }) {
                         </div>
                       </div>
                     </Card>
-                  ))
+                    ),
+                  )
                 ) : (
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     No fields configured
@@ -298,7 +314,9 @@ export default function DocumentTemplates({ onRefresh }) {
               >
                 Close
               </Button>
-          <Button disabled title="Feature coming soon">Edit Template</Button>
+              <Button disabled title="Feature coming soon">
+                Edit Template
+              </Button>
             </div>
           </div>
         )}

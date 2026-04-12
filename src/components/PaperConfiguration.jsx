@@ -9,6 +9,11 @@ import {
   Alert,
 } from "./UI";
 import apiClient from "../utils/api";
+import {
+  normalizePaperTemplateFields,
+  normalizePaperTemplateList,
+  normalizePaperTemplateRecord,
+} from "../utils/paperTemplateFields";
 
 export default function PaperConfiguration({ onRefresh }) {
   const [templates, setTemplates] = useState([]);
@@ -33,7 +38,7 @@ export default function PaperConfiguration({ onRefresh }) {
     try {
       setLoading(true);
       const response = await apiClient.getPaperTemplates();
-      setTemplates(response.data || []);
+      setTemplates(normalizePaperTemplateList(response?.data ?? response));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -58,7 +63,7 @@ export default function PaperConfiguration({ onRefresh }) {
       name: template.name || "",
       description: template.description || "",
       template_type: template.template_type || "VACCINE_SCHEDULE",
-      fields: template.fields || [],
+      fields: normalizePaperTemplateFields(template.fields),
     });
     setShowModal(true);
   };
@@ -66,10 +71,19 @@ export default function PaperConfiguration({ onRefresh }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const normalizedFields = normalizePaperTemplateFields(
+        templateForm.fields,
+      );
       if (editingTemplate) {
-        await apiClient.updatePaperTemplate(editingTemplate.id, templateForm);
+        await apiClient.updatePaperTemplate(editingTemplate.id, {
+          ...templateForm,
+          fields: normalizedFields,
+        });
       } else {
-        await apiClient.createPaperTemplate(templateForm);
+        await apiClient.createPaperTemplate({
+          ...templateForm,
+          fields: normalizedFields,
+        });
       }
       setShowModal(false);
       fetchTemplates();
@@ -100,12 +114,12 @@ export default function PaperConfiguration({ onRefresh }) {
     };
     setTemplateForm((prev) => ({
       ...prev,
-      fields: [...prev.fields, newField],
+      fields: [...normalizePaperTemplateFields(prev.fields), newField],
     }));
   };
 
   const updateField = (index, fieldData) => {
-    const newFields = [...templateForm.fields];
+    const newFields = [...normalizePaperTemplateFields(templateForm.fields)];
     newFields[index] = { ...newFields[index], ...fieldData };
     setTemplateForm((prev) => ({
       ...prev,
@@ -114,17 +128,30 @@ export default function PaperConfiguration({ onRefresh }) {
   };
 
   const removeField = (index) => {
-    const newFields = templateForm.fields.filter((_, i) => i !== index);
+    const newFields = normalizePaperTemplateFields(templateForm.fields).filter(
+      (_, i) => i !== index,
+    );
     setTemplateForm((prev) => ({
       ...prev,
       fields: newFields,
     }));
   };
 
-  const filteredTemplates = templates.filter(
+  const normalizedTemplates = templates.map((template) =>
+    normalizePaperTemplateRecord(template),
+  );
+
+  const filteredTemplates = normalizedTemplates.filter(
     (template) =>
-      template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      template.template_type.toLowerCase().includes(searchQuery.toLowerCase()),
+      String(template.name || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
+      String(template.template_type || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()),
+  );
+  const normalizedTemplateFields = normalizePaperTemplateFields(
+    templateForm.fields,
   );
 
   if (loading && templates.length === 0) {
@@ -215,7 +242,7 @@ export default function PaperConfiguration({ onRefresh }) {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                    {template.fields?.length || 0}
+                    {normalizePaperTemplateFields(template.fields).length}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
@@ -352,7 +379,7 @@ export default function PaperConfiguration({ onRefresh }) {
             </div>
 
             <div className="space-y-3">
-              {templateForm.fields.map((field, index) => (
+              {normalizedTemplateFields.map((field, index) => (
                 <Card key={index} className="p-4">
                   <div className="grid grid-cols-4 gap-4">
                     <Input

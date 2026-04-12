@@ -14,6 +14,10 @@ import PaperConfiguration from "../components/PaperConfiguration";
 import DownloadCenter from "../components/DownloadCenter";
 import MonitoringDashboard from "../components/MonitoringDashboard";
 import DocumentTemplates from "../components/DocumentTemplates";
+import {
+  normalizePaperTemplateList,
+} from "../utils/paperTemplateFields";
+import { toArrayPayload } from "../utils/adminDataAdapters";
 
 const DIGITAL_PAPERS_DEFAULT_TAB = "paper_configuration";
 const DIGITAL_PAPERS_TAB_ALIASES = {
@@ -144,20 +148,32 @@ export default function DigitalPapersDashboard() {
       const truthSourceDownloads = Number(
         reportsSummary?.reports?.total_downloads,
       );
+      const normalizedTemplates = normalizePaperTemplateList(templates);
+      const normalizedRecentActivity = toArrayPayload(recentDownloads, [
+        "recent_downloads",
+        "downloads",
+        "records",
+        "items",
+      ]);
+      const normalizedPendingCompletions = toArrayPayload(completions, [
+        "alerts",
+        "records",
+        "items",
+      ]);
 
       setStats({
-        totalTemplates: templates?.data?.length || 0,
+        totalTemplates: normalizedTemplates.length,
         totalDownloads:
           (Number.isFinite(truthSourceDownloads) && truthSourceDownloads > 0
             ? truthSourceDownloads
             : null) ||
           allDownloads?.pagination?.total ||
           allDownloads?.total ||
-          allDownloads?.data?.length ||
+          toArrayPayload(allDownloads, ["downloads", "records", "items"]).length ||
           allDownloads?.length ||
           0,
-        pendingCompletions: completions?.data?.length || 0,
-        recentActivity: recentDownloads?.data || recentDownloads || [],
+        pendingCompletions: normalizedPendingCompletions.length,
+        recentActivity: normalizedRecentActivity,
       });
 
       if (

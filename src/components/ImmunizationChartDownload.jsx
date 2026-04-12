@@ -637,6 +637,9 @@ export default function ImmunizationChartDownload({
                   ? "N"
                   : "____";
             const remarksText = visitVaccines[0]?.notes || "__________";
+            const actualVisitVaccines = Array.isArray(visit.vaccines)
+              ? visit.vaccines
+              : [];
 
             return (
               <div
@@ -729,13 +732,13 @@ export default function ImmunizationChartDownload({
 
                   <div className="col w-1/2 pl-4" style={{ padding: 0 }}>
                     <div className="font-bold mb-1">VACCINES</div>
-                    {visit.vaccines.length === 0 ? (
+                    {actualVisitVaccines.length === 0 ? (
                       <div className="vaccine-row">
                         <span>No approved vaccine scheduled</span>
                         <span>○</span>
                       </div>
                     ) : (
-                      visit.vaccines.map((vaccine) => (
+                      actualVisitVaccines.map((vaccine) => (
                         <div
                           key={`${vaccine.name}-${vaccine.doseNo}`}
                           className="vaccine-row"

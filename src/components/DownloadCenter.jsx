@@ -13,6 +13,7 @@ import {
   normalizeInfantsResponse,
   toArrayPayload,
 } from "../utils/adminDataAdapters";
+import { normalizePaperTemplateList } from "../utils/paperTemplateFields";
 import apiClient from "../utils/api";
 import SearchableInfantSelect from "./SearchableInfantSelect";
 
@@ -139,13 +140,13 @@ export default function DownloadCenter({ onRefresh }) {
       ]);
 
       setDownloads((toArrayPayload(downloadsData) || []).map(normalizeDownloadRecord));
-      setTemplates(templatesData?.data || templatesData || []);
+      setTemplates(normalizePaperTemplateList(templatesData?.data ?? templatesData));
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [isAdmin]);
+  }, []);
 
   useEffect(() => {
     fetchData();

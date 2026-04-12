@@ -1,4 +1,10 @@
 import { normalizeApprovedVaccineName } from "../constants/approvedVaccines";
+import {
+  buildInfantSearchText,
+  getInfantDisplayLabel,
+  getInfantFullName,
+  getInfantControlNumber,
+} from "./infantIdentity";
 
 const NUMBER_FALLBACK = null;
 
@@ -157,6 +163,19 @@ export const normalizeInfant = (row = {}) => {
   const middleName = toStringSafe(
     row.middle_name ?? row.middlename ?? row.patient_middle_name,
   );
+  const fullName = getInfantFullName({
+    ...row,
+    first_name: firstName,
+    middle_name: middleName,
+    last_name: lastName,
+  });
+  const controlNumber = getInfantControlNumber(row);
+  const displayName = getInfantDisplayLabel({
+    ...row,
+    first_name: firstName,
+    middle_name: middleName,
+    last_name: lastName,
+  });
   const validationStatus = normalizeStatus(
     row.validation_status ?? row.latest_transfer_case_status,
     "not_started",
@@ -180,10 +199,15 @@ export const normalizeInfant = (row = {}) => {
     first_name: firstName,
     last_name: lastName,
     middle_name: middleName,
-    full_name:
-      toStringSafe(row.full_name) ||
-      toStringSafe(row.infant_name) ||
-      joinName(firstName, middleName, lastName),
+    full_name: fullName,
+    name: fullName,
+    display_name: displayName,
+    search_text: buildInfantSearchText({
+      ...row,
+      first_name: firstName,
+      middle_name: middleName,
+      last_name: lastName,
+    }),
     dob: row.dob ?? row.date_of_birth ?? null,
     sex: normalizeSex(row.sex),
     address: row.address ?? row.street_address ?? row.full_address ?? null,
@@ -194,8 +218,9 @@ export const normalizeInfant = (row = {}) => {
       joinName(row.guardian_first_name, row.guardian_last_name),
     guardian_phone:
       row.guardian_phone ?? row.guardian?.phone ?? row.primary_contact ?? null,
-    control_number:
-      row.control_number ?? row.infant_control_number ?? row.patient_control_number,
+    control_number: controlNumber,
+    infant_control_number: row.infant_control_number ?? controlNumber,
+    patient_control_number: row.patient_control_number ?? controlNumber,
     mother_name:
       row.mother_name ??
       joinName(row.mother_first_name, row.mother_middle_name, row.mother_last_name) ??

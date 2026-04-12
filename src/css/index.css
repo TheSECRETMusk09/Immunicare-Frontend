@@ -218,6 +218,26 @@ body::-webkit-scrollbar {
   display: none;
 }
 
+/* ========================================================================
+   Admin Dashboard Compact Mode
+   - Keeps the dashboard at full viewport width
+   - Reduces base typography scale so rem-based spacing, controls, and cards
+     become slightly denser without changing layout structure
+   - Applied only while an admin route is mounted
+   ======================================================================== */
+
+html.admin-dashboard-compact {
+  font-size: 90%;
+}
+
+body.admin-dashboard-compact {
+  width: 100% !important;
+  min-width: 100% !important;
+  min-height: 100vh !important;
+  max-width: none !important;
+  overflow-x: hidden !important;
+}
+
 /* Guardian-specific: Allow scrolling in content areas */
 .guardian-main-content,
 .guardian-content-area {

@@ -24,6 +24,7 @@ const normalizeVisitTime = (value) => {
 };
 
 export default function VisitRecordingForm({ infant, visit, onClose, onSave }) {
+  const visitVaccines = Array.isArray(visit?.vaccines) ? visit.vaccines : [];
   const [formData, setFormData] = useState({
     visit_date: new Date().toISOString().split("T")[0],
     visit_time: normalizeVisitTime(new Date().toTimeString().split(" ")[0].substring(0, 5)),
@@ -36,7 +37,7 @@ export default function VisitRecordingForm({ infant, visit, onClose, onSave }) {
       respiratory_rate: "",
       breastfeeding: false,
     },
-    vaccines: visit.vaccines.map((vaccine) => ({
+    vaccines: visitVaccines.map((vaccine) => ({
       name: typeof vaccine === "string" ? vaccine : vaccine.name,
       displayLabel:
         typeof vaccine === "string"

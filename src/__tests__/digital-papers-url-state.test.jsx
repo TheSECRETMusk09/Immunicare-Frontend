@@ -16,6 +16,7 @@ jest.mock("../utils/api", () => ({
     getPaperTemplates: jest.fn(),
     getDownloadHistory: jest.fn(),
     getDocumentAlerts: jest.fn(),
+    request: jest.fn(),
   },
 }));
 
@@ -71,6 +72,7 @@ describe("Digital papers URL state", () => {
     apiClient.getPaperTemplates.mockResolvedValue({ data: [] });
     apiClient.getDownloadHistory.mockResolvedValue({ data: [], pagination: { total: 0 } });
     apiClient.getDocumentAlerts.mockResolvedValue({ data: [] });
+    apiClient.request.mockResolvedValue({ data: {} });
   });
 
   test("deep links load the matching tab and tab clicks keep the URL in sync", async () => {

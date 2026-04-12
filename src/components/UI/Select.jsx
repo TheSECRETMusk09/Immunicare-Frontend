@@ -26,6 +26,7 @@ const Select = ({
 }) => {
   const selectId =
     id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
+  const selectOptions = Array.isArray(options) ? options : null;
 
   return (
     <div className={`${containerClassName}`}>
@@ -81,8 +82,8 @@ const Select = ({
         }
         {...props}
       >
-        {options
-          ? options.map((option, index) => (
+        {selectOptions
+          ? selectOptions.map((option, index) => (
               <option
                 key={`${String(option.value ?? 'option')}-${index}`}
                 value={option.value}

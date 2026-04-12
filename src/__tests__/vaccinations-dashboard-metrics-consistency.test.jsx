@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { MemoryRouter } from "react-router-dom";
 
@@ -42,6 +42,16 @@ const renderVaccinationsDashboard = () =>
 
 const readMetricValue = (label) =>
   screen.getByText(label).previousElementSibling?.textContent?.trim();
+
+const createDeferred = () => {
+  let resolve;
+
+  const promise = new Promise((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+
+  return { promise, resolve };
+};
 
 describe("Vaccinations dashboard metric consistency", () => {
   beforeEach(() => {
@@ -162,6 +172,8 @@ describe("Vaccinations dashboard metric consistency", () => {
         scope: "system",
         exclude_future_dob: true,
         fields: "lite",
+        start_date: "2026-03-01",
+        end_date: "2026-03-31",
         page: 1,
         limit: 10000,
       });
@@ -169,8 +181,90 @@ describe("Vaccinations dashboard metric consistency", () => {
 
     expect(readMetricValue("Completed Vaccinations")).toBe("1");
     expect(readMetricValue("Due Soon (7 Days)")).toBe("1");
-    expect(readMetricValue("Overdue Vaccinations")).toBe("2");
+    expect(readMetricValue("Overdue Vaccinations")).toBe("1");
     expect(readMetricValue("Children Tracked")).toBe("3");
     expect(screen.queryByText(/future seed/i)).not.toBeInTheDocument();
+  });
+
+  test("records tab can be restored from the URL without hydrating schedule data", async () => {
+    apiClient.getVaccinationRecords.mockResolvedValue([]);
+    apiClient.getVaccinationSchedules.mockResolvedValue([]);
+
+    render(
+      <MemoryRouter initialEntries={["/vaccination-management?tab=records"]}>
+        <VaccinationsDashboard />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("button", { name: /vaccination records/i }),
+    ).toHaveClass("bg-white");
+
+    await waitFor(() => {
+      expect(apiClient.getVaccinationRecords).toHaveBeenCalled();
+      expect(apiClient.getVaccinationSchedules).not.toHaveBeenCalled();
+      expect(apiClient.getDashboardInfants).not.toHaveBeenCalled();
+      expect(apiClient.getVaccinationReconciliationRecords).not.toHaveBeenCalled();
+    });
+  });
+
+  test("records tab keeps the loading guard visible until a silent refresh resolves", async () => {
+    const deferredRecords = createDeferred();
+
+    apiClient.getVaccinationRecords.mockReturnValueOnce(deferredRecords.promise);
+    apiClient.getVaccinationSchedules.mockResolvedValue([]);
+    apiClient.getDashboardInfants.mockResolvedValue([]);
+    apiClient.getVaccinationReconciliationRecords.mockResolvedValue([]);
+
+    render(
+      <MemoryRouter initialEntries={["/vaccination-management?tab=schedule"]}>
+        <VaccinationsDashboard />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("button", { name: /vaccination schedule/i }),
+    ).toHaveClass("bg-white");
+
+    fireEvent.click(screen.getByRole("button", { name: /vaccination records/i }));
+
+    expect(
+      await screen.findByText(/loading vaccination records/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /no vaccination records/i }),
+    ).not.toBeInTheDocument();
+
+    deferredRecords.resolve([]);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: /no vaccination records/i }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  test("tracking tab can be restored from the URL and hydrates shared data on first render", async () => {
+    apiClient.getVaccinationRecords.mockResolvedValue([]);
+    apiClient.getVaccinationSchedules.mockResolvedValue([]);
+    apiClient.getVaccinationReconciliationRecords.mockResolvedValue([]);
+    apiClient.getDashboardInfants.mockResolvedValue([]);
+
+    render(
+      <MemoryRouter initialEntries={["/vaccination-management?tab=tracking"]}>
+        <VaccinationsDashboard />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("button", { name: /vaccination tracking/i }),
+    ).toHaveClass("bg-white");
+
+    await waitFor(() => {
+      expect(apiClient.getVaccinationRecords).not.toHaveBeenCalled();
+      expect(apiClient.getVaccinationSchedules).toHaveBeenCalled();
+      expect(apiClient.getDashboardInfants).toHaveBeenCalled();
+      expect(apiClient.getVaccinationReconciliationRecords).toHaveBeenCalled();
+    });
   });
 });

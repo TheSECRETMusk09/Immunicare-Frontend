@@ -3,64 +3,19 @@ import React, {
   useMemo,
   useRef,
   useEffect,
+  useCallback,
   useDeferredValue,
 } from "react";
 import { Search, X, ChevronDown } from "lucide-react";
+import {
+  buildInfantSearchText,
+  formatInfantDate,
+  getInfantControlNumber,
+  getInfantDisplayLabel,
+  getInfantFullName,
+} from "../utils/infantIdentity";
 
 const normalizeSearchTerm = (value) => String(value || "").trim().toLowerCase();
-
-const infantDateFormatter = new Intl.DateTimeFormat("en-PH", {
-  timeZone: "Asia/Manila",
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-});
-
-const formatInfantDate = (value) => {
-  if (!value) return "";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "";
-  return infantDateFormatter.format(parsed);
-};
-
-const buildInfantDateSearchTokens = (value) => {
-  if (!value) return "";
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "";
-
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
-  const day = String(parsed.getDate()).padStart(2, "0");
-  const year = String(parsed.getFullYear());
-
-  return [
-    formatInfantDate(parsed),
-    `${year}-${month}-${day}`,
-    `${month}/${day}/${year}`,
-    `${Number(month)}/${Number(day)}/${year}`,
-  ].join(" ");
-};
-
-const buildInfantSearchableText = (infant) => {
-  const name = [infant.first_name, infant.last_name]
-    .filter(Boolean)
-    .join(" ")
-    .trim() || infant.full_name || infant.name || "";
-
-  const controlNumber = infant.control_number || infant.infant_control_number || "";
-  const rawDob = infant.dob || infant.date_of_birth || infant.birth_date;
-  const dob = formatInfantDate(rawDob);
-  const dobSearchTokens = buildInfantDateSearchTokens(rawDob);
-
-  return {
-    name,
-    controlNumber,
-    dob,
-    searchText: normalizeSearchTerm(
-      `${name} ${controlNumber} ${dob} ${dobSearchTokens} ${String(rawDob || "")}`
-    ),
-  };
-};
 
 const SearchableInfantSelect = ({
   infants = [],
@@ -93,12 +48,15 @@ const SearchableInfantSelect = ({
       : internalSearchQuery;
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
-  const setDropdownOpen = (nextIsOpen) => {
-    setIsOpen(nextIsOpen);
-    if (typeof onOpenChange === "function") {
-      onOpenChange(nextIsOpen);
-    }
-  };
+  const setDropdownOpen = useCallback(
+    (nextIsOpen) => {
+      setIsOpen(nextIsOpen);
+      if (typeof onOpenChange === "function") {
+        onOpenChange(nextIsOpen);
+      }
+    },
+    [onOpenChange],
+  );
 
   const updateSearchQuery = (nextValue) => {
     if (controlledSearchQuery === undefined) {
@@ -123,13 +81,13 @@ const SearchableInfantSelect = ({
     }
 
     return undefined;
-  }, [isOpen]);
+  }, [isOpen, setDropdownOpen]);
 
   useEffect(() => {
     if (isOpen && searchInputRef.current) {
       searchInputRef.current.focus();
     }
-  }, [isOpen]);
+  }, [isOpen, setDropdownOpen]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -142,27 +100,29 @@ const SearchableInfantSelect = ({
 
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [isOpen]);
+  }, [isOpen, setDropdownOpen]);
 
   const infantsWithSearchData = useMemo(
     () =>
       infants.map((infant) => ({
         ...infant,
-        ...buildInfantSearchableText(infant),
+        displayName: getInfantDisplayLabel(infant),
+        fullName: getInfantFullName(infant),
+        controlNumber: getInfantControlNumber(infant),
+        dobDisplay: formatInfantDate(infant.dob || infant.date_of_birth || infant.birth_date),
+        searchText: infant.search_text || buildInfantSearchText(infant),
       })),
     [infants]
   );
 
   const filteredInfants = useMemo(() => {
-    if (onSearchQueryChange) return infantsWithSearchData;
-
     if (!deferredSearchQuery.trim()) return infantsWithSearchData;
 
     const normalizedQuery = normalizeSearchTerm(deferredSearchQuery);
     return infantsWithSearchData.filter((infant) =>
       infant.searchText.includes(normalizedQuery)
     );
-  }, [deferredSearchQuery, infantsWithSearchData, onSearchQueryChange]);
+  }, [deferredSearchQuery, infantsWithSearchData]);
 
   const selectedInfant = useMemo(() => {
     const selectedId = Number(value);
@@ -183,7 +143,9 @@ const SearchableInfantSelect = ({
     ) {
       return {
         ...selectedInfantOverride,
-        ...buildInfantSearchableText(selectedInfantOverride),
+        searchText:
+          selectedInfantOverride.searchText ||
+          buildInfantSearchText(selectedInfantOverride),
       };
     }
 
@@ -203,7 +165,7 @@ const SearchableInfantSelect = ({
   };
 
   const displayText = selectedInfant
-    ? `${selectedInfant.name}${selectedInfant.dob ? ` (${selectedInfant.dob})` : ""}`
+    ? `${selectedInfant.displayName || selectedInfant.fullName || selectedInfant.name || "Infant record"}${selectedInfant.dobDisplay ? ` (${selectedInfant.dobDisplay})` : ""}`
     : "Select Infant";
 
   return (
@@ -244,7 +206,7 @@ const SearchableInfantSelect = ({
           <div className="flex items-center gap-2">
             {selectedInfant && !disabled && (
               <X
-                className="w-4 h-4 text-gray-400 hover:text-gray-200"
+                className="w-4 h-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                 onClick={handleClear}
               />
             )}
@@ -272,12 +234,12 @@ const SearchableInfantSelect = ({
                   placeholder={placeholder}
                   className="
                     w-full pl-10 pr-4 py-2
-                    bg-gray-600 dark:bg-gray-900
-                    border border-gray-500 dark:border-gray-600
+                    bg-white dark:bg-gray-900
+                    border border-gray-300 dark:border-gray-600
                     rounded-lg
-                    text-gray-100 dark:text-gray-200
-                    placeholder-gray-400
-                    focus:outline-none focus:ring-2 focus:ring-blue-500
+                    text-gray-900 dark:text-gray-100
+                    placeholder:text-gray-400 dark:placeholder:text-gray-500
+                    focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400
                     text-sm
                   "
                 />
@@ -286,11 +248,11 @@ const SearchableInfantSelect = ({
 
             <div className="overflow-y-auto max-h-80 modern-scrollbar">
               {loading && filteredInfants.length === 0 ? (
-                <div className="p-4 text-center text-gray-400 text-sm">
+                <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
                   Loading infants...
                 </div>
               ) : filteredInfants.length === 0 ? (
-                <div className="p-4 text-center text-gray-400 text-sm">
+                <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
                   {searchQuery ? "No matching infant found" : emptyMessage}
                 </div>
               ) : (
@@ -302,25 +264,27 @@ const SearchableInfantSelect = ({
                       onClick={() => handleSelect(infant)}
                       className={`
                         w-full px-4 py-2.5 text-left
-                        hover:bg-gray-600 dark:hover:bg-gray-700
+                        hover:bg-gray-50 dark:hover:bg-gray-700
                         transition-colors
                         ${
                           infant.id === Number(value)
                             ? "bg-blue-600 dark:bg-blue-700 text-white"
-                            : "text-gray-100 dark:text-gray-200"
+                            : "text-gray-900 dark:text-gray-100"
                         }
                       `}
                     >
                       <div className="flex flex-col gap-0.5">
-                        <span className="font-medium">{infant.name}</span>
-                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                        <span className="font-medium">
+                          {infant.displayName || infant.fullName || infant.name || "Infant record"}
+                        </span>
+                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                           {infant.controlNumber && (
                             <span className="font-mono">{infant.controlNumber}</span>
                           )}
-                          {infant.dob && (
+                          {infant.dobDisplay && (
                             <>
                               {infant.controlNumber && <span>-</span>}
-                              <span>{infant.dob}</span>
+                              <span>{infant.dobDisplay}</span>
                             </>
                           )}
                         </div>
@@ -335,7 +299,7 @@ const SearchableInfantSelect = ({
                         e.stopPropagation();
                         onLoadMore && onLoadMore();
                       }}
-                      className="w-full py-3 text-sm text-blue-500 hover:bg-gray-600 dark:hover:bg-gray-700 font-medium transition-colors border-t border-gray-600 dark:border-gray-700 disabled:opacity-50"
+                      className="w-full py-3 text-sm text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors border-t border-gray-200 dark:border-gray-700 disabled:opacity-50"
                     >
                       {loading ? "Loading more..." : "Load more infants..."}
                     </button>
@@ -345,7 +309,7 @@ const SearchableInfantSelect = ({
             </div>
 
             {!loading && filteredInfants.length > 0 && (
-              <div className="p-2 border-t border-gray-600 dark:border-gray-700 text-xs text-gray-400 text-center">
+              <div className="p-2 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 text-center">
                 {filteredInfants.length} infant{filteredInfants.length !== 1 ? "s" : ""} found
               </div>
             )}

@@ -8,6 +8,7 @@ import {
 } from "./UI";
 import apiClient from "../utils/api";
 import { useAuth } from "../contexts/AuthContext";
+import { toArrayPayload } from "../utils/adminDataAdapters";
 
 export default function MonitoringDashboard({ onRefresh }) {
   const { hasPermission, isAdmin, isHealthcareWorker, user } = useAuth();
@@ -62,7 +63,21 @@ export default function MonitoringDashboard({ onRefresh }) {
 
       // Handle monitoring data
       if (monitoringResponse.status === "fulfilled") {
-        setMonitoringData(monitoringResponse.value.data);
+        const monitoringPayload = monitoringResponse.value.data;
+        const monitoringObject =
+          monitoringPayload &&
+          typeof monitoringPayload === "object" &&
+          !Array.isArray(monitoringPayload)
+            ? monitoringPayload
+            : {};
+        setMonitoringData({
+          ...monitoringObject,
+          recent_downloads: toArrayPayload(monitoringPayload, [
+            "recent_downloads",
+            "downloads",
+            "records",
+          ]),
+        });
       } else {
         console.warn(
           "Monitoring data fetch failed:",
@@ -72,7 +87,9 @@ export default function MonitoringDashboard({ onRefresh }) {
 
       // Handle alerts separately to not block the entire dashboard
       if (alertsResponse.status === "fulfilled") {
-        setAlerts(alertsResponse.value.data);
+        setAlerts(
+          toArrayPayload(alertsResponse.value, ["alerts", "items", "records"]),
+        );
       } else {
         const errorResponse = alertsResponse.reason?.response;
         if (errorResponse?.status === 403) {
@@ -314,7 +331,8 @@ export default function MonitoringDashboard({ onRefresh }) {
             Recent Activity
           </h4>
           <div className="space-y-3">
-            {monitoringData?.recent_downloads?.length > 0 ? (
+            {Array.isArray(monitoringData?.recent_downloads) &&
+            monitoringData.recent_downloads.length > 0 ? (
               monitoringData.recent_downloads.map((download) => (
                 <Card key={download.id} className="p-4">
                   <div className="flex justify-between items-start">

@@ -16,7 +16,7 @@ describe("vaccination period helpers", () => {
     });
 
     expect(range).toEqual({
-      startDate: "",
+      startDate: "2026-03-01",
       endDate: "2026-03-31",
     });
   });

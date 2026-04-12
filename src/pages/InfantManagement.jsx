@@ -13,6 +13,10 @@ import useInfantManagementSocket from "../hooks/useInfantManagementSocket";
 import { useAuth } from "../contexts/AuthContext";
 import { normalizeInfantsResponse } from "../utils/adminDataAdapters";
 import {
+  buildInfantRecordPrefillContext,
+  getInfantDisplayLabel,
+} from "../utils/infantIdentity";
+import {
   Button,
   PageHeader,
   PageContainer,
@@ -67,7 +71,9 @@ const normalizeVaccinationPrefillFromRoute = (prefill = {}) => {
   const normalizedDoseNumber = Number(prefill.dose_number ?? prefill.doseNo ?? 1) || 1;
 
   return {
+    ...prefill,
     infant_id: normalizedInfantId,
+    infantId: normalizedInfantId,
     vaccine_id: normalizedVaccineId,
     dose_number: normalizedDoseNumber,
     date_administered: prefill.date_administered || prefill.admin_date || "",
@@ -144,12 +150,7 @@ export default function InfantManagement() {
 
   const openRecordVaccinationsModal = useCallback((targetInfant = null) => {
     setRecordVaccinationPrefill(
-      targetInfant
-        ? {
-            infant_id: targetInfant.id,
-            infantId: targetInfant.id,
-          }
-        : null,
+      targetInfant ? buildInfantRecordPrefillContext(targetInfant) : null,
     );
     setShowInjectModal(true);
   }, []);
@@ -1058,11 +1059,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
         isOpen={showReadinessModal}
         onClose={closeReadinessManager}
         infantId={readinessTargetInfant?.id}
-        infantName={
-          readinessTargetInfant
-            ? `${readinessTargetInfant.first_name} ${readinessTargetInfant.last_name}`
-            : ""
-        }
+        infantName={readinessTargetInfant ? getInfantDisplayLabel(readinessTargetInfant) : ""}
         onSuccess={() => {
           void fetchInfants(true);
         }}
@@ -1076,11 +1073,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
           setRecordVaccinationPrefill(null);
         }}
         infantId={selectedInfant?.id}
-        infantName={
-          selectedInfant
-            ? `${selectedInfant.first_name} ${selectedInfant.last_name}`
-            : ""
-        }
+        infantName={selectedInfant ? getInfantDisplayLabel(selectedInfant) : ""}
         prefillContext={recordVaccinationPrefill}
         onSuccess={() => {
           setShowInjectModal(false);

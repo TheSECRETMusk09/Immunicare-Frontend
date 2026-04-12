@@ -82,11 +82,8 @@ export const getVaccinationPeriodRange = ({
   } else if (normalizedPeriod === "week") {
     start.setDate(start.getDate() - 6);
   } else if (normalizedPeriod === "month") {
+    start.setDate(1);
     end.setMonth(end.getMonth() + 1, 0);
-    return {
-      startDate: "",
-      endDate: toDateKey(end),
-    };
   } else {
     return {
       startDate: "",
