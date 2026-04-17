@@ -12,7 +12,6 @@ import {
   ClipboardList,
   Megaphone,
   Bell,
-  FileText,
   ChevronDown,
   ChevronRight,
   Building2,
@@ -48,7 +47,6 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
     { name: "Vaccinations", icon: Syringe },
     { name: "Inventory", icon: Package },
     { name: "Appointments", icon: Calendar },
-    { name: "Digital Papers", icon: FileText },
     { name: "Reports", icon: ClipboardList },
     { name: "Announcements", icon: Megaphone },
     { name: "Notifications", icon: Bell },
@@ -90,7 +88,6 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
       Vaccinations: adminRoutePaths.vaccinations,
       Inventory: adminRoutePaths.inventory,
       Appointments: adminRoutePaths.appointments,
-      "Digital Papers": adminRoutePaths.digitalPapers,
       Reports: adminRoutePaths.reports,
       Announcements: adminRoutePaths.announcements,
       Notifications: adminRoutePaths.notifications,
@@ -118,7 +115,6 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
     if (path.includes("/infants")) return "Infant Management";
     if (path.includes("/analytics")) return "Analytics";
     if (path.includes("/appointments")) return "Appointments";
-    if (path.includes("/digital-papers")) return "Digital Papers";
     if (path.includes("/reports")) return "Reports";
     if (path.includes("/announcements")) return "Announcements";
     if (path.includes("/notifications")) return "Notifications";

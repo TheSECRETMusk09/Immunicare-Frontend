@@ -26,7 +26,7 @@ const documentService = {
     }
 
     return handleApiResponse(
-      apiClient.customRequest(`${API_BASE}/${infantId}`, {
+      apiClient.request(`${API_BASE}/${infantId}`, {
         method: "POST",
         data: formData,
         headers: {
@@ -57,7 +57,7 @@ const documentService = {
       : `${API_BASE}/${infantId}`;
 
     return handleApiResponse(
-      apiClient.request(endpoint),
+      apiClient.request(endpoint, { disableRetry: true }),
       "Fetch infant documents"
     );
   },

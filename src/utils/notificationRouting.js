@@ -786,7 +786,7 @@ export const resolveNotificationActionUrl = (raw, options = {}) => {
       return "/notifications?category=outbound_message_failed&status=failed";
     case "general":
     default:
-      return "/dashboard";
+      return "/analytics";
   }
 };
 

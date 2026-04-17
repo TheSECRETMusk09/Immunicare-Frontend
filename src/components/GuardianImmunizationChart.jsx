@@ -155,7 +155,6 @@ const ImmunizationCard = ({ vaccine, status, dueDate, index, onViewDetails }) =>
 const EnhancedGuardianImmunizationChart = ({
   immunizations = [],
   childId = null,
-  onViewFullChart = null,
   forceRefresh = false
 }) => {
   const navigate = useNavigate();
@@ -312,24 +311,6 @@ const EnhancedGuardianImmunizationChart = ({
     stopDragging(event.pointerId);
   }, [stopDragging]);
 
-  const handleViewFullChart = () => {
-    if (typeof onViewFullChart === 'function') {
-      onViewFullChart();
-      return;
-    }
-
-    const sanitizedChildId =
-      childId !== null && childId !== undefined && String(childId).trim() !== ''
-        ? String(childId).trim()
-        : null;
-
-    const targetPath = sanitizedChildId
-      ? `/guardian/immunization-chart/${sanitizedChildId}`
-      : '/guardian/immunization-chart';
-
-    navigate(targetPath, { replace: false });
-  };
-
   const handleViewDetails = (vaccine, status) => {
     if (status === 'completed' && childId) {
       navigate(`/guardian/vaccination-records/${childId}`);
@@ -444,14 +425,6 @@ const EnhancedGuardianImmunizationChart = ({
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           Immunization Schedule
         </h2>
-        <button
-          className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-          onClick={handleViewFullChart}
-          aria-label="View full immunization chart"
-          type="button"
-        >
-          View Full Chart
-        </button>
       </div>
 
       {/* Summary badges */}

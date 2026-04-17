@@ -24,11 +24,43 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
+  const pendingPreviewUrlRef = useRef("");
+  const viewBlobUrlRef = useRef("");
 
   // Modal state for uploading
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [pendingFile, setPendingFile] = useState(null);
+  const [pendingPreview, setPendingPreview] = useState(null);
   const [uploadForm, setUploadForm] = useState({ documentType: "vaccination_card", description: "" });
+
+  // Modal state for in-page document viewing
+  const [viewDocModal, setViewDocModal] = useState(null);
+  const [viewDocLoading, setViewDocLoading] = useState(null);
+
+  const revokePendingPreviewUrl = useCallback(() => {
+    const previewUrl = pendingPreviewUrlRef.current;
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    pendingPreviewUrlRef.current = "";
+  }, []);
+
+  const clearPendingPreview = useCallback(() => {
+    revokePendingPreviewUrl();
+    setPendingPreview(null);
+  }, [revokePendingPreviewUrl]);
+
+  const clearPendingUploadState = useCallback(() => {
+    clearPendingPreview();
+    setPendingFile(null);
+  }, [clearPendingPreview]);
+
+  useEffect(() => () => {
+    revokePendingPreviewUrl();
+    if (viewBlobUrlRef.current) {
+      URL.revokeObjectURL(viewBlobUrlRef.current);
+    }
+  }, [revokePendingPreviewUrl]);
 
   const loadDocuments = useCallback(async () => {
     try {
@@ -101,18 +133,21 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
   };
 
   const initiateUploadForm = (file) => {
+    clearPendingPreview();
+
     // Validate file
     const validTypes = [
       "application/pdf",
       "image/jpeg",
       "image/png",
+      "image/webp",
       "image/gif",
       "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     ];
 
     if (!validTypes.includes(file.type)) {
-      setError("Invalid file type. Allowed: PDF, JPEG, PNG, GIF, DOC, DOCX");
+      setError("Invalid file type. Allowed: PDF, JPEG, PNG, WEBP, GIF, DOC, DOCX");
       return;
     }
 
@@ -121,6 +156,15 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
       return;
     }
 
+    const canPreviewInline = documentService.isImage(file.type) || documentService.isPDF(file.type);
+    const previewUrl = canPreviewInline ? URL.createObjectURL(file) : "";
+    pendingPreviewUrlRef.current = previewUrl;
+    setPendingPreview({
+      url: previewUrl,
+      mimeType: file.type,
+      fileName: file.name,
+      fileSize: file.size,
+    });
     setPendingFile(file);
     setUploadForm({ documentType: "vaccination_card", description: "" });
     setShowUploadModal(true);
@@ -167,7 +211,7 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
     } finally {
       setUploading(false);
       setUploadProgress(0);
-      setPendingFile(null);
+      clearPendingUploadState();
     }
   };
 
@@ -190,16 +234,39 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
     }
   };
 
-  const handleView = async (documentId) => {
+  const closeViewModal = () => {
+    if (viewBlobUrlRef.current) {
+      URL.revokeObjectURL(viewBlobUrlRef.current);
+      viewBlobUrlRef.current = "";
+    }
+    setViewDocModal(null);
+  };
+
+  const handleView = async (documentId, doc) => {
     try {
+      setViewDocLoading(documentId);
+      setError(null);
       const response = await documentService.downloadDocument(documentId);
 
-      // Open in new tab for viewing
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      window.open(url, "_blank");
+      // Revoke any previously created view blob URL
+      if (viewBlobUrlRef.current) {
+        URL.revokeObjectURL(viewBlobUrlRef.current);
+      }
+
+      const mimeType = doc?.mime_type || "application/octet-stream";
+      const blob =
+        response.data instanceof Blob
+          ? response.data
+          : new Blob([response.data], { type: mimeType });
+      const blobUrl = URL.createObjectURL(blob);
+      viewBlobUrlRef.current = blobUrl;
+
+      setViewDocModal({ doc, blobUrl, mimeType });
     } catch (err) {
       console.error("Error viewing document:", err);
       setError(err.response?.data?.error || err.message || "Failed to view document");
+    } finally {
+      setViewDocLoading(null);
     }
   };
 
@@ -253,6 +320,57 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
       <svg className="w-8 h-8 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
+    );
+  };
+
+  const getDocumentPreviewUrl = (doc) =>
+    doc.downloadUrl ||
+    doc.download_url ||
+    doc.file_url ||
+    `/api/infant-documents/file/${doc.id}`;
+
+  const renderDocumentPreview = ({ url, mimeType, fileName, fileSize }) => {
+    if (documentService.isImage(mimeType)) {
+      if (!url) {
+        return null;
+      }
+
+      return (
+        <img
+          src={url}
+          alt={`${fileName || "Document"} preview`}
+          className="max-h-[200px] max-w-full rounded border border-gray-200 object-contain dark:border-gray-600"
+        />
+      );
+    }
+
+    if (documentService.isPDF(mimeType)) {
+      if (!url) {
+        return null;
+      }
+
+      return (
+        <embed
+          src={url}
+          type="application/pdf"
+          title={`${fileName || "PDF document"} preview`}
+          className="h-[200px] w-full rounded border border-gray-200 dark:border-gray-600"
+        />
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-3 rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-700/50">
+        <div className="flex-shrink-0">{getFileIcon(mimeType)}</div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+            {fileName || "Selected document"}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {fileSize ? documentService.formatFileSize(fileSize) : "Document selected"} - Preview not available
+          </p>
+        </div>
+      </div>
     );
   };
 
@@ -318,7 +436,7 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
           type="file"
           className="hidden"
           onChange={handleFileSelect}
-          accept=".pdf,.jpeg,.jpg,.png,.gif,.doc,.docx"
+          accept=".pdf,.jpeg,.jpg,.png,.webp,.gif,.doc,.docx"
         />
 
         {uploading ? (
@@ -355,7 +473,7 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
               or drag and drop
             </p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
-              PDF, JPEG, PNG, GIF, DOC, DOCX (max 10MB)
+              PDF, JPEG, PNG, WEBP, GIF, DOC, DOCX (max 10MB)
             </p>
           </div>
         )}
@@ -416,6 +534,14 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
                       {doc.description}
                     </p>
                   )}
+                  <div className="mt-2 max-w-md">
+                    {renderDocumentPreview({
+                      url: getDocumentPreviewUrl(doc),
+                      mimeType: doc.mime_type,
+                      fileName: doc.original_filename,
+                      fileSize: doc.file_size,
+                    })}
+                  </div>
                 </div>
               </div>
 
@@ -423,8 +549,9 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
               <div className="flex items-center gap-2 ml-4">
                 {/* View Button */}
                 <button
-                  onClick={() => handleView(doc.id)}
-                  className="p-2 text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                  onClick={() => handleView(doc.id, doc)}
+                  disabled={viewDocLoading === doc.id}
+                  className="p-2 text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-wait"
                   title="View"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -457,6 +584,74 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* In-page Document View Modal */}
+      {viewDocModal && (
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          onClick={closeViewModal}
+        >
+          <div
+            className="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <p className="text-sm font-medium text-gray-900 dark:text-white truncate pr-4">
+                {viewDocModal.doc?.original_filename || "Document Preview"}
+              </p>
+              <button
+                onClick={closeViewModal}
+                className="p-1 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 flex-shrink-0"
+                aria-label="Close preview"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-auto p-4 min-h-0">
+              {documentService.isImage(viewDocModal.mimeType) ? (
+                <img
+                  src={viewDocModal.blobUrl}
+                  alt={viewDocModal.doc?.original_filename || "Document preview"}
+                  className="mx-auto max-h-[75vh] max-w-full rounded-lg object-contain"
+                />
+              ) : documentService.isPDF(viewDocModal.mimeType) ? (
+                <iframe
+                  src={viewDocModal.blobUrl}
+                  title={viewDocModal.doc?.original_filename || "PDF document"}
+                  className="w-full rounded-lg border border-gray-200 dark:border-gray-700"
+                  style={{ height: "75vh" }}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="mb-4">{getFileIcon(viewDocModal.mimeType)}</div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                    {viewDocModal.doc?.original_filename}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    Preview not available for this file type.
+                  </p>
+                  <button
+                    onClick={() =>
+                      handleDownload(
+                        viewDocModal.doc?.id,
+                        viewDocModal.doc?.original_filename,
+                      )
+                    }
+                    className="px-4 py-2 text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors text-sm"
+                  >
+                    Download File
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -493,7 +688,7 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
         isOpen={showUploadModal}
         onClose={() => {
           setShowUploadModal(false);
-          setPendingFile(null);
+          clearPendingUploadState();
         }}
         title="Upload Document"
         size="md"
@@ -501,7 +696,7 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
           <div className="flex justify-end gap-3 w-full">
             <Button variant="cancel" onClick={() => {
               setShowUploadModal(false);
-              setPendingFile(null);
+              clearPendingUploadState();
             }}>Cancel</Button>
             <Button onClick={confirmUpload} disabled={uploading}>Upload</Button>
           </div>
@@ -512,6 +707,16 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               Selected file: <span className="font-semibold text-gray-900 dark:text-gray-100">{pendingFile?.name}</span>
             </p>
+            {pendingPreview && (
+              <div className="mt-3">
+                {renderDocumentPreview({
+                  url: pendingPreview.url,
+                  mimeType: pendingPreview.mimeType,
+                  fileName: pendingPreview.fileName,
+                  fileSize: pendingPreview.fileSize,
+                })}
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

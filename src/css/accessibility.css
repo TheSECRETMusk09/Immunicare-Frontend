@@ -689,6 +689,12 @@ textarea:focus {
   margin-right: var(--space-2);
 }
 
+/* Buttons already render an explicit spinner component; avoid double spinners. */
+button[aria-busy="true"]::before {
+  content: none;
+  display: none;
+}
+
 /* ==========================================================================
    Disabled State Accessibility
    ========================================================================== */

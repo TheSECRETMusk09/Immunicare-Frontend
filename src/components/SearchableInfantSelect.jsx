@@ -10,12 +10,22 @@ import { Search, X, ChevronDown } from "lucide-react";
 import {
   buildInfantSearchText,
   formatInfantDate,
+  getInfantDateOfBirthValue,
   getInfantControlNumber,
   getInfantDisplayLabel,
   getInfantFullName,
 } from "../utils/infantIdentity";
 
 const normalizeSearchTerm = (value) => String(value || "").trim().toLowerCase();
+
+const matchesTokenizedQuery = (searchText, query) => {
+  const normalized = normalizeSearchTerm(query);
+  if (!normalized) return true;
+  const tokens = normalized.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+  const haystack = normalizeSearchTerm(searchText);
+  return tokens.every((token) => haystack.includes(token));
+};
 
 const SearchableInfantSelect = ({
   infants = [],
@@ -109,7 +119,7 @@ const SearchableInfantSelect = ({
         displayName: getInfantDisplayLabel(infant),
         fullName: getInfantFullName(infant),
         controlNumber: getInfantControlNumber(infant),
-        dobDisplay: formatInfantDate(infant.dob || infant.date_of_birth || infant.birth_date),
+        dobDisplay: formatInfantDate(getInfantDateOfBirthValue(infant)),
         searchText: infant.search_text || buildInfantSearchText(infant),
       })),
     [infants]
@@ -118,9 +128,8 @@ const SearchableInfantSelect = ({
   const filteredInfants = useMemo(() => {
     if (!deferredSearchQuery.trim()) return infantsWithSearchData;
 
-    const normalizedQuery = normalizeSearchTerm(deferredSearchQuery);
     return infantsWithSearchData.filter((infant) =>
-      infant.searchText.includes(normalizedQuery)
+      matchesTokenizedQuery(infant.searchText, deferredSearchQuery)
     );
   }, [deferredSearchQuery, infantsWithSearchData]);
 
@@ -131,7 +140,7 @@ const SearchableInfantSelect = ({
     }
 
     const matchedInfant = infantsWithSearchData.find(
-      (infant) => infant.id === selectedId,
+      (infant) => Number(infant.id) === selectedId,
     );
     if (matchedInfant) {
       return matchedInfant;
@@ -267,7 +276,7 @@ const SearchableInfantSelect = ({
                         hover:bg-gray-50 dark:hover:bg-gray-700
                         transition-colors
                         ${
-                          infant.id === Number(value)
+                          Number(infant.id) === Number(value)
                             ? "bg-blue-600 dark:bg-blue-700 text-white"
                             : "text-gray-900 dark:text-gray-100"
                         }

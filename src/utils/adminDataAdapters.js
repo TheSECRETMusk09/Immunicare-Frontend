@@ -5,6 +5,7 @@ import {
   getInfantFullName,
   getInfantControlNumber,
 } from "./infantIdentity";
+import { toClinicDateKey } from "./dateUtils";
 
 const NUMBER_FALLBACK = null;
 
@@ -32,6 +33,16 @@ const toBoolean = (value, fallback = false) => {
 
 const isObject = (value) =>
   value !== null && typeof value === "object" && !Array.isArray(value);
+
+const toClinicUtcDate = (value) => {
+  if (!value) return null;
+
+  const dateKey = toClinicDateKey(value);
+  if (!dateKey) return null;
+
+  const parsed = new Date(`${dateKey}T00:00:00.000Z`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
 
 export const unwrapApiData = (response) => {
   if (response === null || response === undefined) return response;
@@ -99,16 +110,16 @@ const normalizeStatus = (value, fallback = "pending") => {
   return normalized || fallback;
 };
 
+const ACTIONABLE_DUE_WINDOW_DAYS = 7;
+
 const toValidDate = (value) => {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
+  return toClinicUtcDate(value);
 };
 
 const toStartOfDayDate = (value) => {
-  const date = toValidDate(value);
+  const date = toClinicUtcDate(value);
   if (!date) return null;
-  date.setHours(0, 0, 0, 0);
+  date.setUTCHours(0, 0, 0, 0);
   return date;
 };
 
@@ -124,7 +135,8 @@ export const isFutureDatedDate = (value, referenceDate = new Date()) => {
 };
 
 export const isCurrentVaccinationInfant = (infant = {}, referenceDate = new Date()) => {
-  const dob = infant?.dob ?? infant?.date_of_birth ?? infant?.birth_date ?? null;
+  const dob =
+    infant?.dob ?? infant?.date_of_birth ?? infant?.dateOfBirth ?? infant?.birth_date ?? null;
   const dobDate = toStartOfDayDate(dob);
   const reference = toStartOfDayDate(referenceDate) || new Date();
 
@@ -143,7 +155,7 @@ export const filterCurrentVaccinationInfants = (infants = [], referenceDate = ne
 const toDateString = (value) => {
   const validDate = toValidDate(value);
   if (!validDate) return null;
-  return validDate.toISOString();
+  return toClinicDateKey(validDate) || null;
 };
 
 const joinName = (...parts) =>
@@ -208,7 +220,7 @@ export const normalizeInfant = (row = {}) => {
       middle_name: middleName,
       last_name: lastName,
     }),
-    dob: row.dob ?? row.date_of_birth ?? null,
+    dob: row.dob ?? row.date_of_birth ?? row.dateOfBirth ?? row.birth_date ?? null,
     sex: normalizeSex(row.sex),
     address: row.address ?? row.street_address ?? row.full_address ?? null,
     guardian_id: toNumber(row.guardian_id),
@@ -347,6 +359,11 @@ export const normalizeVaccinationSchedule = (row = {}) => {
       row.disease_prevented ?? row.description ?? row.recommended_age ?? "",
     age_in_months: ageInMonths,
     target_age_weeks: targetAgeWeeks,
+    minimum_age_days: toNumber(
+      row.minimum_age_days,
+      row.min_age_days !== undefined ? toNumber(row.min_age_days) : null,
+    ),
+    grace_period_days: toNumber(row.grace_period_days, ACTIONABLE_DUE_WINDOW_DAYS),
     dose_number: doseNumber,
     dose_no: doseNumber,
     total_doses: toNumber(row.total_doses ?? row.doses_required ?? doseNumber, doseNumber),
@@ -505,10 +522,8 @@ export const buildFefoBatchOptions = ({
     ? inventoryRecords.map((row) => normalizeVaccineInventoryRecord(row || {}))
     : normalizeVaccineInventoryResponse(inventoryRecords);
 
-  const referenceDay = referenceDate ? toValidDate(referenceDate) || new Date() : null;
-  if (referenceDay) {
-    referenceDay.setHours(0, 0, 0, 0);
-  }
+  const referenceDay = toValidDate(referenceDate) || new Date();
+  referenceDay.setUTCHours(0, 0, 0, 0);
 
   const relevantInventoryRecords = normalizedInventoryRecords.filter((record) => {
     if (normalizedVaccineId && Number(record.vaccine_id) !== normalizedVaccineId) {
@@ -546,6 +561,11 @@ export const buildFefoBatchOptions = ({
         return false;
       }
 
+      const batchStatus = toStringSafe(batch.status ?? batch.batch_status).trim().toLowerCase();
+      if (batch.is_active === false || (batchStatus && batchStatus !== "active")) {
+        return false;
+      }
+
       if (
         normalizedVaccineId &&
         Number(batch.vaccine_id || 0) > 0 &&
@@ -555,11 +575,13 @@ export const buildFefoBatchOptions = ({
       }
 
       const expiryDate = toValidDate(batch.expiry_date);
-      if (referenceDay && expiryDate) {
-        expiryDate.setHours(0, 0, 0, 0);
-        if (expiryDate < referenceDay) {
-          return false;
-        }
+      if (!expiryDate) {
+        return false;
+      }
+
+      expiryDate.setUTCHours(0, 0, 0, 0);
+      if (expiryDate < referenceDay) {
+        return false;
       }
 
       return true;
@@ -710,10 +732,10 @@ export const calculateAgeInMonths = (dob, referenceDate = new Date()) => {
   if (!birthDate || !reference || birthDate > reference) return 0;
 
   let months =
-    (reference.getFullYear() - birthDate.getFullYear()) * 12 +
-    (reference.getMonth() - birthDate.getMonth());
+    (reference.getUTCFullYear() - birthDate.getUTCFullYear()) * 12 +
+    (reference.getUTCMonth() - birthDate.getUTCMonth());
 
-  if (reference.getDate() < birthDate.getDate()) {
+  if (reference.getUTCDate() < birthDate.getUTCDate()) {
     months -= 1;
   }
 
@@ -756,8 +778,8 @@ export const buildVaccinationScheduleTimeline = ({
 
   const now = toStartOfDayDate(referenceDate) || new Date();
   const dueSoonThreshold = new Date(now);
-  dueSoonThreshold.setDate(dueSoonThreshold.getDate() + 14);
-  dueSoonThreshold.setHours(0, 0, 0, 0);
+  dueSoonThreshold.setUTCDate(dueSoonThreshold.getUTCDate() + ACTIONABLE_DUE_WINDOW_DAYS);
+  dueSoonThreshold.setUTCHours(0, 0, 0, 0);
 
   const birthDate = toStartOfDayDate(infantDob);
   if (!birthDate) {
@@ -775,10 +797,18 @@ export const buildVaccinationScheduleTimeline = ({
       const matchedRecord = recordByDoseKey.get(recordKey) || null;
 
       let dueDate = null;
-      if (schedule.age_in_months !== null && schedule.age_in_months !== undefined) {
+      if (
+        schedule.minimum_age_days !== null &&
+        schedule.minimum_age_days !== undefined &&
+        Number.isFinite(Number(schedule.minimum_age_days))
+      ) {
         dueDate = new Date(birthDate);
-        dueDate.setMonth(dueDate.getMonth() + Number(schedule.age_in_months || 0));
-        dueDate.setHours(0, 0, 0, 0);
+        dueDate.setUTCDate(dueDate.getUTCDate() + Number(schedule.minimum_age_days || 0));
+        dueDate.setUTCHours(0, 0, 0, 0);
+      } else if (schedule.age_in_months !== null && schedule.age_in_months !== undefined) {
+        dueDate = new Date(birthDate);
+        dueDate.setUTCMonth(dueDate.getUTCMonth() + Number(schedule.age_in_months || 0));
+        dueDate.setUTCHours(0, 0, 0, 0);
       }
 
       const explicitStatus = normalizeStatus(matchedRecord?.status, "");
@@ -872,22 +902,25 @@ export const computeVaccinationComplianceSummary = ({
     includeFutureSeedData,
   });
 
-  const currentAgeMonths = calculateAgeInMonths(infantDob, referenceDate);
-  const dueTimeline = timeline.filter(
-    (entry) => Number(entry.age_in_months || 0) <= currentAgeMonths,
-  );
-
-  const completed = dueTimeline.filter((entry) => entry.status === "completed").length;
-  const overdue = dueTimeline.filter((entry) => entry.status === "overdue").length;
-  const pending = Math.max(dueTimeline.length - completed - overdue, 0);
+  const completed = timeline.filter((entry) => entry.status === "completed").length;
+  const due = timeline.filter((entry) => entry.status === "due").length;
+  const overdue = timeline.filter((entry) => entry.status === "overdue").length;
+  const pending = due + overdue;
+  const upcoming = timeline.filter(
+    (entry) => !["completed", "due", "overdue"].includes(entry.status),
+  ).length;
+  const progressTotal = completed + pending;
 
   return {
-    dueCount: dueTimeline.length,
+    dueCount: due + overdue,
     completed,
     pending,
+    due,
     overdue,
-    completionRate: dueTimeline.length
-      ? Math.round((completed / dueTimeline.length) * 100)
+    upcoming,
+    progressTotal,
+    completionRate: progressTotal
+      ? Math.round((completed / progressTotal) * 100)
       : 0,
     timeline,
   };

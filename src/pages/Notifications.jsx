@@ -440,13 +440,23 @@ const Notifications = () => {
       setLoading(true);
       setError("");
 
+      const apiFilters = {
+        limit: 100,
+        ...(categoryFilter !== "all" ? { category: categoryFilter } : {}),
+        ...(statusFilter === "unread"
+          ? { isRead: false }
+          : statusFilter === "read"
+            ? { isRead: true }
+            : {}),
+      };
+
       if (isGuardian) {
         const response = await guardianNotificationService.getNotifications({
           limit: 100,
         });
         setNotifications(extractNotificationArray(response));
       } else {
-        const response = await apiClient.getNotifications({ limit: 100 });
+        const response = await apiClient.getNotifications(apiFilters);
         setNotifications(extractNotificationArray(response));
       }
     } catch (err) {
@@ -456,7 +466,7 @@ const Notifications = () => {
     } finally {
       setLoading(false);
     }
-  }, [isGuardian]);
+  }, [categoryFilter, isGuardian, statusFilter]);
 
   useEffect(() => {
     fetchNotifications();

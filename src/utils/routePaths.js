@@ -7,7 +7,6 @@ export const adminRoutePaths = Object.freeze({
   transferInCases: "/transfer-in-cases",
   inventory: "/inventory",
   appointments: "/appointments",
-  digitalPapers: "/digital-papers",
   reports: "/reports",
   announcements: "/announcements",
   notifications: "/notifications",
@@ -34,5 +33,5 @@ export const guardianRoutePaths = Object.freeze({
 });
 
 export const legacyRouteRedirects = Object.freeze({
-  guardianDigitalPaperDownloadsTab: `${adminRoutePaths.digitalPapers}?tab=download_center`,
+  // Retained for backward compatibility with older links if needed.
 });

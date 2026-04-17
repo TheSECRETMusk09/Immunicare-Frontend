@@ -189,4 +189,47 @@ describe("InfantManagement pagination", () => {
       expect(screen.getByDisplayValue("baby")).toBeInTheDocument();
     });
   });
+
+  test("requests DOB ascending ordering after a custom date range is applied", async () => {
+    infantService.getAll.mockResolvedValue(buildResponse(1));
+
+    render(
+      <MemoryRouter initialEntries={["/infants"]}>
+        <InfantManagement />
+      </MemoryRouter>,
+    );
+
+    await screen.findByPlaceholderText(/search by name, control no, or contact/i);
+
+    fireEvent.change(screen.getByTitle(/filter by registration period/i), {
+      target: { value: "custom" },
+    });
+
+    let dateInputs;
+    await waitFor(() => {
+      dateInputs = Array.from(document.querySelectorAll('input[type="date"]'));
+      expect(dateInputs.length).toBeGreaterThanOrEqual(2);
+    });
+
+    const [fromInput, toInput] = dateInputs;
+
+    fireEvent.change(fromInput, {
+      target: { value: "2026-03-01" },
+    });
+    fireEvent.change(toInput, {
+      target: { value: "2026-03-31" },
+    });
+
+    await waitFor(() => {
+      expect(infantService.getAll).toHaveBeenLastCalledWith({
+        page: 1,
+        limit: 20,
+        scope: "system",
+        start_date: "2026-03-01",
+        end_date: "2026-03-31",
+        order_by: "dob",
+        order_direction: "asc",
+      });
+    });
+  });
 });

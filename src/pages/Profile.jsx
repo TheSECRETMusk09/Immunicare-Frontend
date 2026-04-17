@@ -177,7 +177,11 @@ export default function Profile() {
         await apiClient.updateGuardianProfile(profileGuardianId, formData);
         trackEvent("profile_updated", { role: "guardian" });
       } else if (user?.id) {
-        await apiClient.updateUserProfile(user.id, formData);
+        await apiClient.updateUserProfile(user.id, {
+          username: formData.name,
+          contact: formData.phone,
+          email: formData.email,
+        });
         trackEvent("profile_updated", { role: "system_user" });
       }
 

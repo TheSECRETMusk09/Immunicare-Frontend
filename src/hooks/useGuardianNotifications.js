@@ -78,10 +78,21 @@ const useGuardianNotifications = (options = {}) => {
         setLoading(true);
         setError(null);
 
-        const [notificationsRes, countRes] = await Promise.all([
+        const [notificationsResult, countResult] = await Promise.allSettled([
           guardianNotificationService.getNotifications({ ...queryFilters, limit }),
           guardianNotificationService.getUnreadCount(),
         ]);
+
+        if (notificationsResult.status === "rejected") {
+          console.warn("Guardian notifications fetch skipped:", notificationsResult.reason);
+        }
+        if (countResult.status === "rejected") {
+          console.warn("Guardian unread-count fetch skipped:", countResult.reason);
+        }
+
+        const notificationsRes =
+          notificationsResult.status === "fulfilled" ? notificationsResult.value : null;
+        const countRes = countResult.status === "fulfilled" ? countResult.value : null;
 
         if (isMountedRef.current) {
           if (notificationsRes?.success) {

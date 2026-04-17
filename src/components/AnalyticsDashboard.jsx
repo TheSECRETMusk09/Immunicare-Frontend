@@ -17,9 +17,6 @@ import {
   Skeleton,
   Snackbar,
   Switch,
-  Tab,
-  Tabs,
-  TextField,
   Tooltip,
   Typography,
   useMediaQuery,
@@ -1025,7 +1022,9 @@ const mapDashboardPayload = (payload) => {
     validatedMetrics.pendingAppointments;
 
   const summaryVaccinationsToday =
+    summary.vaccinationsCompletedTodayUnique ??
     summary.vaccinationsCompletedToday ??
+    summary.vaccinationsCompletedTodayDoses ??
     summary.vaccinationsToday ??
     summary.completedToday ??
     validatedMetrics.vaccinationsToday;
@@ -1058,7 +1057,10 @@ const mapDashboardPayload = (payload) => {
     totalInfants: safeNum(summaryTotalInfants),
     totalGuardians: safeNum(summaryTotalGuardians),
     vaccinationsToday: safeNum(summaryVaccinationsToday),
-    dueForVaccination: safeNum(summaryDueForVaccination),
+    dueForVaccination: Math.max(
+      safeNum(summaryDueForVaccination),
+      safeNum(summaryOverdueVaccinations),
+    ),
     overdueVaccinations: safeNum(summaryOverdueVaccinations),
     pendingAppointments: safeNum(summaryPendingAppointments),
     lowStockVaccines: safeNum(summaryLowStock),
@@ -3028,68 +3030,107 @@ const AnalyticsDashboard = () => {
   const [shortcutLoadingKey, setShortcutLoadingKey] = useState("");
 
   const pollRef = useRef(null);
+  const fetchRef = useRef(null);
+  const isMountedRef = useRef(true);
+  const lastRequestParamsRef = useRef(null);
+  
   const sectionDividerSx = useMemo(
     () => ({ mb: 3, borderColor: isDark ? ANALYTICS_DARK_UI.divider : "divider" }),
     [isDark],
   );
 
+  // Memoize params to ensure stable reference
+  const queryParams = useMemo(() => buildQueryParams(filters), [filters]);
+  
   const fetchDashboard = useCallback(async ({ silent = false } = {}) => {
-    if (!silent) {
-      setLoading(true);
+    // Prevent concurrent requests
+    if (fetchRef.current) {
+      return fetchRef.current;
     }
 
-    try {
-      if (!silent) {
-        setError("");
-      }
-      setRefreshWarning("");
-      const params = buildQueryParams(filters);
-      const response = await apiClient.getAnalyticsDashboard(params);
-
-      const normalizedPayload = normalizeResponsePayload(response);
-      if (!normalizedPayload) {
-        throw new Error(response?.error || "Failed to load analytics dashboard data");
-      }
-
-      setDashboardData(mapDashboardPayload(normalizedPayload));
-    } catch (fetchError) {
-      console.error("Analytics dashboard fetch error:", fetchError);
-      const message = fetchError?.message || "Unable to load analytics data";
-
-      if (silent) {
-        setRefreshWarning(`Auto-refresh failed: ${message}`);
-      } else {
-        setError(message);
-      }
-    } finally {
-      if (!silent) {
-        setLoading(false);
-      }
+    // Prevent duplicate requests with same params
+    const paramsKey = JSON.stringify(queryParams);
+    if (!silent && lastRequestParamsRef.current === paramsKey) {
+      return Promise.resolve();
     }
-  }, [filters]);
+    lastRequestParamsRef.current = paramsKey;
 
+    const promise = (async () => {
+      try {
+        if (!silent) {
+          setLoading(true);
+          setError("");
+        }
+        setRefreshWarning("");
+        const response = await apiClient.getAnalyticsDashboard(queryParams);
+
+        const normalizedPayload = normalizeResponsePayload(response);
+        if (!normalizedPayload) {
+          throw new Error(response?.error || "Failed to load analytics dashboard data");
+        }
+
+        if (isMountedRef.current) {
+          setDashboardData(mapDashboardPayload(normalizedPayload));
+        }
+      } catch (fetchError) {
+        if (isMountedRef.current) {
+          console.error("Analytics dashboard fetch error:", fetchError);
+          const message = fetchError?.message || "Unable to load analytics data";
+
+          if (silent) {
+            setRefreshWarning(`Auto-refresh failed: ${message}`);
+          } else {
+            setError(message);
+          }
+        }
+      } finally {
+        if (!silent && isMountedRef.current) {
+          setLoading(false);
+        }
+        fetchRef.current = null;
+      }
+    })();
+
+    fetchRef.current = promise;
+    return promise;
+  }, [queryParams]);
+
+  // Only fetch on mount or when queryParams change
   useEffect(() => {
-    fetchDashboard();
-  }, [fetchDashboard]);
+    isMountedRef.current = true;
+    void fetchDashboard();
+    
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [queryParams, fetchDashboard]);
 
   useEffect(() => {
     if (!autoRefresh) {
       if (pollRef.current) {
         clearInterval(pollRef.current);
+        pollRef.current = null;
       }
-      pollRef.current = null;
       return undefined;
     }
 
-    pollRef.current = setInterval(() => {
-      fetchDashboard({ silent: true });
-    }, 30000);
+    // Schedule polling using timer function, not fetchDashboard directly to avoid dependency on callback
+    const startPolling = () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+      }
+      pollRef.current = setInterval(() => {
+        void fetchDashboard({ silent: true });
+      }, 30000);
+    };
+
+    startPolling();
 
     return () => {
       if (pollRef.current) {
         clearInterval(pollRef.current);
+        pollRef.current = null;
       }
-      pollRef.current = null;
     };
   }, [autoRefresh, fetchDashboard]);
 
@@ -3138,7 +3179,7 @@ const AnalyticsDashboard = () => {
       listeners.forEach(({ eventName, handler }) => off(eventName, handler));
       windowListeners.forEach(({ eventName, handler }) => window.removeEventListener(eventName, handler));
     };
-  }, [fetchDashboard, on, off, connectionState]);
+  }, [fetchDashboard, on, off]);
 
   useEffect(() => {
     return () => {
@@ -3354,44 +3395,28 @@ const AnalyticsDashboard = () => {
           scopeLabel={dashboardData?.scopeLabel}
         />
 
-        <Tabs
-          value={tab}
-          onChange={handleTabChange}
-          variant={isMobile ? "scrollable" : "standard"}
-          scrollButtons="auto"
-          sx={{
-            mb: 2,
-            mt: 3,
-            borderBottom: 1,
-            borderColor: isDark ? ANALYTICS_DARK_UI.divider : 'divider',
-            '& .MuiTab-root': {
-              color: isDark ? ANALYTICS_DARK_UI.textMuted : '#64748B',
-              fontWeight: 700,
-              '&:hover': {
-                color: isDark ? ANALYTICS_DARK_UI.textSecondary : '#334155',
-              },
-              '&.Mui-selected': {
-                color: isDark ? ANALYTICS_DARK_UI.textPrimary : '#0F172A',
-                fontWeight: 700,
-              },
-            },
-            '& .MuiTabs-indicator': {
-              backgroundColor: isDark ? '#5B8DEF' : '#5B8DEF',
-            },
-            '& .MuiTabs-scrollButtons': {
-              color: isDark ? ANALYTICS_DARK_UI.textSecondary : undefined,
-            },
-          }}
-          aria-label="Analytics content sections"
-        >
-          {tabs.map((tabConfig) => (
-            <Tab
-              key={tabConfig.key}
-              label={tabConfig.label}
-              sx={{ textTransform: "none", fontWeight: 600 }}
-            />
-          ))}
-        </Tabs>
+        <Box sx={{ mt: 3, mb: 2 }}>
+          <nav
+            className="flex space-x-2 overflow-x-auto bg-gray-100 dark:bg-gray-800 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700"
+            aria-label="Analytics content sections"
+          >
+            {tabs.map((tabConfig, tabIndex) => (
+              <button
+                key={tabConfig.key}
+                onClick={() => handleTabChange(null, tabIndex)}
+                className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
+                  tab === tabIndex
+                    ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                    : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+                }`}
+                aria-selected={tab === tabIndex}
+                role="tab"
+              >
+                {tabConfig.label}
+              </button>
+            ))}
+          </nav>
+        </Box>
       </Box>
 
       {/* Scrollable Content Area */}

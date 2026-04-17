@@ -25,6 +25,8 @@ jest.mock("../utils/api", () => ({
   default: {
     getDashboardInfants: jest.fn(),
     getVaccinationRecords: jest.fn(),
+    getVaccinationTracking: jest.fn(),
+    getVaccinationScheduleOverview: jest.fn(),
     getVaccinationSchedules: jest.fn(),
     getInfants: jest.fn(),
     getVaccines: jest.fn(),
@@ -176,6 +178,23 @@ describe("Admin integration sync and mapping checks", () => {
     apiClient.getVaccineInventoryStatus.mockResolvedValue({ clinicId: 7, batches: [] });
     apiClient.createVaccineInventoryTransaction.mockResolvedValue({ id: 901 });
     apiClient.getInfants.mockResolvedValue(infantRows);
+    apiClient.getVaccinationTracking.mockResolvedValue({
+      rows: [],
+      summary: { completed: 0, dueSoon: 0, overdue: 0, trackedInfants: 0 },
+      metadata: { page: 1, limit: 9, total: 0, totalPages: 0 },
+    });
+    apiClient.getVaccinationScheduleOverview.mockResolvedValue({
+      rows: [],
+      summary: {
+        upcoming: 0,
+        due: 0,
+        completed: 0,
+        overdue: 0,
+        trackedInfants: 0,
+        totalRows: 0,
+      },
+      metadata: { page: 1, limit: 20, total: 0, totalPages: 0 },
+    });
     apiClient.getSystemUsers.mockResolvedValue([
       {
         id: 100,
@@ -264,8 +283,18 @@ describe("Admin integration sync and mapping checks", () => {
 
   test("vaccinations dashboard removes analytics tab and renders only required tabs", async () => {
     apiClient.getVaccinationRecords.mockResolvedValueOnce(vaccinationRecordRows);
-    apiClient.getVaccinationSchedules.mockResolvedValueOnce(scheduleRows);
-    apiClient.getDashboardInfants.mockResolvedValueOnce(infantRows);
+    apiClient.getVaccinationScheduleOverview.mockResolvedValueOnce({
+      rows: [],
+      summary: {
+        upcoming: 0,
+        due: 0,
+        completed: 0,
+        overdue: 0,
+        trackedInfants: 0,
+        totalRows: 0,
+      },
+      metadata: { page: 1, limit: 20, total: 0, totalPages: 0 },
+    });
     apiClient.getVaccines.mockResolvedValueOnce(vaccineRows);
 
     renderVaccinationsDashboard();
@@ -277,7 +306,14 @@ describe("Admin integration sync and mapping checks", () => {
     await waitFor(() => {
       expect(apiClient.getVaccinationRecords).not.toHaveBeenCalled();
     });
-    expect(apiClient.getVaccinationSchedules).toHaveBeenCalled();
+    expect(apiClient.getVaccinationScheduleOverview).toHaveBeenCalledWith({
+      scope: "system",
+      period: "month",
+      page: 1,
+      limit: 20,
+    });
+    expect(apiClient.getVaccinationSchedules).not.toHaveBeenCalled();
+    expect(apiClient.getDashboardInfants).not.toHaveBeenCalled();
 
     expect(
       screen.getByRole("button", { name: /vaccination records/i }),
@@ -323,7 +359,7 @@ describe("Admin integration sync and mapping checks", () => {
           vaccine_id: 2,
           lot_no: "PENTA-FEFO-001",
           qty_current: 9,
-          expiry_date: "2026-04-01",
+          expiry_date: "2026-04-20",
         },
       ],
     });
@@ -419,7 +455,7 @@ describe("Admin integration sync and mapping checks", () => {
           vaccine_id: 2,
           lot_no: "PENTA-FEFO-001",
           qty_current: 9,
-          expiry_date: "2026-04-01",
+          expiry_date: "2026-04-20",
         },
       ],
     });

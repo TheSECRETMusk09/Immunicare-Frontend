@@ -31,11 +31,11 @@ import {
 } from "../utils/vaccinationFormOptions";
 import {
   buildVaccinationRecordPeriodParams,
-  buildVaccinationInfantPeriodParams,
   getVaccinationPeriodRange,
   isDateWithinVaccinationPeriod,
   normalizeVaccinationPeriod,
 } from "../utils/vaccinationPeriods";
+import { fromClinicDateKey, toClinicDateKey } from "../utils/dateUtils";
 import {
   buildInfantRecordPrefillContext,
   buildInfantSearchText,
@@ -45,12 +45,42 @@ import {
 import { useLocation, useSearchParams } from "react-router-dom";
 
 const pollingIntervalMs = 60000;
-const STABLE_REFERENCE_TTL_MS = 5 * 60 * 1000;
 const VACCINATION_TAB_STORAGE_KEY = "admin.vaccinations.activeTab";
 const VACCINATION_TAB_KEYS = ["records", "tracking", "schedule"];
 const DEFAULT_VACCINATION_TAB_KEY = "schedule";
 
+// Performance optimization constants
+const INFANT_CHUNK_SIZE = 10000; // Enough to keep derived dashboard counts in one scoped batch
+const CACHE_TTL_MS = 10 * 60 * 1000; // Extended cache TTL for better performance
+
 const normalizeSearchValue = (value) => String(value || "").trim().toLowerCase();
+
+const mergeByNumericId = (existing = [], incoming = []) => {
+  const merged = [];
+  const seen = new Set();
+
+  [...existing, ...incoming].forEach((entry) => {
+    const id = Number.parseInt(entry?.id, 10);
+    if (!Number.isFinite(id) || id <= 0 || seen.has(id)) {
+      return;
+    }
+    seen.add(id);
+    merged.push(entry);
+  });
+
+  return merged;
+};
+
+const matchesTokenizedSearch = (searchableText, rawQuery) => {
+  const normalizedQuery = normalizeSearchValue(rawQuery);
+  if (!normalizedQuery) return true;
+
+  const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+
+  const haystack = String(searchableText || "").toLowerCase();
+  return tokens.every((token) => haystack.includes(token));
+};
 
 const normalizeVaccinationTabKey = (value) => {
   const normalizedValue = String(value || "").trim().toLowerCase();
@@ -102,9 +132,7 @@ const getStatusBadgeClassName = (status) => {
 
 const formatDateInputValue = (value) => {
   if (!value) return "";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "";
-  return parsed.toISOString().split("T")[0];
+  return toClinicDateKey(value);
 };
 
 const formatAgeLabel = (ageInMonths) => {
@@ -114,11 +142,9 @@ const formatAgeLabel = (ageInMonths) => {
 };
 
 const normalizeDateToStartOfDay = (value) => {
-  if (!value) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
-  parsed.setHours(0, 0, 0, 0);
-  return parsed;
+  const dateKey = toClinicDateKey(value);
+  if (!dateKey) return null;
+  return fromClinicDateKey(dateKey);
 };
 
 const classifyScheduleDoseStatus = (entry = {}) => {
@@ -149,6 +175,226 @@ const classifyScheduleDoseStatus = (entry = {}) => {
   }
 
   return "upcoming";
+};
+
+const isCompletedVaccinationRecord = (record = {}) => {
+  const normalizedStatus = String(record.status || "").trim().toLowerCase();
+  return normalizedStatus === "completed" || normalizedStatus === "attended" || Boolean(record.admin_date);
+};
+
+const getTrackingTimelineReferenceDate = (entry = {}) => {
+  const statusKey = classifyScheduleDoseStatus(entry);
+
+  if (statusKey === "completed") {
+    return entry.admin_date || entry.due_date || null;
+  }
+
+  return entry.due_date || entry.admin_date || null;
+};
+
+const summarizeTrackingTimeline = (timeline = []) => {
+  const completed = timeline.filter(
+    (entry) => classifyScheduleDoseStatus(entry) === "completed",
+  ).length;
+  const due = timeline.filter(
+    (entry) => classifyScheduleDoseStatus(entry) === "due",
+  ).length;
+  const overdue = timeline.filter(
+    (entry) => classifyScheduleDoseStatus(entry) === "overdue",
+  ).length;
+  const pending = due + overdue;
+  const progressTotal = completed + pending;
+
+  return {
+    dueCount: due,
+    completed,
+    pending,
+    overdue,
+    completionRate: progressTotal ? Math.round((completed / progressTotal) * 100) : 0,
+  };
+};
+
+const filterTrackingSnapshotByPeriod = (snapshot = {}, range = {}) => {
+  const filteredTimeline = Array.isArray(snapshot.timeline)
+    ? snapshot.timeline.filter((entry) => {
+        const statusKey = classifyScheduleDoseStatus(entry);
+        if (!["completed", "due", "overdue"].includes(statusKey)) {
+          return false;
+        }
+
+        const referenceDate =
+          statusKey === "completed"
+            ? entry.admin_date || null
+            : entry.due_date || null;
+        return referenceDate ? isDateWithinVaccinationPeriod(referenceDate, range) : false;
+      })
+    : [];
+
+  return {
+    ...snapshot,
+    ...summarizeTrackingTimeline(filteredTimeline),
+    timeline: filteredTimeline,
+  };
+};
+
+const DEFAULT_OVERVIEW_PAGINATION = Object.freeze({
+  page: 1,
+  limit: 0,
+  total: 0,
+  totalPages: 0,
+  hasNext: false,
+  hasPrev: false,
+});
+
+const DEFAULT_TRACKING_OVERVIEW_SUMMARY = Object.freeze({
+  completed: 0,
+  dueSoon: 0,
+  overdue: 0,
+  trackedInfants: 0,
+});
+
+const DEFAULT_SCHEDULE_OVERVIEW_SUMMARY = Object.freeze({
+  upcoming: 0,
+  due: 0,
+  completed: 0,
+  overdue: 0,
+  trackedInfants: 0,
+  totalRows: 0,
+});
+
+const normalizeOverviewPagination = (metadata = {}, fallbackLimit = 0) => {
+  const page = Number(metadata.page || 1);
+  const limit = Number(metadata.limit || fallbackLimit || 0);
+  const total = Number(metadata.total || 0);
+  const totalPages = Number(
+    metadata.totalPages || metadata.total_pages || (limit > 0 ? Math.ceil(total / limit) : 0),
+  );
+
+  return {
+    ...DEFAULT_OVERVIEW_PAGINATION,
+    ...metadata,
+    page,
+    limit,
+    total,
+    totalPages,
+    hasNext: Boolean(metadata.hasNext ?? metadata.has_next ?? page < totalPages),
+    hasPrev: Boolean(metadata.hasPrev ?? metadata.has_prev ?? page > 1),
+  };
+};
+
+const buildVaccinationOverviewPeriodParams = ({
+  period,
+  startDate,
+  endDate,
+} = {}) => {
+  const normalizedPeriod = normalizeVaccinationPeriod(period);
+
+  return {
+    period: normalizedPeriod,
+    ...(normalizedPeriod === "custom"
+      ? {
+          startDate,
+          endDate,
+        }
+      : {}),
+  };
+};
+
+const normalizeTrackingOverviewResponse = (response = {}, fallbackLimit = 9) => {
+  const rows = Array.isArray(response?.rows)
+    ? response.rows
+    : Array.isArray(response?.data?.rows)
+      ? response.data.rows
+      : [];
+  const summary = response?.summary || response?.data?.summary || {};
+  const metadata = response?.metadata || response?.pagination || response?.data?.metadata || {};
+
+  return {
+    rows: rows.map((row) => {
+      const infant = row.infant || row.infant_context || {};
+      return {
+        ...row,
+        infant,
+        dueCount: Number(row.dueCount ?? row.due_count ?? row.due ?? 0),
+        completed: Number(row.completed || 0),
+        pending: Number(row.pending || 0),
+        overdue: Number(row.overdue || 0),
+        completionRate: Number(row.completionRate ?? row.completion_rate ?? 0),
+        timeline: Array.isArray(row.timeline) ? row.timeline : [],
+      };
+    }),
+    summary: {
+      ...DEFAULT_TRACKING_OVERVIEW_SUMMARY,
+      completed: Number(summary.completed || 0),
+      dueSoon: Number(summary.dueSoon ?? summary.due_soon ?? summary.due ?? 0),
+      overdue: Number(summary.overdue || 0),
+      trackedInfants: Number(summary.trackedInfants ?? summary.tracked_infants ?? 0),
+    },
+    metadata: normalizeOverviewPagination(metadata, fallbackLimit),
+  };
+};
+
+const normalizeScheduleOverviewResponse = (response = {}, fallbackLimit = 20) => {
+  const rows = Array.isArray(response?.rows)
+    ? response.rows
+    : Array.isArray(response?.data?.rows)
+      ? response.data.rows
+      : [];
+  const summary = response?.summary || response?.data?.summary || {};
+  const metadata = response?.metadata || response?.pagination || response?.data?.metadata || {};
+
+  return {
+    rows: rows.map((row) => {
+      const infantContext = row.infant_context || {
+        id: row.infant_id,
+        first_name: row.infant_first_name || "",
+        middle_name: row.infant_middle_name || "",
+        last_name: row.infant_last_name || "",
+        full_name: row.infant_full_name || row.infant_name || "",
+        display_name: row.infant_display_name || row.infant_name || "",
+        control_number: row.infant_control_number || "",
+        dob: row.infant_dob || null,
+      };
+
+      return {
+        ...row,
+        infant_context: infantContext,
+        status_label:
+          row.status_label ||
+          `${String(row.status_key || "").charAt(0).toUpperCase()}${String(row.status_key || "").slice(1)}`,
+      };
+    }),
+    summary: {
+      ...DEFAULT_SCHEDULE_OVERVIEW_SUMMARY,
+      upcoming: Number(summary.upcoming || 0),
+      due: Number(summary.due || 0),
+      completed: Number(summary.completed || 0),
+      overdue: Number(summary.overdue || 0),
+      trackedInfants: Number(summary.trackedInfants ?? summary.tracked_infants ?? 0),
+      totalRows: Number(summary.totalRows ?? summary.total_rows ?? metadata.total ?? 0),
+    },
+    metadata: normalizeOverviewPagination(metadata, fallbackLimit),
+  };
+};
+
+const extractInfantsFromOverviewRows = (rows = []) => {
+  const infantsById = new Map();
+
+  rows.forEach((row) => {
+    const infant = row.infant || row.infant_context;
+    const infantId = Number.parseInt(infant?.id ?? row.infant_id, 10);
+    if (!Number.isFinite(infantId) || infantId <= 0 || infantsById.has(infantId)) {
+      return;
+    }
+
+    infantsById.set(infantId, {
+      ...infant,
+      id: infantId,
+      dob: infant?.dob || row.infant_dob || null,
+    });
+  });
+
+  return Array.from(infantsById.values());
 };
 
 const isAbortError = (error) =>
@@ -193,11 +439,19 @@ const VaccinationsDashboard = () => {
   const [periodEndDate, setPeriodEndDate] = useState("");
   const activeTabRef = useRef(activeTab);
   const currentPageRef = useRef(1);
+  const scheduleCurrentPageRef = useRef(1);
+  const trackingCurrentPageRef = useRef(1);
   const searchQueryRef = useRef("");
   const hasInitializedPeriodEffectRef = useRef(false);
   const hasInitializedActiveTabEffectRef = useRef(false);
   const hasInitializedSearchEffectRef = useRef(false);
   const hasInitializedRecordPageEffectRef = useRef(false);
+  const hasInitializedSelectedInfantEffectRef = useRef(false);
+  const previousSchedulePageRef = useRef(1);
+  const previousTrackingPageRef = useRef(1);
+  const hasInitializedViewModeEffectRef = useRef(false);
+
+  const [viewMode] = useState("all");
 
   const infantQueryScope = useMemo(
     () => (isAdmin ? { scope: "system" } : {}),
@@ -212,26 +466,16 @@ const VaccinationsDashboard = () => {
           },
     [],
   );
-  const activeInfantPeriodParams = useMemo(
-    () =>
-      buildVaccinationInfantPeriodParams({
-        period,
-        startDate: periodStartDate,
-        endDate: periodEndDate,
-      }),
-    [period, periodStartDate, periodEndDate],
-  );
   const buildVaccinationInfantQuery = useCallback(
     (overrides = {}) => {
       return {
         ...infantQueryScope,
         exclude_future_dob: true,
         fields: "lite",
-        ...activeInfantPeriodParams,
         ...overrides,
       };
     },
-    [activeInfantPeriodParams, infantQueryScope],
+    [infantQueryScope],
   );
 
   const [vaccinationRecords, setVaccinationRecords] = useState([]);
@@ -248,6 +492,22 @@ const VaccinationsDashboard = () => {
   const [vaccinationSchedules, setVaccinationSchedules] = useState([]);
   const [infants, setInfants] = useState([]);
   const [dashboardSummary, setDashboardSummary] = useState(null);
+  const [trackingOverviewRows, setTrackingOverviewRows] = useState([]);
+  const [trackingOverviewSummary, setTrackingOverviewSummary] = useState({
+    ...DEFAULT_TRACKING_OVERVIEW_SUMMARY,
+  });
+  const [trackingOverviewPagination, setTrackingOverviewPagination] = useState({
+    ...DEFAULT_OVERVIEW_PAGINATION,
+    limit: 9,
+  });
+  const [scheduleOverviewRows, setScheduleOverviewRows] = useState([]);
+  const [scheduleOverviewSummary, setScheduleOverviewSummary] = useState({
+    ...DEFAULT_SCHEDULE_OVERVIEW_SUMMARY,
+  });
+  const [scheduleOverviewPagination, setScheduleOverviewPagination] = useState({
+    ...DEFAULT_OVERVIEW_PAGINATION,
+    limit: 20,
+  });
   const currentDateAvailability = dashboardSummary?.currentDateAvailability || null;
   const isBlockedTodayView =
     period === "today" && currentDateAvailability?.isAvailable === false;
@@ -286,12 +546,113 @@ const VaccinationsDashboard = () => {
     abortController: null,
     requestId: 0,
   });
+
+  // Performance optimization state
+  const [tabLoadingStates, setTabLoadingStates] = useState({
+    records: false,
+    tracking: false,
+    schedule: false,
+  });
+  const [tabDataLoaded, setTabDataLoaded] = useState({
+    records: false,
+    tracking: false,
+    schedule: false,
+  });
+  const tabDataLoadedRef = useRef({ records: false, tracking: false, schedule: false });
+  const tabDataCacheRef = useRef(new Map());
   const socketRefreshTimeoutRef = useRef(null);
+  const lastPathnameRef = useRef(location?.pathname || "");
+
+  // Request deduplication refs (prevent concurrent fetches)
+  const fetchDataRequestRef = useRef(null);
+  const fetchTabDataRequestMapRef = useRef(new Map());
+  const lastFetchTabDataParamsRef = useRef(null);
+  const isMountedRef = useRef(true);
+  const sharedVaccinationDataRef = useRef({
+    infants: [],
+    schedules: [],
+    reconciliation: [],
+  });
+  const sharedVaccinationDataScopeRef = useRef("");
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 350);
+    const fetchState = fetchStateRef.current;
+
+    return () => {
+      if (fetchState.abortController) {
+        fetchState.abortController.abort();
+      }
+      if (socketRefreshTimeoutRef.current) {
+        clearTimeout(socketRefreshTimeoutRef.current);
+      }
+      // Clear cache on unmount
+      tabDataCacheRef.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    sharedVaccinationDataRef.current = {
+      infants,
+      schedules: vaccinationSchedules,
+      reconciliation: vaccinationRecords,
+    };
+  }, [infants, vaccinationRecords, vaccinationSchedules]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 2500);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // When searching by infant name in Tracking / Schedule tabs, ensure the infant lookup
+  // queries the full infants table (no period/date constraints).
+  useEffect(() => {
+    if (activeTab !== "tracking" && activeTab !== "schedule") {
+      return undefined;
+    }
+
+    const normalized = String(debouncedSearchQuery || "").trim();
+    if (!normalized) {
+      return undefined;
+    }
+
+    const abortController = new AbortController();
+    const requestConfig = buildRequestConfig(abortController.signal);
+
+    (async () => {
+      try {
+        const response = requestConfig
+          ? await apiClient.getInfants(
+              {
+                ...infantQueryScope,
+                exclude_future_dob: true,
+                fields: "lite",
+                page: 1,
+                limit: 100,
+                search: normalized,
+              },
+              requestConfig,
+            )
+          : await apiClient.getInfants({
+              ...infantQueryScope,
+              exclude_future_dob: true,
+              fields: "lite",
+              page: 1,
+              limit: 100,
+              search: normalized,
+            });
+
+        const normalizedRows = normalizeInfantsResponse(response);
+        if (Array.isArray(normalizedRows) && normalizedRows.length > 0) {
+          setInfants((previous) => mergeByNumericId(previous, normalizedRows));
+        }
+      } catch (lookupError) {
+        if (isAbortError(lookupError)) return;
+        console.error("[VaccinationsDashboard] Failed to load infants for tracking search:", lookupError);
+      }
+    })();
+
+    return () => abortController.abort();
+  }, [activeTab, buildRequestConfig, debouncedSearchQuery, infantQueryScope]);
 
   useEffect(() => {
     activeTabRef.current = activeTab;
@@ -323,6 +684,14 @@ const VaccinationsDashboard = () => {
   }, [currentPage]);
 
   useEffect(() => {
+    scheduleCurrentPageRef.current = scheduleCurrentPage;
+  }, [scheduleCurrentPage]);
+
+  useEffect(() => {
+    trackingCurrentPageRef.current = trackingCurrentPage;
+  }, [trackingCurrentPage]);
+
+  useEffect(() => {
     searchQueryRef.current = debouncedSearchQuery;
   }, [debouncedSearchQuery]);
 
@@ -341,6 +710,13 @@ const VaccinationsDashboard = () => {
     [debouncedSearchQuery],
   );
 
+  const selectedInfantFocusId = useMemo(() => {
+    const parsedId = Number.parseInt(selectedInfantId, 10);
+    return Number.isInteger(parsedId) && parsedId > 0 ? parsedId : null;
+  }, [selectedInfantId]);
+
+  const shouldUseChildProgressScope = Boolean(normalizedSearchQuery || selectedInfantFocusId);
+
   const selectedTrackingInfant = useMemo(() => {
     if (!selectedInfantId || activeTab !== "tracking") {
       return null;
@@ -357,13 +733,9 @@ const VaccinationsDashboard = () => {
       return [];
     }
 
-    return infants.filter((infant) =>
-      isDateWithinVaccinationPeriod(
-        infant.dob || infant.date_of_birth || infant.birth_date,
-        periodRange,
-      ),
-    );
-  }, [activeTab, infants, isBlockedTodayView, periodRange]);
+    // Period filters apply to compliance timelines, not infant lookup.
+    return infants;
+  }, [activeTab, infants, isBlockedTodayView]);
 
   useEffect(() => {
     if (activeTab !== "tracking" || !selectedInfantId) {
@@ -383,6 +755,16 @@ const VaccinationsDashboard = () => {
   const activeRecordPeriodParams = useMemo(
     () =>
       buildVaccinationRecordPeriodParams({
+        period,
+        startDate: periodStartDate,
+        endDate: periodEndDate,
+      }),
+    [period, periodStartDate, periodEndDate],
+  );
+
+  const activeOverviewPeriodParams = useMemo(
+    () =>
+      buildVaccinationOverviewPeriodParams({
         period,
         startDate: periodStartDate,
         endDate: periodEndDate,
@@ -435,14 +817,16 @@ const VaccinationsDashboard = () => {
   const fetchVaccinationRecordPage = useCallback(
     async ({ page, search, signal } = {}) => {
       const requestConfig = buildRequestConfig(signal || fetchStateRef.current.abortController?.signal);
+      const hasSearch = Boolean(String(search || "").trim());
       const response = requestConfig
         ? await apiClient.getVaccinationRecords(
             {
               page,
               limit: itemsPerPage,
               ...infantQueryScope,
-              ...activeRecordPeriodParams,
+              ...(!hasSearch ? activeRecordPeriodParams : {}),
               ...(search ? { search } : {}),
+              date_view: viewMode,
             },
             requestConfig,
           )
@@ -450,8 +834,9 @@ const VaccinationsDashboard = () => {
             page,
             limit: itemsPerPage,
             ...infantQueryScope,
-            ...activeRecordPeriodParams,
+            ...(!hasSearch ? activeRecordPeriodParams : {}),
             ...(search ? { search } : {}),
+            date_view: viewMode,
           });
       const metadata = {
         page,
@@ -469,90 +854,99 @@ const VaccinationsDashboard = () => {
         metadata,
       };
     },
-    [activeRecordPeriodParams, buildRequestConfig, infantQueryScope, itemsPerPage],
+    [activeRecordPeriodParams, buildRequestConfig, infantQueryScope, itemsPerPage, viewMode],
   );
 
-  const fetchVaccinationSummaryData = useCallback(async () => {
-    if (typeof apiClient.getAnalyticsDashboard !== "function") {
+  const fetchVaccinationTrackingOverview = useCallback(
+    async ({ page, search, signal } = {}) => {
+      const requestConfig = buildRequestConfig(signal || fetchStateRef.current.abortController?.signal);
+      const params = {
+        page,
+        limit: trackingItemsPerPage,
+        ...infantQueryScope,
+        ...activeOverviewPeriodParams,
+        ...(search ? { search } : {}),
+        ...(selectedInfantFocusId ? { infant_id: selectedInfantFocusId } : {}),
+      };
+      const response = requestConfig
+        ? await apiClient.getVaccinationTracking(params, requestConfig)
+        : await apiClient.getVaccinationTracking(params);
+
+      return normalizeTrackingOverviewResponse(response, trackingItemsPerPage);
+    },
+    [
+      activeOverviewPeriodParams,
+      buildRequestConfig,
+      infantQueryScope,
+      selectedInfantFocusId,
+      trackingItemsPerPage,
+    ],
+  );
+
+  const fetchVaccinationScheduleOverview = useCallback(
+    async ({ page, search, signal } = {}) => {
+      const requestConfig = buildRequestConfig(signal || fetchStateRef.current.abortController?.signal);
+      const params = {
+        page,
+        limit: scheduleItemsPerPage,
+        ...infantQueryScope,
+        ...activeOverviewPeriodParams,
+        ...(search ? { search } : {}),
+        ...(selectedInfantFocusId ? { infant_id: selectedInfantFocusId } : {}),
+      };
+      const response = requestConfig
+        ? await apiClient.getVaccinationScheduleOverview(params, requestConfig)
+        : await apiClient.getVaccinationScheduleOverview(params);
+
+      return normalizeScheduleOverviewResponse(response, scheduleItemsPerPage);
+    },
+    [
+      activeOverviewPeriodParams,
+      buildRequestConfig,
+      infantQueryScope,
+      scheduleItemsPerPage,
+      selectedInfantFocusId,
+    ],
+  );
+
+  const isCustomRangeIncomplete =
+    period === "custom" && (!periodStartDate || !periodEndDate);
+
+  const fetchVaccinationSummaryData = useCallback(async ({ signal } = {}) => {
+    if (
+      typeof apiClient.getAnalyticsDashboardSummary !== "function" &&
+      typeof apiClient.getAnalyticsDashboard !== "function"
+    ) {
+      return null;
+    }
+
+    if (isCustomRangeIncomplete) {
       return null;
     }
 
     try {
-      const response = await apiClient.getAnalyticsDashboard(dashboardSummaryQuery);
+      const requestConfig = buildRequestConfig(signal || fetchStateRef.current.abortController?.signal);
+      const summaryRequest =
+        typeof apiClient.getAnalyticsDashboardSummary === "function"
+          ? apiClient.getAnalyticsDashboardSummary
+          : apiClient.getAnalyticsDashboard;
+      const response = requestConfig
+        ? await summaryRequest.call(apiClient, dashboardSummaryQuery, requestConfig)
+        : await summaryRequest.call(apiClient, dashboardSummaryQuery);
       return response?.data?.summary || response?.summary || null;
     } catch (summaryError) {
+      if (isAbortError(summaryError)) {
+        return null;
+      }
       console.error(
         "[VaccinationsDashboard] Failed to load dashboard summary metrics:",
         summaryError,
       );
       return null;
     }
-  }, [dashboardSummaryQuery]);
+  }, [buildRequestConfig, dashboardSummaryQuery, isCustomRangeIncomplete]);
 
-  const fetchVaccinationInfantsData = useCallback(async ({ signal } = {}) => {
-    const requestConfig = buildRequestConfig(signal || fetchStateRef.current.abortController?.signal);
-
-    if (typeof apiClient.getDashboardInfants === "function") {
-      const pageSize = 10000;
-      const aggregatedInfants = [];
-      let page = 1;
-      let hasNext = true;
-      let pagination = null;
-
-      while (hasNext) {
-        const infantQuery = buildVaccinationInfantQuery({
-          page,
-          limit: pageSize,
-        });
-        const response = requestConfig
-          ? await apiClient.getDashboardInfants(infantQuery, requestConfig)
-          : await apiClient.getDashboardInfants(infantQuery);
-        aggregatedInfants.push(...normalizeInfantsResponse(response));
-        pagination =
-          response?.pagination ||
-          response?.metadata ||
-          response?.data?.pagination ||
-          pagination ||
-          {};
-        hasNext = Boolean(pagination?.hasNext);
-        page += 1;
-
-        if (page > 200) {
-          console.warn(
-            "[VaccinationsDashboard] Stopping infant aggregation after 200 pages to avoid an infinite loop.",
-          );
-          break;
-        }
-      }
-
-      return {
-        rows: aggregatedInfants,
-        metadata: pagination || {},
-      };
-    }
-
-    const response = requestConfig
-      ? await apiClient.getInfants(
-          buildVaccinationInfantQuery({
-            page: 1,
-            limit: 10000,
-          }),
-          requestConfig,
-        )
-      : await apiClient.getInfants(
-          buildVaccinationInfantQuery({
-            page: 1,
-            limit: 10000,
-          }),
-        );
-    const metadata = response?.metadata || response?.pagination || {};
-
-    return {
-      rows: normalizeInfantsResponse(response),
-      metadata,
-    };
-  }, [buildRequestConfig, buildVaccinationInfantQuery]);
-
+  // Optimized data loading functions for better performance
   const refreshVaccineInventory = useCallback(async () => {
     if (typeof apiClient.getVaccineInventory !== "function") {
       return;
@@ -568,173 +962,324 @@ const VaccinationsDashboard = () => {
     }
   }, [scopedClinicId]);
 
+  const fetchInfantsChunked = useCallback(async ({ signal, limit = INFANT_CHUNK_SIZE, search = "" } = {}) => {
+    const requestConfig = buildRequestConfig(signal || fetchStateRef.current.abortController?.signal);
+    const infantQuery = buildVaccinationInfantQuery({
+      page: 1,
+      limit,
+      ...(search ? { search } : {}),
+    });
+
+    const response =
+      typeof apiClient.getDashboardInfants === "function"
+        ? requestConfig
+          ? await apiClient.getDashboardInfants(infantQuery, requestConfig)
+          : await apiClient.getDashboardInfants(infantQuery)
+        : requestConfig
+          ? await apiClient.getInfants(infantQuery, requestConfig)
+          : await apiClient.getInfants(infantQuery);
+
+    return normalizeInfantsResponse(response);
+  }, [buildRequestConfig, buildVaccinationInfantQuery]);
+
+  const fetchTabData = useCallback(async (tabKey, { signal, force = false, background = false } = {}) => {
+    const activeSearch = normalizeSearchValue(searchQueryRef.current);
+    const pageKey =
+      tabKey === "records"
+        ? currentPageRef.current
+        : tabKey === "tracking"
+          ? trackingCurrentPageRef.current
+          : scheduleCurrentPageRef.current;
+    const cacheKey = [
+      tabKey,
+      period,
+      periodStartDate,
+      periodEndDate,
+      activeSearch,
+      pageKey,
+      selectedInfantFocusId || "",
+    ].join("_");
+    const cached = tabDataCacheRef.current.get(cacheKey);
+    const now = Date.now();
+
+    // Check cache validity
+    if (!force && cached && (now - cached.timestamp) < CACHE_TTL_MS) {
+      return cached.data;
+    }
+
+    setTabLoadingStates(prev => ({ ...prev, [tabKey]: !background }));
+
+    try {
+      let data = {};
+
+      switch (tabKey) {
+        case "records": {
+          // Records tab: Load records and, when a child search is active, hydrate the
+          // same schedule/reconciliation source used by Tracking and Schedule cards.
+          const hasSearch = Boolean(activeSearch);
+          const [
+            recordPageData,
+            summaryData,
+            infantsData,
+            schedulesData,
+            reconciliationData,
+          ] = await Promise.all([
+            fetchVaccinationRecordPage({
+              page: currentPageRef.current,
+              search: searchQueryRef.current,
+              signal,
+            }),
+            !isCustomRangeIncomplete ? fetchVaccinationSummaryData({ signal }) : Promise.resolve(null),
+            hasSearch
+              ? fetchInfantsChunked({ signal, limit: INFANT_CHUNK_SIZE, search: activeSearch })
+              : Promise.resolve(null),
+            hasSearch
+              ? apiClient.getVaccinationSchedules({ date_view: viewMode })
+              : Promise.resolve(null),
+            hasSearch
+              ? fetchVaccinationReconciliationRecords({ signal })
+              : Promise.resolve(null),
+          ]);
+
+          data = {
+            records: recordPageData?.rows || [],
+            pagination: recordPageData?.metadata || {},
+            summary: summaryData,
+            sharedScope: hasSearch ? activeSearch : "",
+            infants: Array.isArray(infantsData) ? infantsData : null,
+            schedules: schedulesData
+              ? normalizeVaccinationSchedulesResponse(schedulesData)
+              : null,
+            reconciliation: reconciliationData
+              ? Array.isArray(reconciliationData)
+                ? reconciliationData
+                : normalizeVaccinationRecordsResponse(reconciliationData)
+              : null,
+          };
+          break;
+        }
+
+        case "tracking": {
+          const trackingOverview = await fetchVaccinationTrackingOverview({
+            page: trackingCurrentPageRef.current,
+            search: searchQueryRef.current,
+            signal,
+          });
+
+          data = {
+            trackingOverviewRows: trackingOverview.rows,
+            trackingOverviewSummary: trackingOverview.summary,
+            trackingOverviewPagination: trackingOverview.metadata,
+            infants: extractInfantsFromOverviewRows(trackingOverview.rows),
+          };
+          break;
+        }
+
+        case "schedule": {
+          const scheduleOverview = await fetchVaccinationScheduleOverview({
+            page: scheduleCurrentPageRef.current,
+            search: searchQueryRef.current,
+            signal,
+          });
+
+          data = {
+            scheduleOverviewRows: scheduleOverview.rows,
+            scheduleOverviewSummary: scheduleOverview.summary,
+            scheduleOverviewPagination: scheduleOverview.metadata,
+            infants: extractInfantsFromOverviewRows(scheduleOverview.rows),
+          };
+          break;
+        }
+      }
+
+      if (signal?.aborted) {
+        return {};
+      }
+
+      // Cache the data
+      tabDataCacheRef.current.set(cacheKey, {
+        data,
+        timestamp: now,
+      });
+
+      return data;
+    } finally {
+      if (!signal?.aborted) {
+        setTabLoadingStates(prev => ({ ...prev, [tabKey]: false }));
+      }
+    }
+  }, [
+    fetchVaccinationRecordPage,
+    fetchVaccinationSummaryData,
+    fetchInfantsChunked,
+    fetchVaccinationReconciliationRecords,
+    fetchVaccinationTrackingOverview,
+    fetchVaccinationScheduleOverview,
+    isCustomRangeIncomplete,
+    period,
+    periodStartDate,
+    periodEndDate,
+    selectedInfantFocusId,
+    viewMode,
+  ]);
 
   const fetchData = useCallback(
     async ({ silent = false, force = false } = {}) => {
-      const now = Date.now();
-      const shouldLoadInfants =
-        force ||
-        stableDataLoadedAtRef.current.infants === 0 ||
-        now - stableDataLoadedAtRef.current.infants > STABLE_REFERENCE_TTL_MS;
-      const shouldLoadSchedules =
-        force ||
-        stableDataLoadedAtRef.current.schedules === 0 ||
-        now - stableDataLoadedAtRef.current.schedules > STABLE_REFERENCE_TTL_MS;
-      const shouldLoadReconciliationRecords =
-        force ||
-        stableDataLoadedAtRef.current.reconciliation === 0 ||
-        now - stableDataLoadedAtRef.current.reconciliation > STABLE_REFERENCE_TTL_MS;
-      const shouldLoadSummary =
-        force ||
-        stableDataLoadedAtRef.current.summary === 0 ||
-        now - stableDataLoadedAtRef.current.summary > STABLE_REFERENCE_TTL_MS;
       const currentActiveTab = activeTabRef.current;
-      const currentRecordsPage = currentActiveTab === "records" ? currentPageRef.current : 1;
-      const currentRecordSearch =
-        currentActiveTab === "records" ? searchQueryRef.current : "";
-      const shouldLoadRecordTable = currentActiveTab === "records";
-      const shouldLoadSharedData =
-        currentActiveTab !== "records" &&
-        (shouldLoadInfants || shouldLoadSchedules || shouldLoadReconciliationRecords);
-      const shouldLoadData =
-        shouldLoadRecordTable || shouldLoadSharedData || shouldLoadSummary;
 
-      if (!shouldLoadData) {
-        return;
-      }
-
-      const requestId = fetchStateRef.current.requestId + 1;
-
+      // Cancel any existing requests
       if (fetchStateRef.current.abortController) {
         fetchStateRef.current.abortController.abort();
       }
 
       const abortController = new AbortController();
       fetchStateRef.current.abortController = abortController;
-      fetchStateRef.current.requestId = requestId;
+      fetchStateRef.current.requestId += 1;
+      const requestId = fetchStateRef.current.requestId;
 
       try {
-        if (silent) {
-          setRefreshing(true);
-        } else {
+        if (!silent) {
           setLoading(true);
         }
-
         setError(null);
 
-        if (shouldLoadSharedData) {
-          setRecordsHydrationLoading(true);
-        }
-
-        if (shouldLoadInfants) {
-          setInfantsLoading(true);
-        }
-
-        const requestConfig = buildRequestConfig(abortController.signal);
-
-        const [recordPageData, schedulesData, infantsData, reconciliationData, summaryData] =
-          await Promise.all([
-            shouldLoadRecordTable
-              ? fetchVaccinationRecordPage({
-                  page: currentRecordsPage,
-                  search: currentRecordSearch,
-                  signal: abortController.signal,
-                })
-              : Promise.resolve(null),
-            shouldLoadSharedData && shouldLoadSchedules
-              ? requestConfig
-                ? apiClient.getVaccinationSchedules({}, requestConfig)
-                : apiClient.getVaccinationSchedules({})
-              : Promise.resolve(null),
-            shouldLoadSharedData && shouldLoadInfants
-              ? fetchVaccinationInfantsData({ signal: abortController.signal })
-              : Promise.resolve(null),
-            shouldLoadSharedData && shouldLoadReconciliationRecords
-              ? fetchVaccinationReconciliationRecords({ signal: abortController.signal })
-              : Promise.resolve(null),
-            shouldLoadSummary ? fetchVaccinationSummaryData() : Promise.resolve(null),
-          ]);
+        // Load data for the current active tab
+        const tabData = await fetchTabData(currentActiveTab, { signal: abortController.signal, force });
 
         if (abortController.signal.aborted || fetchStateRef.current.requestId !== requestId) {
           return;
         }
 
-        if (shouldLoadRecordTable && recordPageData) {
-          const completedCount = recordPageData?.metadata?.completed ?? 0;
-          setRecordTableRows(recordPageData.rows || []);
-          setRecordTablePagination(
-            recordPageData.metadata || {
-              page: currentRecordsPage,
-              limit: itemsPerPage,
-              total: 0,
-              totalPages: 0,
-              completed: completedCount,
-              hasNext: false,
-              hasPrev: currentRecordsPage > 1,
-            },
-          );
+        // Update state based on tab data
+        switch (currentActiveTab) {
+          case "records":
+            setRecordTableRows(tabData.records || []);
+            setRecordTablePagination(tabData.pagination || {});
+            if (tabData.summary) {
+              setDashboardSummary(tabData.summary);
+              stableDataLoadedAtRef.current.summary = Date.now();
+            }
+            if (tabData.infants) {
+              setInfants(tabData.infants);
+              stableDataLoadedAtRef.current.infants = Date.now();
+            }
+            if (tabData.schedules) {
+              setVaccinationSchedules(tabData.schedules);
+              stableDataLoadedAtRef.current.schedules = Date.now();
+            }
+            if (tabData.reconciliation) {
+              setVaccinationRecords(tabData.reconciliation);
+              stableDataLoadedAtRef.current.reconciliation = Date.now();
+            }
+            break;
+
+          case "tracking":
+            setTrackingOverviewRows(tabData.trackingOverviewRows || []);
+            setTrackingOverviewSummary({
+              ...DEFAULT_TRACKING_OVERVIEW_SUMMARY,
+              ...(tabData.trackingOverviewSummary || {}),
+            });
+            setTrackingOverviewPagination({
+              ...DEFAULT_OVERVIEW_PAGINATION,
+              limit: trackingItemsPerPage,
+              ...(tabData.trackingOverviewPagination || {}),
+            });
+            if (tabData.infants) {
+              setInfants(tabData.infants);
+              stableDataLoadedAtRef.current.infants = Date.now();
+            }
+            break;
+
+          case "schedule":
+            setScheduleOverviewRows(tabData.scheduleOverviewRows || []);
+            setScheduleOverviewSummary({
+              ...DEFAULT_SCHEDULE_OVERVIEW_SUMMARY,
+              ...(tabData.scheduleOverviewSummary || {}),
+            });
+            setScheduleOverviewPagination({
+              ...DEFAULT_OVERVIEW_PAGINATION,
+              limit: scheduleItemsPerPage,
+              ...(tabData.scheduleOverviewPagination || {}),
+            });
+            if (tabData.infants) {
+              setInfants(tabData.infants);
+              stableDataLoadedAtRef.current.infants = Date.now();
+            }
+            if (tabData.schedules) {
+              setVaccinationSchedules(tabData.schedules);
+              stableDataLoadedAtRef.current.schedules = Date.now();
+            }
+            if (tabData.reconciliation) {
+              setVaccinationRecords(tabData.reconciliation);
+              stableDataLoadedAtRef.current.reconciliation = Date.now();
+            }
+            break;
         }
 
-        if (shouldLoadSharedData && shouldLoadSchedules) {
-          const normalizedSchedules = normalizeVaccinationSchedulesResponse(schedulesData);
-          setVaccinationSchedules(normalizedSchedules);
-          stableDataLoadedAtRef.current.schedules = Date.now();
+        if (
+          tabData.sharedScope !== undefined &&
+          (tabData.infants || tabData.schedules || tabData.reconciliation)
+        ) {
+          sharedVaccinationDataScopeRef.current = tabData.sharedScope || "";
         }
 
-        if (shouldLoadSharedData && shouldLoadInfants) {
-          const normalizedInfants = infantsData?.rows || [];
-          setInfants(normalizedInfants);
-          stableDataLoadedAtRef.current.infants = Date.now();
-        }
+        setTabDataLoaded(prev => ({ ...prev, [currentActiveTab]: true }));
 
-        if (shouldLoadSharedData && shouldLoadReconciliationRecords) {
-          const normalizedReconciliationRecords = Array.isArray(reconciliationData)
-            ? reconciliationData
-            : normalizeVaccinationRecordsResponse(reconciliationData);
-          setVaccinationRecords(normalizedReconciliationRecords);
-          stableDataLoadedAtRef.current.reconciliation = Date.now();
-        }
-
-        if (shouldLoadSummary && summaryData) {
-          setDashboardSummary(summaryData);
-          stableDataLoadedAtRef.current.summary = Date.now();
-        }
       } catch (err) {
-        if (abortController.signal.aborted || fetchStateRef.current.requestId !== requestId || isAbortError(err)) {
-          return;
-        }
-
+        if (abortController.signal.aborted || isAbortError(err)) return;
+        if (fetchStateRef.current.requestId !== requestId) return;
         setError(err.message || "Failed to fetch vaccination dashboard data.");
       } finally {
-        if (fetchStateRef.current.requestId !== requestId) {
-          return;
+        if (fetchStateRef.current.requestId === requestId) {
+          setLoading(false);
+          setRefreshing(false);
+          if (fetchStateRef.current.abortController === abortController) {
+            fetchStateRef.current.abortController = null;
+          }
         }
-
-        setInfantsLoading(false);
-        setLoading(false);
-        setRefreshing(false);
-        setRecordsHydrationLoading(false);
-        fetchStateRef.current.abortController = null;
       }
     },
-      [
-      buildRequestConfig,
-      fetchVaccinationInfantsData,
-      fetchVaccinationRecordPage,
-      fetchVaccinationReconciliationRecords,
-      fetchVaccinationSummaryData,
-      itemsPerPage,
-    ],
+    [fetchTabData],
   );
 
   const fetchDataRef = useRef(fetchData);
+  // Keep fetchDataRef in sync so callers never hold a stale closure
   useEffect(() => {
     fetchDataRef.current = fetchData;
   }, [fetchData]);
-
+  // Memory management: Clean up old cache entries periodically
   useEffect(() => {
-    void fetchDataRef.current?.();
+    const cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      const cache = tabDataCacheRef.current;
+
+      for (const [key, entry] of cache.entries()) {
+        if (now - entry.timestamp > CACHE_TTL_MS) {
+          cache.delete(key);
+        }
+      }
+    }, 5 * 60 * 1000); // Clean up every 5 minutes
+
+    return () => clearInterval(cleanupInterval);
   }, []);
+
+  // When navigating back to the vaccinations module, force a refresh so we don't
+  // render stale empty states gated by the in-memory TTL cache.
+  useEffect(() => {
+    const nextPath = String(location?.pathname || "");
+    const prevPath = String(lastPathnameRef.current || "");
+    lastPathnameRef.current = nextPath;
+
+    const isVaccinationsRoute =
+      nextPath.includes("/vaccination-management") ||
+      nextPath.includes("/vaccinations");
+    const wasVaccinationsRoute =
+      prevPath.includes("/vaccination-management") || prevPath.includes("/vaccinations");
+
+    if (isVaccinationsRoute && !wasVaccinationsRoute) {
+      void fetchDataRef.current?.({ silent: true, force: true });
+    }
+  }, [location?.pathname]);
 
   useEffect(() => {
     void refreshVaccineInventory();
@@ -748,13 +1293,24 @@ const VaccinationsDashboard = () => {
     return () => window.clearInterval(intervalId);
   }, [refreshVaccineInventory]);
 
+  // Mirror tabDataLoaded into a ref so the tab-switch effect can read the latest
+  // value without adding the state object to its dependency array (which would
+  // re-run the effect—and trigger another fetch—every time any fetch completes).
   useEffect(() => {
-    if (!hasInitializedActiveTabEffectRef.current) {
-      hasInitializedActiveTabEffectRef.current = true;
-      return;
-    }
+    tabDataLoadedRef.current = tabDataLoaded;
+  }, [tabDataLoaded]);
 
-    void fetchDataRef.current?.({ silent: true });
+  useEffect(() => {
+    // Read via ref – must NOT be in the dependency array or every completed
+    // fetch (which calls setTabDataLoaded) would re-trigger this effect,
+    // creating the "Maximum update depth exceeded" loop.
+    if (tabDataLoadedRef.current[activeTab]) {
+      // Data already loaded, just ensure it's fresh
+      void fetchDataRef.current?.({ silent: true });
+    } else {
+      // First time loading this tab, force load
+      void fetchDataRef.current?.({ silent: true, force: true });
+    }
   }, [activeTab]);
 
   useEffect(() => {
@@ -766,22 +1322,57 @@ const VaccinationsDashboard = () => {
     setCurrentPage(1);
     setScheduleCurrentPage(1);
     setTrackingCurrentPage(1);
+    currentPageRef.current = 1;
+    scheduleCurrentPageRef.current = 1;
+    trackingCurrentPageRef.current = 1;
 
-    if (activeTab === "records") {
-      void fetchDataRef.current?.({ silent: true });
+    // Refetch derived views on search changes so clearing a child-scoped search
+    // restores the full scoped infant set instead of keeping the last child slice.
+    const currentTab = activeTabRef.current;
+    if (["records", "tracking", "schedule"].includes(currentTab)) {
+      void fetchDataRef.current?.({ silent: true, force: true });
     }
-  }, [activeTab, debouncedSearchQuery]);
+  }, [debouncedSearchQuery]);
+
+  useEffect(() => {
+    if (!hasInitializedViewModeEffectRef.current) {
+      hasInitializedViewModeEffectRef.current = true;
+      return;
+    }
+    setCurrentPage(1);
+    setScheduleCurrentPage(1);
+    setTrackingCurrentPage(1);
+    currentPageRef.current = 1;
+    scheduleCurrentPageRef.current = 1;
+    trackingCurrentPageRef.current = 1;
+
+    // Clear cache when view mode changes
+    tabDataCacheRef.current.clear();
+    setTabDataLoaded({ records: false, tracking: false, schedule: false });
+
+    void fetchDataRef.current?.({ force: true });
+  }, [viewMode]);
 
   useEffect(() => {
     if (!hasInitializedPeriodEffectRef.current) {
       hasInitializedPeriodEffectRef.current = true;
       return;
     }
-
     setCurrentPage(1);
     setScheduleCurrentPage(1);
     setTrackingCurrentPage(1);
-    void fetchDataRef.current?.({ silent: true, force: true });
+    currentPageRef.current = 1;
+    scheduleCurrentPageRef.current = 1;
+    trackingCurrentPageRef.current = 1;
+
+    // Clear cache when period changes
+    tabDataCacheRef.current.clear();
+    setTabDataLoaded({ records: false, tracking: false, schedule: false });
+
+    void fetchDataRef.current?.({
+      silent: true,
+      force: true,
+    });
   }, [period, periodEndDate, periodStartDate]);
 
   useEffect(() => {
@@ -790,23 +1381,62 @@ const VaccinationsDashboard = () => {
       return;
     }
 
+    // Pagination change within records tab - fetch new page
     if (activeTab === "records") {
       void fetchDataRef.current?.({ silent: true });
     }
-  }, [activeTab, currentPage]);
+  }, [currentPage]);
+
+  useEffect(() => {
+    const previousPage = previousTrackingPageRef.current;
+    previousTrackingPageRef.current = trackingCurrentPage;
+
+    if (previousPage !== trackingCurrentPage && activeTab === "tracking") {
+      void fetchDataRef.current?.({ silent: true });
+    }
+  }, [activeTab, trackingCurrentPage]);
+
+  useEffect(() => {
+    const previousPage = previousSchedulePageRef.current;
+    previousSchedulePageRef.current = scheduleCurrentPage;
+
+    if (previousPage !== scheduleCurrentPage && activeTab === "schedule") {
+      void fetchDataRef.current?.({ silent: true });
+    }
+  }, [activeTab, scheduleCurrentPage]);
+
+  useEffect(() => {
+    if (!hasInitializedSelectedInfantEffectRef.current) {
+      hasInitializedSelectedInfantEffectRef.current = true;
+      return;
+    }
+
+    const currentTab = activeTabRef.current;
+    if (currentTab !== "tracking" && currentTab !== "schedule") {
+      return;
+    }
+
+    setScheduleCurrentPage(1);
+    setTrackingCurrentPage(1);
+    scheduleCurrentPageRef.current = 1;
+    trackingCurrentPageRef.current = 1;
+    tabDataCacheRef.current.clear();
+    void fetchDataRef.current?.({ silent: true, force: true });
+  }, [selectedInfantFocusId]);
+
+  const handleVaccinationSocketChange = useCallback(() => {
+    if (socketRefreshTimeoutRef.current) {
+      return;
+    }
+    socketRefreshTimeoutRef.current = window.setTimeout(() => {
+      socketRefreshTimeoutRef.current = null;
+      void fetchDataRef.current?.({ silent: true, force: true });
+    }, 300);
+  }, []);
 
   useVaccinationSocket({
     setVaccinations: setVaccinationRecords,
-    onChange: () => {
-      if (socketRefreshTimeoutRef.current) {
-        return;
-      }
-
-      socketRefreshTimeoutRef.current = window.setTimeout(() => {
-        socketRefreshTimeoutRef.current = null;
-        void fetchDataRef.current?.({ silent: true, force: true });
-      }, 300);
-    },
+    onChange: handleVaccinationSocketChange,
   });
 
   const closeAddModal = useCallback(() => {
@@ -948,7 +1578,7 @@ const VaccinationsDashboard = () => {
 
   const filteredRecords = recordTableRows;
   const shouldShowRecordTableLoading =
-    (loading || refreshing || recordsHydrationLoading) && recordTableRows.length === 0;
+    (tabLoadingStates.records || refreshing) && recordTableRows.length === 0;
   const paginatedRecords = recordTableRows;
   const totalPages = Math.max(
     1,
@@ -991,10 +1621,18 @@ const VaccinationsDashboard = () => {
   );
 
   const shouldComputeScheduleViews =
-    activeTab === "schedule" || (!dashboardSummary && activeTab !== "tracking");
+    activeTab === "schedule" ||
+    (activeTab === "records" && shouldUseChildProgressScope) ||
+    (!dashboardSummary && activeTab !== "tracking");
   const shouldComputeTrackingViews = activeTab === "tracking";
+  const isUsingServerTrackingOverview = activeTab === "tracking" && tabDataLoaded.tracking;
+  const isUsingServerScheduleOverview = activeTab === "schedule" && tabDataLoaded.schedule;
 
   const allScheduleOverviewRows = useMemo(() => {
+    if (isUsingServerScheduleOverview) {
+      return scheduleOverviewRows;
+    }
+
     if (!shouldComputeScheduleViews || isBlockedTodayView) {
       return [];
     }
@@ -1073,6 +1711,8 @@ const VaccinationsDashboard = () => {
     approvedVaccinationSchedules,
     infants,
     isBlockedTodayView,
+    isUsingServerScheduleOverview,
+    scheduleOverviewRows,
     shouldComputeScheduleViews,
     vaccinationRecordsByInfantId,
   ]);
@@ -1082,7 +1722,15 @@ const VaccinationsDashboard = () => {
       return [];
     }
 
+    if (isUsingServerScheduleOverview) {
+      return allScheduleOverviewRows;
+    }
+
     return allScheduleOverviewRows.filter((row) => {
+      if (selectedInfantFocusId && Number(row.infant_id) !== selectedInfantFocusId) {
+        return false;
+      }
+
       if (!isDateWithinVaccinationPeriod(row.due_date, periodRange)) {
         return false;
       }
@@ -1104,13 +1752,15 @@ const VaccinationsDashboard = () => {
         .join(" ")
         .toLowerCase();
 
-      return searchableText.includes(normalizedSearchQuery);
+      return matchesTokenizedSearch(searchableText, normalizedSearchQuery);
     });
   }, [
     allScheduleOverviewRows,
+    isUsingServerScheduleOverview,
     isBlockedTodayView,
     normalizedSearchQuery,
     periodRange,
+    selectedInfantFocusId,
     shouldComputeScheduleViews,
   ]);
 
@@ -1143,24 +1793,42 @@ const VaccinationsDashboard = () => {
   ]);
 
   const filteredTrackingRows = useMemo(() => {
+    if (isUsingServerTrackingOverview) {
+      return trackingOverviewRows;
+    }
+
     if (!shouldComputeTrackingViews || isBlockedTodayView || !trackingComplianceSnapshots.length) {
       return [];
     }
 
+    const scopedSnapshots = trackingComplianceSnapshots
+      .map((snapshot) => filterTrackingSnapshotByPeriod(snapshot, periodRange))
+      .filter((snapshot) => snapshot.timeline.length > 0);
+
+    const infantScopedSnapshots = selectedInfantFocusId
+      ? scopedSnapshots.filter(
+          ({ infant }) => Number.parseInt(infant?.id, 10) === selectedInfantFocusId,
+        )
+      : scopedSnapshots;
+
     if (!normalizedSearchQuery) {
-      return trackingComplianceSnapshots;
+      return infantScopedSnapshots;
     }
 
-    return trackingComplianceSnapshots.filter(({ infant }) => {
+    return infantScopedSnapshots.filter(({ infant }) => {
       const searchableText = buildInfantSearchText(infant);
 
-      return searchableText.includes(normalizedSearchQuery);
+      return matchesTokenizedSearch(searchableText, normalizedSearchQuery);
     });
   }, [
     isBlockedTodayView,
+    isUsingServerTrackingOverview,
     normalizedSearchQuery,
+    periodRange,
+    selectedInfantFocusId,
     shouldComputeTrackingViews,
     trackingComplianceSnapshots,
+    trackingOverviewRows,
   ]);
 
   const scheduleStatusSummary = useMemo(
@@ -1171,6 +1839,15 @@ const VaccinationsDashboard = () => {
           due: 0,
           completed: 0,
           overdue: 0,
+        };
+      }
+
+      if (isUsingServerScheduleOverview) {
+        return {
+          upcoming: scheduleOverviewSummary.upcoming,
+          due: scheduleOverviewSummary.due,
+          completed: scheduleOverviewSummary.completed,
+          overdue: scheduleOverviewSummary.overdue,
         };
       }
 
@@ -1189,15 +1866,58 @@ const VaccinationsDashboard = () => {
         },
       );
     },
-    [activeTab, filteredScheduleOverviewRows, shouldComputeScheduleViews],
+    [
+      activeTab,
+      filteredScheduleOverviewRows,
+      isUsingServerScheduleOverview,
+      scheduleOverviewSummary,
+      shouldComputeScheduleViews,
+    ],
   );
 
   const dashboardStats = useMemo(() => {
-    const summarySource = dashboardSummary || null;
+    if (activeTab === "records" && shouldUseChildProgressScope) {
+      const completedFromRecords =
+        Number(recordTablePagination?.completed || 0) ||
+        recordTableRows.filter(isCompletedVaccinationRecord).length;
+      const uniqueInfantIds = new Set();
+      let dueSoon = 0;
+      let overdue = 0;
+
+      recordTableRows.forEach((record) => {
+        const recordInfantId = Number(record.infant_id || record.patient_id || 0);
+        if (recordInfantId > 0) {
+          uniqueInfantIds.add(recordInfantId);
+        }
+      });
+
+      filteredScheduleOverviewRows.forEach((row) => {
+        const rowInfantId = Number(row.infant_id || 0);
+        if (rowInfantId > 0) {
+          uniqueInfantIds.add(rowInfantId);
+        }
+
+        if (row.status_key === "due") {
+          dueSoon += 1;
+        } else if (row.status_key === "overdue") {
+          overdue += 1;
+        }
+      });
+
+      return {
+        completed: completedFromRecords,
+        dueSoon,
+        overdue,
+        trackedInfants: uniqueInfantIds.size,
+      };
+    }
+
+    const summarySource =
+      activeTab === "records" && !shouldUseChildProgressScope ? dashboardSummary || null : null;
 
     if (summarySource) {
       return {
-        completed: Number(summarySource.completedDoseTotal ?? summarySource.completedToday ?? 0),
+        completed: Number(summarySource.administeredInPeriod ?? summarySource.completedDoseTotal ?? summarySource.completedToday ?? 0),
         dueSoon: Number(summarySource.dueSoon7Days ?? summarySource.dueToday ?? 0),
         overdue: Number(summarySource.overdueVaccinations ?? summarySource.overdue ?? 0),
         trackedInfants: Number(
@@ -1209,10 +1929,28 @@ const VaccinationsDashboard = () => {
       };
     }
 
+    if (activeTab === "tracking" && isUsingServerTrackingOverview) {
+      return {
+        completed: trackingOverviewSummary.completed,
+        dueSoon: trackingOverviewSummary.dueSoon,
+        overdue: trackingOverviewSummary.overdue,
+        trackedInfants: trackingOverviewSummary.trackedInfants,
+      };
+    }
+
+    if (activeTab === "schedule" && isUsingServerScheduleOverview) {
+      return {
+        completed: scheduleOverviewSummary.completed,
+        dueSoon: scheduleOverviewSummary.due,
+        overdue: scheduleOverviewSummary.overdue,
+        trackedInfants: scheduleOverviewSummary.trackedInfants,
+      };
+    }
+
     const today = normalizeDateToStartOfDay(new Date());
     const dueSoonWindow = new Date(today || new Date());
-    dueSoonWindow.setDate(dueSoonWindow.getDate() + 7);
-    dueSoonWindow.setHours(0, 0, 0, 0);
+    dueSoonWindow.setUTCDate(dueSoonWindow.getUTCDate() + 7);
+    dueSoonWindow.setUTCHours(0, 0, 0, 0);
 
     if (activeTab === "tracking") {
       if (!filteredTrackingRows.length) {
@@ -1308,31 +2046,102 @@ const VaccinationsDashboard = () => {
       overdue,
       trackedInfants: uniqueInfantIds.size,
     };
-  }, [activeTab, dashboardSummary, filteredScheduleOverviewRows, filteredTrackingRows]);
+  }, [
+    activeTab,
+    dashboardSummary,
+    filteredScheduleOverviewRows,
+    filteredTrackingRows,
+    isUsingServerScheduleOverview,
+    isUsingServerTrackingOverview,
+    recordTablePagination?.completed,
+    recordTableRows,
+    scheduleOverviewSummary,
+    shouldUseChildProgressScope,
+    trackingOverviewSummary,
+  ]);
+
+  const shouldShowDashboardStatsSkeleton = useMemo(() => {
+    if (activeTab === "records") {
+      return (tabLoadingStates.records || refreshing) && !dashboardSummary;
+    }
+
+    return (
+      (tabLoadingStates[activeTab] || refreshing) &&
+      dashboardStats.completed === 0 &&
+      dashboardStats.dueSoon === 0 &&
+      dashboardStats.overdue === 0 &&
+      dashboardStats.trackedInfants === 0
+    );
+  }, [
+    activeTab,
+    dashboardStats.completed,
+    dashboardStats.dueSoon,
+    dashboardStats.overdue,
+    dashboardStats.trackedInfants,
+    dashboardSummary,
+    infantsLoading,
+    loading,
+    recordsHydrationLoading,
+    refreshing,
+  ]);
 
   const paginatedScheduleRows = useMemo(() => {
     if (activeTab !== "schedule") {
       return [];
     }
 
+    if (isUsingServerScheduleOverview) {
+      return filteredScheduleOverviewRows;
+    }
+
     const startIndex = (scheduleCurrentPage - 1) * scheduleItemsPerPage;
     return filteredScheduleOverviewRows.slice(startIndex, startIndex + scheduleItemsPerPage);
-  }, [activeTab, filteredScheduleOverviewRows, scheduleCurrentPage]);
+  }, [
+    activeTab,
+    filteredScheduleOverviewRows,
+    isUsingServerScheduleOverview,
+    scheduleCurrentPage,
+  ]);
   const scheduleTotalPages = activeTab === "schedule"
-    ? Math.ceil(filteredScheduleOverviewRows.length / scheduleItemsPerPage)
+    ? isUsingServerScheduleOverview
+      ? scheduleOverviewPagination.totalPages
+      : Math.ceil(filteredScheduleOverviewRows.length / scheduleItemsPerPage)
     : 0;
+  const scheduleTotalRows = isUsingServerScheduleOverview
+    ? scheduleOverviewPagination.total
+    : filteredScheduleOverviewRows.length;
+  const scheduleDisplayPage = isUsingServerScheduleOverview
+    ? scheduleOverviewPagination.page || scheduleCurrentPage
+    : scheduleCurrentPage;
 
   const paginatedComplianceRows = useMemo(() => {
     if (!shouldComputeTrackingViews) {
       return [];
     }
 
+    if (isUsingServerTrackingOverview) {
+      return filteredTrackingRows;
+    }
+
     const startIndex = (trackingCurrentPage - 1) * trackingItemsPerPage;
     return filteredTrackingRows.slice(startIndex, startIndex + trackingItemsPerPage);
-  }, [filteredTrackingRows, shouldComputeTrackingViews, trackingCurrentPage]);
+  }, [
+    filteredTrackingRows,
+    isUsingServerTrackingOverview,
+    shouldComputeTrackingViews,
+    trackingCurrentPage,
+  ]);
   const trackingTotalPages = shouldComputeTrackingViews
-    ? Math.ceil(filteredTrackingRows.length / trackingItemsPerPage)
+    ? isUsingServerTrackingOverview
+      ? trackingOverviewPagination.totalPages
+      : Math.ceil(filteredTrackingRows.length / trackingItemsPerPage)
     : 0;
+  const trackingTotalRows = isUsingServerTrackingOverview
+    ? trackingOverviewPagination.total
+    : filteredTrackingRows.length;
+  const trackingDisplayPage = isUsingServerTrackingOverview
+    ? trackingOverviewPagination.page || trackingCurrentPage
+    : trackingCurrentPage;
 
   useEffect(() => {
     if (activeTab !== "schedule") {
@@ -1381,6 +2190,10 @@ const VaccinationsDashboard = () => {
   const hasPrimaryTabData =
     activeTab === "records"
       ? recordTableRows.length > 0
+      : activeTab === "tracking"
+        ? tabDataLoaded.tracking || trackingOverviewRows.length > 0
+        : activeTab === "schedule"
+          ? tabDataLoaded.schedule || scheduleOverviewRows.length > 0
       : vaccinationSchedules.length > 0 ||
         infants.length > 0 ||
         vaccinationRecords.length > 0;
@@ -1459,6 +2272,11 @@ const VaccinationsDashboard = () => {
                 icon={Search}
                 containerClassName="mb-0"
               />
+              {activeTab === "records" && normalizedSearchQuery ? (
+                <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Metrics and records are scoped to "{normalizedSearchQuery}".
+                </div>
+              ) : null}
             </div>
             <VaccinationPeriodFilter
               period={period}
@@ -1468,6 +2286,11 @@ const VaccinationsDashboard = () => {
               onStartDateChange={setPeriodStartDate}
               onEndDateChange={setPeriodEndDate}
             />
+            {isCustomRangeIncomplete && period === "custom" ? (
+              <div className="w-full text-xs text-amber-700 dark:text-amber-300">
+                Please select a start and end date to load analytics.
+              </div>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-3 mt-3 xl:mt-0">
             {refreshing && (
@@ -1498,25 +2321,41 @@ const VaccinationsDashboard = () => {
 
       <div className="flex-shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-4 text-center">
-          <div className="text-xl sm:text-2xl font-bold text-success-600">{dashboardStats.completed}</div>
+          {shouldShowDashboardStatsSkeleton ? (
+            <div className="h-7 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mx-auto" />
+          ) : (
+            <div className="text-xl sm:text-2xl font-bold text-success-600">{dashboardStats.completed}</div>
+          )}
           <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Completed Vaccinations
           </p>
         </Card>
         <Card className="p-4 text-center">
-          <div className="text-xl sm:text-2xl font-bold text-warning-600">{dashboardStats.dueSoon}</div>
+          {shouldShowDashboardStatsSkeleton ? (
+            <div className="h-7 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mx-auto" />
+          ) : (
+            <div className="text-xl sm:text-2xl font-bold text-warning-600">{dashboardStats.dueSoon}</div>
+          )}
           <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Due Soon (7 Days)
           </p>
         </Card>
         <Card className="p-4 text-center">
-          <div className="text-xl sm:text-2xl font-bold text-danger-600">{dashboardStats.overdue}</div>
+          {shouldShowDashboardStatsSkeleton ? (
+            <div className="h-7 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mx-auto" />
+          ) : (
+            <div className="text-xl sm:text-2xl font-bold text-danger-600">{dashboardStats.overdue}</div>
+          )}
           <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             Overdue Vaccinations
           </p>
         </Card>
         <Card className="p-4 text-center">
-          <div className="text-xl sm:text-2xl font-bold text-info-600">{dashboardStats.trackedInfants}</div>
+          {shouldShowDashboardStatsSkeleton ? (
+            <div className="h-7 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mx-auto" />
+          ) : (
+            <div className="text-xl sm:text-2xl font-bold text-info-600">{dashboardStats.trackedInfants}</div>
+          )}
           <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">Children Tracked</p>
         </Card>
       </div>
@@ -1527,21 +2366,28 @@ const VaccinationsDashboard = () => {
             Vaccination Schedule Overview
           </h3>
 
-          {recordsHydrationLoading && vaccinationRecords.length === 0 ? (
+          {tabLoadingStates.schedule && !tabDataLoaded.schedule && scheduleOverviewRows.length === 0 ? (
+            <div className="space-y-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                Loading vaccination schedule data...
+              </div>
+              <SkeletonTable rows={8} columns={9} />
+            </div>
+          ) : !isUsingServerScheduleOverview && recordsHydrationLoading && vaccinationRecords.length === 0 ? (
             <div className="space-y-4">
               <div className="text-sm text-gray-500 dark:text-gray-400">
                 Loading vaccination history for schedule reconciliation...
               </div>
               <SkeletonTable rows={8} columns={9} />
             </div>
-          ) : approvedVaccinationSchedules.length === 0 ? (
+          ) : !isUsingServerScheduleOverview && approvedVaccinationSchedules.length === 0 ? (
             <EmptyState
               title="No vaccination schedules"
               description="No active schedule definitions were returned by the backend."
               icon="📅"
               className="border-none shadow-none py-12"
             />
-          ) : infants.length === 0 ? (
+          ) : !isUsingServerScheduleOverview && infants.length === 0 ? (
             <EmptyState
               title="No infants tracked"
               description="There are no infants registered in the system yet."
@@ -1684,12 +2530,12 @@ const VaccinationsDashboard = () => {
             {scheduleTotalPages > 1 && (
               <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
                 <div className="text-sm text-gray-500">
-                  Showing {(scheduleCurrentPage - 1) * scheduleItemsPerPage + 1} to{" "}
+                  Showing {(scheduleDisplayPage - 1) * scheduleItemsPerPage + 1} to{" "}
                   {Math.min(
-                    scheduleCurrentPage * scheduleItemsPerPage,
-                    filteredScheduleOverviewRows.length,
+                    scheduleDisplayPage * scheduleItemsPerPage,
+                    scheduleTotalRows,
                   )}{" "}
-                  of {filteredScheduleOverviewRows.length} schedule rows
+                  of {scheduleTotalRows} schedule rows
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -1701,7 +2547,7 @@ const VaccinationsDashboard = () => {
                     Previous
                   </Button>
                   <span className="flex items-center px-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Page {scheduleCurrentPage} of {scheduleTotalPages}
+                    Page {scheduleDisplayPage} of {scheduleTotalPages}
                   </span>
                   <Button
                     variant="secondary"
@@ -1888,7 +2734,16 @@ const VaccinationsDashboard = () => {
             Vaccination Compliance Tracking
           </h3>
 
-          {recordsHydrationLoading && vaccinationRecords.length === 0 ? (
+          {tabLoadingStates.tracking && !tabDataLoaded.tracking && trackingOverviewRows.length === 0 ? (
+            <div className="space-y-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                Loading vaccination data for compliance tracking...
+              </div>
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          ) : !isUsingServerTrackingOverview && recordsHydrationLoading && vaccinationRecords.length === 0 ? (
             <div className="space-y-4">
               <div className="text-sm text-gray-500 dark:text-gray-400">
                 Loading vaccination history for compliance tracking...
@@ -1913,13 +2768,27 @@ const VaccinationsDashboard = () => {
                   <SearchableInfantSelect
                     infants={trackingVisibleInfants}
                     value={selectedInfantId || ""}
-                    onChange={(e) => setSelectedInfantId(e.target.value ? Number(e.target.value) : null)}
+                    onChange={(e) => {
+                      const nextValue = e.target.value ? Number(e.target.value) : null;
+                      setSelectedInfantId(nextValue);
+
+                      if (nextValue) {
+                        const selected = trackingVisibleInfants.find(
+                          (infant) => Number.parseInt(infant?.id, 10) === Number(nextValue),
+                        );
+                        if (selected) {
+                          setSearchQuery(getInfantDisplayLabel(selected));
+                        }
+                      }
+                    }}
                     label="Focus by infant"
                     placeholder="Search by name, control number, or date of birth..."
                     emptyMessage="No infants available"
                     loading={infantsLoading || recordsHydrationLoading}
                     selectedInfant={selectedTrackingInfant}
                     required={false}
+                    searchQuery={activeTab === "tracking" ? searchQuery : ""}
+                    onSearchQueryChange={activeTab === "tracking" ? setSearchQuery : undefined}
                   />
                 </div>
               </div>
@@ -1927,7 +2796,10 @@ const VaccinationsDashboard = () => {
               <div className="flex-1 overflow-y-auto auto-hide-scrollbar">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-2">
                 {(selectedInfantId
-                  ? paginatedComplianceRows.filter((entry) => entry.infant.id === selectedInfantId)
+                  ? paginatedComplianceRows.filter(
+                      (entry) =>
+                        Number.parseInt(entry.infant?.id, 10) === Number.parseInt(selectedInfantId, 10),
+                    )
                   : paginatedComplianceRows
                 ).map((entry) => {
                   const { infant, dueCount, completed, pending, overdue, completionRate } =
@@ -2001,6 +2873,10 @@ const VaccinationsDashboard = () => {
 
                       <Button
                         onClick={() => {
+                          const infantLabel = getInfantDisplayLabel(infant);
+                          setSearchQuery(infantLabel);
+                          setDebouncedSearchQuery(infantLabel);
+                          searchQueryRef.current = infantLabel;
                           activateVaccinationTab("records");
                           setSelectedInfantId(infant.id);
                         }}
@@ -2018,12 +2894,12 @@ const VaccinationsDashboard = () => {
               {!selectedInfantId && trackingTotalPages > 1 && (
                 <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
                   <div className="text-sm text-gray-500">
-                    Showing {(trackingCurrentPage - 1) * trackingItemsPerPage + 1} to{" "}
+                    Showing {(trackingDisplayPage - 1) * trackingItemsPerPage + 1} to{" "}
                     {Math.min(
-                      trackingCurrentPage * trackingItemsPerPage,
-                      filteredTrackingRows.length,
+                      trackingDisplayPage * trackingItemsPerPage,
+                      trackingTotalRows,
                     )}{" "}
-                    of {filteredTrackingRows.length} infants
+                    of {trackingTotalRows} infants
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -2035,7 +2911,7 @@ const VaccinationsDashboard = () => {
                       Previous
                     </Button>
                     <span className="flex items-center px-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Page {trackingCurrentPage} of {trackingTotalPages}
+                      Page {trackingDisplayPage} of {trackingTotalPages}
                     </span>
                     <Button
                       variant="secondary"
@@ -2049,7 +2925,7 @@ const VaccinationsDashboard = () => {
                 </div>
               )}
 
-              {selectedInfantId && selectedInfantRecords.length === 0 && (
+              {!isUsingServerTrackingOverview && selectedInfantId && selectedInfantRecords.length === 0 && (
                 <div className="mt-6">
                   <EmptyState
                     title="No recorded vaccinations for selected infant"

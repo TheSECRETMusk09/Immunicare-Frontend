@@ -1,6 +1,6 @@
 import React from "react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import GuardianImmunizationChart from "../components/GuardianImmunizationChart";
 
@@ -13,7 +13,7 @@ jest.mock("../utils/api", () => ({
   },
 }));
 
-describe("GuardianImmunizationChart - View Full Chart navigation", () => {
+describe("GuardianImmunizationChart dead full-chart action", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     apiClient.getInfantVaccinationSchedule.mockResolvedValue({
@@ -39,50 +39,16 @@ describe("GuardianImmunizationChart - View Full Chart navigation", () => {
     });
   });
 
-  test("navigates to child-specific guardian route without hard reload fallback", () => {
-    render(
-      <MemoryRouter initialEntries={["/guardian/dashboard"]}>
-        <Routes>
-          <Route
-            path="/guardian/dashboard"
-            element={<GuardianImmunizationChart childId={42} />}
-          />
-          <Route
-            path="/guardian/immunization-chart/:childId"
-            element={<div>Reached Child Full Chart</div>}
-          />
-        </Routes>
-      </MemoryRouter>,
-    );
-
-    return screen
-      .findByRole("button", {
-        name: /view full chart/i,
-      })
-      .then((viewFullChartButton) => {
-        fireEvent.click(viewFullChartButton);
-
-        expect(screen.getByText("Reached Child Full Chart")).toBeInTheDocument();
-      });
-  });
-
-  test("uses provided onViewFullChart callback when passed from parent", () => {
-    const onViewFullChart = jest.fn();
-
+  test("does not render the removed View Full Chart CTA", async () => {
     render(
       <MemoryRouter>
-        <GuardianImmunizationChart childId={7} onViewFullChart={onViewFullChart} />
+        <GuardianImmunizationChart childId={42} />
       </MemoryRouter>,
     );
 
-    return screen
-      .findByRole("button", {
-        name: /view full chart/i,
-      })
-      .then((viewFullChartButton) => {
-        fireEvent.click(viewFullChartButton);
-
-        expect(onViewFullChart).toHaveBeenCalledTimes(1);
-      });
+    expect(await screen.findByText("Immunization Schedule")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /view full chart/i }),
+    ).not.toBeInTheDocument();
   });
 });

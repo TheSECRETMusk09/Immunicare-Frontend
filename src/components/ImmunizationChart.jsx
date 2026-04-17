@@ -6,6 +6,8 @@ import VisitRecordingForm from "./VisitRecordingForm";
 import {
   normalizeInfantResponse,
   normalizeVaccinationRecordsResponse,
+  normalizeVaccineInventoryResponse,
+  buildFefoBatchOptions,
   toArrayPayload,
 } from "../utils/adminDataAdapters";
 import { useAuth } from "../contexts/AuthContext";
@@ -18,6 +20,7 @@ import {
   downloadWordDocument,
   PRINT_PAGE_PRESETS,
 } from "../utils/printDocumentExport";
+import { resolveLotBatchValue } from "../utils/vaccinationFormOptions";
 
 const sanitizeFileSegment = (value) =>
   String(value || "document")
@@ -2032,6 +2035,7 @@ const VisitSection = ({ summary, onRecordVisit }) => {
 
 export default function ImmunizationChart({ infantId }) {
   const { user } = useAuth();
+  const scopedClinicId = Number(user?.clinic_id || user?.facility_id || 0) || null;
   const [infant, setInfant] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [growthRecords, setGrowthRecords] = useState([]);
@@ -2928,7 +2932,11 @@ export default function ImmunizationChart({ infantId }) {
 
       if (Array.isArray(visitData.vaccines) && visitData.vaccines.length > 0) {
         const vaccines = toArrayPayload(await apiClient.getVaccines(), ["vaccines"]);
-        const batches = toArrayPayload(await apiClient.getVaccineBatches(), ["batches"]);
+        const inventoryRecords = normalizeVaccineInventoryResponse(
+          await apiClient.getVaccineInventory(
+            scopedClinicId ? { clinic_id: scopedClinicId } : {},
+          ),
+        );
 
         for (const vaccineEntry of visitData.vaccines) {
           if (!vaccineEntry?.administered) {
@@ -2940,8 +2948,26 @@ export default function ImmunizationChart({ infantId }) {
             continue;
           }
 
-          const batch = batches.find(
-            (entry) => entry?.vaccine_id === vaccine.id && Number(entry?.qty_current) > 0,
+          const availableLots = toArrayPayload(
+            await apiClient.getAvailableInventoryLots({ vaccine_id: vaccine.id }),
+            ["inventory", "lots", "batches"],
+          );
+          const fefoBatchOptions = buildFefoBatchOptions({
+            batches: availableLots,
+            inventoryRecords,
+            vaccineId: vaccine.id,
+            clinicId: scopedClinicId,
+          });
+          const selectedBatchOption =
+            fefoBatchOptions.find((entry) => !entry.selection_disabled) || null;
+          const selectedInventoryRecord = selectedBatchOption?.matched_inventory_record || null;
+          const selectedLotBatchNumber = resolveLotBatchValue(
+            selectedBatchOption?.lot_batch_number,
+            selectedInventoryRecord?.lot_batch_number,
+            selectedBatchOption?.lot_number,
+            selectedBatchOption?.batch_number,
+            vaccineEntry.lot_number,
+            vaccineEntry.batch_number,
           );
 
           const basePayload = {
@@ -2953,16 +2979,26 @@ export default function ImmunizationChart({ infantId }) {
             health_care_provider: visitData.healthcare_worker || null,
             site_of_injection: vaccineEntry.site || "Left arm",
             reactions: vaccineEntry.reactions || null,
-            lot_number: vaccineEntry.lot_number || null,
-            batch_number: vaccineEntry.lot_number || null,
+            lot_number: selectedLotBatchNumber || vaccineEntry.lot_number || null,
+            batch_number: selectedLotBatchNumber || vaccineEntry.lot_number || null,
             notes:
               visitData.remarks || `Administered during ${visitData.visit_age} visit`,
           };
 
-          if (batch && typeof apiClient.recordVaccinationWithInventory === "function") {
+          if (
+            selectedBatchOption &&
+            !selectedBatchOption.selection_disabled &&
+            selectedInventoryRecord &&
+            typeof apiClient.recordVaccinationWithInventory === "function"
+          ) {
             await apiClient.recordVaccinationWithInventory({
               ...basePayload,
-              batch_id: batch.id,
+              batch_id: selectedBatchOption.batch_id,
+              vaccine_inventory_id: selectedInventoryRecord.id,
+              lot_batch_number: selectedLotBatchNumber || null,
+              lot_number: selectedLotBatchNumber || null,
+              batch_number: selectedLotBatchNumber || null,
+              expiration_date: selectedBatchOption.expiry_date || null,
             });
           } else {
             await apiClient.createVaccinationRecord(basePayload);

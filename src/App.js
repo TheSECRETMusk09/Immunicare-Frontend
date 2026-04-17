@@ -27,7 +27,7 @@ import {
   getDefaultAuthenticatedRouteFromFlags,
   getLoginRouteFromPathname,
 } from "./utils/authRedirect";
-import { legacyRouteRedirects } from "./utils/routePaths";
+// legacyRouteRedirects intentionally unused in admin routes
 
 // Lazy load components for better performance
 // Core components loaded immediately
@@ -119,11 +119,6 @@ const Reports = lazy(() => import("./pages/Reports"));
 const Announcements = lazy(() => import("./pages/Announcements"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const ChangePasswordPage = lazy(() => import("./pages/ChangePassword"));
-
-// Digital Papers Pages - lazy loaded
-const DigitalPapersDashboard = lazy(
-  () => import("./pages/DigitalPapersDashboard"),
-);
 
 // Import digital papers pages
 const ImmunizationChartPage = lazy(
@@ -443,21 +438,6 @@ function AppContent() {
                 </AdminLayout>
               </ProtectedRoute>
             }
-          />
-          {/* Digital Papers Routes - Main dashboard with tabs */}
-          <Route
-            path="/digital-papers"
-            element={
-              <ProtectedRoute requireSystemAdmin>
-                <AdminLayout>
-                  <DigitalPapersDashboard />
-                </AdminLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/digital-papers/downloads"
-            element={<Navigate to={legacyRouteRedirects.guardianDigitalPaperDownloadsTab} replace />}
           />
           {/* Digital Papers - Immunization Chart */}
           <Route

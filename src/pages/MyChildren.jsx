@@ -107,6 +107,10 @@ const mapInfantFieldErrors = (fields = {}) => {
 };
 
 const hasFieldErrors = (errors = {}) => Object.keys(errors).length > 0;
+const PDF_MIME_TYPE = "application/pdf";
+
+const isImageMimeType = (mimeType = "") => String(mimeType).startsWith("image/");
+const isPdfMimeType = (mimeType = "") => String(mimeType) === PDF_MIME_TYPE;
 
 const createInitialChildForm = () => ({
   first_name: "",
@@ -199,7 +203,7 @@ const getActionErrorMessage = (error, fallback) => {
   return error?.message || fallback;
 };
 
-const READINESS_REQUEST_TIMEOUT_MS = 5000;
+const READINESS_REQUEST_TIMEOUT_MS = 25000;
 
 const withTimeout = (promise, timeoutMs, message) =>
   new Promise((resolve, reject) => {
@@ -223,6 +227,8 @@ export default function MyChildren() {
   const navigate = useNavigate();
   const location = useLocation();
   const readinessRequestIdRef = useRef(0);
+  const inFlightReadiness = useRef(new Set());
+  const transferCardPreviewUrlRef = useRef("");
   const [children, setChildren] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -250,11 +256,34 @@ export default function MyChildren() {
     prior_vaccines: [createTransferVaccineEntry(1)],
     vaccination_card: null,
     vaccination_card_preview: "",
+    vaccination_card_preview_type: "",
     notes: "",
   });
   const [vaccineOptions] = useState(
     APPROVED_VACCINE_NAMES.map((name) => ({ value: name, label: name })),
   );
+
+  const revokeTransferCardPreviewUrl = useCallback(() => {
+    const previewUrl = transferCardPreviewUrlRef.current;
+    if (previewUrl && previewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    transferCardPreviewUrlRef.current = "";
+  }, []);
+
+  const clearTransferCardPreview = useCallback(() => {
+    revokeTransferCardPreviewUrl();
+    setTransferFormData((prev) => ({
+      ...prev,
+      vaccination_card: null,
+      vaccination_card_preview: "",
+      vaccination_card_preview_type: "",
+    }));
+  }, [revokeTransferCardPreviewUrl]);
+
+  useEffect(() => () => {
+    revokeTransferCardPreviewUrl();
+  }, [revokeTransferCardPreviewUrl]);
 
 
 
@@ -296,6 +325,10 @@ export default function MyChildren() {
 
   // Fetch vaccine readiness for a child
   const fetchChildReadiness = useCallback(async (childId) => {
+    if (inFlightReadiness.current.has(childId)) {
+      return null;
+    }
+    inFlightReadiness.current.add(childId);
     try {
       const response = await withTimeout(
         apiClient.get(`/vaccination-readiness/${childId}`),
@@ -309,6 +342,8 @@ export default function MyChildren() {
     } catch (err) {
       console.error(`Error fetching readiness for child ${childId}:`, err);
       return null;
+    } finally {
+      inFlightReadiness.current.delete(childId);
     }
   }, []);
 
@@ -616,23 +651,29 @@ export default function MyChildren() {
 
   // Handle vaccination card file upload
   const handleCardUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setTransferFormData((prev) => ({
-        ...prev,
-        vaccination_card: file,
-        vaccination_card_preview: URL.createObjectURL(file),
-      }));
-    }
+    const file = e.target.files?.[0] || null;
+    revokeTransferCardPreviewUrl();
+    const canPreviewInline =
+      file && (isImageMimeType(file.type) || isPdfMimeType(file.type));
+    const previewUrl = canPreviewInline ? URL.createObjectURL(file) : "";
+    transferCardPreviewUrlRef.current = previewUrl;
+    setTransferFormData((prev) => ({
+      ...prev,
+      vaccination_card: file,
+      vaccination_card_preview: previewUrl,
+      vaccination_card_preview_type: file?.type || "",
+    }));
   };
 
   // Reset transfer form
   const resetTransferForm = () => {
+    revokeTransferCardPreviewUrl();
     setTransferFormData({
       source_facility: "",
       prior_vaccines: [createTransferVaccineEntry(1)],
       vaccination_card: null,
       vaccination_card_preview: "",
+      vaccination_card_preview_type: "",
       notes: "",
     });
     setRegistrationType("new");
@@ -728,8 +769,10 @@ export default function MyChildren() {
 
       const transferResponse = await apiClient.registerGuardianTransferChild({
         infant: infantData,
+        guardian_id: guardianId,
         source_facility: transferFormData.source_facility,
         submitted_vaccines: submittedVaccines,
+        prior_doses: submittedVaccines,
         vaccination_card_url: uploadedCardUrl,
         remarks: transferRemarks || null,
       });
@@ -1161,6 +1204,7 @@ export default function MyChildren() {
           <Modal
             isOpen={showRegisterModal}
             onClose={() => {
+              clearTransferCardPreview();
               setShowRegisterModal(false);
               setRegisterError(null);
               setRegisterSuccess(null);
@@ -1178,6 +1222,7 @@ export default function MyChildren() {
                   variant="cancel"
                   actionRole="cancel"
                   onClick={() => {
+                    clearTransferCardPreview();
                     setShowRegisterModal(false);
                     setRegisterError(null);
                     setRegisterSuccess(null);
@@ -1659,18 +1704,29 @@ export default function MyChildren() {
                       {transferFormData.vaccination_card_preview && (
                         <div className="mt-3">
                           <p className="text-xs text-theme-secondary mb-1">Preview:</p>
-                          {transferFormData.vaccination_card_preview.startsWith('http') ? (
+                          {isImageMimeType(transferFormData.vaccination_card_preview_type) ? (
                             <img
                               src={transferFormData.vaccination_card_preview}
                               alt="Vaccination card preview"
-                              className="max-w-xs h-auto rounded border"
+                              className="max-w-xs max-h-52 h-auto rounded border object-contain"
+                            />
+                          ) : isPdfMimeType(transferFormData.vaccination_card_preview_type) ? (
+                            <embed
+                              src={transferFormData.vaccination_card_preview}
+                              type={PDF_MIME_TYPE}
+                              title="Vaccination card PDF preview"
+                              className="w-full max-w-md h-[200px] rounded border"
                             />
                           ) : (
-                            <img
-                              src={transferFormData.vaccination_card_preview}
-                              alt="Vaccination card preview"
-                              className="max-w-xs h-auto rounded border"
-                            />
+                            <div className="flex max-w-md items-center gap-3 rounded border border-theme-border-primary p-3 text-xs text-theme-secondary">
+                              <FileText className="h-5 w-5 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <p className="truncate font-medium text-theme-primary">
+                                  {transferFormData.vaccination_card?.name || "Selected file"}
+                                </p>
+                                <p>Document selected</p>
+                              </div>
+                            </div>
                           )}
                         </div>
                       )}

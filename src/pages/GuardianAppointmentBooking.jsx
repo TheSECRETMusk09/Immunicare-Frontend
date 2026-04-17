@@ -33,7 +33,12 @@ import {
 } from "../components/QuickActionFAB";
 import { trackEvent } from "../utils/telemetry";
 import { isDateAvailableForBooking, getMinBookingDate } from "../utils/holidays";
-import { formatTimeSlotLabel } from "../utils/dateUtils";
+import {
+  combineClinicDateTime,
+  formatClinicDateLabel,
+  formatClinicTime,
+  formatTimeSlotLabel,
+} from "../utils/dateUtils";
 import { normalizeArrayPayload } from "../utils/apiUtils";
 
 // Get minimum booking date (today)
@@ -128,6 +133,68 @@ const resolvePatientSexLabel = (patient) => {
   return "N/A";
 };
 
+const normalizeTimeForSubmit = (value) => {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+
+  const meridiemMatch = text.match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
+  if (meridiemMatch) {
+    let hours = Number.parseInt(meridiemMatch[1], 10);
+    const minutes = Number.parseInt(meridiemMatch[2], 10);
+    const meridiem = meridiemMatch[3].toUpperCase();
+
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 1 || hours > 12 || minutes > 59) {
+      return "";
+    }
+
+    if (meridiem === "PM" && hours !== 12) {
+      hours += 12;
+    } else if (meridiem === "AM" && hours === 12) {
+      hours = 0;
+    }
+
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  }
+
+  const timeMatch = text.match(/^(\d{1,2}):(\d{2})$/);
+  if (!timeMatch) {
+    return "";
+  }
+
+  const hours = Number.parseInt(timeMatch[1], 10);
+  const minutes = Number.parseInt(timeMatch[2], 10);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours > 23 || minutes > 59) {
+    return "";
+  }
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+};
+
+const getBookingErrorMessage = (error) => {
+  const status = error?.status || error?.response?.status;
+  const message = String(error?.message || "").toLowerCase();
+  const serverError = String(error?.response?.data?.error || error?.data?.error || "").toLowerCase();
+
+  if (status === 400) {
+    if (serverError.includes("stock") || serverError.includes("vaccine") || message.includes("stock") || message.includes("vaccine")) {
+      return "Your appointment has been submitted but vaccine availability could not be confirmed. The health center will contact you to confirm.";
+    }
+    return "We couldn't complete your booking. Please check your appointment details and try again.";
+  }
+
+  if (status === 403) {
+    return "You don't have permission to perform this action. Please contact the health center.";
+  }
+
+  if (!error?.response || message.includes("unable to connect") || message.includes("network")) {
+    return "Unable to connect to the server. Please check your connection and try again.";
+  }
+
+  return error?.response?.data?.error || error?.data?.error || error?.message || "Failed to create appointment";
+};
+
 export default function GuardianAppointmentBooking() {
   const { guardianId } = useAuth();
   const navigate = useNavigate();
@@ -164,12 +231,16 @@ export default function GuardianAppointmentBooking() {
     type: "Vaccination",
     notes: "",
   });
+  const [appointmentDocuments, setAppointmentDocuments] = useState({});
 
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const blockedBookingMessage = getBlockedBookingMessage(childReadiness);
   const bookingClinicId = selectedChild?.clinic_id || selectedChild?.facility_id || null;
   const bookingMonthKey = formData.scheduled_date ? String(formData.scheduled_date).slice(0, 7) : "";
+  const clearBookingError = useCallback(() => {
+    setError(null);
+  }, []);
 
   // Fetch children for this guardian
   const fetchChildren = useCallback(async () => {
@@ -264,7 +335,9 @@ export default function GuardianAppointmentBooking() {
 
       setFormData((previous) => {
         if (!previous.scheduled_time) return previous;
-        if (slots.includes(previous.scheduled_time)) return previous;
+        const previousTime = normalizeTimeForSubmit(previous.scheduled_time);
+        const normalizedSlots = slots.map((slot) => normalizeTimeForSubmit(slot)).filter(Boolean);
+        if (previousTime && normalizedSlots.includes(previousTime)) return previous;
         return { ...previous, scheduled_time: "" };
       });
     } catch (slotError) {
@@ -405,7 +478,7 @@ export default function GuardianAppointmentBooking() {
           return;
         }
 
-        console.error("Error fetching blocked dates:", err);
+        console.warn("Blocked dates unavailable; continuing with empty blocked-date list:", err);
         if (active) {
           setBlockedDates({});
         }
@@ -423,6 +496,7 @@ export default function GuardianAppointmentBooking() {
   // Handle child selection
   const handleChildSelect = (infantId) => {
     const child = children.find((c) => c.id === parseInt(infantId));
+    clearBookingError();
     setSelectedChild(child);
     setFormData((prev) => ({
       ...prev,
@@ -473,6 +547,7 @@ export default function GuardianAppointmentBooking() {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError(null);
 
     // Validate all required fields
     let hasErrors = false;
@@ -498,7 +573,17 @@ export default function GuardianAppointmentBooking() {
       return;
     }
 
-    if (timeSlots.length > 0 && !timeSlots.includes(formData.scheduled_time)) {
+    const normalizedScheduledTime = normalizeTimeForSubmit(formData.scheduled_time);
+    const normalizedAvailableSlots = timeSlots
+      .map((slot) => normalizeTimeForSubmit(slot))
+      .filter(Boolean);
+
+    if (!normalizedScheduledTime) {
+      setError("Please select a valid appointment time.");
+      return;
+    }
+
+    if (timeSlots.length > 0 && !normalizedAvailableSlots.includes(normalizedScheduledTime)) {
       setError("Selected time is no longer available. Please choose another slot.");
       return;
     }
@@ -513,7 +598,12 @@ export default function GuardianAppointmentBooking() {
     setSubmitting(true);
 
     try {
-      const scheduledDateTime = `${formData.scheduled_date}T${formData.scheduled_time}:00`;
+      const scheduledDateTime = combineClinicDateTime(formData.scheduled_date, normalizedScheduledTime);
+      if (!scheduledDateTime) {
+        setError("Please select a valid appointment date and time.");
+        setSubmitting(false);
+        return;
+      }
 
       const appointmentData = {
         infant_id: parseInt(formData.infant_id),
@@ -521,12 +611,35 @@ export default function GuardianAppointmentBooking() {
         scheduled_date: scheduledDateTime,
         type: formData.type,
         notes: formData.notes,
+        clinic_id: bookingClinicId || undefined,
         // Control number is resolved from selected infant on backend
         control_number: selectedChild?.control_number || null,
       };
 
-      const newAppointment = await apiClient.createAppointment(appointmentData);
-      setCreatedAppointment(newAppointment?.data || newAppointment);
+      console.debug("[GuardianAppointmentBooking] createAppointment payload:", appointmentData);
+
+      const documentEntries = Object.entries(appointmentDocuments).filter(
+        ([, fileData]) => fileData?.file && !fileData?.persisting,
+      );
+      let appointmentPayload = appointmentData;
+
+      if (documentEntries.length > 0) {
+        const appointmentFormData = new FormData();
+        Object.entries(appointmentData).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            appointmentFormData.append(key, String(value));
+          }
+        });
+        documentEntries.forEach(([documentType, fileData]) => {
+          appointmentFormData.append("documents", fileData.file, fileData.name);
+          appointmentFormData.append("document_types", documentType);
+        });
+        appointmentPayload = appointmentFormData;
+      }
+
+      const newAppointment = await apiClient.createAppointment(appointmentPayload);
+      const createdAppointmentPayload = newAppointment?.data || newAppointment;
+      setCreatedAppointment(createdAppointmentPayload);
       setSuccess(true);
 
       trackEvent("appointment_booked", {
@@ -546,7 +659,14 @@ export default function GuardianAppointmentBooking() {
       // Send SMS confirmation (backend should handle this)
     } catch (err) {
       console.error("Error creating appointment:", err);
-      setError(err.response?.data?.error || err.message || "Failed to create appointment");
+      const validationFields = err?.data?.fields || err?.response?.data?.fields || err?.data?.details || err?.response?.data?.details;
+      if (validationFields && typeof validationFields === "object") {
+        setErrors((prev) => ({
+          ...prev,
+          ...validationFields,
+        }));
+      }
+      setError(getBookingErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -586,6 +706,12 @@ export default function GuardianAppointmentBooking() {
 
             {/* Appointment Details */}
             <div className="p-6 space-y-6">
+              {(createdAppointment.stock_warning || createdAppointment.stockWarning) && (
+                <Alert variant="warning">
+                  {createdAppointment.stock_warning || createdAppointment.stockWarning}
+                </Alert>
+              )}
+
               {/* Child Info */}
               {selectedChild && (
                 <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4">
@@ -642,26 +768,13 @@ export default function GuardianAppointmentBooking() {
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-blue-500" />
                     <span className="font-semibold text-gray-900 dark:text-white">
-                      {new Date(
-                        createdAppointment.scheduled_date,
-                      ).toLocaleDateString("en-US", {
-                        weekday: "long",
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
+                      {formatClinicDateLabel(createdAppointment.scheduled_date)}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-blue-500" />
                     <span className="font-semibold text-gray-900 dark:text-white">
-                      {new Date(
-                        createdAppointment.scheduled_date,
-                      ).toLocaleTimeString("en-US", {
-                        hour: "numeric",
-                        minute: "2-digit",
-                        hour12: true,
-                      })}
+                      {formatClinicTime(createdAppointment.scheduled_date)}
                     </span>
                   </div>
                 </div>
@@ -674,7 +787,10 @@ export default function GuardianAppointmentBooking() {
               </div>
 
               {/* Document Checklist */}
-              <DocumentChecklist />
+              <DocumentChecklist
+                onFilesChange={setAppointmentDocuments}
+                infantId={formData.infant_id || null}
+              />
 
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row gap-3 pt-4">
@@ -948,13 +1064,14 @@ export default function GuardianAppointmentBooking() {
                         shouldDisableDate={(date) =>
                           !isDateAvailableForBooking(date, { blockedDates }).isAvailable
                         }
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          clearBookingError();
                           setFormData((prev) => ({
                             ...prev,
                             scheduled_date: e.target.value,
                             scheduled_time: "",
-                          }))
-                        }
+                          }));
+                        }}
                         onBlur={() => handleBlur("scheduled_date")}
                         error={touched.scheduled_date ? errors.scheduled_date : undefined}
                         className="w-full guardian-input"
@@ -970,12 +1087,13 @@ export default function GuardianAppointmentBooking() {
                       </label>
                       <Select
                         value={formData.scheduled_time}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          clearBookingError();
                           setFormData((prev) => ({
                             ...prev,
                             scheduled_time: e.target.value,
-                          }))
-                        }
+                          }));
+                        }}
                         onBlur={() => handleBlur("scheduled_time")}
                         error={touched.scheduled_time ? errors.scheduled_time : undefined}
                         disabled={
@@ -1018,12 +1136,13 @@ export default function GuardianAppointmentBooking() {
                     </label>
                     <Select
                       value={formData.type}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        clearBookingError();
                         setFormData((prev) => ({
                           ...prev,
                           type: e.target.value,
-                        }))
-                      }
+                        }));
+                      }}
                       className="w-full guardian-input"
                     >
                       <option value="Vaccination">Vaccination</option>
@@ -1039,12 +1158,13 @@ export default function GuardianAppointmentBooking() {
                     </label>
                     <textarea
                       value={formData.notes}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        clearBookingError();
                         setFormData((prev) => ({
                           ...prev,
                           notes: e.target.value,
-                        }))
-                      }
+                        }));
+                      }}
                       rows={3}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent guardian-input"
                       placeholder="Any special notes or concerns..."
@@ -1129,15 +1249,7 @@ export default function GuardianAppointmentBooking() {
                           Date
                         </p>
                         <p className="font-medium text-gray-900 dark:text-white">
-                          {new Date(formData.scheduled_date).toLocaleDateString(
-                            "en-US",
-                            {
-                              weekday: "long",
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                            },
-                          )}
+                          {formatClinicDateLabel(formData.scheduled_date)}
                         </p>
                       </div>
                     </div>
@@ -1148,13 +1260,7 @@ export default function GuardianAppointmentBooking() {
                           Time
                         </p>
                         <p className="font-medium text-gray-900 dark:text-white">
-                          {new Date(
-                            `2000-01-01T${formData.scheduled_time}`,
-                          ).toLocaleTimeString("en-US", {
-                            hour: "numeric",
-                            minute: "2-digit",
-                            hour12: true,
-                          })}
+                          {formatTimeSlotLabel(formData.scheduled_time)}
                         </p>
                       </div>
                     </div>
@@ -1174,7 +1280,10 @@ export default function GuardianAppointmentBooking() {
               )}
 
               {/* Document Checklist */}
-              <DocumentChecklist />
+              <DocumentChecklist
+                onFilesChange={setAppointmentDocuments}
+                infantId={formData.infant_id || null}
+              />
             </div>
           </div>
 
@@ -1207,6 +1316,7 @@ export default function GuardianAppointmentBooking() {
                       key={idx}
                       type="button"
                       onClick={() => {
+                        clearBookingError();
                         const date = new Date(slot.date || slot.suggestedDate);
                         setFormData(prev => ({
                           ...prev,

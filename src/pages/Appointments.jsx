@@ -5,7 +5,6 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import moment from "moment";
 import {
   AdminModalActions,
   Button,
@@ -22,6 +21,16 @@ import {
 import SearchableInfantSelect from "../components/SearchableInfantSelect";
 import { useAppointments } from "../hooks/useDashboard";
 import apiClient from "../utils/api";
+import {
+  combineClinicDateTime,
+  formatClinicDateLabel,
+  formatClinicDateTime,
+  formatClinicTime,
+  formatTimeSlotLabel,
+  getClinicDateTimeParts,
+  normalizeAppointmentDateTimeForDisplay,
+  toClinicDateKey,
+} from "../utils/dateUtils";
 import {
   isDateAvailableForBooking,
   isPhilippineHoliday,
@@ -72,25 +81,13 @@ const mergeInfantLookupResults = (...collections) => {
 // Calendar utility functions (matching GuardianAppointmentsPage)
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const toDateKey = (value) => {
-  if (typeof value === "string") {
-    const normalized = value.trim();
-    if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
-      return normalized;
-    }
-  }
-
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
 const toMonthKey = (date) => {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   return `${date.getFullYear()}-${month}`;
+};
+
+const formatCalendarDateLabel = (dateKey) => {
+  return formatClinicDateLabel(dateKey);
 };
 
 const buildCalendarGrid = (monthDate) => {
@@ -104,9 +101,9 @@ const buildCalendarGrid = (monthDate) => {
     cursor.setDate(gridStart.getDate() + index);
     cells.push({
       date: cursor,
-      dateKey: toDateKey(cursor),
+      dateKey: toClinicDateKey(cursor),
       isCurrentMonth: cursor.getMonth() === monthDate.getMonth(),
-      isToday: toDateKey(cursor) === toDateKey(new Date()),
+      isToday: toClinicDateKey(cursor) === toClinicDateKey(new Date()),
     });
   }
 
@@ -138,17 +135,6 @@ const validateDateSelection = (dateStr, { blockedDate = null, allowPast = false 
   return { valid: true, message: "Date is available" };
 };
 
-const formatTimeSlotLabel = (value) => {
-  if (!value) return "";
-  const parsed = new Date(`2000-01-01T${value}`);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-};
-
 const normalizeAppointmentStatus = (value) => {
   const normalized = String(value || "")
     .trim()
@@ -176,10 +162,16 @@ const normalizeAppointmentRecord = (appointment) => {
   }
 
   const normalizedStatus = normalizeAppointmentStatus(appointment.status);
+  const normalizedScheduledDate = normalizeAppointmentDateTimeForDisplay(
+    appointment.scheduled_date,
+  );
   return {
     ...appointment,
     raw_status: appointment.status,
     status: normalizedStatus,
+    scheduled_date: normalizedScheduledDate
+      ? normalizedScheduledDate.toISOString()
+      : appointment.scheduled_date,
   };
 };
 
@@ -309,8 +301,7 @@ export default function Appointments() {
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [blockedDates, setBlockedDates] = useState({});
   const [calendarAvailabilityByDate, setCalendarAvailabilityByDate] = useState({});
-  const [selectedDate, setSelectedDate] = useState(toDateKey(new Date()));
-  const [selectedDateDetails, setSelectedDateDetails] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(toClinicDateKey(new Date()));
   const [showDateDetailsModal, setShowDateDetailsModal] = useState(false);
 
   // Calendar grid memoized
@@ -343,7 +334,7 @@ export default function Appointments() {
   const [dateFilterEnd, setDateFilterEnd] = useState("");
 
   // Sorting state
-  const [sortField, setSortField] = useState("scheduled_date");
+  const [sortField] = useState("scheduled_date");
   const [sortDirection, setSortDirection] = useState("desc");
   // Helper function to get default date range when no filters are set
   const getDefaultDateRange = useCallback(() => {
@@ -360,8 +351,8 @@ export default function Appointments() {
     // Match the Analytics dashboard default "This Month" window so both modules
     // resolve the same appointment counts unless the user explicitly changes filters.
     return {
-      start_date: toDateKey(monthStart),
-      end_date: toDateKey(today),
+      start_date: toClinicDateKey(monthStart),
+      end_date: toClinicDateKey(today),
     };
   }, [dateFilterStart, dateFilterEnd]);
 
@@ -520,7 +511,6 @@ export default function Appointments() {
           totalAppointments,
         )
       : 0;
-  const [dateDetailsLoading, setDateDetailsLoading] = useState(false);
   const [createFormError, setCreateFormError] = useState("");
   const [editFormErrors, setEditFormErrors] = useState({});
   const [cancelModalError, setCancelModalError] = useState("");
@@ -530,6 +520,9 @@ export default function Appointments() {
   const [timeSlotsFeedback, setTimeSlotsFeedback] = useState(null);
 
   const [bookingDateDetails, setBookingDateDetails] = useState(null);
+  const [bookingAvailabilityStatus, setBookingAvailabilityStatus] = useState(null);
+  const [bookingAvailabilityMessage, setBookingAvailabilityMessage] = useState("");
+  const bookingAvailabilityTimerRef = useRef(null);
 
   const [formErrors, setFormErrors] = useState({});
 
@@ -544,7 +537,7 @@ export default function Appointments() {
 
   const resolveDateAvailability = useCallback(
     (dateValue, { allowPast = true } = {}) => {
-      const dateKey = toDateKey(dateValue);
+      const dateKey = toClinicDateKey(dateValue);
       if (!dateKey) {
         return {
           isAvailable: false,
@@ -616,13 +609,165 @@ export default function Appointments() {
     }
   }, [resolveDateAvailability, showBookingModal, showEditModal]);
 
+  const updateBookingAvailabilityStatus = useCallback(
+    ({
+      scheduledDate,
+      scheduledTime,
+      slotsLoading,
+      slots,
+      slotsFeedback,
+      dateDetails,
+    }) => {
+      const normalizedDate = String(scheduledDate || "").trim();
+      const normalizedTime = String(scheduledTime || "").trim();
+
+      if (!normalizedDate || !normalizedTime) {
+        setBookingAvailabilityStatus(null);
+        setBookingAvailabilityMessage("");
+        return;
+      }
+
+      if (slotsLoading) {
+        setBookingAvailabilityStatus("checking");
+        setBookingAvailabilityMessage("Checking availability...");
+        return;
+      }
+
+      const dateValidation = validateDateSelection(normalizedDate, {
+        blockedDate: blockedDates[normalizedDate] || null,
+      });
+      if (!dateValidation.valid) {
+        setBookingAvailabilityStatus("unavailable");
+        setBookingAvailabilityMessage(dateValidation.message);
+        return;
+      }
+
+      const resolvedAvailability = dateDetails?.availability || null;
+      const resolvedIsAvailable =
+        typeof resolvedAvailability?.available === "boolean"
+          ? resolvedAvailability.available
+          : typeof resolvedAvailability?.isAvailable === "boolean"
+            ? resolvedAvailability.isAvailable
+            : null;
+
+      if (resolvedIsAvailable === false) {
+        setBookingAvailabilityStatus("unavailable");
+        setBookingAvailabilityMessage(
+          resolvedAvailability?.reason || "Selected date is unavailable.",
+        );
+        return;
+      }
+
+      if (slotsFeedback && slotsFeedback.available === false) {
+        setBookingAvailabilityStatus("unavailable");
+        setBookingAvailabilityMessage(
+          slotsFeedback.message || "No available time slots for the selected date.",
+        );
+        return;
+      }
+
+      if (Array.isArray(slots) && slots.length > 0 && !slots.includes(normalizedTime)) {
+        setBookingAvailabilityStatus("unavailable");
+        setBookingAvailabilityMessage(
+          "Selected time is no longer available. Please choose another slot.",
+        );
+        return;
+      }
+
+      setBookingAvailabilityStatus("available");
+      setBookingAvailabilityMessage("Available");
+    },
+    [blockedDates],
+  );
+
+  // Debounced booking availability fetches (prevents duplicate banners / racing effects)
   useEffect(() => {
-    const abortController = new AbortController();
-    if (showBookingModal && createFormData.scheduled_date) {
-      fetchTimeSlots(createFormData.scheduled_date, undefined, abortController.signal);
+    if (!showBookingModal) {
+      if (bookingAvailabilityTimerRef.current) {
+        window.clearTimeout(bookingAvailabilityTimerRef.current);
+      }
+      setBookingAvailabilityStatus(null);
+      setBookingAvailabilityMessage("");
+      return undefined;
     }
-    return () => abortController.abort();
-  }, [showBookingModal, createFormData.scheduled_date, fetchTimeSlots]);
+
+    const scheduledDate = String(createFormData.scheduled_date || "").trim();
+    if (!scheduledDate) {
+      setBookingDateDetails(null);
+      setTimeSlots([]);
+      setTimeSlotsFeedback(null);
+      updateBookingAvailabilityStatus({
+        scheduledDate: "",
+        scheduledTime: createFormData.scheduled_time,
+        slotsLoading: false,
+        slots: [],
+        slotsFeedback: null,
+        dateDetails: null,
+      });
+      return undefined;
+    }
+
+    const abortController = new AbortController();
+
+    if (bookingAvailabilityTimerRef.current) {
+      window.clearTimeout(bookingAvailabilityTimerRef.current);
+    }
+
+    bookingAvailabilityTimerRef.current = window.setTimeout(async () => {
+      try {
+        await fetchTimeSlots(scheduledDate, undefined, abortController.signal);
+      } catch (_error) {
+        // fetchTimeSlots handles its own state updates
+      }
+
+      try {
+        const details = await apiClient.getAppointmentDateDetails(
+          scheduledDate,
+          {},
+          { signal: abortController.signal },
+        );
+        setBookingDateDetails(normalizeAppointmentDateDetails(details));
+      } catch (err) {
+        if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED") return;
+        setBookingDateDetails(null);
+      }
+    }, 300);
+
+    return () => {
+      abortController.abort();
+      if (bookingAvailabilityTimerRef.current) {
+        window.clearTimeout(bookingAvailabilityTimerRef.current);
+      }
+    };
+  }, [
+    showBookingModal,
+    createFormData.scheduled_date,
+    createFormData.scheduled_time,
+    fetchTimeSlots,
+    updateBookingAvailabilityStatus,
+  ]);
+
+  // Keep the consolidated availability status in sync with local inputs + fetched slot feedback.
+  useEffect(() => {
+    if (!showBookingModal) return;
+    updateBookingAvailabilityStatus({
+      scheduledDate: createFormData.scheduled_date,
+      scheduledTime: createFormData.scheduled_time,
+      slotsLoading: timeSlotsLoading,
+      slots: timeSlots,
+      slotsFeedback: timeSlotsFeedback,
+      dateDetails: bookingDateDetails,
+    });
+  }, [
+    showBookingModal,
+    createFormData.scheduled_date,
+    createFormData.scheduled_time,
+    timeSlotsLoading,
+    timeSlots,
+    timeSlotsFeedback,
+    bookingDateDetails,
+    updateBookingAvailabilityStatus,
+  ]);
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -704,8 +849,8 @@ export default function Appointments() {
 
         while (hasNext) {
           const response = await apiClient.getAppointments({
-            start_date: toDateKey(monthStart),
-            end_date: toDateKey(monthEnd),
+            start_date: toClinicDateKey(monthStart),
+            end_date: toClinicDateKey(monthEnd),
             sort_field: "scheduled_date",
             sort_direction: "asc",
             page,
@@ -775,29 +920,7 @@ export default function Appointments() {
     return undefined;
   }, [fetchCalendarAppointments, view]);
 
-  useEffect(() => {
-    const abortController = new AbortController();
-    const fetchBookingDateDetails = async () => {
-      if (!showBookingModal || !createFormData.scheduled_date) {
-        setBookingDateDetails(null);
-        return;
-      }
-
-      try {
-        const details = await apiClient.getAppointmentDateDetails(
-          createFormData.scheduled_date,
-          {}, { signal: abortController.signal }
-        );
-        setBookingDateDetails(normalizeAppointmentDateDetails(details));
-      } catch (err) {
-        if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
-        setBookingDateDetails(null);
-      }
-    };
-
-    fetchBookingDateDetails();
-    return () => abortController.abort();
-  }, [showBookingModal, createFormData.scheduled_date]);
+  // bookingDateDetails is now fetched inside the debounced booking availability effect above.
 
   // Handle date cell click
   const handleDateCellClick = (dateKey) => {
@@ -806,36 +929,13 @@ export default function Appointments() {
     }
 
     setSelectedDate(dateKey);
-    setSelectedSlot(new Date(dateKey));
+    setSelectedSlot(dateKey);
     setShowDateDetailsModal(true);
   };
 
-  useEffect(() => {
-    const abortController = new AbortController();
-    const fetchSelectedDateDetails = async () => {
-      if (!selectedDate || !showDateDetailsModal) {
-        return;
-      }
-
-      try {
-        setDateDetailsLoading(true);
-        const details = await apiClient.getAppointmentDateDetails(selectedDate, {}, { signal: abortController.signal });
-        setSelectedDateDetails(normalizeAppointmentDateDetails(details));
-      } catch (err) {
-        if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
-        setSelectedDateDetails(null);
-      } finally {
-        setDateDetailsLoading(false);
-      }
-    };
-
-    fetchSelectedDateDetails();
-    return () => abortController.abort();
-  }, [selectedDate, showDateDetailsModal]);
-
   // Get appointments for a specific date
   const getAppointmentsForDate = useCallback((dateKey) => {
-    const normalizedDateKey = toDateKey(dateKey);
+    const normalizedDateKey = toClinicDateKey(dateKey);
     if (!normalizedDateKey) {
       return [];
     }
@@ -845,12 +945,70 @@ export default function Appointments() {
       return [];
     }
 
-    return appointments.filter((apt) => {
-      if (!apt.scheduled_date) return false;
-      const aptDateKey = toDateKey(apt.scheduled_date);
-      return aptDateKey === normalizedDateKey;
-    });
+    return appointments
+      .filter((apt) => {
+        if (!apt.scheduled_date) return false;
+        const aptDateKey = toClinicDateKey(apt.scheduled_date);
+        return aptDateKey === normalizedDateKey;
+      })
+      .sort((left, right) => {
+        const leftDate = normalizeAppointmentDateTimeForDisplay(left.scheduled_date);
+        const rightDate = normalizeAppointmentDateTimeForDisplay(right.scheduled_date);
+        return (leftDate?.getTime() || 0) - (rightDate?.getTime() || 0);
+      });
   }, [appointments, resolveDateAvailability]);
+
+  const selectedDateLabel = useMemo(
+    () => formatCalendarDateLabel(selectedDate),
+    [selectedDate],
+  );
+
+  const selectedDateDetails = useMemo(() => {
+    if (!selectedDate) {
+      return null;
+    }
+
+    const normalizedDateKey = toClinicDateKey(selectedDate);
+    if (!normalizedDateKey) {
+      return null;
+    }
+
+    const dayAvailability = calendarAvailabilityByDate[normalizedDateKey] || null;
+    const dayAppointments = getAppointmentsForDate(normalizedDateKey);
+    const resolvedAvailability = resolveDateAvailability(normalizedDateKey, {
+      allowPast: true,
+    });
+    const holiday = dayAvailability?.holiday ||
+      (dayAvailability?.isHoliday
+        ? {
+            name: dayAvailability.holidayName || "Holiday",
+            type: dayAvailability.holidayType || "regular",
+          }
+        : isPhilippineHoliday(normalizedDateKey));
+    const isWeekendDay = dayAvailability?.isWeekend ?? isWeekend(normalizedDateKey);
+    const isBlocked = dayAvailability?.isAdminBlocked ?? blockedDates[normalizedDateKey]?.is_blocked ?? false;
+
+    return {
+      ...dayAvailability,
+      dateKey: normalizedDateKey,
+      availability: {
+        ...(dayAvailability?.availability || {}),
+        ...resolvedAvailability,
+        available: !isBlocked && resolvedAvailability.isAvailable,
+      },
+      holiday,
+      isWeekend: isWeekendDay,
+      blocked: isBlocked,
+      appointments: dayAppointments,
+      summary: buildAppointmentSummary(dayAppointments),
+    };
+  }, [
+    blockedDates,
+    calendarAvailabilityByDate,
+    getAppointmentsForDate,
+    resolveDateAvailability,
+    selectedDate,
+  ]);
 
   // Refresh appointments from API
   const refreshAppointments = useCallback(async () => {
@@ -1085,9 +1243,9 @@ export default function Appointments() {
     let dateStr = "";
     let timeStr = "";
     if (appointment.scheduled_date) {
-      const dateTime = new Date(appointment.scheduled_date);
-      dateStr = dateTime.toISOString().split("T")[0];
-      timeStr = dateTime.toTimeString().slice(0, 5);
+      const dateTime = getClinicDateTimeParts(appointment.scheduled_date);
+      dateStr = dateTime?.dateKey || "";
+      timeStr = dateTime?.time || "";
     }
 
     setEditFormData({
@@ -1103,7 +1261,9 @@ export default function Appointments() {
 
   // Handle Create Appointment
   const handleCreateAppointment = async (event) => {
-    event.preventDefault();
+    if (event?.preventDefault) {
+      event.preventDefault();
+    }
     setCreateFormError("");
 
     // Validate all required fields
@@ -1211,7 +1371,10 @@ export default function Appointments() {
       setCreateFormError("");
 
       // Combine date and time
-      const scheduledDateTime = `${createFormData.scheduled_date}T${createFormData.scheduled_time}:00`;
+      const scheduledDateTime = combineClinicDateTime(
+        createFormData.scheduled_date,
+        createFormData.scheduled_time,
+      );
 
       const appointmentData = {
         infant_id: parseInt(createFormData.infant_id),
@@ -1309,7 +1472,10 @@ export default function Appointments() {
       setEditFormErrors({});
 
       // Combine date and time
-      const scheduledDateTime = `${editFormData.scheduled_date}T${editFormData.scheduled_time}:00`;
+      const scheduledDateTime = combineClinicDateTime(
+        editFormData.scheduled_date,
+        editFormData.scheduled_time,
+      );
 
       const appointmentData = {
         scheduled_date: scheduledDateTime,
@@ -1492,7 +1658,7 @@ export default function Appointments() {
                 onClick={() => {
                   const today = new Date();
                   setMonthCursor(today);
-                  setSelectedDate(toDateKey(today));
+                  setSelectedDate(toClinicDateKey(today));
                 }}
                 className="px-4 py-1.5 text-sm font-medium rounded-lg bg-primary-100 text-primary-700 hover:bg-primary-200 dark:bg-primary-900/30 dark:text-primary-300 dark:hover:bg-primary-900/50 transition-colors"
                 aria-label="Go to today"
@@ -1698,21 +1864,17 @@ export default function Appointments() {
           {selectedDate && (
             <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
               <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
-                Appointments for {new Date(selectedDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+                Appointments for {selectedDateLabel}
               </h4>
               {(() => {
-                const dayAvailability = resolveDateAvailability(selectedDate, {
-                  allowPast: true,
-                });
-                const dayAppointments = getAppointmentsForDate(selectedDate);
-                if (!dayAvailability.isAvailable) {
+                if (selectedDateDetails?.availability?.available === false) {
                   return (
                     <Alert variant="warning">
                       This date is unavailable for booking. Appointment entries are hidden.
                     </Alert>
                   );
                 }
-                if (dayAppointments.length === 0) {
+                if ((selectedDateDetails?.appointments || []).length === 0) {
                   return (
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       No appointments scheduled for this date.
@@ -1721,7 +1883,7 @@ export default function Appointments() {
                 }
                 return (
                   <div className="space-y-2">
-                    {dayAppointments.map((apt, idx) => (
+                    {(selectedDateDetails?.appointments || []).map((apt, idx) => (
                       <div
                         key={`apt-${apt.id}-${idx}`}
                         className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
@@ -1731,7 +1893,7 @@ export default function Appointments() {
                             {apt.first_name} {apt.last_name}
                           </p>
                           <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {new Date(apt.scheduled_date).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} - {apt.type || "General Checkup"}
+                            {formatClinicTime(apt.scheduled_date)} - {apt.type || "General Checkup"}
                           </p>
                         </div>
                         <Badge
@@ -1807,21 +1969,7 @@ export default function Appointments() {
                 />
               </div>
 
-              {/* 6. Sort Dropdown */}
-              <div className="flex-shrink-0">
-                <select
-                  value={sortField}
-                  onChange={(e) => setSortField(e.target.value)}
-                  className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-[100px]"
-                >
-                  <option value="scheduled_date">Date</option>
-                  <option value="first_name">Name</option>
-                  <option value="status">Status</option>
-                  <option value="type">Type</option>
-                </select>
-              </div>
-
-              {/* 7. Sort Direction Toggle */}
+              {/* 6. Sort Direction Toggle */}
               <button
                 onClick={() => {
                   setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -1833,22 +1981,7 @@ export default function Appointments() {
                 {sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
               </button>
 
-              {/* 8. Refresh Button */}
-              <button
-                onClick={() => refreshAppointments()}
-                disabled={isRefreshing}
-                className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-600 flex-shrink-0"
-                aria-label="Refresh appointments"
-                title="Refresh"
-              >
-                {isRefreshing ? (
-                  <span className="animate-spin w-4 h-4 block">⟳</span>
-                ) : (
-                  <span className="w-4 h-4 block">↻</span>
-                )}
-              </button>
-
-              {/* 9. Clear Filters Button (optional, when filters are active) */}
+              {/* 7. Clear Filters Button (optional, when filters are active) */}
               {(searchQuery || statusFilter !== 'all' || dateFilterStart || dateFilterEnd) && (
                 <button
                   onClick={() => {
@@ -1912,7 +2045,7 @@ export default function Appointments() {
                             {col.render
                               ? col.render(row[col.key], row)
                               : col.type === "datetime" && row[col.key]
-                                ? moment(row[col.key]).format("MMM D, YYYY h:mm A")
+                                ? formatClinicDateTime(row[col.key])
                                 : row[col.key]}
                           </td>
                         ))}
@@ -1964,9 +2097,8 @@ export default function Appointments() {
         isOpen={showDateDetailsModal}
         onClose={() => {
           setShowDateDetailsModal(false);
-          setDateDetailsLoading(false);
         }}
-        title={`Date Details • ${selectedDate ? new Date(selectedDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : ""}`}
+        title={`Date Details • ${selectedDateLabel}`}
         size="lg"
         footer={
           <AdminModalActions>
@@ -1979,19 +2111,18 @@ export default function Appointments() {
             </Button>
             <Button
               type="button"
-              variant={blockedDates[selectedDate]?.is_blocked ? "secondary" : "danger"}
+              variant={selectedDateDetails?.blocked ? "secondary" : "danger"}
               onClick={() => {
                 if (selectedDate) {
                   handleToggleBlockedDate(selectedDate);
                 }
               }}
               disabled={
-                dateDetailsLoading ||
                 !selectedDate ||
-                !resolveDateAvailability(selectedDate, { allowPast: true }).isAvailable
+                selectedDateDetails?.availability?.available === false
               }
             >
-              {blockedDates[selectedDate]?.is_blocked ? "Unblock Date" : "Block Date"}
+              {selectedDateDetails?.blocked ? "Unblock Date" : "Block Date"}
             </Button>
             <Button
               type="button"
@@ -2006,8 +2137,8 @@ export default function Appointments() {
                 }
               }}
               disabled={
-                dateDetailsLoading ||
-                Boolean(selectedDate && !resolveDateAvailability(selectedDate, { allowPast: true }).isAvailable)
+                !selectedDate ||
+                selectedDateDetails?.availability?.available === false
               }
             >
               Book Appointment
@@ -2015,20 +2146,14 @@ export default function Appointments() {
           </AdminModalActions>
         }
       >
-        {dateDetailsLoading ? (
-          <div className="py-8 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-            <p className="text-sm text-gray-500 mt-3">Loading date details...</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
+        <div className="space-y-4">
           {/* Availability Info */}
           {selectedDate && (() => {
             const holiday = selectedDateDetails?.holiday || isPhilippineHoliday(selectedDate);
-            const selectedDateAvailability = resolveDateAvailability(selectedDate, {
+            const selectedDateAvailability = selectedDateDetails?.availability || resolveDateAvailability(selectedDate, {
               allowPast: true,
             });
-            const isBlocked = blockedDates[selectedDate]?.is_blocked;
+            const isBlocked = selectedDateDetails?.blocked || blockedDates[selectedDate]?.is_blocked;
 
             if (isBlocked) {
               return (
@@ -2070,31 +2195,28 @@ export default function Appointments() {
             <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
               <p className="text-xs text-gray-500">Total Appointments</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                {selectedDateDetails?.summary?.total ??
-                  (selectedDate ? getAppointmentsForDate(selectedDate).length : 0)}
+                {selectedDateDetails?.summary?.total ?? 0}
               </p>
             </div>
             <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
               <p className="text-xs text-gray-500">Holiday</p>
               <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                {(selectedDateDetails?.holiday?.name ||
-                  (selectedDate && isPhilippineHoliday(selectedDate)?.name)) ||
-                  "None"}
+                {selectedDateDetails?.holiday?.name || "None"}
               </p>
             </div>
             <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
               <p className="text-xs text-gray-500">Status</p>
               <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                 {(() => {
-                  const selectedDateAvailability = resolveDateAvailability(selectedDate, {
+                  const selectedDateAvailability = selectedDateDetails?.availability || resolveDateAvailability(selectedDate, {
                     allowPast: true,
                   });
 
-                  if (blockedDates[selectedDate]?.is_blocked) {
+                  if (selectedDateDetails?.blocked || blockedDates[selectedDate]?.is_blocked) {
                     return "Blocked by Admin";
                   }
 
-                  if (!selectedDateAvailability.isAvailable && (selectedDateDetails?.holiday || (selectedDate && isPhilippineHoliday(selectedDate)))) {
+                  if (!selectedDateAvailability.isAvailable && selectedDateDetails?.holiday) {
                     return "Holiday";
                   }
 
@@ -2121,14 +2243,10 @@ export default function Appointments() {
               <Alert variant="warning">
                 Appointment entries are hidden for unavailable dates.
               </Alert>
-            ) : ((selectedDateDetails?.appointments ||
-              (selectedDate && getAppointmentsForDate(selectedDate)) ||
-              []).length === 0 ? (
+            ) : ((selectedDateDetails?.appointments || []).length === 0 ? (
               <p className="text-sm text-gray-500">No appointments scheduled for this date.</p>
             ) : (
-              (selectedDateDetails?.appointments ||
-                (selectedDate && getAppointmentsForDate(selectedDate)) ||
-                []).map((appointment, index) => (
+              (selectedDateDetails?.appointments || []).map((appointment, index) => (
                 <div
                   key={`appointment-${appointment.id}-${index}`}
                   className="rounded-xl border border-gray-200 dark:border-gray-700 p-3"
@@ -2145,17 +2263,13 @@ export default function Appointments() {
                     </Badge>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    {new Date(appointment.scheduled_date).toLocaleTimeString("en-US", {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })} - {appointment.type || "General Checkup"}
+                    {formatClinicTime(appointment.scheduled_date)} - {appointment.type || "General Checkup"}
                   </p>
                 </div>
               ))
             ))}
           </div>
-          </div>
-        )}
+        </div>
       </Modal>
 
       {/* Booking Modal */}
@@ -2165,6 +2279,8 @@ export default function Appointments() {
           setShowBookingModal(false);
           setSelectedSlot(null);
           setBookingDateDetails(null);
+          setBookingAvailabilityStatus(null);
+          setBookingAvailabilityMessage("");
           setCreateFormError("");
           setCreateFormData({
             infant_id: "",
@@ -2186,6 +2302,8 @@ export default function Appointments() {
                 setShowBookingModal(false);
                 setSelectedSlot(null);
                 setBookingDateDetails(null);
+                setBookingAvailabilityStatus(null);
+                setBookingAvailabilityMessage("");
                 setCreateFormError("");
                 setCreateFormData({
                   infant_id: "",
@@ -2201,32 +2319,33 @@ export default function Appointments() {
               Cancel
             </Button>
             <Button
-              type="submit"
-              form="appointmentCreateForm"
+              type="button"
+              onClick={(event) => handleCreateAppointment(event)}
               loading={isSubmitting}
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting ||
+                !createFormData.infant_id ||
+                !createFormData.scheduled_date ||
+                !createFormData.scheduled_time ||
+                timeSlotsLoading ||
+                bookingAvailabilityStatus === "unavailable"
+              }
             >
               {isSubmitting ? "Scheduling..." : "Schedule Appointment"}
             </Button>
           </AdminModalActions>
         }
       >
-        <form id="appointmentCreateForm" className="admin-form" onSubmit={handleCreateAppointment}>
+        <div className="admin-form">
           {selectedSlot && (
             <div className="admin-info-card admin-info-card-info">
               <div className="admin-info-card-content">
                 <p className="admin-info-card-text flex items-center gap-2">
                   <span>📅</span> Selected Date:{" "}
-                  {moment(selectedSlot).format("MMMM Do YYYY, h:mm A")}
+                  {selectedDateLabel}
                 </p>
               </div>
             </div>
-          )}
-
-          {createFormData.scheduled_date && bookingDateDetails?.availability && !bookingDateDetails.availability.available && (
-            <Alert variant="warning" className="mb-3">
-              {bookingDateDetails.availability.reason}
-            </Alert>
           )}
 
           {/* Patient Selection */}
@@ -2349,6 +2468,21 @@ export default function Appointments() {
             </div>
           </div>
 
+          {bookingAvailabilityStatus ? (
+            <Alert
+              variant={
+                bookingAvailabilityStatus === "available"
+                  ? "success"
+                  : bookingAvailabilityStatus === "checking"
+                    ? "warning"
+                    : "error"
+              }
+              className="mb-4"
+            >
+              {bookingAvailabilityMessage}
+            </Alert>
+          ) : null}
+
           <div className="admin-field-group">
             <label className="admin-field-label">Appointment Type</label>
             <Select
@@ -2405,7 +2539,7 @@ export default function Appointments() {
               {createFormError}
             </Alert>
           )}
-        </form>
+        </div>
       </Modal>
 
       {/* View Appointment Modal */}
@@ -2458,9 +2592,7 @@ export default function Appointments() {
                 </label>
                 <p className="font-medium text-gray-900 dark:text-gray-100">
                   {selectedAppointment.scheduled_date
-                    ? moment(selectedAppointment.scheduled_date).format(
-                        "MMMM D, YYYY h:mm A",
-                      )
+                    ? formatClinicDateTime(selectedAppointment.scheduled_date)
                     : "N/A"}
                 </p>
               </div>
@@ -2743,9 +2875,7 @@ export default function Appointments() {
                 </span>
                 <p className="font-medium text-gray-900 dark:text-white">
                   {selectedAppointment.scheduled_date
-                    ? moment(selectedAppointment.scheduled_date).format(
-                        "MMM D, YYYY h:mm A",
-                      )
+                    ? formatClinicDateTime(selectedAppointment.scheduled_date)
                     : "N/A"}
                 </p>
               </div>

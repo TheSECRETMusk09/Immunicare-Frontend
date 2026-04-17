@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   AdminModalActions,
   Card,
@@ -64,6 +64,8 @@ const Announcements = () => {
   );
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createError, setCreateError] = useState(null);
+  const createdAnnouncementIdRef = useRef(null);
   const [formErrors, setFormErrors] = useState({});
   const [deliverySummaryByAnnouncement, setDeliverySummaryByAnnouncement] =
     useState({});
@@ -133,6 +135,9 @@ const Announcements = () => {
 
   const handleCreateAnnouncement = async (event) => {
     event.preventDefault();
+    if (isSubmitting) {
+      return;
+    }
     const title = sanitizeText(formData.title, { maxLength: 150 });
     const content = sanitizeText(formData.content, {
       maxLength: 2000,
@@ -217,17 +222,29 @@ const Announcements = () => {
     try {
       setIsSubmitting(true);
       setError(null);
+      setCreateError(null);
       setFormErrors({});
-      const payload = {
-        title,
-        content,
-        target_audience: targetAudience,
-        priority,
-        status,
-      };
-      const newAnnouncement = await apiClient.createAnnouncement(payload);
+      let createdId = createdAnnouncementIdRef.current;
 
-      const createdId = newAnnouncement?.id || newAnnouncement?.data?.id || newAnnouncement?.announcement_id;
+      if (!createdId) {
+        const payload = {
+          title,
+          content,
+          target_audience: targetAudience,
+          priority,
+          status,
+        };
+        const newAnnouncement = await apiClient.createAnnouncement(payload);
+        createdId =
+          newAnnouncement?.id ||
+          newAnnouncement?.data?.id ||
+          newAnnouncement?.announcement_id ||
+          null;
+        if (createdId) {
+          createdAnnouncementIdRef.current = createdId;
+        }
+      }
+
       if (status === "published" && createdId) {
         await apiClient.publishAnnouncement(createdId);
       }
@@ -242,7 +259,9 @@ const Announcements = () => {
         status: "draft",
       });
       setFormErrors({});
+      createdAnnouncementIdRef.current = null;
     } catch (err) {
+      const statusCode = err?.response?.status;
       const backendFields = err?.response?.data?.fields || {};
       if (Object.keys(backendFields).length > 0) {
         setFormErrors((prev) => ({
@@ -250,12 +269,41 @@ const Announcements = () => {
           ...backendFields,
         }));
       }
-      setError(err.response?.data?.error || err.message || "Failed to create announcement");
+      if (statusCode === 409) {
+        const friendly =
+          "An announcement with this title and content already exists. Please modify the title or content before submitting.";
+        setCreateError(friendly);
+        // Keep existing duplicate field banners if present; avoid overwriting with generic error
+        setError(null);
+      } else {
+        const message =
+          err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          err?.message ||
+          "Failed to create announcement";
+        setCreateError(message);
+        setError(message);
+      }
       console.error("Error creating announcement:", err);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const resetCreateModalState = useCallback(() => {
+    setShowCreateModal(false);
+    setFormErrors({});
+    setCreateError(null);
+    setError(null);
+    createdAnnouncementIdRef.current = null;
+    setFormData({
+      title: "",
+      content: "",
+      target_audience: "all",
+      priority: "medium",
+      status: "draft",
+    });
+  }, []);
 
   const handlePublishAnnouncement = async (announcement) => {
     try {
@@ -567,7 +615,13 @@ const Announcements = () => {
                     </p>
                     <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
                       {deliverySummaryLoading ? (
-                        <span className="text-gray-500">Loading delivery summary...</span>
+                        <>
+                          <Badge variant="secondary">Recipients: —</Badge>
+                          <Badge variant="success">Delivered: —</Badge>
+                          <Badge variant="warning">Pending: —</Badge>
+                          <Badge variant="info">Read: —</Badge>
+                          <Badge variant="danger">Failed: —</Badge>
+                        </>
                       ) : (
                         <>
                           <Badge variant="secondary">
@@ -649,10 +703,7 @@ const Announcements = () => {
       {/* Create Announcement Modal */}
       <Modal
         isOpen={showCreateModal}
-        onClose={() => {
-          setShowCreateModal(false);
-          setFormErrors({});
-        }}
+        onClose={resetCreateModalState}
         title="Create New Announcement"
         size="lg"
         footer={
@@ -660,10 +711,7 @@ const Announcements = () => {
             <Button
               variant="cancel"
               type="button"
-              onClick={() => {
-                setShowCreateModal(false);
-                setFormErrors({});
-              }}
+              onClick={resetCreateModalState}
               disabled={isSubmitting}
             >
               Cancel
@@ -681,6 +729,11 @@ const Announcements = () => {
         }
       >
         <form id="announcementCreateForm" className="admin-form" onSubmit={handleCreateAnnouncement}>
+          {createError && (
+            <Alert variant="error" className="mb-2" onClose={() => setCreateError(null)}>
+              {createError}
+            </Alert>
+          )}
           {hasFieldErrors(formErrors) && (
             <Alert variant="error" className="mb-2">
               Please resolve the highlighted field errors before submitting.

@@ -312,7 +312,6 @@ export default function GuardianImmunizationChartPage() {
         <div className="guardian-chart-scroll-container bg-theme-bg-card rounded-xl shadow-sm border border-theme-border-primary p-4">
           <GuardianImmunizationChart
             childId={selectedChild.id}
-            onViewFullChart={() => navigate(`/guardian/immunization-chart/${selectedChild.id}`)}
           />
         </div>
       )}

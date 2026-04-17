@@ -12,6 +12,11 @@ import {
   PageHeader,
 } from "../components/UI";
 import apiClient from "../utils/api";
+import VaccinationPeriodFilter from "../components/VaccinationPeriodFilter";
+import {
+  getVaccinationPeriodRange,
+  normalizeVaccinationPeriod,
+} from "../utils/vaccinationPeriods";
 import { BarChart3 } from "lucide-react";
 import {
   hasFieldErrors,
@@ -80,6 +85,61 @@ const formatBackendErrorMessage = (error, fallback = "Request failed") => {
   return sanitizeText(backendMessage) || fallback;
 };
 
+const DEFAULT_REPORT_TEMPLATES = Object.freeze([
+  {
+    type: "vaccination",
+    name: "Vaccination Report",
+    description: "Comprehensive vaccination administration and compliance report",
+  },
+  {
+    type: "inventory",
+    name: "Inventory Report",
+    description: "Vaccine and medical supply inventory tracking report",
+  },
+  {
+    type: "appointment",
+    name: "Appointment Report",
+    description: "Appointment scheduling and attendance analysis",
+  },
+  {
+    type: "guardian",
+    name: "Guardian Report",
+    description: "Guardian registration and engagement statistics",
+  },
+  {
+    type: "infant",
+    name: "Infant Health Report",
+    description: "Infant health monitoring and vaccination status",
+  },
+  {
+    type: "system",
+    name: "System Report",
+    description: "System user and access activity report",
+  },
+  {
+    type: "barangay",
+    name: "Barangay Health Report",
+    description: "Barangay-specific health statistics",
+  },
+  {
+    type: "compliance",
+    name: "Compliance Report",
+    description: "Vaccination compliance and coverage analysis",
+  },
+  {
+    type: "healthcenter",
+    name: "Health Center Report",
+    description: "Health center performance and statistics",
+  },
+  {
+    type: "consolidated",
+    name: "Consolidated Report",
+    description: "All-in-one comprehensive report",
+  },
+]);
+
+const getDefaultTemplates = () => [...DEFAULT_REPORT_TEMPLATES];
+
 const Reports = () => {
   const { on, off } = useSocket();
   const [reports, setReports] = useState([]);
@@ -102,74 +162,51 @@ const Reports = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingReportId, setDeletingReportId] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [reportTotal, setReportTotal] = useState(0);
+  const [reportOffset, setReportOffset] = useState(0);
+  const reportLimit = 50;
 
-  // Default templates fallback
-  const getDefaultTemplates = () => [
-    {
-      type: "vaccination",
-      name: "Vaccination Report",
-      description:
-        "Comprehensive vaccination administration and compliance report",
-    },
-    {
-      type: "inventory",
-      name: "Inventory Report",
-      description: "Vaccine and medical supply inventory tracking report",
-    },
-    {
-      type: "appointment",
-      name: "Appointment Report",
-      description: "Appointment scheduling and attendance analysis",
-    },
-    {
-      type: "guardian",
-      name: "Guardian Report",
-      description: "Guardian registration and engagement statistics",
-    },
-    {
-      type: "infant",
-      name: "Infant Health Report",
-      description: "Infant health monitoring and vaccination status",
-    },
-    {
-      type: "system",
-      name: "System Report",
-      description: "System user and access activity report",
-    },
-    {
-      type: "barangay",
-      name: "Barangay Health Report",
-      description: "Barangay-specific health statistics",
-    },
-    {
-      type: "compliance",
-      name: "Compliance Report",
-      description: "Vaccination compliance and coverage analysis",
-    },
-    {
-      type: "healthcenter",
-      name: "Health Center Report",
-      description: "Health center performance and statistics",
-    },
-    {
-      type: "consolidated",
-      name: "Consolidated Report",
-      description: "All-in-one comprehensive report",
-    },
-  ];
+  const pollTimeoutRef = React.useRef(null);
+  const isGeneratingRef = React.useRef(false);
 
-  const fetchReports = useCallback(async () => {
+  const [period, setPeriod] = useState("month");
+  const [periodStartDate, setPeriodStartDate] = useState("");
+  const [periodEndDate, setPeriodEndDate] = useState("");
+
+  // silent=true skips the full-page loading skeleton (used for post-generation refreshes)
+  const fetchReports = useCallback(async (silent = false, options = {}) => {
     try {
-      setLoading(true);
-      const response = await apiClient.request("/reports");
-      setReports(Array.isArray(response.data) ? response.data : []);
+      if (!silent) setLoading(true);
+      const offset = Number.isFinite(options.offsetOverride)
+        ? options.offsetOverride
+        : reportOffset;
+      const normalizedPeriod = normalizeVaccinationPeriod(period);
+      const range = getVaccinationPeriodRange({
+        period: normalizedPeriod,
+        startDate: periodStartDate,
+        endDate: periodEndDate,
+      });
+
+      const response = await apiClient.request("/reports", {
+        params: {
+          ...(range.startDate ? { start_date: range.startDate } : {}),
+          ...(range.endDate ? { end_date: range.endDate } : {}),
+          limit: reportLimit,
+          offset,
+        },
+      });
+      const responseReports = Array.isArray(response.data) ? response.data : [];
+      setReports(responseReports);
+      const serverTotal =
+        Number(response?.pagination?.total ?? response?.meta?.total ?? response?.total);
+      setReportTotal(Number.isFinite(serverTotal) ? serverTotal : responseReports.length);
     } catch (err) {
-      setError(formatBackendErrorMessage(err, "Failed to fetch reports."));
+      if (!silent) setError(formatBackendErrorMessage(err, "Failed to fetch reports."));
       console.error("Error fetching reports:", err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, []);
+  }, [period, periodEndDate, periodStartDate, reportLimit, reportOffset]);
 
   const fetchAdminSummary = useCallback(async () => {
     try {
@@ -233,6 +270,15 @@ const Reports = () => {
     fetchAdminSummary();
   }, [fetchReports, fetchReportTemplates, fetchAdminSummary]);
 
+  // Cancel any pending poll timer when the component unmounts
+  useEffect(() => {
+    return () => {
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     const refreshSummary = () => {
       void fetchAdminSummary();
@@ -282,6 +328,9 @@ const Reports = () => {
 
   const handleGenerateReport = useCallback(async (event) => {
     event.preventDefault();
+
+    if (isGeneratingRef.current) return;
+
     const trimmedType = sanitizeText(formData.type).toLowerCase();
     const trimmedFormat = normalizeReportFormatInput(formData.format);
     const startDate = formData.startDate || "";
@@ -318,6 +367,7 @@ const Reports = () => {
     }
 
     try {
+      isGeneratingRef.current = true;
       setIsGenerating(true);
       setError(null);
       setFormErrors({});
@@ -337,16 +387,61 @@ const Reports = () => {
         filters: safeFilters,
       };
 
-      const response = await apiClient.request("/reports/generate", {
+      // Step 1: submit the job — returns 202 immediately
+      const jobResponse = await apiClient.request("/reports/generate-job", {
         method: "POST",
         data: reportData,
+        disableRetry: true,
       });
 
-      if (response?.success && response?.data) {
+      const reportId = jobResponse?.reportId || jobResponse?.jobId;
+      if (!jobResponse?.success || !reportId) {
+        throw new Error("Failed to start report generation job.");
+      }
+
+      setReportOffset(0);
+      await fetchReports(true, { offsetOverride: 0 });
+      void fetchAdminSummary();
+
+      // Step 2: poll until the job is completed or failed (max 5 minutes)
+      const POLL_INTERVAL_MS = 2000;
+      const MAX_WAIT_MS = 5 * 60 * 1000;
+      const startedAt = Date.now();
+
+      const report = await new Promise((resolve, reject) => {
+        const poll = async () => {
+          if (Date.now() - startedAt > MAX_WAIT_MS) {
+            reject(new Error("Report generation timed out. Please try again."));
+            return;
+          }
+          try {
+            const statusResponse = await apiClient.get(
+              `/reports/${reportId}/status`,
+            );
+            const { status, error_message: jobError, error } =
+              statusResponse?.data || {};
+            if (status === "completed") {
+              resolve(statusResponse?.data);
+            } else if (status === "failed") {
+              reject(new Error(jobError || error || "Report generation failed."));
+            } else {
+              pollTimeoutRef.current = setTimeout(poll, POLL_INTERVAL_MS);
+            }
+          } catch (pollErr) {
+            reject(pollErr);
+          }
+        };
+        void poll();
+      });
+
+      // Step 3: success — identical to the original post-generate flow
+      const persistedId = report?.id;
+      if (report && persistedId) {
         setReports((prevReports) => [
-          response.data,
-          ...prevReports.filter((row) => row.id !== response.data.id),
+          report,
+          ...prevReports.filter((row) => row.id !== persistedId),
         ]);
+        await fetchReports(true, { offsetOverride: 0 });
         void fetchAdminSummary();
         setShowGenerateModal(false);
         setFormData({
@@ -358,8 +453,13 @@ const Reports = () => {
         });
         setFormErrors({});
         setError(null);
+      } else {
+        throw new Error("Report generation completed but no saved record was returned.");
       }
     } catch (err) {
+      setReportOffset(0);
+      void fetchReports(true, { offsetOverride: 0 });
+      void fetchAdminSummary();
       const backendFields = err?.response?.data?.fields || {};
       if (Object.keys(backendFields).length > 0) {
         setFormErrors((prev) => ({
@@ -370,9 +470,14 @@ const Reports = () => {
       setError(formatBackendErrorMessage(err, "Failed to generate report."));
       console.error("Error generating report:", err);
     } finally {
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = null;
+      }
+      isGeneratingRef.current = false;
       setIsGenerating(false);
     }
-  }, [fetchAdminSummary, formData]);
+  }, [fetchAdminSummary, fetchReports, formData]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -498,6 +603,8 @@ const Reports = () => {
         method: "DELETE",
       });
       setReports((prevReports) => prevReports.filter((r) => r.id !== deletingReportId));
+      setReportTotal((prevTotal) => Math.max(0, prevTotal - 1));
+      void fetchReports(true);
       void fetchAdminSummary();
       setShowDeleteModal(false);
       setDeletingReportId(null);
@@ -507,7 +614,7 @@ const Reports = () => {
     } finally {
       setIsDeleting(false);
     }
-  }, [deletingReportId, fetchAdminSummary]);
+  }, [deletingReportId, fetchAdminSummary, fetchReports]);
 
   const closeDeleteModal = useCallback(() => {
     setShowDeleteModal(false);
@@ -822,8 +929,25 @@ const Reports = () => {
       <Card title="📁 Generated Reports" className="flex-shrink-0">
         <div className="flex justify-between items-center mb-4 flex-shrink-0">
           <div className="text-sm text-gray-600 dark:text-gray-400">
-            Total Reports: <strong>{reports.length}</strong>
+            Total Reports: <strong>{reportTotal}</strong>
           </div>
+          <VaccinationPeriodFilter
+            period={period}
+            startDate={periodStartDate}
+            endDate={periodEndDate}
+            onPeriodChange={(value) => {
+              setReportOffset(0);
+              setPeriod(value);
+            }}
+            onStartDateChange={(value) => {
+              setReportOffset(0);
+              setPeriodStartDate(value);
+            }}
+            onEndDateChange={(value) => {
+              setReportOffset(0);
+              setPeriodEndDate(value);
+            }}
+          />
           <Button variant="primary" onClick={() => setShowGenerateModal(true)}>
             + Generate New Report
           </Button>
@@ -848,6 +972,31 @@ const Reports = () => {
         ) : (
           <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
             <DataTable columns={reportColumns} data={reports} pagination />
+            {reportTotal > reportLimit && (
+              <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-400">
+                <span>
+                  Showing {reportOffset + 1}-{Math.min(reportOffset + reports.length, reportTotal)} of {reportTotal}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setReportOffset((value) => Math.max(0, value - reportLimit))}
+                    disabled={reportOffset === 0 || isGenerating}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setReportOffset((value) => value + reportLimit)}
+                    disabled={reportOffset + reportLimit >= reportTotal || isGenerating}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Card>
@@ -858,6 +1007,7 @@ const Reports = () => {
       <Modal
         isOpen={showGenerateModal}
         onClose={() => {
+          if (isGeneratingRef.current) return;
           setShowGenerateModal(false);
           setSelectedTemplate(null);
           setFormErrors({});

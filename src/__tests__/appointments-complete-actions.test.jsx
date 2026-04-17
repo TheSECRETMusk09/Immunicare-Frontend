@@ -21,6 +21,11 @@ let mockInfantsError = null;
 jest.mock("../hooks/useDashboard", () => ({
   useAppointments: () => ({
     appointments: mockDashboardAppointments,
+    pagination: {
+      page: 1,
+      total: mockDashboardAppointments.length,
+      totalPages: 1,
+    },
     loading: false,
     error: null,
     refreshAppointments: mockRefreshAppointments,
@@ -29,6 +34,13 @@ jest.mock("../hooks/useDashboard", () => ({
     infants: mockInfants,
     loading: mockInfantsLoading,
     error: mockInfantsError,
+  }),
+}));
+
+jest.mock("../contexts/AuthContext", () => ({
+  useAuth: () => ({
+    isAdmin: true,
+    user: { id: 1, role_type: "SYSTEM_ADMIN", clinic_id: 7, facility_id: 7 },
   }),
 }));
 
@@ -78,7 +90,7 @@ describe("Appointments completion action workflow", () => {
         first_name: "Baby",
         last_name: "One",
         control_number: "INF-2026-000001",
-        dob: "2030-01-01",
+        dateOfBirth: "2030-01-01",
       },
     ];
 
@@ -256,7 +268,7 @@ describe("Appointments completion action workflow", () => {
           first_name: "Fallback",
           last_name: "Baby",
           control_number: "INF-2026-000099",
-          dob: "2030-02-14",
+          dateOfBirth: "2030-02-14",
         },
       ],
     });
@@ -274,8 +286,9 @@ describe("Appointments completion action workflow", () => {
 
     await waitFor(() => {
       expect(apiClient.getInfants).toHaveBeenCalledWith({
-        limit: 10000,
+        limit: 50,
         page: 1,
+        scope: "system",
       });
     });
 

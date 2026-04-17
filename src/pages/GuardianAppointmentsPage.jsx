@@ -396,9 +396,6 @@ export default function GuardianAppointmentsPage() {
       classNames.push("guardian-appointments-calendar-day--blocked");
     }
 
-    if (availability?.blocked && !holiday && !isWeekendDate(args.date) && !blockedDate?.is_blocked) {
-      classNames.push("guardian-appointments-calendar-day--unavailable");
-    }
 
     if (dateKey === toDateKey(new Date())) {
       classNames.push("guardian-appointments-calendar-day--today");
@@ -978,7 +975,6 @@ export default function GuardianAppointmentsPage() {
                   const availability = calendarAvailabilityByDate[dateKey] || null;
                   const blockedDate = blockedDates[dateKey];
                   const isUnavailable =
-                    availability?.blocked === true ||
                     Boolean(blockedDate?.is_blocked) ||
                     Boolean(holiday) ||
                     isWeekendDate(arg.date);

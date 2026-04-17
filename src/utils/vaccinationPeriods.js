@@ -1,3 +1,5 @@
+import { toClinicDateKey } from "./dateUtils";
+
 const PERIOD_OPTIONS = Object.freeze([
   { value: "today", label: "Today" },
   { value: "week", label: "This Week" },
@@ -5,50 +7,43 @@ const PERIOD_OPTIONS = Object.freeze([
   { value: "custom", label: "Custom Date Range" },
 ]);
 
-const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
-
-const pad = (value) => String(value).padStart(2, "0");
-
-const buildLocalDate = (year, monthIndex, day) => {
-  const date = new Date(year, monthIndex, day);
-  if (
-    Number.isNaN(date.getTime()) ||
-    date.getFullYear() !== year ||
-    date.getMonth() !== monthIndex ||
-    date.getDate() !== day
-  ) {
-    return null;
+const shiftClinicDateKey = (value, days) => {
+  const dateKey = toClinicDateKey(value);
+  if (!dateKey || !Number.isFinite(days)) {
+    return "";
   }
 
-  return date;
-};
-
-const parseDateValue = (value) => {
-  if (!value) return null;
-
-  if (value instanceof Date) {
-    return buildLocalDate(value.getFullYear(), value.getMonth(), value.getDate());
-  }
-
-  const text = String(value).trim();
-  const match = text.match(DATE_ONLY_PATTERN);
-  if (match) {
-    return buildLocalDate(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  }
-
-  const parsed = new Date(text);
+  const parsed = new Date(`${dateKey}T00:00:00.000Z`);
   if (Number.isNaN(parsed.getTime())) {
-    return null;
+    return "";
   }
 
-  return buildLocalDate(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+  parsed.setUTCDate(parsed.getUTCDate() + days);
+  return toClinicDateKey(parsed);
 };
 
-const toDateKey = (value) => {
-  const date = parseDateValue(value);
-  if (!date) return "";
+const startOfClinicMonthKey = (value) => {
+  const dateKey = toClinicDateKey(value);
+  if (!dateKey) {
+    return "";
+  }
 
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return `${dateKey.slice(0, 7)}-01`;
+};
+
+const endOfClinicMonthKey = (value) => {
+  const startOfMonthKey = startOfClinicMonthKey(value);
+  if (!startOfMonthKey) {
+    return "";
+  }
+
+  const parsed = new Date(`${startOfMonthKey}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+
+  parsed.setUTCMonth(parsed.getUTCMonth() + 1, 0);
+  return toClinicDateKey(parsed);
 };
 
 export const normalizeVaccinationPeriod = (value) => {
@@ -68,22 +63,31 @@ export const getVaccinationPeriodRange = ({
 
   if (normalizedPeriod === "custom") {
     return {
-      startDate: toDateKey(startDate),
-      endDate: toDateKey(endDate),
+      startDate: toClinicDateKey(startDate),
+      endDate: toClinicDateKey(endDate),
     };
   }
 
-  const today = parseDateValue(referenceDate) || new Date();
-  const start = new Date(today);
-  const end = new Date(today);
+  const today = toClinicDateKey(referenceDate);
+  if (!today) {
+    return {
+      startDate: "",
+      endDate: "",
+    };
+  }
 
   if (normalizedPeriod === "today") {
     // same-day range
   } else if (normalizedPeriod === "week") {
-    start.setDate(start.getDate() - 6);
+    return {
+      startDate: shiftClinicDateKey(today, -6),
+      endDate: today,
+    };
   } else if (normalizedPeriod === "month") {
-    start.setDate(1);
-    end.setMonth(end.getMonth() + 1, 0);
+    return {
+      startDate: startOfClinicMonthKey(today),
+      endDate: endOfClinicMonthKey(today),
+    };
   } else {
     return {
       startDate: "",
@@ -92,19 +96,19 @@ export const getVaccinationPeriodRange = ({
   }
 
   return {
-    startDate: toDateKey(start),
-    endDate: toDateKey(end),
+    startDate: today,
+    endDate: today,
   };
 };
 
 export const isDateWithinVaccinationPeriod = (value, range = {}) => {
-  const candidate = toDateKey(value);
+  const candidate = toClinicDateKey(value);
   if (!candidate) {
     return false;
   }
 
-  const start = toDateKey(range.startDate);
-  const end = toDateKey(range.endDate);
+  const start = toClinicDateKey(range.startDate);
+  const end = toClinicDateKey(range.endDate);
 
   if (start && candidate < start) {
     return false;

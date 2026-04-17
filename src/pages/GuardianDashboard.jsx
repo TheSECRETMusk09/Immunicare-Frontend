@@ -451,7 +451,10 @@ const GuardianDashboard = () => {
         apiStats?.nextAppointment?.scheduledDate ||
         appointmentsData?.[0]?.scheduledDate ||
         appointmentsData?.[0]?.scheduled_date ||
-        appointmentsData?.[0]?.date;
+        appointmentsData?.[0]?.date ||
+        apiStats?.nextActionDate ||
+        dueVaccinesData?.[0]?.dueDate ||
+        dueVaccinesData?.[0]?.due_date;
 
       const nextAppointmentDate = nextAppointmentDateSource
         ? new Date(nextAppointmentDateSource).toLocaleDateString('en-US', {
@@ -1094,7 +1097,7 @@ const GuardianDashboard = () => {
                               {appointment.type || appointment.vaccineName || 'Vaccination'}
                             </h3>
                             <p className="text-sm text-theme-secondary">
-                              {dateInfo.time} • {appointment.doctorName || 'Dr. Smith'}
+                              {dateInfo.time} • {appointment.doctorName || 'Provider unavailable'}
                             </p>
                             {appointment.infantName && (
                               <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">

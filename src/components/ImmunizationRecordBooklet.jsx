@@ -1406,7 +1406,7 @@ export default function ImmunizationRecordBooklet({ infantId }) {
           </div>
         </div>
 
-        <div className="guardian-table-card-list p-4 md:hidden">
+        <div className="guardian-table-card-list immunization-record-booklet__mobile-list p-4">
           {bookletRows.map((row) => {
             const noteEntries = row.slots.filter((slot) => hasDisplayValue(slot.notes));
 
@@ -1462,7 +1462,7 @@ export default function ImmunizationRecordBooklet({ infantId }) {
           })}
         </div>
 
-        <div className="guardian-table-scroll-shell hidden md:block">
+        <div className="guardian-table-scroll-shell immunization-record-booklet__desktop-table">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>

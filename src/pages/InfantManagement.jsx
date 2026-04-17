@@ -16,6 +16,7 @@ import {
   buildInfantRecordPrefillContext,
   getInfantDisplayLabel,
 } from "../utils/infantIdentity";
+import { getVaccinationPeriodRange } from "../utils/vaccinationPeriods";
 import {
   Button,
   PageHeader,
@@ -37,6 +38,24 @@ import {
   Baby,
   RefreshCw,
 } from "lucide-react";
+
+const getPeriodDateRange = (period, customFrom = "", customTo = "") => {
+  if (period === "all") {
+    return { from: null, to: null };
+  }
+
+  const { startDate, endDate } = getVaccinationPeriodRange({
+    period,
+    startDate: customFrom,
+    endDate: customTo,
+    referenceDate: new Date(),
+  });
+
+  return {
+    from: startDate || null,
+    to: endDate || null,
+  };
+};
 
 const WORKFLOW_STATUS_META = {
   needs_review: { label: "Needs Review", variant: "warning" },
@@ -126,8 +145,9 @@ export default function InfantManagement() {
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
-  const [startDateFilter, setStartDateFilter] = useState("");
-  const [endDateFilter, setEndDateFilter] = useState("");
+  const [period, setPeriod] = useState("all");
+  const [periodStartDate, setPeriodStartDate] = useState("");
+  const [periodEndDate, setPeriodEndDate] = useState("");
   const [transferCasesRefreshing, setTransferCasesRefreshing] = useState(false);
   const [infantPagination, setInfantPagination] = useState({
     page: 1,
@@ -162,7 +182,7 @@ export default function InfantManagement() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchQuery, startDateFilter, endDateFilter]);
+  }, [debouncedSearchQuery, period, periodStartDate, periodEndDate]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -231,13 +251,21 @@ export default function InfantManagement() {
       }
       setError(null);
 
+      const activePeriodRange = getPeriodDateRange(period, periodStartDate, periodEndDate);
+      const shouldSortByDobAscending = period === "custom";
       const result = await infantService.getAll({
         page: currentPage,
         limit: itemsPerPage,
         ...(isAdmin ? { scope: "system" } : {}),
         ...(debouncedSearchQuery ? { search: debouncedSearchQuery } : {}),
-        ...(startDateFilter ? { start_date: startDateFilter } : {}),
-        ...(endDateFilter ? { end_date: endDateFilter } : {}),
+        ...(!debouncedSearchQuery && activePeriodRange.from ? { start_date: activePeriodRange.from } : {}),
+        ...(!debouncedSearchQuery && activePeriodRange.to ? { end_date: activePeriodRange.to } : {}),
+        ...(shouldSortByDobAscending
+          ? {
+              order_by: "dob",
+              order_direction: "asc",
+            }
+          : {}),
       });
       const infantsData = normalizeInfantsResponse(result?.data ?? result);
       const nextPagination = normalizePaginationState(
@@ -308,8 +336,9 @@ export default function InfantManagement() {
     }
   }, [
     currentPage,
-    startDateFilter,
-    endDateFilter,
+    period,
+    periodStartDate,
+    periodEndDate,
     debouncedSearchQuery,
     hasLoadedInitialData,
     isAdmin,
@@ -910,22 +939,40 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                 className="pl-10"
               />
             </div>
-            <div className="w-full sm:w-auto sm:max-w-[200px]">
-              <Input
-                type="date"
-                value={startDateFilter}
-                onChange={(e) => setStartDateFilter(e.target.value)}
-                title="Filter by Start Date of Birth"
-              />
+            <div className="w-full sm:w-auto">
+              <select
+                value={period}
+                onChange={(e) => { setPeriod(e.target.value); setCurrentPage(1); }}
+                className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
+                title="Filter by registration period"
+              >
+                <option value="all">All Time</option>
+                <option value="today">Today</option>
+                <option value="week">This Week</option>
+                <option value="month">This Month</option>
+                <option value="custom">Custom Range</option>
+              </select>
             </div>
-            <div className="w-full sm:w-auto sm:max-w-[200px]">
-              <Input
-                type="date"
-                value={endDateFilter}
-                onChange={(e) => setEndDateFilter(e.target.value)}
-                title="Filter by End Date of Birth"
-              />
-            </div>
+            {period === "custom" && (
+              <>
+                <div className="w-full sm:w-auto sm:max-w-[180px]">
+                  <Input
+                    type="date"
+                    value={periodStartDate}
+                    onChange={(e) => { setPeriodStartDate(e.target.value); setCurrentPage(1); }}
+                    title="Registration date from"
+                  />
+                </div>
+                <div className="w-full sm:w-auto sm:max-w-[180px]">
+                  <Input
+                    type="date"
+                    value={periodEndDate}
+                    onChange={(e) => { setPeriodEndDate(e.target.value); setCurrentPage(1); }}
+                    title="Registration date to"
+                  />
+                </div>
+              </>
+            )}
             </div>
             <div className="flex items-center justify-between gap-3 sm:justify-start">
               {refreshing && (

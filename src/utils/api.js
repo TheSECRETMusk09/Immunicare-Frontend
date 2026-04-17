@@ -21,6 +21,7 @@ let refreshCooldownUntil = 0;
 let proactiveRefreshTerminalFailure = false;
 const inFlightGetRequests = new Map();
 const DEFAULT_REFRESH_RATE_LIMIT_COOLDOWN_MS = 30 * 1000;
+const GUARDIAN_NOTIFICATIONS_PATH = "/guardian/notifications";
 
 const hasStoredAuthState = (storage) =>
   Boolean(
@@ -241,7 +242,8 @@ const isRequestCanceled = (error) =>
   axios.isCancel(error) ||
   error?.code === "ERR_CANCELED" ||
   error?.name === "CanceledError" ||
-  error?.message === "canceled";
+  error?.message === "canceled" ||
+  String(error?.message || "").toLowerCase().includes("ns_binding_aborted");
 
 const isTimeoutError = (error) =>
   error?.code === "ECONNABORTED" ||
@@ -347,7 +349,7 @@ const axiosClient = axios.create({
     "Content-Type": "application/json",
   },
   withCredentials: true, // Enable sending cookies in cross-origin requests
-  timeout: 30000, // 30 second timeout for all requests (increased from 10s)
+  timeout: 22000, // 22s: just after backend 20s gateway timeout, before frontend 25s withTimeout
 });
 
 const SAFE_RETRY_METHODS = new Set(["get", "head", "options"]);
@@ -400,6 +402,9 @@ const buildInFlightRequestKey = (config = {}, baseURL = "") => {
   const method = String(config.method || "get").toLowerCase();
 
   if (
+    // Requests with their own AbortSignal must not share an in-flight promise.
+    // Otherwise a canceled fetch can poison the next retry during reload or tab switches.
+    config.signal ||
     !DEDUPED_REQUEST_METHODS.has(method) ||
     config.disableRequestDeduplication === true
   ) {
@@ -436,7 +441,7 @@ axiosRetry(axiosClient, {
     }
 
     const responseStatus = error.response?.status;
-    if ([400, 401, 403, 404, 409, 422, 429].includes(responseStatus)) {
+    if ([400, 401, 403, 404, 409, 422, 429, 504].includes(responseStatus)) {
       return false;
     }
 
@@ -513,6 +518,8 @@ axiosClient.interceptors.request.use(
         const isTerminalFailure = isTerminalRefreshFailure(refreshError);
         if (isTerminalFailure) {
           markProactiveRefreshTerminalFailure();
+          clearAuthStorage();
+          redirectToLoginIfNeeded();
         }
         if (
           !isTerminalFailure &&
@@ -548,6 +555,12 @@ axiosClient.interceptors.response.use(
     }
 
     if (isRequestCanceled(error)) {
+      return Promise.reject(error);
+    }
+
+    if (error.response?.status === 401 && isAuthRefreshRequest(originalRequest?.url)) {
+      clearAuthStorage();
+      redirectToLoginIfNeeded();
       return Promise.reject(error);
     }
 
@@ -692,6 +705,10 @@ class ApiClient {
       String(endpoint).includes("/documents/generate")
     ) {
       requestConfig.timeout = 120000;
+    }
+
+    if (String(endpoint).includes("/analytics/dashboard")) {
+      requestConfig.timeout = 15000;
     }
 
     const inFlightRequestKey = buildInFlightRequestKey(
@@ -1016,9 +1033,20 @@ class ApiClient {
   }
 
   // Comprehensive analytics dashboard data
-  async getAnalyticsDashboard(params = {}) {
+  async getAnalyticsDashboard(params = {}, config = {}) {
     const suffix = this.buildQuerySuffix(params);
-    return this.request(`/analytics/dashboard${suffix}`);
+    return this.request(`/analytics/dashboard${suffix}`, {
+      method: "GET",
+      ...config,
+    });
+  }
+
+  async getAnalyticsDashboardSummary(params = {}, config = {}) {
+    const suffix = this.buildQuerySuffix(params);
+    return this.request(`/analytics/dashboard-summary${suffix}`, {
+      method: "GET",
+      ...config,
+    });
   }
 
   async getInventoryAnalytics(params = {}) {
@@ -1245,7 +1273,7 @@ class ApiClient {
   async getTransferInCases(filters = {}) {
     const params = new URLSearchParams(filters);
     const suffix = params.toString() ? `?${params.toString()}` : "";
-    return this.request(`/transfer-in-cases${suffix}`);
+    return this.request(`/transfer-in-cases${suffix}`, { disableRetry: true });
   }
 
   async getTransferInCase(id) {
@@ -1346,6 +1374,22 @@ class ApiClient {
     });
   }
 
+  async getVaccinationTracking(params = {}, config = {}) {
+    const suffix = this.buildQuerySuffix(params);
+    return this.request(`/vaccinations/tracking${suffix}`, {
+      method: "GET",
+      ...config,
+    });
+  }
+
+  async getVaccinationScheduleOverview(params = {}, config = {}) {
+    const suffix = this.buildQuerySuffix(params);
+    return this.request(`/vaccinations/schedule-overview${suffix}`, {
+      method: "GET",
+      ...config,
+    });
+  }
+
   async getVaccinationRecordsByInfant(infantId) {
     return this.request(`/vaccinations/records/infant/${infantId}`);
   }
@@ -1356,6 +1400,22 @@ class ApiClient {
   }
 
   async createVaccinationRecord(recordData) {
+    const hasInventoryContext = Boolean(
+      recordData &&
+        typeof recordData === "object" &&
+        (
+          recordData.vaccine_inventory_id ||
+          recordData.batch_id ||
+          recordData.lot_batch_number ||
+          recordData.lot_number ||
+          recordData.batch_number
+        ),
+    );
+
+    if (hasInventoryContext && typeof this.recordVaccinationWithInventory === "function") {
+      return this.recordVaccinationWithInventory(recordData);
+    }
+
     return this.request("/vaccinations/records", {
       method: "POST",
       data: recordData,
@@ -1866,13 +1926,16 @@ class ApiClient {
     return this.request(`/appointments?${params}`);
   }
 
-  async checkAppointmentAvailability({ scheduled_date, vaccine_id, clinic_id } = {}) {
+  async checkAppointmentAvailability({ scheduled_date, vaccine_id, clinic_id } = {}, options = {}) {
     const params = new URLSearchParams();
     if (scheduled_date) params.append("scheduled_date", scheduled_date);
     if (vaccine_id) params.append("vaccine_id", vaccine_id);
     if (clinic_id) params.append("clinic_id", clinic_id);
 
-    return this.request(`/appointments/availability/check?${params}`);
+    return this.request(`/appointments/availability/check?${params}`, {
+      method: "GET",
+      ...options,
+    });
   }
 
   async getAppointmentTimeSlots({ scheduled_date, vaccine_id, clinic_id, exclude_appointment_id } = {}, options = {}) {
@@ -1909,9 +1972,11 @@ class ApiClient {
   }
 
   async createAppointment(appointmentData) {
+    const isMultipart = typeof FormData !== "undefined" && appointmentData instanceof FormData;
     return this.request("/appointments", {
       method: "POST",
       data: appointmentData,
+      ...(isMultipart ? { headers: { "Content-Type": undefined } } : {}),
     });
   }
 
@@ -2023,6 +2088,7 @@ class ApiClient {
   async publishAnnouncement(id) {
     return this.request(`/announcements/${id}/publish`, {
       method: "PUT",
+      timeout: 30000,
     });
   }
 
@@ -2066,7 +2132,10 @@ class ApiClient {
     const params = new URLSearchParams({
       announcement_ids: normalizedIds.join(","),
     });
-    return this.request(`/announcements/delivery/summary?${params.toString()}`);
+    return this.request(`/announcements/delivery/summary?${params.toString()}`, {
+      timeout: 30000,
+      disableRetry: true,
+    });
   }
 
   async getMyAnnouncements() {
@@ -2148,6 +2217,7 @@ class ApiClient {
     return this.request(`/documents/download/${downloadId}`, {
       method: "GET",
       responseType: "blob",
+      disableRetry: true,
     });
   }
 
@@ -2346,37 +2416,37 @@ class ApiClient {
     });
 
     const suffix = params.toString() ? `?${params.toString()}` : "";
-    return this.request(`/guardian/notifications${suffix}`);
+    return this.request(`${GUARDIAN_NOTIFICATIONS_PATH}${suffix}`);
   }
 
   async getGuardianUnreadNotificationCount() {
-    return this.request(`/guardian/notifications/unread-count`);
+    return this.request(`${GUARDIAN_NOTIFICATIONS_PATH}/unread-count`);
   }
 
   async getGuardianNotificationStats() {
-    return this.request(`/guardian/notifications/stats/summary`);
+    return this.request(`${GUARDIAN_NOTIFICATIONS_PATH}/stats/summary`);
   }
 
   async markGuardianNotificationAsRead(id) {
-    return this.request(`/guardian/notifications/${id}/read`, {
+    return this.request(`${GUARDIAN_NOTIFICATIONS_PATH}/${id}/read`, {
       method: "PATCH",
     });
   }
 
   async markGuardianNotificationAsUnread(id) {
-    return this.request(`/guardian/notifications/${id}/unread`, {
+    return this.request(`${GUARDIAN_NOTIFICATIONS_PATH}/${id}/unread`, {
       method: "PATCH",
     });
   }
 
   async markAllGuardianNotificationsAsRead() {
-    return this.request(`/guardian/notifications/read-all`, {
+    return this.request(`${GUARDIAN_NOTIFICATIONS_PATH}/read-all`, {
       method: "PATCH",
     });
   }
 
   async deleteGuardianNotification(id) {
-    return this.request(`/guardian/notifications/${id}`, {
+    return this.request(`${GUARDIAN_NOTIFICATIONS_PATH}/${id}`, {
       method: "DELETE",
     });
   }

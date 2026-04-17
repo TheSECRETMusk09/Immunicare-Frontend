@@ -10,6 +10,7 @@ import apiClient, {
   clearAuthStorage,
   getRememberMePreference,
   getStoredAccessToken,
+  getStoredRefreshToken,
   getStoredUserJson,
   persistAuthSession,
   persistStoredUser,
@@ -103,7 +104,15 @@ const resolveInitialAuthState = async () => {
   if (!authBootstrapPromise) {
     authBootstrapPromise = (async () => {
       const token = getStoredAccessToken();
+      const refreshToken = getStoredRefreshToken();
       const { user: hydratedUser, invalid } = readStoredAuthUser();
+
+      if (!token && !refreshToken && !hydratedUser && !invalid) {
+        return {
+          user: null,
+          forcePasswordChange: false,
+        };
+      }
 
       try {
         const verifyResponse = await apiClient.verifySession();

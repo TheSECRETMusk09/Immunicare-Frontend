@@ -100,10 +100,11 @@ describe("Phase 1 route cleanup", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /transfer-in cases/i }));
-    fireEvent.click(screen.getByRole("button", { name: /digital papers/i }));
 
     expect(mockNavigate).toHaveBeenCalledWith(adminRoutePaths.transferInCases);
-    expect(mockNavigate).toHaveBeenCalledWith(adminRoutePaths.digitalPapers);
+    expect(
+      screen.queryByRole("button", { name: /digital papers/i }),
+    ).not.toBeInTheDocument();
   });
 
   test("mobile bottom navigation standardizes guardian account access under profile", () => {
@@ -130,9 +131,7 @@ describe("Phase 1 route cleanup", () => {
     expect(guardianRoutePaths.documents).toBe("/guardian/documents");
   });
 
-  test("legacy digital papers route redirects to the consolidated download-center tab", () => {
-    expect(legacyRouteRedirects.guardianDigitalPaperDownloadsTab).toBe(
-      "/digital-papers?tab=download_center",
-    );
+  test("legacy route helpers remain stable for existing guardian routes", () => {
+    expect(typeof legacyRouteRedirects).toBe("object");
   });
 });

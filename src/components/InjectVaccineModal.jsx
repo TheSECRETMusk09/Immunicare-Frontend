@@ -27,6 +27,7 @@ import {
   getInfantDisplayLabel,
   getInfantFullName,
 } from "../utils/infantIdentity";
+import { toClinicDateKey } from "../utils/dateUtils";
 
 const ADMINISTERED_BY_ROLE_OPTIONS = [
   { value: "physician", label: "Physician" },
@@ -66,12 +67,10 @@ const normalizeSearchValue = (value) => String(value || "").trim().toLowerCase()
 
 const formatDateInputValue = (value, fallback = "") => {
   if (!value) return fallback;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return fallback;
-  return parsed.toISOString().split("T")[0];
+  return toClinicDateKey(value) || fallback;
 };
 
-const createTodayDateInput = () => new Date().toISOString().split("T")[0];
+const createTodayDateInput = () => toClinicDateKey(new Date()) || "";
 
 const injectionSiteOptions = [
   { value: "", label: "Select Site" },
@@ -318,6 +317,7 @@ export default function InjectVaccineModal({
       dob:
         context.dob ||
         context.date_of_birth ||
+        context.dateOfBirth ||
         context.birth_date ||
         context.patient_dob ||
         "",
@@ -423,6 +423,8 @@ export default function InjectVaccineModal({
         limit: 50,
         page,
         search: query || undefined,
+        orderBy: "dob",
+        orderDirection: "DESC",
         ...(isAdmin ? { scope: "system" } : {}),
       };
 

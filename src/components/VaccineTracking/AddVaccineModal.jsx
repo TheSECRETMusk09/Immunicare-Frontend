@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import { Modal, Button, Input } from "../UI";
 import FormActions from "../UI/FormActions";
+import { toClinicDateKey } from "../../utils/dateUtils";
+
+const createTodayDateInput = () => toClinicDateKey(new Date()) || "";
 
 const AddVaccineModal = ({
   isOpen,
@@ -13,7 +16,7 @@ const AddVaccineModal = ({
     infant_id: infant?.id || "",
     vaccine_id: "",
     dose_no: 1,
-    admin_date: new Date().toISOString().split("T")[0],
+    admin_date: createTodayDateInput(),
     healthcare_worker: "",
     batch_number: "",
     notes: "",
@@ -27,7 +30,7 @@ const AddVaccineModal = ({
         infant_id: infant?.id || "",
         vaccine_id: "",
         dose_no: 1,
-        admin_date: new Date().toISOString().split("T")[0],
+        admin_date: createTodayDateInput(),
         healthcare_worker: "",
         batch_number: "",
         notes: "",

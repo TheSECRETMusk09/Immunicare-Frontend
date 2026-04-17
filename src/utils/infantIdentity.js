@@ -14,6 +14,9 @@ const infantDateFormatter = new Intl.DateTimeFormat("en-PH", {
   year: "numeric",
 });
 
+export const getInfantDateOfBirthValue = (infant = {}) =>
+  infant.dob ?? infant.date_of_birth ?? infant.dateOfBirth ?? infant.birth_date ?? "";
+
 export const formatInfantDate = (value) => {
   if (!value) return "";
 
@@ -134,7 +137,7 @@ export const buildInfantRecordPrefillContext = (infant = {}) => {
     full_name: displayName,
     name: displayName,
     display_name: displayName,
-    dob: infant.dob ?? infant.date_of_birth ?? infant.birth_date ?? null,
+    dob: getInfantDateOfBirthValue(infant) || null,
     control_number: controlNumber || null,
     infant_control_number: controlNumber || null,
     patient_control_number: controlNumber || null,
@@ -155,7 +158,7 @@ export const buildInfantRecordPrefillContext = (infant = {}) => {
 export const buildInfantSearchText = (infant = {}) => {
   const fullName = getInfantFullName(infant);
   const controlNumber = getInfantControlNumber(infant);
-  const rawDob = infant.dob || infant.date_of_birth || infant.birth_date || "";
+  const rawDob = getInfantDateOfBirthValue(infant);
 
   const searchParts = [
     fullName,

@@ -12,6 +12,7 @@ jest.mock("../utils/api", () => ({
   __esModule: true,
   default: {
     request: jest.fn(),
+    get: jest.fn(),
     customRequest: jest.fn(),
   },
 }));
@@ -163,6 +164,17 @@ describe("Reports page backend contract alignment", () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
+    const generatedReport = {
+      id: 101,
+      type: "vaccination",
+      title: "Vaccination Report",
+      file_format: "pdf",
+      date_generated: "2026-03-08T00:00:00.000Z",
+      file_size: 2048,
+      download_count: 0,
+      status: "completed",
+    };
+
     apiClient.request.mockImplementation((endpoint, options = {}) => {
       if (endpoint === "/reports" && !options.method) {
         return Promise.resolve({ success: true, data: [] });
@@ -197,19 +209,12 @@ describe("Reports page backend contract alignment", () => {
         });
       }
 
-      if (endpoint === "/reports/generate" && options.method === "POST") {
+      if (endpoint === "/reports/generate-job" && options.method === "POST") {
         return Promise.resolve({
           success: true,
-          data: {
-            id: 101,
-            type: options.data.type,
-            title: "Vaccination Report",
-            file_format: options.data.format,
-            date_generated: "2026-03-08T00:00:00.000Z",
-            file_size: 2048,
-            download_count: 0,
-            status: "completed",
-          },
+          jobId: "101",
+          reportId: 101,
+          status: "generating",
         });
       }
 
@@ -218,6 +223,17 @@ describe("Reports page backend contract alignment", () => {
       }
 
       return Promise.resolve({ success: true, data: [] });
+    });
+
+    apiClient.get.mockImplementation((endpoint) => {
+      if (endpoint === "/reports/101/status") {
+        return Promise.resolve({
+          success: true,
+          data: generatedReport,
+        });
+      }
+
+      return Promise.resolve({ success: true, data: {} });
     });
   });
 
@@ -254,15 +270,20 @@ describe("Reports page backend contract alignment", () => {
 
     await waitFor(() => {
       expect(apiClient.request).toHaveBeenCalledWith(
-        "/reports/generate",
+        "/reports/generate-job",
         expect.objectContaining({
           method: "POST",
+          disableRetry: true,
           data: expect.objectContaining({
             type: "vaccination",
             format: "pdf",
           }),
         }),
       );
+    });
+
+    await waitFor(() => {
+      expect(apiClient.get).toHaveBeenCalledWith("/reports/101/status");
     });
   });
 
@@ -283,19 +304,31 @@ describe("Reports page backend contract alignment", () => {
         return Promise.resolve({ success: true, data: { vaccination: {} } });
       }
 
-      if (endpoint === "/reports/generate" && options.method === "POST") {
-        const error = new Error("HTTP error");
-        error.response = {
-          data: {
-            message:
-              "No data found for selected filters. Please adjust filter criteria and try again.",
-            error: "REPORT_EMPTY_DATASET",
-          },
-        };
-        return Promise.reject(error);
+      if (endpoint === "/reports/generate-job" && options.method === "POST") {
+        return Promise.resolve({
+          success: true,
+          jobId: "102",
+          reportId: 102,
+          status: "generating",
+        });
       }
 
       return Promise.resolve({ success: true, data: [] });
+    });
+
+    apiClient.get.mockImplementation((endpoint) => {
+      if (endpoint === "/reports/102/status") {
+        return Promise.resolve({
+          success: true,
+          data: {
+            status: "failed",
+            error_message:
+              "No data found for selected filters. Please adjust filter criteria and try again.",
+          },
+        });
+      }
+
+      return Promise.resolve({ success: true, data: {} });
     });
 
     render(<Reports />);

@@ -215,7 +215,7 @@ export default function UserVaccinationRecords() {
         setChildReadiness(null);
       }
     } catch (err) {
-      console.error("Error fetching readiness:", err);
+      console.warn("Error fetching readiness:", err);
       setChildReadiness(null);
     } finally {
       setReadinessLoading(false);

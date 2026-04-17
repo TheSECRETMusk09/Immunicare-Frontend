@@ -86,4 +86,19 @@ describe("apiClient request deduplication", () => {
 
     expect(mockAxiosInstance.request).toHaveBeenCalledTimes(2);
   });
+
+  test("does not deduplicate GET requests that carry their own abort signals", async () => {
+    mockAxiosInstance.request.mockResolvedValue({ data: { notifications: [] } });
+
+    await Promise.all([
+      apiClient.get("/guardian/notifications?limit=50", {
+        signal: { id: "first-signal" },
+      }),
+      apiClient.get("/guardian/notifications?limit=50", {
+        signal: { id: "second-signal" },
+      }),
+    ]);
+
+    expect(mockAxiosInstance.request).toHaveBeenCalledTimes(2);
+  });
 });
