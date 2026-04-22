@@ -1210,6 +1210,11 @@ export default function InjectVaccineModal({
             detail: { patient_id: recordPayload.patient_id },
           })
         );
+        window.dispatchEvent(
+          new CustomEvent("child-data-update", {
+            detail: { patient_id: recordPayload.patient_id },
+          })
+        );
       }
 
       setTimeout(() => {

@@ -51,6 +51,72 @@ const normalizeScheduleRecord = (scheduleItem) => ({
   source_facility: scheduleItem?.source_facility || null,
 });
 
+const normalizeStatusKey = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, "_");
+
+const resolveCanonicalStatusKey = (record) => {
+  if (record?.admin_date) {
+    return "completed";
+  }
+
+  const normalizedStatus = normalizeStatusKey(record?.status);
+
+  if (!normalizedStatus) {
+    return record?.isScheduleOnly ? "upcoming" : "pending";
+  }
+
+  if (normalizedStatus === "attended") {
+    return "completed";
+  }
+
+  if (normalizedStatus === "confirmed" || normalizedStatus === "rescheduled") {
+    return "scheduled";
+  }
+
+  return normalizedStatus;
+};
+
+const resolveStatusDisplay = (record) => {
+  const statusKey = resolveCanonicalStatusKey(record);
+
+  const statusMap = {
+    completed: { status: "Completed", color: "green", label: "Completed" },
+    ready: { status: "Ready", color: "green", label: "Ready" },
+    overdue: { status: "Overdue", color: "red", label: "Overdue" },
+    pending_confirmation: {
+      status: "Pending Confirmation",
+      color: "yellow",
+      label: "Pending Confirmation",
+    },
+    due_soon: { status: "Due Soon", color: "yellow", label: "Due Soon" },
+    upcoming: { status: "Upcoming", color: "gray", label: "Upcoming" },
+    pending: { status: "Pending", color: "gray", label: "Pending" },
+    scheduled: { status: "Scheduled", color: "gray", label: "Scheduled" },
+    cancelled: { status: "Cancelled", color: "gray", label: "Cancelled" },
+  };
+
+  return statusMap[statusKey] || statusMap.pending;
+};
+
+const getStatusBadgeClass = (color) => {
+  if (color === "green") {
+    return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+  }
+
+  if (color === "red") {
+    return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+  }
+
+  if (color === "yellow") {
+    return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
+  }
+
+  return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
+};
+
 const VaccinationRecordCard = ({
   vaccine,
   status,
@@ -67,15 +133,7 @@ const VaccinationRecordCard = ({
         </p>
       </div>
       <span
-        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-          status.color === "green"
-            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-            : status.color === "red"
-              ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-              : status.color === "yellow"
-                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-        }`}
+        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClass(status.color)}`}
       >
         {status.label}
       </span>
@@ -286,7 +344,7 @@ export default function UserVaccinationRecords() {
   );
 
   const resolveActionLabel = (vaccine) => {
-    if (vaccine.admin_date || String(vaccine.status || "").toLowerCase() === "completed") {
+    if (resolveCanonicalStatusKey(vaccine) === "completed") {
       return "Edit Date";
     }
 
@@ -378,51 +436,7 @@ export default function UserVaccinationRecords() {
     };
   }, [normalizedScheduleRecords, scheduleSummary, vaccinationRecords]);
 
-  const getVaccineStatus = (vaccine) => {
-    const normalizedStatus = String(vaccine.status || "").toLowerCase();
-
-    if (vaccine.admin_date || normalizedStatus === "completed") {
-      return { status: "Completed", color: "green", label: "Completed" };
-    }
-
-    if (normalizedStatus === "ready") {
-      return { status: "Ready", color: "green", label: "Ready" };
-    }
-
-    if (normalizedStatus === "pending_confirmation") {
-      return {
-        status: "Pending Confirmation",
-        color: "yellow",
-        label: "Pending Confirmation",
-      };
-    }
-
-    if (normalizedStatus === "due_soon") {
-      return { status: "Due Soon", color: "yellow", label: "Due Soon" };
-    }
-
-    if (normalizedStatus === "upcoming") {
-      return { status: "Upcoming", color: "gray", label: "Upcoming" };
-    }
-
-    if (!vaccine.due_date) {
-      return { status: "Pending", color: "yellow", label: "Pending" };
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const dueDate = new Date(vaccine.due_date);
-    dueDate.setHours(0, 0, 0, 0);
-    const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-
-    if (daysUntilDue < 0) {
-      return { status: "Overdue", color: "red", label: "Overdue" };
-    } else if (daysUntilDue <= 14) {
-      return { status: "Due Soon", color: "yellow", label: "Due Soon" };
-    } else {
-      return { status: "Pending", color: "gray", label: "Pending" };
-    }
-  };
+  const getVaccineStatus = (vaccine) => resolveStatusDisplay(vaccine);
 
   // Filter records based on search and view mode
   const filteredRecords = useMemo(() => {
@@ -447,8 +461,8 @@ export default function UserVaccinationRecords() {
     // Filter by view mode
     if (viewMode === "upcoming") {
       records = records.filter((v) => {
-        const normalizedStatus = String(v.status || "").toLowerCase();
-        return !["completed", "overdue"].includes(normalizedStatus);
+        const canonicalStatus = resolveCanonicalStatusKey(v);
+        return !["completed", "overdue", "cancelled"].includes(canonicalStatus);
       });
     }
 
@@ -961,15 +975,7 @@ export default function UserVaccinationRecords() {
                               </td>
                               <td className="px-4 py-4">
                                 <span
-                                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                    status.color === "green"
-                                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                      : status.color === "red"
-                                        ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                                        : status.color === "yellow"
-                                          ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                                          : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-                                  }`}
+                                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClass(status.color)}`}
                                 >
                                   {status.label}
                                 </span>

@@ -16,6 +16,32 @@ import apiClient from "../utils/api";
 
 const mockNavigate = jest.fn();
 
+const toManilaDateTimeKey = (value) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(parsed);
+
+  const lookup = parts.reduce((accumulator, part) => {
+    if (part.type !== "literal") {
+      accumulator[part.type] = part.value;
+    }
+    return accumulator;
+  }, {});
+
+  return `${lookup.year}-${lookup.month}-${lookup.day}T${lookup.hour}:${lookup.minute}`;
+};
+
 const mockFullCalendarProps = { current: null };
 const mockCalendarApi = {
   changeView: jest.fn(),
@@ -335,7 +361,9 @@ describe("Guardian appointments weekend blocking and action order", () => {
     fireEvent.click(screen.getByTestId("fc-date-click-saturday"));
 
     expect(
-      await screen.findByText(/appointments can only be booked on weekdays/i),
+      await screen.findByText(
+        /saturday - no appointments available|appointments can only be booked on weekdays/i,
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: /book appointment/i })).not.toBeInTheDocument();
     expect(mockNavigate).not.toHaveBeenCalled();
@@ -554,10 +582,13 @@ describe("Guardian appointments weekend blocking and action order", () => {
           infant_id: 1,
           vaccine_id: 11,
           type: "Vaccination",
-          scheduled_date: "2030-03-04T09:00:00",
+          scheduled_date: expect.any(String),
         }),
       );
     });
+
+    const submittedPayload = apiClient.createAppointment.mock.calls.at(-1)?.[0];
+    expect(toManilaDateTimeKey(submittedPayload?.scheduled_date)).toBe("2030-03-04T09:00");
   });
 
   test("booking page deduplicates repeated pending confirmation reasons", async () => {

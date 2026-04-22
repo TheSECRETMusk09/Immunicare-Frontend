@@ -117,6 +117,14 @@ const normalizeDatePrefill = (value) => {
   return `${year}-${month}-${day}`;
 };
 
+const resolveSuggestedDateValue = (slot) => {
+  if (!slot || typeof slot !== "object") {
+    return "";
+  }
+
+  return normalizeDatePrefill(slot.date || slot.suggestedDate || "");
+};
+
 const resolvePatientSexLabel = (patient) => {
   const normalizedSex = String(patient?.sex || patient?.gender || "")
     .trim()
@@ -176,11 +184,33 @@ const getBookingErrorMessage = (error) => {
   const status = error?.status || error?.response?.status;
   const message = String(error?.message || "").toLowerCase();
   const serverError = String(error?.response?.data?.error || error?.data?.error || "").toLowerCase();
+  const serverErrorMessage =
+    error?.response?.data?.error ||
+    error?.data?.error ||
+    null;
+  const serverFieldErrors =
+    error?.response?.data?.fields ||
+    error?.data?.fields ||
+    error?.response?.data?.details ||
+    error?.data?.details ||
+    null;
 
   if (status === 400) {
     if (serverError.includes("stock") || serverError.includes("vaccine") || message.includes("stock") || message.includes("vaccine")) {
       return "Your appointment has been submitted but vaccine availability could not be confirmed. The health center will contact you to confirm.";
     }
+
+    if (serverErrorMessage) {
+      return serverErrorMessage;
+    }
+
+    if (serverFieldErrors && typeof serverFieldErrors === "object") {
+      const firstFieldError = Object.values(serverFieldErrors).find((value) => typeof value === "string" && value.trim());
+      if (firstFieldError) {
+        return firstFieldError;
+      }
+    }
+
     return "We couldn't complete your booking. Please check your appointment details and try again.";
   }
 
@@ -378,19 +408,25 @@ export default function GuardianAppointmentBooking() {
 
         setChildReadiness(readinessData);
         setRecommendedVaccine(nextRecommendedVaccine);
-        setFormData((prev) => ({
-          ...prev,
-          vaccine_id: nextRecommendedVaccine?.vaccineId
+        setFormData((prev) => {
+          const recommendedVaccineId = nextRecommendedVaccine?.vaccineId
             ? String(nextRecommendedVaccine.vaccineId)
-            : "",
-          scheduled_date:
+            : "";
+          const nextVaccineId = prev.vaccine_id || recommendedVaccineId;
+          const nextScheduledDate =
             prev.scheduled_date ||
-            readinessData?.nextAppointmentPrediction?.date ||
-            nextRecommendedVaccine?.earliestDate ||
-            "",
-          scheduled_time: "",
-          type: "Vaccination",
-        }));
+            normalizeDatePrefill(readinessData?.nextAppointmentPrediction?.date) ||
+            normalizeDatePrefill(nextRecommendedVaccine?.earliestDate) ||
+            "";
+
+          return {
+            ...prev,
+            vaccine_id: nextVaccineId,
+            scheduled_date: nextScheduledDate,
+            scheduled_time: nextScheduledDate !== prev.scheduled_date ? "" : prev.scheduled_time,
+            type: "Vaccination",
+          };
+        });
       } else {
         setChildReadiness(null);
         setRecommendedVaccine(null);
@@ -598,6 +634,14 @@ export default function GuardianAppointmentBooking() {
     setSubmitting(true);
 
     try {
+      const hasPendingDocumentUploads = Object.values(appointmentDocuments).some(
+        (fileData) => fileData?.persisting,
+      );
+      if (hasPendingDocumentUploads) {
+        setError("Please wait for document uploads to finish before booking the appointment.");
+        return;
+      }
+
       const scheduledDateTime = combineClinicDateTime(formData.scheduled_date, normalizedScheduledTime);
       if (!scheduledDateTime) {
         setError("Please select a valid appointment date and time.");
@@ -605,39 +649,48 @@ export default function GuardianAppointmentBooking() {
         return;
       }
 
+      const parsedInfantId = Number.parseInt(formData.infant_id, 10);
+      if (!Number.isInteger(parsedInfantId) || parsedInfantId <= 0) {
+        setErrors((prev) => ({
+          ...prev,
+          infant_id: "Please select a valid child.",
+        }));
+        setError("Please select a valid child before booking.");
+        return;
+      }
+
+      const parsedVaccineId = Number.parseInt(formData.vaccine_id, 10);
+      if (!Number.isInteger(parsedVaccineId) || parsedVaccineId <= 0) {
+        setErrors((prev) => ({
+          ...prev,
+          vaccine_id: "Please select a valid vaccine.",
+        }));
+        setError("Please select a valid due vaccine before booking.");
+        return;
+      }
+
+      const parsedClinicId = bookingClinicId ? Number.parseInt(bookingClinicId, 10) : null;
+      if (bookingClinicId && (!Number.isInteger(parsedClinicId) || parsedClinicId <= 0)) {
+        setError("Unable to resolve clinic information for this child. Please refresh and try again.");
+        return;
+      }
+
       const appointmentData = {
-        infant_id: parseInt(formData.infant_id),
-        vaccine_id: parseInt(formData.vaccine_id, 10),
+        infant_id: parsedInfantId,
+        vaccine_id: parsedVaccineId,
         scheduled_date: scheduledDateTime,
         type: formData.type,
         notes: formData.notes,
-        clinic_id: bookingClinicId || undefined,
+        clinic_id: parsedClinicId || undefined,
         // Control number is resolved from selected infant on backend
         control_number: selectedChild?.control_number || null,
       };
 
       console.debug("[GuardianAppointmentBooking] createAppointment payload:", appointmentData);
 
-      const documentEntries = Object.entries(appointmentDocuments).filter(
-        ([, fileData]) => fileData?.file && !fileData?.persisting,
-      );
-      let appointmentPayload = appointmentData;
-
-      if (documentEntries.length > 0) {
-        const appointmentFormData = new FormData();
-        Object.entries(appointmentData).forEach(([key, value]) => {
-          if (value !== undefined && value !== null) {
-            appointmentFormData.append(key, String(value));
-          }
-        });
-        documentEntries.forEach(([documentType, fileData]) => {
-          appointmentFormData.append("documents", fileData.file, fileData.name);
-          appointmentFormData.append("document_types", documentType);
-        });
-        appointmentPayload = appointmentFormData;
-      }
-
-      const newAppointment = await apiClient.createAppointment(appointmentPayload);
+      // Appointment documents are uploaded immediately by DocumentChecklist, so
+      // appointment creation stays JSON-only for consistent backend parsing.
+      const newAppointment = await apiClient.createAppointment(appointmentData);
       const createdAppointmentPayload = newAppointment?.data || newAppointment;
       setCreatedAppointment(createdAppointmentPayload);
       setSuccess(true);
@@ -1317,12 +1370,13 @@ export default function GuardianAppointmentBooking() {
                       type="button"
                       onClick={() => {
                         clearBookingError();
-                        const date = new Date(slot.date || slot.suggestedDate);
+                        const suggestedDate = resolveSuggestedDateValue(slot);
+                        const suggestedTime = normalizeTimeForSubmit(slot.time || slot.suggestedTime || "");
                         setFormData(prev => ({
                           ...prev,
                           vaccine_id: slot.vaccineId ? String(slot.vaccineId) : prev.vaccine_id,
-                          scheduled_date: date.toISOString().split('T')[0],
-                          scheduled_time: slot.time || slot.suggestedTime || ''
+                          scheduled_date: suggestedDate || prev.scheduled_date,
+                          scheduled_time: suggestedTime || ""
                         }));
                       }}
                       className="w-full text-left p-3 rounded-lg border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"

@@ -69,14 +69,28 @@ const useInfantManagementSocket = ({ setInfants, onChange }) => {
       notifyChange("infant_deleted", { id: parsedId });
     };
 
+    const handleVaccinationChanged = (payload) => {
+      notifyChange("vaccination_changed", payload);
+    };
+
     socket.on('infant_created', handleInfantCreated);
     socket.on('infant_updated', handleInfantUpdated);
     socket.on('infant_deleted', handleInfantDeleted);
+    socket.on('vaccination_created', handleVaccinationChanged);
+    socket.on('vaccination_updated', handleVaccinationChanged);
+    socket.on('vaccination_deleted', handleVaccinationChanged);
+    socket.on('infant_vaccine_readiness_updated', handleVaccinationChanged);
+    socket.on('infant_vaccine_readiness_batch_updated', handleVaccinationChanged);
 
     return () => {
       socket.off('infant_created', handleInfantCreated);
       socket.off('infant_updated', handleInfantUpdated);
       socket.off('infant_deleted', handleInfantDeleted);
+      socket.off('vaccination_created', handleVaccinationChanged);
+      socket.off('vaccination_updated', handleVaccinationChanged);
+      socket.off('vaccination_deleted', handleVaccinationChanged);
+      socket.off('infant_vaccine_readiness_updated', handleVaccinationChanged);
+      socket.off('infant_vaccine_readiness_batch_updated', handleVaccinationChanged);
     };
   }, [socket, setInfants, onChange]);
 };

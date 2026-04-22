@@ -91,7 +91,7 @@ const buildNotificationsPayload = () => [
 ];
 
 const renderPage = async (payload = buildNotificationsPayload()) => {
-  apiClient.getNotifications.mockResolvedValueOnce({ data: payload });
+  apiClient.getNotifications.mockResolvedValue({ data: payload });
 
   render(
     <MemoryRouter initialEntries={["/notifications"]}>
@@ -148,23 +148,25 @@ describe("Admin notifications center", () => {
     });
 
     expect(
-      screen.getByText(/vaccine inventory warning/i),
+      await screen.findByText(/mmr doses are running low in inventory/i),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByText(/appointment reminder pending/i),
-    ).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/appointment reminder pending/i),
+      ).not.toBeInTheDocument();
+    });
 
     const statusFilter = screen.getByLabelText(/status/i);
     fireEvent.change(statusFilter, { target: { value: "failed" } });
 
     expect(
-      screen.getByText(/no notifications matched the active filters/i),
+      await screen.findByText(/no notifications matched the active filters/i),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /reset filters/i }));
 
     expect(
-      screen.getByText(/outbound sms delivery failed/i),
+      await screen.findByText(/outbound sms delivery failed/i),
     ).toBeInTheDocument();
   });
 

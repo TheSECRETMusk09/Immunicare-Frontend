@@ -298,7 +298,15 @@ describe("Vaccinations dashboard metric consistency", () => {
     ).toHaveClass("bg-white");
 
     await waitFor(() => {
-      expect(apiClient.getVaccinationRecords).toHaveBeenCalled();
+      expect(apiClient.getVaccinationRecords).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: "system",
+          period: "month",
+          page: 1,
+          limit: 20,
+          date_view: "all",
+        }),
+      );
       expect(apiClient.getAnalyticsDashboardSummary).toHaveBeenCalled();
       expect(apiClient.getAnalyticsDashboard).not.toHaveBeenCalled();
       expect(apiClient.getVaccinationSchedules).not.toHaveBeenCalled();
@@ -307,7 +315,7 @@ describe("Vaccinations dashboard metric consistency", () => {
     });
   });
 
-  test("schedule tab does not preload hidden records or analytics requests", async () => {
+  test("schedule tab does not preload hidden records and refreshes shared summary metrics", async () => {
     apiClient.getVaccinationScheduleOverview.mockResolvedValue({
       rows: [],
       summary: {
@@ -350,7 +358,12 @@ describe("Vaccinations dashboard metric consistency", () => {
     expect(apiClient.getVaccinationSchedules).not.toHaveBeenCalled();
     expect(apiClient.getDashboardInfants).not.toHaveBeenCalled();
     expect(apiClient.getVaccinationReconciliationRecords).not.toHaveBeenCalled();
-    expect(apiClient.getAnalyticsDashboardSummary).not.toHaveBeenCalled();
+    expect(apiClient.getAnalyticsDashboardSummary).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scope: "system",
+        period: "month",
+      }),
+    );
     expect(apiClient.getAnalyticsDashboard).not.toHaveBeenCalled();
   });
 
@@ -604,6 +617,94 @@ describe("Vaccinations dashboard metric consistency", () => {
       expect(apiClient.getDashboardInfants).not.toHaveBeenCalled();
       expect(apiClient.getVaccinationReconciliationRecords).not.toHaveBeenCalled();
     });
+  });
+
+  test("top KPI cards stay aligned across tabs using one period summary source", async () => {
+    apiClient.getAnalyticsDashboardSummary.mockResolvedValue({
+      summary: {
+        administeredInPeriod: 3086,
+        dueSoon7Days: 412,
+        overdueVaccinations: 128,
+        totalRegisteredInfants: 8328,
+      },
+    });
+    apiClient.getVaccinationRecords.mockResolvedValue([]);
+    apiClient.getVaccinationTracking.mockResolvedValue({
+      rows: [],
+      summary: { completed: 3199, dueSoon: 6017, overdue: 12246, trackedInfants: 8328 },
+      metadata: { page: 1, limit: 9, total: 0, totalPages: 0 },
+    });
+    apiClient.getVaccinationScheduleOverview.mockResolvedValue({
+      rows: [],
+      summary: {
+        upcoming: 0,
+        due: 6017,
+        completed: 3072,
+        overdue: 12246,
+        trackedInfants: 10134,
+        totalRows: 0,
+      },
+      metadata: { page: 1, limit: 20, total: 0, totalPages: 0 },
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/vaccination-management?tab=tracking"]}>
+        <VaccinationsDashboard />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("button", { name: /vaccination tracking/i }),
+    ).toHaveClass("bg-white");
+
+    await waitFor(() => {
+      expect(apiClient.getVaccinationTracking).toHaveBeenCalledWith({
+        scope: "system",
+        period: "month",
+        page: 1,
+        limit: 9,
+      });
+    });
+
+    expect(readMetricValue("Completed Vaccinations")).toBe("3086");
+    expect(readMetricValue("Due Soon (7 Days)")).toBe("412");
+    expect(readMetricValue("Overdue Vaccinations")).toBe("128");
+    expect(readMetricValue("Children Tracked")).toBe("8328");
+
+    fireEvent.click(screen.getByRole("button", { name: /vaccination schedule/i }));
+
+    await waitFor(() => {
+      expect(apiClient.getVaccinationScheduleOverview).toHaveBeenCalledWith({
+        scope: "system",
+        period: "month",
+        page: 1,
+        limit: 20,
+      });
+    });
+
+    expect(readMetricValue("Completed Vaccinations")).toBe("3086");
+    expect(readMetricValue("Due Soon (7 Days)")).toBe("412");
+    expect(readMetricValue("Overdue Vaccinations")).toBe("128");
+    expect(readMetricValue("Children Tracked")).toBe("8328");
+
+    fireEvent.click(screen.getByRole("button", { name: /vaccination records/i }));
+
+    await waitFor(() => {
+      expect(apiClient.getVaccinationRecords).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: "system",
+          period: "month",
+          page: 1,
+          limit: 20,
+          date_view: "all",
+        }),
+      );
+    });
+
+    expect(readMetricValue("Completed Vaccinations")).toBe("3086");
+    expect(readMetricValue("Due Soon (7 Days)")).toBe("412");
+    expect(readMetricValue("Overdue Vaccinations")).toBe("128");
+    expect(readMetricValue("Children Tracked")).toBe("8328");
   });
 
   test("tracking tab respects the selected period and hides future-dated infants", async () => {

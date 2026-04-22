@@ -6,11 +6,6 @@
  */
 
 const { test, expect } = require('@playwright/test');
-const {
-  checkScreenReaderCompatibility,
-  checkContrast,
-  WCAG_STANDARDS,
-} = require('../utils/mobile-helpers');
 
 const TEST_CREDENTIALS = {
   email: process.env.TEST_GUARDIAN_EMAIL || 'guardian@test.com',
@@ -210,6 +205,8 @@ test.describe('WCAG 2.1 AA Compliance @a11y', () => {
 
       // Try to open a modal
       const addButton = await page.$('button:has-text("Add")');
+      let modalClosed = true;
+
       if (addButton) {
         await addButton.click();
         await page.waitForTimeout(500);
@@ -220,16 +217,16 @@ test.describe('WCAG 2.1 AA Compliance @a11y', () => {
 
         // Modal should be closed
         const modal = await page.$('[role="dialog"][aria-modal="true"]');
-        expect(modal).toBeFalsy();
+        modalClosed = modal === null;
       }
+
+      expect(modalClosed).toBe(true);
     });
   });
 
   test.describe('Color Contrast', () => {
     test('text should meet minimum contrast ratio', async ({ page }) => {
       await page.goto('/guardian/login');
-
-      const textElements = await page.$$('p, span, h1, h2, h3, h4, h5, h6, label, button');
 
       // This is a simplified check - actual contrast calculation would require color parsing
       const hasPoorContrast = await page.evaluate(() => {
@@ -258,21 +255,29 @@ test.describe('WCAG 2.1 AA Compliance @a11y', () => {
       await page.waitForTimeout(500);
 
       const errors = await page.$$('text=/error|invalid|required/i, .error, [role="alert"]');
+      const unstyledVisibleErrors = [];
 
       for (const error of errors) {
         const isVisible = await error.isVisible();
         const hasErrorStyle = await error.evaluate(el => {
           const style = window.getComputedStyle(el);
-          return style.color.includes('red') ||
-                 style.color.includes('rgb(220') ||
-                 el.classList.contains('error') ||
-                 el.classList.contains('text-danger');
+          const colorChannels = style.color.match(/\d+\.?\d*/g)?.map(Number) || [];
+          const [red = 0, green = 0, blue = 0] = colorChannels;
+          const hasErrorColor = red > 150 && green < 140 && blue < 140;
+          const hasErrorClass = Array.from(el.classList).some(className => {
+            return /error|danger|invalid/i.test(className);
+          });
+
+          return hasErrorColor || hasErrorClass;
         });
 
-        if (isVisible) {
-          expect(hasErrorStyle || true).toBe(true);
+        if (isVisible && !hasErrorStyle) {
+          const elementInfo = await error.evaluate(el => el.outerHTML.substring(0, 100));
+          unstyledVisibleErrors.push(elementInfo);
         }
       }
+
+      expect(unstyledVisibleErrors.length).toBe(0);
     });
   });
 
@@ -283,6 +288,8 @@ test.describe('WCAG 2.1 AA Compliance @a11y', () => {
 
       // Try to open a modal
       const addButton = await page.$('button:has-text("Add")');
+      let modalAriaCompliant = true;
+
       if (addButton) {
         await addButton.click();
         await page.waitForTimeout(500);
@@ -297,10 +304,11 @@ test.describe('WCAG 2.1 AA Compliance @a11y', () => {
             };
           });
 
-          expect(ariaAttributes.hasRole).toBe(true);
-          expect(ariaAttributes.hasAriaModal).toBe(true);
+          modalAriaCompliant = ariaAttributes.hasRole && ariaAttributes.hasAriaModal;
         }
       }
+
+      expect(modalAriaCompliant).toBe(true);
     });
 
     test('live regions should announce dynamic content', async ({ page }) => {
@@ -367,6 +375,8 @@ test.describe('WCAG 2.1 AA Compliance @a11y', () => {
       await page.waitForTimeout(2000);
 
       const addButton = await page.$('button:has-text("Add")');
+      let focusTrappedInModal = true;
+
       if (addButton) {
         await addButton.click();
         await page.waitForTimeout(500);
@@ -384,9 +394,11 @@ test.describe('WCAG 2.1 AA Compliance @a11y', () => {
             return modal?.contains(document.activeElement);
           });
 
-          expect(focusedInModal).toBe(true);
+          focusTrappedInModal = focusedInModal === true;
         }
       }
+
+      expect(focusTrappedInModal).toBe(true);
     });
 
     test('focus should return to trigger element when modal closes', async ({ page }) => {
@@ -394,6 +406,8 @@ test.describe('WCAG 2.1 AA Compliance @a11y', () => {
       await page.waitForTimeout(2000);
 
       const addButton = await page.$('button:has-text("Add")');
+      let focusReturnedToTrigger = true;
+
       if (addButton) {
         await addButton.click();
         await page.waitForTimeout(500);
@@ -407,8 +421,10 @@ test.describe('WCAG 2.1 AA Compliance @a11y', () => {
           return document.activeElement?.tagName;
         });
 
-        expect(['BUTTON', 'A']).toContain(focusedElement);
+        focusReturnedToTrigger = ['BUTTON', 'A'].includes(focusedElement);
       }
+
+      expect(focusReturnedToTrigger).toBe(true);
     });
   });
 });

@@ -1,0 +1,441 @@
+{
+  "config": {
+    "configFile": "C:\\Users\\rrjra\\OneDrive\\Desktop\\Immunicare\\frontend\\playwright.config.js",
+    "rootDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/tests",
+    "forbidOnly": true,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/test-results",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {},
+        "id": "Mobile - iPhone SE (320x568)",
+        "name": "Mobile - iPhone SE (320x568)",
+        "testDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/test-results",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {},
+        "id": "Mobile - iPhone 12/13 Mini (375x812)",
+        "name": "Mobile - iPhone 12/13 Mini (375x812)",
+        "testDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/test-results",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {},
+        "id": "Mobile - iPhone 12/13/14 (390x844)",
+        "name": "Mobile - iPhone 12/13/14 (390x844)",
+        "testDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/test-results",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {},
+        "id": "Mobile - Samsung Galaxy S23 (360x780)",
+        "name": "Mobile - Samsung Galaxy S23 (360x780)",
+        "testDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/test-results",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {},
+        "id": "Mobile - Google Pixel 7 (412x915)",
+        "name": "Mobile - Google Pixel 7 (412x915)",
+        "testDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/test-results",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {},
+        "id": "Tablet - iPad Mini (768x1024)",
+        "name": "Tablet - iPad Mini (768x1024)",
+        "testDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/test-results",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {},
+        "id": "Tablet - iPad Air (820x1180)",
+        "name": "Tablet - iPad Air (820x1180)",
+        "testDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/test-results",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {},
+        "id": "Mobile Chrome",
+        "name": "Mobile Chrome",
+        "testDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/test-results",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {},
+        "id": "Mobile Safari",
+        "name": "Mobile Safari",
+        "testDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/test-results",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {},
+        "id": "Mobile - Accessibility",
+        "name": "Mobile - Accessibility",
+        "testDir": "C:/Users/rrjra/OneDrive/Desktop/Immunicare/frontend/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "html",
+        {
+          "outputFolder": "./e2e/playwright-report",
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "./e2e/test-results/results.json"
+        }
+      ],
+      [
+        "list",
+        null
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "runAgents": "none",
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.58.2",
+    "workers": 1,
+    "webServer": {
+      "command": "npm start",
+      "url": "http://localhost:3000",
+      "reuseExistingServer": true,
+      "timeout": 120000,
+      "env": {
+        "NODE_ENV": "test",
+        "ALLUSERSPROFILE": "C:\\ProgramData",
+        "API_BASE_URL": "http://localhost:5000/api",
+        "APPDATA": "C:\\Users\\rrjra\\AppData\\Roaming",
+        "APPLICATION_INSIGHTS_NO_STATSBEAT": "true",
+        "BASE_URL": "http://localhost:3000",
+        "CHROME_CRASHPAD_PIPE_NAME": "\\\\.\\pipe\\crashpad_20896_JDCDKHSGOQUDRVJY",
+        "CI": "true",
+        "CODEX_INTERNAL_ORIGINATOR_OVERRIDE": "codex_vscode",
+        "CODEX_SANDBOX_NETWORK_DISABLED": "1",
+        "CODEX_THREAD_ID": "019db194-a14a-7c32-85b1-6290939e3500",
+        "COLOR": "0",
+        "CommonProgramFiles": "C:\\Program Files\\Common Files",
+        "CommonProgramFiles(x86)": "C:\\Program Files (x86)\\Common Files",
+        "CommonProgramW6432": "C:\\Program Files\\Common Files",
+        "COMPUTERNAME": "ANONYMOUS",
+        "ComSpec": "C:\\WINDOWS\\system32\\cmd.exe",
+        "DEBUG": "release",
+        "DriverData": "C:\\Windows\\System32\\Drivers\\DriverData",
+        "EDITOR": "C:\\WINDOWS\\notepad.exe",
+        "EFC_10852_1262719628": "1",
+        "EFC_10852_1592913036": "1",
+        "EFC_10852_2283032206": "1",
+        "EFC_10852_2775293581": "1",
+        "EFC_10852_3789132940": "1",
+        "ELECTRON_RUN_AS_NODE": "1",
+        "FPS_BROWSER_APP_PROFILE_STRING": "Internet Explorer",
+        "FPS_BROWSER_USER_PROFILE_STRING": "Default",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "C:\\Users\\rrjra\\OneDrive\\Desktop\\Immunicare\\frontend",
+        "GIT_PAGER": "more.com",
+        "HOME": "C:\\Users\\rrjra",
+        "HOMEDRIVE": "C:",
+        "HOMEPATH": "\\Users\\rrjra",
+        "IMMUNICARE_ALLOW_UNSAFE_TEST_DB": "true",
+        "INIT_CWD": "C:\\Users\\rrjra\\OneDrive\\Desktop\\Immunicare\\frontend",
+        "IntelliJ IDEA": "C:\\Program Files\\JetBrains\\IntelliJ IDEA 2024.1.4\\bin;",
+        "JAVA_HOME": "C:\\Users\\rrjra\\AppData\\Local\\Programs\\Eclipse Adoptium\\jdk-17.0.11.9-hotspot\\",
+        "LESS": "",
+        "LOCALAPPDATA": "C:\\Users\\rrjra\\AppData\\Local",
+        "LOGONSERVER": "\\\\ANONYMOUS",
+        "NODE": "C:\\Program Files\\nodejs\\node.exe",
+        "NODE_EXE": "C:\\Program Files\\nodejs\\\\node.exe",
+        "NPM_CLI_JS": "C:\\Users\\rrjra\\AppData\\Roaming\\npm\\node_modules\\npm\\bin\\npm-cli.js",
+        "npm_command": "run",
+        "npm_config_cache": "C:\\Users\\rrjra\\AppData\\Local\\npm-cache",
+        "npm_config_globalconfig": "C:\\Users\\rrjra\\AppData\\Roaming\\npm\\etc\\npmrc",
+        "npm_config_global_prefix": "C:\\Users\\rrjra\\AppData\\Roaming\\npm",
+        "npm_config_init_module": "C:\\Users\\rrjra\\.npm-init.js",
+        "npm_config_local_prefix": "C:\\Users\\rrjra\\OneDrive\\Desktop\\Immunicare\\frontend",
+        "npm_config_node_gyp": "C:\\Users\\rrjra\\AppData\\Roaming\\npm\\node_modules\\npm\\node_modules\\node-gyp\\bin\\node-gyp.js",
+        "npm_config_noproxy": "",
+        "npm_config_npm_version": "11.11.1",
+        "npm_config_prefix": "C:\\Users\\rrjra\\AppData\\Roaming\\npm",
+        "npm_config_userconfig": "C:\\Users\\rrjra\\.npmrc",
+        "npm_config_user_agent": "npm/11.11.1 node/v22.18.0 win32 x64 workspaces/false",
+        "npm_execpath": "C:\\Users\\rrjra\\AppData\\Roaming\\npm\\node_modules\\npm\\bin\\npm-cli.js",
+        "npm_lifecycle_event": "e2e:san-nicolas",
+        "npm_lifecycle_script": "set QA_RUN_COMPREHENSIVE=true&& playwright test e2e/tests/admin-guardian-comprehensive-qa.spec.js --project=\"Tablet - iPad Air (820x1180)\"",
+        "npm_node_execpath": "C:\\Program Files\\nodejs\\node.exe",
+        "npm_package_json": "C:\\Users\\rrjra\\OneDrive\\Desktop\\Immunicare\\frontend\\package.json",
+        "npm_package_name": "frontend",
+        "npm_package_version": "0.1.0",
+        "NPM_PREFIX_JS": "C:\\Program Files\\nodejs\\\\node_modules\\npm\\bin\\npm-prefix.js",
+        "NPM_PREFIX_NPM_CLI_JS": "C:\\Users\\rrjra\\AppData\\Roaming\\npm\\node_modules\\npm\\bin\\npm-cli.js",
+        "NUMBER_OF_PROCESSORS": "16",
+        "OneDrive": "C:\\Users\\rrjra\\OneDrive",
+        "OS": "Windows_NT",
+        "PAGER": "more.com",
+        "PATH": "C:\\Users\\rrjra\\OneDrive\\Desktop\\Immunicare\\frontend\\node_modules\\.bin;C:\\Users\\rrjra\\OneDrive\\Desktop\\Immunicare\\node_modules\\.bin;C:\\Users\\rrjra\\OneDrive\\Desktop\\node_modules\\.bin;C:\\Users\\rrjra\\OneDrive\\node_modules\\.bin;C:\\Users\\rrjra\\node_modules\\.bin;C:\\Users\\node_modules\\.bin;C:\\node_modules\\.bin;C:\\Users\\rrjra\\AppData\\Roaming\\npm\\node_modules\\npm\\node_modules\\@npmcli\\run-script\\lib\\node-gyp-bin;C:\\Users\\rrjra\\.codex\\tmp\\arg0\\codex-arg0UmeYiH;C:\\Users\\rrjra\\AppData\\Local\\Programs\\Microsoft VS Code;C:\\Program Files (x86)\\VMware\\VMware Workstation\\bin\\;C:\\Program Files\\Common Files\\Oracle\\Java\\javapath;C:\\Windows\\system32;C:\\Windows;C:\\Windows\\System32\\Wbem;C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\;C:\\Windows\\System32\\OpenSSH\\;C:\\Program Files (x86)\\NVIDIA Corporation\\PhysX\\Common;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\WINDOWS\\System32\\Wbem;C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\;C:\\WINDOWS\\System32\\OpenSSH\\;C:\\Program Files\\Microsoft SQL Server\\150\\Tools\\Binn\\;C:\\Program Files\\Git\\cmd;C:\\xampp\\php;C:\\ProgramData\\ComposerSetup\\bin;C:\\Program Files\\7-Zip;C:\\Program Files\\NVIDIA Corporation\\NVIDIA app\\NvDLISR;C:\\Users\\rrjra\\Downloads\\python-3.13.1-amd64.exe;C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\170\\Tools\\Binn\\;C:\\Program Files\\dotnet\\;C:\\Users\\rrjra\\Downloads\\maven-mvnd-1.0.2-windows-amd64.tar.gz\\maven-mvnd-1.0.2-windows-amd64\\bin;C:\\Users\\rrjra\\Downloads\\maven-mvnd-1.0.2-windows-amd64.tar.gz\\maven-mvnd-1.0.2-windows-amd64\\bin;C:\\Program Files\\nodejs\\;C:\\Users\\rrjra\\AppData\\Local\\Programs\\Python\\Launcher\\;C:\\Users\\rrjra\\AppData\\Local\\Programs\\Eclipse Adoptium\\jdk-17.0.11.9-hotspot\\bin;C:\\Users\\rrjra\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Users\\rrjra\\AppData\\Local\\Programs\\Microsoft VS Code\\bin;C:\\Program Files\\JetBrains\\IntelliJ IDEA 2024.1.4\\bin;;C:\\src\\flutter\\bin;C:\\Users\\rrjra\\AppData\\Roaming\\Composer\\vendor\\bin;C:\\Program Files\\7-Zip;C:\\Program Files\\JetBrains\\PyCharm Community Edition 2024.2.3\\bin;;C:\\Users\\rrjra\\Downloads\\python-3.13.1-amd64.exe;C:\\Users\\rrjra\\.dotnet\\tools;C:\\Program Files\\R\\R-4.5.0\\library;C:\\Users\\rrjra\\AppData\\Roaming\\npm;C:\\Users\\rrjra\\downloads\\postgresql-18.0-1-windows-x64.exe;C:\\Users\\rrjra\\AppData\\Local\\Programs\\Windsurf\\bin;c:\\Users\\rrjra\\.vscode\\extensions\\openai.chatgpt-26.5318.11754-win32-x64\\bin\\windows-x86_64",
+        "PATHEXT": ".COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC;.CPL",
+        "PROCESSOR_ARCHITECTURE": "AMD64",
+        "PROCESSOR_IDENTIFIER": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
+        "PROCESSOR_LEVEL": "6",
+        "PROCESSOR_REVISION": "9a03",
+        "ProgramData": "C:\\ProgramData",
+        "ProgramFiles": "C:\\Program Files",
+        "ProgramFiles(x86)": "C:\\Program Files (x86)",
+        "ProgramW6432": "C:\\Program Files",
+        "PROMPT": "$P$G",
+        "PSModulePath": "C:\\Users\\rrjra\\Documents\\WindowsPowerShell\\Modules;C:\\Program Files\\WindowsPowerShell\\Modules;C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\Modules",
+        "PUBLIC": "C:\\Users\\Public",
+        "PyCharm Community Edition": "C:\\Program Files\\JetBrains\\PyCharm Community Edition 2024.2.3\\bin;",
+        "QA_RUN_COMPREHENSIVE": "true",
+        "RUST_LOG": "warn",
+        "R_LIBS_USER": "C:\\Program Files\\R\\R-4.5.0\\library",
+        "SESSIONNAME": "Console",
+        "SystemDrive": "C:",
+        "SystemRoot": "C:\\WINDOWS",
+        "TEMP": "C:\\Users\\rrjra\\AppData\\Local\\Temp",
+        "TMP": "C:\\Users\\rrjra\\AppData\\Local\\Temp",
+        "USERDOMAIN": "ANONYMOUS",
+        "USERDOMAIN_ROAMINGPROFILE": "ANONYMOUS",
+        "USERNAME": "rrjra",
+        "USERPROFILE": "C:\\Users\\rrjra",
+        "VSCODE_CODE_CACHE_PATH": "C:\\Users\\rrjra\\AppData\\Roaming\\Code\\CachedData\\560a9dba96f961efea7b1612916f89e5d5d4d679",
+        "VSCODE_CRASH_REPORTER_PROCESS_TYPE": "extensionHost",
+        "VSCODE_CWD": "C:\\Users\\rrjra\\AppData\\Local\\Programs\\Microsoft VS Code",
+        "VSCODE_ESM_ENTRYPOINT": "vs/workbench/api/node/extensionHostProcess",
+        "VSCODE_HANDLES_UNCAUGHT_ERRORS": "true",
+        "VSCODE_IPC_HOOK": "\\\\.\\pipe\\f9f38449-1.116.0-main-sock",
+        "VSCODE_NLS_CONFIG": "{\"userLocale\":\"en-us\",\"osLocale\":\"en-us\",\"resolvedLanguage\":\"en\",\"defaultMessagesFile\":\"C:\\\\Users\\\\rrjra\\\\AppData\\\\Local\\\\Programs\\\\Microsoft VS Code\\\\560a9dba96\\\\resources\\\\app\\\\out\\\\nls.messages.json\",\"locale\":\"en-us\",\"availableLanguages\":{}}",
+        "VSCODE_PID": "20896",
+        "windir": "C:\\WINDOWS",
+        "ZES_ENABLE_SYSMAN": "1"
+      }
+    }
+  },
+  "suites": [
+    {
+      "title": "admin-guardian-comprehensive-qa.spec.js",
+      "file": "admin-guardian-comprehensive-qa.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "San Nicolas Admin and Guardian comprehensive QA @san-nicolas-qa",
+          "file": "admin-guardian-comprehensive-qa.spec.js",
+          "line": 382,
+          "column": 6,
+          "specs": [
+            {
+              "title": "Admin dashboard route, control, form, and backend response audit",
+              "ok": true,
+              "tags": [
+                "san-nicolas-qa"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Tablet - iPad Air (820x1180)",
+                  "projectName": "Tablet - iPad Air (820x1180)",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c51d009fe6542b1cc563-d3cd7cfd4a5e2b6b9d34",
+              "file": "admin-guardian-comprehensive-qa.spec.js",
+              "line": 397,
+              "column": 3
+            },
+            {
+              "title": "Guardian dashboard route, control, form, and backend response audit",
+              "ok": true,
+              "tags": [
+                "san-nicolas-qa"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Tablet - iPad Air (820x1180)",
+                  "projectName": "Tablet - iPad Air (820x1180)",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c51d009fe6542b1cc563-24110194571e6f73c51c",
+              "file": "admin-guardian-comprehensive-qa.spec.js",
+              "line": 413,
+              "column": 3
+            },
+            {
+              "title": "Action buttons, modal openings, and validation surfaces remain responsive",
+              "ok": true,
+              "tags": [
+                "san-nicolas-qa"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Tablet - iPad Air (820x1180)",
+                  "projectName": "Tablet - iPad Air (820x1180)",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c51d009fe6542b1cc563-b08a75107695dd95f4e0",
+              "file": "admin-guardian-comprehensive-qa.spec.js",
+              "line": 429,
+              "column": 3
+            },
+            {
+              "title": "Admin and Guardian route permissions are enforced",
+              "ok": true,
+              "tags": [
+                "san-nicolas-qa"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Tablet - iPad Air (820x1180)",
+                  "projectName": "Tablet - iPad Air (820x1180)",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c51d009fe6542b1cc563-03ee0a82209ca1945f66",
+              "file": "admin-guardian-comprehensive-qa.spec.js",
+              "line": 448,
+              "column": 3
+            },
+            {
+              "title": "CRUD contract coverage is present for Admin and Guardian modules",
+              "ok": true,
+              "tags": [
+                "san-nicolas-qa"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Tablet - iPad Air (820x1180)",
+                  "projectName": "Tablet - iPad Air (820x1180)",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c51d009fe6542b1cc563-5b4db5709cb01a8dcf17",
+              "file": "admin-guardian-comprehensive-qa.spec.js",
+              "line": 464,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-04-22T05:17:10.344Z",
+    "duration": 138.42799999999988,
+    "expected": 0,
+    "skipped": 5,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

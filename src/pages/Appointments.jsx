@@ -336,25 +336,13 @@ export default function Appointments() {
   // Sorting state
   const [sortField] = useState("scheduled_date");
   const [sortDirection, setSortDirection] = useState("desc");
-  // Helper function to get default date range when no filters are set
-  const getDefaultDateRange = useCallback(() => {
-    if (dateFilterStart || dateFilterEnd) {
-      return {
-        ...(dateFilterStart ? { start_date: dateFilterStart } : {}),
-        ...(dateFilterEnd ? { end_date: dateFilterEnd } : {}),
-      };
-    }
-
-    const today = new Date();
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-
-    // Match the Analytics dashboard default "This Month" window so both modules
-    // resolve the same appointment counts unless the user explicitly changes filters.
-    return {
-      start_date: toClinicDateKey(monthStart),
-      end_date: toClinicDateKey(today),
-    };
-  }, [dateFilterStart, dateFilterEnd]);
+  const explicitDateRangeFilters = useMemo(
+    () => ({
+      ...(dateFilterStart ? { start_date: dateFilterStart } : {}),
+      ...(dateFilterEnd ? { end_date: dateFilterEnd } : {}),
+    }),
+    [dateFilterStart, dateFilterEnd],
+  );
 
   const listQueryParams = useMemo(
     () => ({
@@ -362,7 +350,7 @@ export default function Appointments() {
       limit: itemsPerPage,
       ...(debouncedSearchQuery ? { search: debouncedSearchQuery } : {}),
       ...(statusFilter !== "all" ? { status: statusFilter } : {}),
-      ...getDefaultDateRange(),
+      ...explicitDateRangeFilters,
       sort_field: sortField,
       sort_direction: sortDirection,
     }),
@@ -371,7 +359,7 @@ export default function Appointments() {
       itemsPerPage,
       debouncedSearchQuery,
       statusFilter,
-      getDefaultDateRange,
+      explicitDateRangeFilters,
       sortField,
       sortDirection,
     ],
@@ -2108,21 +2096,6 @@ export default function Appointments() {
               onClick={() => setShowDateDetailsModal(false)}
             >
               Close
-            </Button>
-            <Button
-              type="button"
-              variant={selectedDateDetails?.blocked ? "secondary" : "danger"}
-              onClick={() => {
-                if (selectedDate) {
-                  handleToggleBlockedDate(selectedDate);
-                }
-              }}
-              disabled={
-                !selectedDate ||
-                selectedDateDetails?.availability?.available === false
-              }
-            >
-              {selectedDateDetails?.blocked ? "Unblock Date" : "Block Date"}
             </Button>
             <Button
               type="button"

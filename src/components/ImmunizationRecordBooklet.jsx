@@ -6,9 +6,8 @@ import usePrintDateRange from "../hooks/usePrintDateRange";
 import {
   normalizeInfantResponse,
   normalizeVaccinationRecordsResponse,
-  normalizeVaccinationSchedulesResponse,
-  buildVaccinationScheduleTimeline,
 } from "../utils/adminDataAdapters";
+import { normalizeArrayPayload } from "../utils/apiUtils";
 import { filterItemsByPrintDateRange } from "../utils/printDateRange";
 import {
   downloadPdfFromHtml,
@@ -17,7 +16,6 @@ import {
 } from "../utils/printDocumentExport";
 
 const DATE_ONLY_VALUE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
-const DUE_SOON_WINDOW_DAYS = 14;
 
 const BOOKLET_VACCINE_ROWS = [
   {
@@ -365,9 +363,9 @@ const PRINTABLE_STYLES = `
 
   .record-card-export__title {
     margin: 0 0 3mm;
-    font-size: 19px;
+    font-size: 18px;
     font-weight: 800;
-    line-height: 1;
+    line-height: 1.15;
   }
 
   .record-card-export__info-grid {
@@ -390,8 +388,8 @@ const PRINTABLE_STYLES = `
 
   .record-card-export__field-table th,
   .record-card-export__field-table td {
-    font-size: 9px;
-    line-height: 1.05;
+    font-size: 9.5px;
+    line-height: 1.2;
     padding: 0;
     vertical-align: bottom;
   }
@@ -405,9 +403,9 @@ const PRINTABLE_STYLES = `
   }
 
   .record-card-export__field-table td {
-    border-bottom: 1.5px solid #1f2937;
-    min-height: 13px;
-    height: 13px;
+    border-bottom: 1px solid #1f2937;
+    min-height: 14px;
+    height: 14px;
     padding-bottom: 1px;
   }
 
@@ -422,9 +420,9 @@ const PRINTABLE_STYLES = `
   }
 
   .record-card-export__table-wrap {
-    background:
-      linear-gradient(180deg, #0f6967 0, #0f6967 7mm, #f68d3f 7mm, #f68d3f 100%);
-    padding: 3mm 3mm 2mm;
+    background: #ffffff;
+    border-top: 2px solid #0f6967;
+    padding: 3mm 3mm 2.5mm;
   }
 
   .record-card-export__table {
@@ -436,7 +434,7 @@ const PRINTABLE_STYLES = `
 
   .record-card-export__table th,
   .record-card-export__table td {
-    border: 2px solid #0f6967;
+    border: 1.25px solid #0f6967;
     background: #ffffff;
     color: #111827;
     vertical-align: top;
@@ -447,17 +445,17 @@ const PRINTABLE_STYLES = `
 
   .record-card-export__table th {
     background: #f4b24d;
-    font-size: 9px;
+    font-size: 9.5px;
     font-weight: 800;
-    padding: 4px 3px;
+    padding: 5px 4px;
     text-align: center;
-    line-height: 1.05;
+    line-height: 1.2;
   }
 
   .record-card-export__table td {
-    font-size: 7.5px;
-    padding: 2px;
-    line-height: 1.02;
+    font-size: 8.5px;
+    padding: 3px;
+    line-height: 1.2;
   }
 
   .record-card-export__column--vaccine {
@@ -478,8 +476,8 @@ const PRINTABLE_STYLES = `
 
   .record-card-export__vaccine-cell {
     font-weight: 700;
-    font-size: 8px;
-    line-height: 1.05;
+    font-size: 8.5px;
+    line-height: 1.2;
     text-align: center;
     vertical-align: middle !important;
   }
@@ -502,11 +500,11 @@ const PRINTABLE_STYLES = `
   }
 
   .record-card-export__dose-badge {
-    width: 11px;
-    height: 11px;
+    width: 12px;
+    height: 12px;
     border-radius: 999px;
     background: #f4b24d;
-    font-size: 6.5px;
+    font-size: 7px;
     font-weight: 800;
     display: inline-flex;
     align-items: center;
@@ -515,8 +513,8 @@ const PRINTABLE_STYLES = `
   }
 
   .record-card-export__dose-label {
-    font-size: 7.5px;
-    line-height: 1;
+    font-size: 8px;
+    line-height: 1.2;
     font-weight: 700;
   }
 
@@ -529,13 +527,13 @@ const PRINTABLE_STYLES = `
 
   .record-card-export__date-grid td {
     position: relative;
-    min-height: 14px;
-    height: 14px;
+    min-height: 16px;
+    height: 16px;
     border: 1px solid #94a3b8;
-    padding: 5px 1px 1px;
+    padding: 5px 2px 2px;
     text-align: center;
     vertical-align: middle;
-    font-size: 6.5px;
+    font-size: 7.5px;
     font-weight: 700;
     background: #ffffff;
   }
@@ -544,7 +542,7 @@ const PRINTABLE_STYLES = `
     position: absolute;
     top: 1px;
     left: 2px;
-    font-size: 5px;
+    font-size: 5.5px;
     font-weight: 800;
     color: #64748b;
   }
@@ -552,14 +550,14 @@ const PRINTABLE_STYLES = `
   .record-card-export__remarks-box {
     white-space: pre-wrap;
     word-break: break-word;
-    line-height: 1.02;
+    line-height: 1.2;
   }
 
   .record-card-export__footer-note {
     margin-top: 1.75mm;
-    color: #ffffff;
-    font-size: 7px;
-    line-height: 1.05;
+    color: #1f2937;
+    font-size: 7.5px;
+    line-height: 1.25;
     font-weight: 600;
   }
 
@@ -887,37 +885,68 @@ const assignItemsToSlots = ({ items = [], slots = [], scorer }) => {
   return bestAssignment.assignments;
 };
 
-const deriveSlotStatus = ({ record, infantDob, slot, referenceDate = new Date() }) => {
-  const explicitStatus = normalizeStatusValue(record?.status, "");
-  const dueDate = getSlotTargetDate(infantDob, slot);
-  const now = parseDateValue(referenceDate) || new Date();
-  const dueSoonThreshold = new Date(now);
-  dueSoonThreshold.setDate(dueSoonThreshold.getDate() + DUE_SOON_WINDOW_DAYS);
+const normalizeCanonicalStatus = (value) => {
+  const normalized = normalizeStatusValue(value, "").replace(/-/g, "_");
 
-  if (record?.admin_date || explicitStatus === "completed") {
+  if (!normalized) {
+    return "";
+  }
+
+  if (normalized === "attended") {
     return "completed";
   }
 
-  if (explicitStatus && !["pending", "scheduled"].includes(explicitStatus)) {
-    return explicitStatus;
+  if (normalized === "confirmed" || normalized === "rescheduled") {
+    return "scheduled";
   }
 
-  if (dueDate && dueDate < now) {
-    return "overdue";
+  if (normalized === "due") {
+    return "due_soon";
   }
 
-  if (dueDate && dueDate <= dueSoonThreshold) {
-    return "due";
+  return normalized;
+};
+
+const resolveSlotStatus = ({ record, timelineEntry }) => {
+  if (record?.admin_date) {
+    return "completed";
+  }
+
+  const timelineStatus = normalizeCanonicalStatus(timelineEntry?.status);
+  if (timelineStatus) {
+    return timelineStatus;
+  }
+
+  const recordStatus = normalizeCanonicalStatus(record?.status);
+  if (recordStatus) {
+    return recordStatus;
   }
 
   return "pending";
+};
+
+const getStatusLabel = (status) => {
+  const normalized = normalizeCanonicalStatus(status) || "pending";
+
+  const labels = {
+    completed: "Completed",
+    ready: "Ready",
+    overdue: "Overdue",
+    due_soon: "Due Soon",
+    pending_confirmation: "Pending Confirmation",
+    upcoming: "Upcoming",
+    scheduled: "Scheduled",
+    pending: "Pending",
+    cancelled: "Cancelled",
+  };
+
+  return labels[normalized] || normalized.replace(/_/g, " ");
 };
 
 const buildBookletRows = ({
   records = [],
   timeline = [],
   infantDob,
-  referenceDate = new Date(),
 }) =>
   BOOKLET_VACCINE_ROWS.map((row) => {
     const recordAssignments = assignItemsToSlots({
@@ -947,8 +976,7 @@ const buildBookletRows = ({
     const slots = row.slots.map((slot) => {
       const record = recordAssignments.get(slot.key) || null;
       const timelineEntry = timelineAssignments.get(slot.key) || null;
-      const timelineStatus = normalizeStatusValue(timelineEntry?.status, "");
-      const derivedStatus = deriveSlotStatus({ record, infantDob, slot, referenceDate });
+      const resolvedStatus = resolveSlotStatus({ record, timelineEntry });
 
       return {
         ...slot,
@@ -956,12 +984,7 @@ const buildBookletRows = ({
         timelineEntry,
         adminDate: record?.admin_date ?? null,
         notes: record?.notes ?? "",
-        status:
-          derivedStatus === "completed"
-            ? "completed"
-            : timelineStatus && timelineStatus !== "pending"
-              ? timelineStatus
-              : derivedStatus,
+        status: resolvedStatus,
       };
     });
 
@@ -973,12 +996,15 @@ const buildBookletRows = ({
   });
 
 const getStatusBadgeClassName = (status) => {
-  switch (status) {
+  switch (normalizeCanonicalStatus(status)) {
     case "completed":
+      return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-200";
+    case "ready":
       return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-200";
     case "overdue":
       return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-200";
-    case "due":
+    case "due_soon":
+    case "pending_confirmation":
       return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-200";
     default:
       return "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200";
@@ -1060,7 +1086,7 @@ export default function ImmunizationRecordBooklet({ infantId }) {
       const [infantData, vaccinationData, schedulesData] = await Promise.all([
         apiClient.getInfant(infantId),
         apiClient.getVaccinationRecordsByInfant(infantId),
-        apiClient.getVaccinationSchedules(),
+        apiClient.getInfantVaccinationSchedule(infantId),
       ]);
 
       if (!isMountedRef.current || requestId !== requestIdRef.current) {
@@ -1069,7 +1095,15 @@ export default function ImmunizationRecordBooklet({ infantId }) {
 
       setInfant(normalizeInfantResponse(infantData));
       setVaccinationRecords(normalizeVaccinationRecordsResponse(vaccinationData));
-      setVaccinationSchedules(normalizeVaccinationSchedulesResponse(schedulesData));
+
+      const normalizedScheduleResponse =
+        schedulesData && typeof schedulesData === "object"
+          ? schedulesData
+          : { schedule: Array.isArray(schedulesData) ? schedulesData : [] };
+
+      setVaccinationSchedules(
+        normalizeArrayPayload(normalizedScheduleResponse, ["schedule", "data"]),
+      );
     } catch (fetchError) {
       if (!isMountedRef.current || requestId !== requestIdRef.current) {
         return;
@@ -1158,12 +1192,36 @@ export default function ImmunizationRecordBooklet({ infantId }) {
 
   const vaccinationTimeline = useMemo(
     () =>
-      buildVaccinationScheduleTimeline({
-        schedules: vaccinationSchedules,
-        records: printableVaccinationRecords,
-        infantDob: infant?.dob,
-      }),
-    [infant?.dob, printableVaccinationRecords, vaccinationSchedules],
+      (Array.isArray(vaccinationSchedules) ? vaccinationSchedules : []).map(
+        (scheduleItem) => ({
+          ...scheduleItem,
+          vaccine_name:
+            scheduleItem?.vaccine?.name ||
+            scheduleItem?.vaccineName ||
+            scheduleItem?.vaccine_name ||
+            "Unknown vaccine",
+          dose_no:
+            scheduleItem?.dose?.number ||
+            scheduleItem?.doseNumber ||
+            scheduleItem?.dose_no ||
+            scheduleItem?.dose_number ||
+            1,
+          due_date:
+            scheduleItem?.schedule?.dueDate ||
+            scheduleItem?.dueDate ||
+            scheduleItem?.due_date ||
+            null,
+          admin_date:
+            scheduleItem?.lastAdministered ||
+            scheduleItem?.adminDate ||
+            scheduleItem?.admin_date ||
+            null,
+          status: normalizeCanonicalStatus(
+            scheduleItem?.status || scheduleItem?.schedule?.status || "",
+          ),
+        }),
+      ),
+    [vaccinationSchedules],
   );
 
   const bookletRows = useMemo(
@@ -1406,63 +1464,7 @@ export default function ImmunizationRecordBooklet({ infantId }) {
           </div>
         </div>
 
-        <div className="guardian-table-card-list immunization-record-booklet__mobile-list p-4">
-          {bookletRows.map((row) => {
-            const noteEntries = row.slots.filter((slot) => hasDisplayValue(slot.notes));
-
-            return (
-              <article key={`mobile-${row.key}`} className="guardian-table-card">
-                <div className="guardian-table-card__header">
-                  <div className="min-w-0">
-                    <h4 className="guardian-table-card__title">{row.vaccineLabel}</h4>
-                  </div>
-                </div>
-
-                <div className="guardian-table-card__rows">
-                  {row.slots.map((slot) => (
-                    <div key={`mobile-slot-${slot.key}`} className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 dark:border-gray-700 dark:bg-gray-900/40">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                          Dose {slot.displayDoseNumber}
-                        </span>
-                        <span
-                          className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadgeClassName(slot.status)}`}
-                        >
-                          {slot.status}
-                        </span>
-                      </div>
-                      <div className="mt-2 grid gap-2 text-sm">
-                        <div className="flex items-start justify-between gap-3">
-                          <span className="text-gray-500 dark:text-gray-400">Schedule</span>
-                          <span className="text-right font-medium text-gray-900 dark:text-gray-100">{slot.scheduleLabel}</span>
-                        </div>
-                        <div className="flex items-start justify-between gap-3">
-                          <span className="text-gray-500 dark:text-gray-400">Date Administered</span>
-                          <span className="text-right font-medium text-gray-900 dark:text-gray-100">{hasDisplayValue(slot.adminDate) ? formatDate(slot.adminDate) : '—'}</span>
-                        </div>
-                        {hasDisplayValue(slot.notes) && (
-                          <div className="flex items-start justify-between gap-3">
-                            <span className="text-gray-500 dark:text-gray-400">Remarks</span>
-                            <span className="text-right font-medium text-gray-900 dark:text-gray-100 break-words">{slot.notes}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-
-                  {!noteEntries.length && (
-                    <div className="guardian-table-card__row">
-                      <span className="guardian-table-card__label">Remarks</span>
-                      <span className="guardian-table-card__value">—</span>
-                    </div>
-                  )}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-
-        <div className="guardian-table-scroll-shell immunization-record-booklet__desktop-table">
+        <div className="guardian-table-scroll-shell p-4 pt-0">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
@@ -1559,11 +1561,11 @@ export default function ImmunizationRecordBooklet({ infantId }) {
                               Dose {slot.displayDoseNumber}
                             </span>
                             <span
-                              className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadgeClassName(
+                              className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClassName(
                                 slot.status,
                               )}`}
                             >
-                              {slot.status}
+                              {getStatusLabel(slot.status)}
                             </span>
                           </div>
                         ))}

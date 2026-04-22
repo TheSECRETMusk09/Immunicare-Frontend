@@ -44,6 +44,24 @@ const normalizeAppointmentsResponse = (response) =>
     notes: entry?.notes ?? entry?.remarks ?? "",
   }));
 
+const extractTcbValue = (entry = {}) => {
+  const directValue =
+    entry?.tcb ??
+    entry?.tcb_value ??
+    entry?.transcutaneous_bilirubin ??
+    entry?.bilirubin_tcb;
+
+  if (directValue !== undefined && directValue !== null && String(directValue).trim()) {
+    return String(directValue).trim();
+  }
+
+  const notes = String(
+    entry?.healthcare_worker_notes ?? entry?.health_care_worker_notes ?? "",
+  );
+  const match = notes.match(/(?:^|\n)\s*TCB\s*:\s*([^\n;]+)/i);
+  return match?.[1]?.trim() || "";
+};
+
 const normalizeGrowthRecordsResponse = (response) =>
   toArrayPayload(response, ["growthRecords", "records", "growth"]).map((entry) => ({
     ...entry,
@@ -56,8 +74,68 @@ const normalizeGrowthRecordsResponse = (response) =>
     weight_kg: toFiniteNumber(entry?.weight_kg, null),
     feeding_status: entry?.feeding_status ?? null,
     notes: entry?.notes ?? entry?.remarks ?? "",
+    healthcare_worker_notes: entry?.healthcare_worker_notes ?? "",
+    tcb: extractTcbValue(entry),
     measurement_date: entry?.measurement_date ?? entry?.date ?? null,
   }));
+
+const normalizeHealthWorkerRole = (value) =>
+  String(value || "").trim().toLowerCase();
+
+const buildHealthWorkerDisplayName = (user = {}) => {
+  const composedName = [user.first_name, user.middle_name, user.last_name]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    composedName ||
+    String(user.full_name || user.name || user.displayName || user.username || user.email || "").trim()
+  );
+};
+
+const normalizeHealthWorkersResponse = (response, scopedClinicId = null) => {
+  const allowedRoles = new Set([
+    "physician",
+    "doctor",
+    "nurse",
+    "midwife",
+    "health_worker",
+    "system_admin",
+    "admin",
+    "super_admin",
+  ]);
+
+  return toArrayPayload(response, ["users", "data"])
+    .map((rawUser) => {
+      const id = Number(rawUser?.id);
+      const role = normalizeHealthWorkerRole(rawUser?.role_name || rawUser?.role);
+      const isActive =
+        rawUser?.is_active !== false &&
+        normalizeHealthWorkerRole(rawUser?.status) !== "inactive";
+      const isGuardianAccount =
+        rawUser?.is_guardian_account === true || role === "guardian";
+      const userClinicId = Number(rawUser?.clinic_id || rawUser?.facility_id || 0) || null;
+
+      if (!Number.isFinite(id) || id <= 0) return null;
+      if (!allowedRoles.has(role) || !isActive || isGuardianAccount) return null;
+      if (scopedClinicId && userClinicId && userClinicId !== Number(scopedClinicId)) {
+        return null;
+      }
+
+      const displayName = buildHealthWorkerDisplayName(rawUser);
+      if (!displayName) return null;
+
+      return {
+        ...rawUser,
+        id,
+        displayName,
+        roleLabel: role.replace(/_/g, " "),
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.displayName.localeCompare(right.displayName));
+};
 
 const VISIT_TEMPLATES = [
   {
@@ -2040,6 +2118,7 @@ export default function ImmunizationChart({ infantId }) {
   const [appointments, setAppointments] = useState([]);
   const [growthRecords, setGrowthRecords] = useState([]);
   const [vaccinations, setVaccinations] = useState([]);
+  const [healthWorkers, setHealthWorkers] = useState([]);
   const [loading, setLoading] = useState(Boolean(infantId));
   const [loadError, setLoadError] = useState(null);
   const [loadWarning, setLoadWarning] = useState(null);
@@ -2081,6 +2160,7 @@ export default function ImmunizationChart({ infantId }) {
       setAppointments([]);
       setGrowthRecords([]);
       setVaccinations([]);
+      setHealthWorkers([]);
       setLoadError(null);
       setLoadWarning(null);
       setLoading(false);
@@ -2092,12 +2172,19 @@ export default function ImmunizationChart({ infantId }) {
       setLoadError(null);
       setLoadWarning(null);
 
-      const [infantResult, appointmentsResult, growthResult, vaccinationResult] =
+      const [infantResult, appointmentsResult, growthResult, vaccinationResult, usersResult] =
         await Promise.allSettled([
           apiClient.getInfant(infantId),
           apiClient.getAppointmentsByInfant(infantId),
           apiClient.getGrowthRecordsByInfant(infantId),
           apiClient.getVaccinationRecordsByInfant(infantId),
+          typeof apiClient.getSystemUsers === "function"
+            ? apiClient.getSystemUsers({
+                limit: 200,
+                roles: "physician,doctor,nurse,midwife,health_worker,system_admin,admin,super_admin",
+                is_active: true,
+              })
+            : Promise.resolve({ data: [] }),
         ]);
 
       if (infantResult.status !== "fulfilled") {
@@ -2131,6 +2218,11 @@ export default function ImmunizationChart({ infantId }) {
           ? normalizeVaccinationRecordsResponse(vaccinationResult.value)
           : [],
       );
+      setHealthWorkers(
+        usersResult.status === "fulfilled"
+          ? normalizeHealthWorkersResponse(usersResult.value, scopedClinicId)
+          : [],
+      );
 
       if (partialFailures.length > 0) {
         setLoadWarning(
@@ -2148,6 +2240,7 @@ export default function ImmunizationChart({ infantId }) {
       setAppointments([]);
       setGrowthRecords([]);
       setVaccinations([]);
+      setHealthWorkers([]);
     } finally {
       if (!isMountedRef.current || requestId !== requestIdRef.current) {
         return;
@@ -2155,7 +2248,7 @@ export default function ImmunizationChart({ infantId }) {
 
       setLoading(false);
     }
-  }, [infantId]);
+  }, [infantId, scopedClinicId]);
 
   useEffect(() => {
     void fetchData();
@@ -2313,7 +2406,7 @@ export default function ImmunizationChart({ infantId }) {
         visitDate,
         remarks,
         breastfeeding,
-        tcb: "",
+        tcb: growth?.tcb || "",
         hasRecordedData:
           Boolean(visitDate) ||
           Boolean(growth) ||
@@ -2905,6 +2998,17 @@ export default function ImmunizationChart({ infantId }) {
     setSaveSuccess(false);
 
     try {
+      const selectedAdministeredBy =
+        Number(visitData.healthcare_worker_id || user?.id || 1) || 1;
+      const visitTime = String(visitData.visit_date || "").split("T")[1]?.slice(0, 5) || null;
+      const tcbValue = String(visitData.growth?.tcb || "").trim();
+      const healthcareWorkerNotes = [
+        tcbValue ? `TCB: ${tcbValue}` : "",
+        visitData.healthcare_worker ? `Recorded by: ${visitData.healthcare_worker}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+
       if (visitData.growth) {
         await apiClient.createGrowthRecord({
           infant_id: infantId,
@@ -2925,8 +3029,10 @@ export default function ImmunizationChart({ infantId }) {
             ? "breastfeeding"
             : "not_breastfeeding",
           health_status: "well",
-          measured_by: 1,
+          measured_by: selectedAdministeredBy,
+          measurement_time: visitTime,
           notes: visitData.remarks || "",
+          healthcare_worker_notes: healthcareWorkerNotes || null,
         });
       }
 
@@ -2975,9 +3081,15 @@ export default function ImmunizationChart({ infantId }) {
             vaccine_id: vaccine.id,
             dose_no: vaccineEntry.dose_no || 1,
             admin_date: visitData.visit_date,
-            administered_by: user?.id || 1,
+            administered_by: selectedAdministeredBy,
             health_care_provider: visitData.healthcare_worker || null,
             site_of_injection: vaccineEntry.site || "Left arm",
+            route_of_injection:
+              String(vaccineEntry.site || "").trim().toLowerCase() === "oral"
+                ? "Oral"
+                : "IM",
+            time_administered: visitTime,
+            expiration_date: vaccineEntry.expiry_date || null,
             reactions: vaccineEntry.reactions || null,
             lot_number: selectedLotBatchNumber || vaccineEntry.lot_number || null,
             batch_number: selectedLotBatchNumber || vaccineEntry.lot_number || null,
@@ -3007,6 +3119,12 @@ export default function ImmunizationChart({ infantId }) {
       }
 
       await fetchData();
+      const updateDetail = {
+        patient_id: Number(infantId),
+        infant_id: Number(infantId),
+      };
+      window.dispatchEvent(new CustomEvent("vaccination-update", { detail: updateDetail }));
+      window.dispatchEvent(new CustomEvent("child-data-update", { detail: updateDetail }));
 
       if (!isMountedRef.current) {
         return;
@@ -3616,6 +3734,7 @@ export default function ImmunizationChart({ infantId }) {
             visit={selectedVisit}
             onClose={() => setShowVisitModal(false)}
             onSave={handleVisitSave}
+            healthWorkers={healthWorkers}
             disabled={saving}
           />
         )}

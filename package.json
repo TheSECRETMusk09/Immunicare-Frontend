@@ -52,6 +52,8 @@
     "test:ci": "set CI=true && react-scripts test --watchAll=false",
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",
+    "e2e:san-nicolas": "set QA_RUN_COMPREHENSIVE=true&& playwright test e2e/tests/admin-guardian-comprehensive-qa.spec.js --project=\"Tablet - iPad Air (820x1180)\"",
+    "e2e:san-nicolas:mutation-surfaces": "set QA_RUN_COMPREHENSIVE=true&& set QA_ENABLE_MUTATION=true&& set QA_REQUIRE_MUTATION=true&& playwright test e2e/tests/admin-guardian-comprehensive-qa.spec.js --project=\"Tablet - iPad Air (820x1180)\"",
     "e2e:report": "playwright show-report ./e2e/playwright-report",
     "eject": "react-scripts eject"
   },

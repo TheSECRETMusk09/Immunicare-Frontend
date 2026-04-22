@@ -22,6 +22,33 @@ const shiftClinicDateKey = (value, days) => {
   return toClinicDateKey(parsed);
 };
 
+const startOfClinicWeekKey = (value) => {
+  const dateKey = toClinicDateKey(value);
+  if (!dateKey) {
+    return "";
+  }
+
+  const parsed = new Date(`${dateKey}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+
+  const dayOfWeek = parsed.getUTCDay();
+  const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  parsed.setUTCDate(parsed.getUTCDate() - diffToMonday);
+
+  return toClinicDateKey(parsed);
+};
+
+const endOfClinicWeekKey = (value) => {
+  const startOfWeekKey = startOfClinicWeekKey(value);
+  if (!startOfWeekKey) {
+    return "";
+  }
+
+  return shiftClinicDateKey(startOfWeekKey, 6);
+};
+
 const startOfClinicMonthKey = (value) => {
   const dateKey = toClinicDateKey(value);
   if (!dateKey) {
@@ -80,8 +107,8 @@ export const getVaccinationPeriodRange = ({
     // same-day range
   } else if (normalizedPeriod === "week") {
     return {
-      startDate: shiftClinicDateKey(today, -6),
-      endDate: today,
+      startDate: startOfClinicWeekKey(today),
+      endDate: endOfClinicWeekKey(today),
     };
   } else if (normalizedPeriod === "month") {
     return {
@@ -122,11 +149,20 @@ export const isDateWithinVaccinationPeriod = (value, range = {}) => {
 };
 
 export const buildVaccinationRecordPeriodParams = (periodState = {}) => {
-  const { startDate, endDate } = getVaccinationPeriodRange(periodState);
+  const normalizedPeriod = normalizeVaccinationPeriod(periodState.period);
+
+  if (normalizedPeriod === "custom") {
+    const { startDate, endDate } = getVaccinationPeriodRange(periodState);
+
+    return {
+      period: normalizedPeriod,
+      ...(startDate ? { startDate } : {}),
+      ...(endDate ? { endDate } : {}),
+    };
+  }
 
   return {
-    ...(startDate ? { administered_start_date: startDate } : {}),
-    ...(endDate ? { administered_end_date: endDate } : {}),
+    period: normalizedPeriod,
   };
 };
 

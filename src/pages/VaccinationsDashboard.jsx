@@ -214,6 +214,17 @@ const summarizeTrackingTimeline = (timeline = []) => {
   };
 };
 
+const isDoseInCompliancePeriod = (entry = {}, range = {}) => {
+  const statusKey = classifyScheduleDoseStatus(entry);
+  if (statusKey === "completed") {
+    const endDate = toClinicDateKey(range.endDate);
+    const administeredDate = toClinicDateKey(entry.admin_date);
+    return !endDate || !administeredDate || administeredDate <= endDate;
+  }
+
+  return isDateWithinVaccinationPeriod(entry.due_date, range);
+};
+
 const filterTrackingSnapshotByPeriod = (snapshot = {}, range = {}) => {
   const filteredTimeline = Array.isArray(snapshot.timeline)
     ? snapshot.timeline.filter((entry) => {
@@ -222,11 +233,7 @@ const filterTrackingSnapshotByPeriod = (snapshot = {}, range = {}) => {
           return false;
         }
 
-        const referenceDate =
-          statusKey === "completed"
-            ? entry.admin_date || null
-            : entry.due_date || null;
-        return referenceDate ? isDateWithinVaccinationPeriod(referenceDate, range) : false;
+        return isDoseInCompliancePeriod(entry, range);
       })
     : [];
 
@@ -1060,33 +1067,45 @@ const VaccinationsDashboard = () => {
         }
 
         case "tracking": {
-          const trackingOverview = await fetchVaccinationTrackingOverview({
-            page: trackingCurrentPageRef.current,
-            search: searchQueryRef.current,
-            signal,
-          });
+          const [trackingOverview, summaryData] = await Promise.all([
+            fetchVaccinationTrackingOverview({
+              page: trackingCurrentPageRef.current,
+              search: searchQueryRef.current,
+              signal,
+            }),
+            !isCustomRangeIncomplete
+              ? fetchVaccinationSummaryData({ signal })
+              : Promise.resolve(null),
+          ]);
 
           data = {
             trackingOverviewRows: trackingOverview.rows,
             trackingOverviewSummary: trackingOverview.summary,
             trackingOverviewPagination: trackingOverview.metadata,
             infants: extractInfantsFromOverviewRows(trackingOverview.rows),
+            summary: summaryData,
           };
           break;
         }
 
         case "schedule": {
-          const scheduleOverview = await fetchVaccinationScheduleOverview({
-            page: scheduleCurrentPageRef.current,
-            search: searchQueryRef.current,
-            signal,
-          });
+          const [scheduleOverview, summaryData] = await Promise.all([
+            fetchVaccinationScheduleOverview({
+              page: scheduleCurrentPageRef.current,
+              search: searchQueryRef.current,
+              signal,
+            }),
+            !isCustomRangeIncomplete
+              ? fetchVaccinationSummaryData({ signal })
+              : Promise.resolve(null),
+          ]);
 
           data = {
             scheduleOverviewRows: scheduleOverview.rows,
             scheduleOverviewSummary: scheduleOverview.summary,
             scheduleOverviewPagination: scheduleOverview.metadata,
             infants: extractInfantsFromOverviewRows(scheduleOverview.rows),
+            summary: summaryData,
           };
           break;
         }
@@ -1188,6 +1207,10 @@ const VaccinationsDashboard = () => {
               setInfants(tabData.infants);
               stableDataLoadedAtRef.current.infants = Date.now();
             }
+            if (tabData.summary) {
+              setDashboardSummary(tabData.summary);
+              stableDataLoadedAtRef.current.summary = Date.now();
+            }
             break;
 
           case "schedule":
@@ -1212,6 +1235,10 @@ const VaccinationsDashboard = () => {
             if (tabData.reconciliation) {
               setVaccinationRecords(tabData.reconciliation);
               stableDataLoadedAtRef.current.reconciliation = Date.now();
+            }
+            if (tabData.summary) {
+              setDashboardSummary(tabData.summary);
+              stableDataLoadedAtRef.current.summary = Date.now();
             }
             break;
         }
@@ -1731,7 +1758,7 @@ const VaccinationsDashboard = () => {
         return false;
       }
 
-      if (!isDateWithinVaccinationPeriod(row.due_date, periodRange)) {
+      if (!isDoseInCompliancePeriod(row, periodRange)) {
         return false;
       }
 
@@ -1912,8 +1939,7 @@ const VaccinationsDashboard = () => {
       };
     }
 
-    const summarySource =
-      activeTab === "records" && !shouldUseChildProgressScope ? dashboardSummary || null : null;
+    const summarySource = !shouldUseChildProgressScope ? dashboardSummary || null : null;
 
     if (summarySource) {
       return {

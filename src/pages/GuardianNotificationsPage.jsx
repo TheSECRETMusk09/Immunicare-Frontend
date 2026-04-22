@@ -92,6 +92,60 @@ const normalizeGuardianNotification = (notification = {}) => {
   };
 };
 
+const normalizeNotificationText = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+
+const resolveNotificationCreatedAt = (notification = {}) =>
+  notification.created_at || notification.createdAt || notification.timestamp || null;
+
+const resolveNotificationMetadata = (notification = {}) => {
+  const metadata = notification.metadata || notification.meta || null;
+  return metadata && typeof metadata === "object" ? metadata : {};
+};
+
+const resolveNotificationReadFlag = (notification = {}) =>
+  Boolean(notification.is_read ?? notification.read ?? notification.isRead ?? false);
+
+const buildNotificationDedupeKey = (notification = {}) => {
+  const metadata = resolveNotificationMetadata(notification);
+  const createdAt = resolveNotificationCreatedAt(notification);
+  const createdAtMs = createdAt ? new Date(createdAt).getTime() : Number.NaN;
+  const fiveMinuteBucket = Number.isFinite(createdAtMs)
+    ? Math.floor(createdAtMs / (5 * 60 * 1000))
+    : 0;
+
+  return [
+    "semantic",
+    normalizeNotificationText(notification.notification_type || notification.type || notification.category || "general"),
+    normalizeNotificationText(notification.title || "").slice(0, 80),
+    normalizeNotificationText(notification.message || "").slice(0, 180),
+    metadata.infant_id || notification.infant_id || "",
+    metadata.appointment_id || notification.appointment_id || "",
+    metadata.vaccine_id || notification.vaccine_id || "",
+    metadata.dose_number || notification.dose_number || "",
+    metadata.suggested_date || notification.suggested_date || metadata.date || "",
+    metadata.suggested_time || notification.suggested_time || metadata.time || "",
+    fiveMinuteBucket,
+  ].join("|");
+};
+
+const mergeDuplicateNotification = (existingNotification, incomingNotification) => {
+  const merged = {
+    ...existingNotification,
+    ...incomingNotification,
+  };
+
+  merged.id = existingNotification?.id || incomingNotification?.id || undefined;
+  merged.is_read =
+    resolveNotificationReadFlag(existingNotification) ||
+    resolveNotificationReadFlag(incomingNotification);
+
+  return merged;
+};
+
 const NotificationItem = ({ notification, onMarkRead, onMarkUnread, onDelete }) => {
   const config =
     NOTIFICATION_CATEGORY_CONFIG[notification.category] ||
@@ -265,13 +319,23 @@ const GuardianNotificationsPage = () => {
   // Combine API notifications with real-time socket notifications
   const combinedNotifications = useMemo(() => {
     const allNotifications = [...socketRealTimeNotifications, ...notifications];
-    // Remove duplicates by ID
+
+    // Remove duplicates using a semantic fingerprint so equivalent records collapse even if IDs differ.
     const uniqueMap = new Map();
-    allNotifications.forEach(n => {
-      if (!uniqueMap.has(n.id)) {
-        uniqueMap.set(n.id, n);
+
+    allNotifications.forEach((notification) => {
+      const key = buildNotificationDedupeKey(notification);
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, notification);
+        return;
       }
+
+      uniqueMap.set(
+        key,
+        mergeDuplicateNotification(uniqueMap.get(key), notification),
+      );
     });
+
     return Array.from(uniqueMap.values());
   }, [socketRealTimeNotifications, notifications]);
 

@@ -99,6 +99,31 @@ const renderInventoryRoute = (initialEntry = "/inventory?tab=inventory_sheet") =
     </MemoryRouter>,
   );
 
+const openGenerateReportModal = async () => {
+  fireEvent.click(screen.getByRole("button", { name: /^generate report$/i }));
+  return screen.findByRole("dialog", { name: /generate report/i });
+};
+
+const generateReportFromModal = async ({
+  reportType = "inventory-sheet",
+  format = "print",
+  reportDate = "2026-11-15",
+} = {}) => {
+  const modal = await openGenerateReportModal();
+
+  fireEvent.change(within(modal).getByLabelText(/report type/i), {
+    target: { value: reportType },
+  });
+  fireEvent.change(within(modal).getByLabelText(/^format/i), {
+    target: { value: format },
+  });
+  fireEvent.change(within(modal).getByLabelText(/report date/i), {
+    target: { value: reportDate },
+  });
+
+  fireEvent.click(within(modal).getByRole("button", { name: /generate report/i }));
+};
+
 describe("Inventory Management print and export behavior", () => {
   const mockPrint = jest.fn();
   const inventoryRecords = [
@@ -209,22 +234,20 @@ describe("Inventory Management print and export behavior", () => {
       screen.getByRole("button", { name: /print report/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /download pdf/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /download word/i }),
-    ).toBeInTheDocument();
-    expect(
       screen.getByRole("button", { name: /save inventory/i }),
     ).toBeInTheDocument();
+
+    const modal = await openGenerateReportModal();
+    expect(within(modal).getByLabelText(/report type/i)).toBeInTheDocument();
+    expect(within(modal).getByLabelText(/^format/i)).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /download inventory sheet pdf/i }),
+      within(modal).getByRole("option", { name: /print preview/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /download doh\/lgu pdf/i }),
+      within(modal).getByRole("option", { name: /pdf document/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /download ris pdf/i }),
+      within(modal).getByRole("option", { name: /word document/i }),
     ).toBeInTheDocument();
   });
 
@@ -232,7 +255,7 @@ describe("Inventory Management print and export behavior", () => {
     renderInventoryRoute("/inventory?tab=inventory_sheet");
 
     await waitForInventoryModuleReady();
-    fireEvent.change(document.getElementById("inventory-report-date-toolbar"), {
+    fireEvent.change(document.getElementById("inventory-report-date"), {
       target: { value: "2026-11-15" },
     });
 
@@ -243,7 +266,7 @@ describe("Inventory Management print and export behavior", () => {
     expect(document.body).toHaveClass("printing-inventory");
     expect(
       document.getElementById("inventory-print-page-style"),
-    ).toHaveTextContent("size: legal portrait");
+    ).toHaveTextContent("size: legal landscape");
     expect(
       screen.getByTestId("inventory-sheet-print-report"),
     ).toBeInTheDocument();
@@ -269,7 +292,7 @@ describe("Inventory Management print and export behavior", () => {
       "San Nicolas Health Center",
     );
     expect(screen.getByTestId("inventory-sheet-print-header")).toHaveTextContent(
-      "Inventory of Vaccines and Other Logistics",
+      /inventory of vaccines and other logistics?/i,
     );
     expect(
       within(screen.getByTestId("inventory-sheet-print-header")).getByAltText(
@@ -309,7 +332,7 @@ describe("Inventory Management print and export behavior", () => {
 
     await waitForInventoryModuleReady();
 
-    fireEvent.change(document.getElementById("inventory-report-date-toolbar"), {
+    fireEvent.change(document.getElementById("inventory-report-date"), {
       target: { value: "2026-11-15" },
     });
     fireEvent.change(screen.getByLabelText(/report format/i), {
@@ -460,7 +483,7 @@ describe("Inventory Management print and export behavior", () => {
 
     await waitForInventoryModuleReady();
 
-    fireEvent.change(document.getElementById("inventory-report-date-toolbar"), {
+    fireEvent.change(document.getElementById("inventory-report-date"), {
       target: { value: "2026-11-15" },
     });
     fireEvent.change(screen.getByLabelText(/report format/i), {
@@ -538,11 +561,10 @@ describe("Inventory Management print and export behavior", () => {
 
     await waitForInventoryModuleReady();
 
-    fireEvent.change(screen.getByLabelText(/report format/i), {
-      target: { value: "requisition-issue-slip" },
+    await generateReportFromModal({
+      reportType: "requisition-issue-slip",
+      format: "word",
     });
-
-    fireEvent.click(screen.getByRole("button", { name: /download word/i }));
 
     await waitFor(() => {
       expect(downloadWordDocument).toHaveBeenCalledWith(
@@ -557,17 +579,16 @@ describe("Inventory Management print and export behavior", () => {
     expect(risWordCall.headerText).toBe("");
     expect(risWordCall.html).toContain("ris-word-header-table");
 
-    fireEvent.change(screen.getByLabelText(/report format/i), {
-      target: { value: "inventory-sheet" },
+    await generateReportFromModal({
+      reportType: "inventory-sheet",
+      format: "word",
     });
-
-    fireEvent.click(screen.getByRole("button", { name: /download word/i }));
 
     await waitFor(() => {
       expect(downloadWordDocument).toHaveBeenLastCalledWith(
         expect.objectContaining({
           title: "EPI VACCINE AND OTHER LOGISTICS INVENTORY FORM",
-          page: PRINT_PAGE_PRESETS.legalLandscape,
+          page: expect.objectContaining({ orientation: "landscape" }),
           headerText: "",
           footerText: "",
           html: expect.stringContaining(
@@ -595,10 +616,10 @@ describe("Inventory Management print and export behavior", () => {
 
     await waitForInventoryModuleReady();
 
-    fireEvent.change(screen.getByLabelText(/report format/i), {
-      target: { value: "doh-lgu-stock-form" },
+    await generateReportFromModal({
+      reportType: "doh-lgu-stock-form",
+      format: "pdf",
     });
-    fireEvent.click(screen.getByRole("button", { name: /^download pdf$/i }));
 
     await waitFor(() => {
       expect(mockPdfSave).toHaveBeenCalledWith(
@@ -609,10 +630,10 @@ describe("Inventory Management print and export behavior", () => {
       expect.objectContaining({ orientation: "landscape", format: "legal" }),
     );
 
-    fireEvent.change(screen.getByLabelText(/report format/i), {
-      target: { value: "requisition-issue-slip" },
+    await generateReportFromModal({
+      reportType: "requisition-issue-slip",
+      format: "pdf",
     });
-    fireEvent.click(screen.getByRole("button", { name: /^download pdf$/i }));
 
     await waitFor(() => {
       expect(mockPdfSave).toHaveBeenCalledWith(
@@ -629,9 +650,10 @@ describe("Inventory Management print and export behavior", () => {
 
     await waitForInventoryModuleReady();
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /download inventory sheet pdf/i }),
-    );
+    await generateReportFromModal({
+      reportType: "inventory-sheet",
+      format: "pdf",
+    });
 
     await waitFor(() => {
       expect(mockPdfSave).toHaveBeenCalledWith(

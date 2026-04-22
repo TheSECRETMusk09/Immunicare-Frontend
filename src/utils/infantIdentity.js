@@ -52,13 +52,13 @@ const buildDateSearchTokens = (value) => {
 
 export const getInfantFullName = (infant = {}) => {
   const firstName = toStringSafe(
-    infant.first_name ?? infant.patient_first_name ?? infant.infant_first_name,
+    infant.first_name ?? infant.firstName ?? infant.patient_first_name ?? infant.infant_first_name,
   );
   const middleName = toStringSafe(
-    infant.middle_name ?? infant.middlename ?? infant.patient_middle_name,
+    infant.middle_name ?? infant.middleName ?? infant.middlename ?? infant.patient_middle_name,
   );
   const lastName = toStringSafe(
-    infant.last_name ?? infant.patient_last_name ?? infant.infant_last_name,
+    infant.last_name ?? infant.lastName ?? infant.patient_last_name ?? infant.infant_last_name,
   );
 
   const fullName = [firstName, middleName, lastName]
@@ -77,7 +77,10 @@ export const getInfantFullName = (infant = {}) => {
 
 export const getInfantControlNumber = (infant = {}) =>
   toStringSafe(
-    infant.control_number ?? infant.infant_control_number ?? infant.patient_control_number,
+    infant.control_number ??
+      infant.controlNumber ??
+      infant.infant_control_number ??
+      infant.patient_control_number,
   );
 
 export const getInfantDisplayLabel = (infant = {}) => {
@@ -109,13 +112,13 @@ export const getInfantDisplayLabel = (infant = {}) => {
 
 export const buildInfantRecordPrefillContext = (infant = {}) => {
   const firstName = toStringSafe(
-    infant.first_name ?? infant.patient_first_name ?? infant.infant_first_name,
+    infant.first_name ?? infant.firstName ?? infant.patient_first_name ?? infant.infant_first_name,
   );
   const middleName = toStringSafe(
-    infant.middle_name ?? infant.middlename ?? infant.patient_middle_name,
+    infant.middle_name ?? infant.middleName ?? infant.middlename ?? infant.patient_middle_name,
   );
   const lastName = toStringSafe(
-    infant.last_name ?? infant.patient_last_name ?? infant.infant_last_name,
+    infant.last_name ?? infant.lastName ?? infant.patient_last_name ?? infant.infant_last_name,
   );
   const displayName = getInfantDisplayLabel({
     ...infant,
@@ -163,8 +166,11 @@ export const buildInfantSearchText = (infant = {}) => {
   const searchParts = [
     fullName,
     infant.first_name,
+    infant.firstName,
     infant.middle_name,
+    infant.middleName,
     infant.last_name,
+    infant.lastName,
     infant.patient_first_name,
     infant.patient_middle_name,
     infant.patient_last_name,

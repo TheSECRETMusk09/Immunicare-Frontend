@@ -1,9 +1,50 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Button, Input } from "./UI";
 
 const VISIT_TIME_MIN = "07:00";
 const VISIT_TIME_MAX = "16:00";
 const HEALTHCARE_WORKER_OPTIONS = ["Midwife", "Nurse"];
+
+const buildWorkerName = (worker = {}) => {
+  const composedName = [
+    worker.first_name,
+    worker.middle_name,
+    worker.last_name,
+  ]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    composedName ||
+    String(worker.displayName || worker.full_name || worker.name || worker.username || worker.email || "").trim()
+  );
+};
+
+const normalizeWorkerOption = (worker) => {
+  if (typeof worker === "string") {
+    return {
+      id: null,
+      value: worker,
+      label: worker,
+    };
+  }
+
+  const id = Number(worker?.id);
+  const name = buildWorkerName(worker);
+  if (!name) {
+    return null;
+  }
+
+  const roleLabel = String(worker?.roleLabel || worker?.role_name || worker?.role || "").trim();
+
+  return {
+    id: Number.isFinite(id) && id > 0 ? id : null,
+    value: Number.isFinite(id) && id > 0 ? String(id) : name,
+    label: roleLabel ? `${name} (${roleLabel})` : name,
+    name,
+  };
+};
 
 const normalizeVisitTime = (value) => {
   const normalizedValue = String(value || "").slice(0, 5);
@@ -23,8 +64,23 @@ const normalizeVisitTime = (value) => {
   return normalizedValue;
 };
 
-export default function VisitRecordingForm({ infant, visit, onClose, onSave }) {
+export default function VisitRecordingForm({
+  infant,
+  visit,
+  onClose,
+  onSave,
+  healthWorkers = [],
+}) {
   const visitVaccines = Array.isArray(visit?.vaccines) ? visit.vaccines : [];
+  const workerOptions = useMemo(() => {
+    const normalized = (Array.isArray(healthWorkers) ? healthWorkers : [])
+      .map(normalizeWorkerOption)
+      .filter(Boolean);
+
+    return normalized.length > 0
+      ? normalized
+      : HEALTHCARE_WORKER_OPTIONS.map(normalizeWorkerOption).filter(Boolean);
+  }, [healthWorkers]);
   const [formData, setFormData] = useState({
     visit_date: new Date().toISOString().split("T")[0],
     visit_time: normalizeVisitTime(new Date().toTimeString().split(" ")[0].substring(0, 5)),
@@ -36,6 +92,7 @@ export default function VisitRecordingForm({ infant, visit, onClose, onSave }) {
       heart_rate: "",
       respiratory_rate: "",
       breastfeeding: false,
+      tcb: "",
     },
     vaccines: visitVaccines.map((vaccine) => ({
       name: typeof vaccine === "string" ? vaccine : vaccine.name,
@@ -52,6 +109,7 @@ export default function VisitRecordingForm({ infant, visit, onClose, onSave }) {
     })),
     remarks: "",
     healthcare_worker: "",
+    healthcare_worker_id: null,
     next_visit_date: "",
   });
 
@@ -105,6 +163,7 @@ export default function VisitRecordingForm({ infant, visit, onClose, onSave }) {
         vaccines: formData.vaccines,
         remarks: formData.remarks,
         healthcare_worker: formData.healthcare_worker,
+        healthcare_worker_id: formData.healthcare_worker_id,
         next_visit_date: formData.next_visit_date,
       };
 
@@ -162,20 +221,25 @@ export default function VisitRecordingForm({ infant, visit, onClose, onSave }) {
             Healthcare Worker *
           </label>
           <select
-            value={formData.healthcare_worker}
-            onChange={(e) =>
+            value={formData.healthcare_worker_id ? String(formData.healthcare_worker_id) : formData.healthcare_worker}
+            onChange={(e) => {
+              const selectedWorker = workerOptions.find(
+                (option) => option.value === e.target.value,
+              );
+
               setFormData((prev) => ({
                 ...prev,
-                healthcare_worker: e.target.value,
-              }))
-            }
+                healthcare_worker: selectedWorker?.name || selectedWorker?.label || e.target.value,
+                healthcare_worker_id: selectedWorker?.id || null,
+              }));
+            }}
             required
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:border-gray-500 dark:text-gray-100"
           >
             <option value="">Select healthcare worker</option>
-            {HEALTHCARE_WORKER_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
+            {workerOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
               </option>
             ))}
           </select>
@@ -287,6 +351,19 @@ export default function VisitRecordingForm({ infant, visit, onClose, onSave }) {
                 handleInputChange("growth", "respiratory_rate", e.target.value)
               }
               placeholder="30"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              TCB
+            </label>
+            <Input
+              type="text"
+              value={formData.growth.tcb}
+              onChange={(e) =>
+                handleInputChange("growth", "tcb", e.target.value)
+              }
+              placeholder="0.0"
             />
           </div>
           <div className="md:col-span-2">
