@@ -37,10 +37,10 @@ describe("authRedirect utilities", () => {
       "/guardian/dashboard",
     );
     expect(getDefaultAuthenticatedRouteFromRoleType("SYSTEM_ADMIN")).toBe(
-      "/dashboard",
+      "/analytics",
     );
     expect(getDefaultAuthenticatedRouteFromRoleType("admin")).toBe(
-      "/dashboard",
+      "/analytics",
     );
     expect(getDefaultAuthenticatedRouteFromRoleType(null)).toBe("/login");
   });
@@ -58,7 +58,7 @@ describe("authRedirect utilities", () => {
         id: 2,
         role: "admin",
       }),
-    ).toBe("/dashboard");
+    ).toBe("/analytics");
   });
 
   test("getDefaultAuthenticatedRouteFromFlags routes by auth flags", () => {
@@ -74,7 +74,7 @@ describe("authRedirect utilities", () => {
         isGuardian: false,
         isAdmin: true,
       }),
-    ).toBe("/dashboard");
+    ).toBe("/analytics");
 
     expect(
       getDefaultAuthenticatedRouteFromFlags({

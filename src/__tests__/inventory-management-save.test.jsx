@@ -41,6 +41,8 @@ const renderInventoryRoute = (initialEntry = "/inventory?tab=inventory_sheet") =
   );
 
 describe("Inventory Management save behavior", () => {
+  const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
   const inventoryRecords = [
     {
       id: 1,
@@ -105,6 +107,20 @@ describe("Inventory Management save behavior", () => {
     apiClient.createVaccineInventory.mockResolvedValue({});
     apiClient.updateVaccineInventory.mockResolvedValue({});
   });
+
+  const findInventoryRowByAction = async (vaccineName, actionName) =>
+    waitFor(() => {
+      const row = screen.getAllByRole("row").find((candidate) => {
+        const rowQueries = within(candidate);
+        return (
+          rowQueries.queryByText(new RegExp(`^${escapeRegExp(vaccineName)}$`, "i")) &&
+          rowQueries.queryByRole("button", { name: new RegExp(actionName, "i") })
+        );
+      });
+
+      expect(row).toBeTruthy();
+      return row;
+    });
 
   test("saves inventory sheet through the supported item update endpoint with a resolved reporting period", async () => {
     renderInventoryRoute();
@@ -174,8 +190,7 @@ describe("Inventory Management save behavior", () => {
 
     await screen.findByRole("button", { name: /save inventory/i });
 
-    const hepaBRow =
-      screen.queryByText("Hepatitis B") || (await screen.findByText(/hepa b/i));
+    const hepaBRow = await findInventoryRowByAction("Hepatitis B", "receive");
     fireEvent.click(
       within(hepaBRow.closest("tr")).getByRole("button", { name: /receive/i }),
     );
@@ -224,7 +239,7 @@ describe("Inventory Management save behavior", () => {
     renderInventoryRoute();
 
     await screen.findByRole("button", { name: /save inventory/i });
-    const bcgRow = await screen.findByText("BCG");
+    const bcgRow = await findInventoryRowByAction("BCG", "issue");
     fireEvent.click(
       within(bcgRow.closest("tr")).getByRole("button", { name: /issue/i }),
     );
@@ -268,7 +283,7 @@ describe("Inventory Management save behavior", () => {
     renderInventoryRoute();
 
     await screen.findByRole("button", { name: /save inventory/i });
-    const bcgRow = await screen.findByText("BCG");
+    const bcgRow = await findInventoryRowByAction("BCG", "waste");
     fireEvent.click(
       within(bcgRow.closest("tr")).getByRole("button", { name: /waste/i }),
     );
@@ -315,7 +330,7 @@ describe("Inventory Management save behavior", () => {
     renderInventoryRoute();
 
     await screen.findByRole("button", { name: /save inventory/i });
-    const bcgRow = await screen.findByText("BCG");
+    const bcgRow = await findInventoryRowByAction("BCG", "receive");
     fireEvent.click(
       within(bcgRow.closest("tr")).getByRole("button", { name: /receive/i }),
     );

@@ -36,9 +36,20 @@ jest.mock("../contexts/ThemeContext", () => ({
   }),
 }));
 
+jest.mock("../contexts/SocketContext", () => ({
+  useSocket: () => ({
+    isConnected: false,
+    on: jest.fn(),
+    off: jest.fn(),
+  }),
+}));
+
 jest.mock("../hooks/useCachedData", () => ({
   usePrefetchGuardian: () => ({
     prefetchGuardianData: jest.fn(),
+  }),
+  useGuardianStats: () => ({
+    data: { childrenCount: 1 },
   }),
 }));
 
@@ -115,4 +126,3 @@ describe("GuardianSidebar logout modal dark mode", () => {
     expect(screen.getByRole("button", { name: /^logout$/i })).toBeEnabled();
   });
 });
-

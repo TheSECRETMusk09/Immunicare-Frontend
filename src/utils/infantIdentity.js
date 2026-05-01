@@ -1,4 +1,27 @@
 const toStringSafe = (value) => String(value ?? "").trim();
+const normalizeSearchToken = (value) =>
+  String(value ?? "")
+    .trim()
+    .replace(/[.,]+/g, "");
+
+export const normalizeSearchQuery = (value) =>
+  String(value ?? "").trim().toLowerCase();
+
+export const tokenizeSearchQuery = (value) =>
+  normalizeSearchQuery(value)
+    .split(/\s+/)
+    .map(normalizeSearchToken)
+    .filter(Boolean);
+
+export const matchesTokenizedTextSearch = (searchableText, rawQuery) => {
+  const tokens = tokenizeSearchQuery(rawQuery);
+  if (tokens.length === 0) {
+    return true;
+  }
+
+  const haystack = normalizeSearchQuery(searchableText);
+  return tokens.every((token) => haystack.includes(token));
+};
 
 const GENERIC_INFANT_LABEL_PATTERN = /^infant(?:[\s#_-]*\d+)?$/i;
 
@@ -160,15 +183,38 @@ export const buildInfantRecordPrefillContext = (infant = {}) => {
 
 export const buildInfantSearchText = (infant = {}) => {
   const fullName = getInfantFullName(infant);
+  const firstName = toStringSafe(
+    infant.first_name ?? infant.firstName ?? infant.patient_first_name ?? infant.infant_first_name,
+  );
+  const middleName = toStringSafe(
+    infant.middle_name ?? infant.middleName ?? infant.middlename ?? infant.patient_middle_name,
+  );
+  const middleInitial = middleName ? middleName.charAt(0) : "";
+  const lastName = toStringSafe(
+    infant.last_name ?? infant.lastName ?? infant.patient_last_name ?? infant.infant_last_name,
+  );
   const controlNumber = getInfantControlNumber(infant);
   const rawDob = getInfantDateOfBirthValue(infant);
 
   const searchParts = [
     fullName,
+    [firstName, middleInitial, lastName].filter(Boolean).join(" "),
+    [firstName, lastName].filter(Boolean).join(" "),
+    [middleName, lastName].filter(Boolean).join(" "),
+    [lastName, firstName].filter(Boolean).join(" "),
+    [lastName, firstName, middleName].filter(Boolean).join(" "),
+    [lastName, firstName, middleInitial].filter(Boolean).join(" "),
+    [lastName, `${firstName}${middleName ? ` ${middleName}` : ""}`.trim()]
+      .filter(Boolean)
+      .join(", "),
+    [lastName, `${firstName}${middleInitial ? ` ${middleInitial}` : ""}`.trim()]
+      .filter(Boolean)
+      .join(", "),
     infant.first_name,
     infant.firstName,
     infant.middle_name,
     infant.middleName,
+    middleInitial,
     infant.last_name,
     infant.lastName,
     infant.patient_first_name,

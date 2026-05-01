@@ -96,7 +96,7 @@ describe("Inventory Management PDF autoTable fallback", () => {
       });
     });
 
-    await screen.findByRole("button", { name: /download pdf/i });
+    await screen.findByText(/download stock form pdf/i);
   };
 
   beforeEach(() => {
@@ -142,13 +142,11 @@ describe("Inventory Management PDF autoTable fallback", () => {
 
     await waitForInventoryToolbar();
 
-    fireEvent.click(
-      await screen.findByRole("button", { name: /download inventory sheet pdf/i }),
-    );
+    fireEvent.click(await screen.findByText(/download stock form pdf/i));
 
     await waitFor(() => {
       expect(mockPdfSave).toHaveBeenCalledWith(
-        expect.stringMatching(/^inventory-sheet-/i),
+        expect.stringMatching(/stock.*report.*\.pdf$/i),
       );
     });
 

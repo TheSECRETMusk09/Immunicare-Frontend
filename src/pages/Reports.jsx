@@ -310,6 +310,7 @@ const Reports = () => {
     const windowEvents = [
       "appointment-update",
       "vaccination-update",
+      "inventory-update",
       "guardian-data-update",
       "child-data-update",
     ];

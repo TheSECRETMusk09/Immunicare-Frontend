@@ -7,7 +7,7 @@ import GuardianDashboard from "../pages/GuardianDashboard";
 import MobileBottomNav from "../components/MobileBottomNav";
 import GuardianSidebar from "../components/GuardianSidebar";
 import MyChildren from "../pages/MyChildren";
-import Appointments from "../pages/Appointments";
+import GuardianAppointmentsPage from "../pages/GuardianAppointmentsPage";
 import apiClient from "../utils/api";
 import {
   GUARDIAN_INFANT_REGISTERED_EVENT,
@@ -21,6 +21,7 @@ const mockAuthContext = {
   forcePasswordChange: false,
   updateUserPasswordStatus: jest.fn(),
 };
+const stableGuardianNotifications = [];
 
 jest.mock("../contexts/AuthContext", () => ({
   useAuth: () => mockAuthContext,
@@ -39,12 +40,33 @@ jest.mock("../contexts/SocketContext", () => ({
     unreadCount: 2,
     alerts: [],
     notifications: [],
+    on: jest.fn(),
+    off: jest.fn(),
   }),
 }));
 
 jest.mock("../hooks/useCachedData", () => ({
   usePrefetchGuardian: () => ({
     prefetchGuardianData: jest.fn(),
+  }),
+  useGuardianStats: () => ({
+    data: { childrenCount: 2 },
+  }),
+}));
+
+jest.mock("../contexts/ThemeContext", () => ({
+  useTheme: () => ({
+    darkMode: false,
+    toggleDarkMode: jest.fn(),
+  }),
+}));
+
+jest.mock("../hooks/useGuardianNotifications", () => ({
+  __esModule: true,
+  default: () => ({
+    notifications: stableGuardianNotifications,
+    unreadCount: 0,
+    refresh: jest.fn(),
   }),
 }));
 
@@ -129,7 +151,50 @@ jest.mock("../utils/api", () => ({
       completedVaccinations: 10,
       pendingVaccinations: 3,
     }),
+    getGuardianDashboardOverview: jest.fn().mockResolvedValue({
+      summary: {
+        childrenCount: 2,
+        nextAppointment: "2030-02-20",
+        completedVaccinations: 10,
+        pendingVaccinations: 3,
+      },
+      appointments: [
+        {
+          id: 1,
+          infant_id: 1,
+          first_name: "John",
+          last_name: "Doe",
+          guardian_name: "Test Guardian",
+          scheduled_date: "2030-02-20T10:00:00",
+          type: "Vaccination",
+          status: "scheduled",
+          location: "Health Center A",
+        },
+      ],
+      notifications: [],
+      dueVaccines: [],
+      alerts: [],
+    }),
     getGuardianNotifications: jest.fn().mockResolvedValue({ data: [] }),
+    getVaccines: jest.fn().mockResolvedValue([
+      { id: 1, name: "BCG" },
+      { id: 2, name: "Penta Valent" },
+    ]),
+    getAppointmentCalendarAvailability: jest.fn().mockResolvedValue({
+      dates: [],
+      blockedDates: {},
+    }),
+    getAppointmentDateDetails: jest.fn().mockResolvedValue({
+      appointments: [],
+      summary: { total: 0 },
+      availability: { available: true, message: "Available for booking" },
+      isWeekend: false,
+      holiday: null,
+    }),
+    checkAppointmentAvailability: jest.fn().mockResolvedValue({
+      available: true,
+      message: "Available for booking",
+    }),
     get: jest.fn().mockResolvedValue({ success: false }),
     getDashboardAppointments: jest.fn().mockResolvedValue([
       {
@@ -290,13 +355,14 @@ describe("Guardian module pages", () => {
     renderWithRoutes("/guardian/children", {
       "/guardian/children": <MyChildren />,
       "/guardian/vaccination-records": <div>VACCINATION_RECORDS_PAGE</div>,
+      "/guardian/vaccination-records/:childId": <div>VACCINATION_RECORDS_PAGE</div>,
     });
 
     await waitFor(() => {
-      expect(screen.getByText("View All Records")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^records$/i })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /view all records/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^records$/i }));
 
     expect(
       await screen.findByText("VACCINATION_RECORDS_PAGE"),
@@ -405,42 +471,43 @@ describe("Guardian module pages", () => {
     expect(await screen.findByText(/Baby New/i)).toBeInTheDocument();
   });
 
-  test("Appointments page opens scheduling modal", async () => {
-    render(
-      <MemoryRouter initialEntries={["/guardian/appointments"]}>
-        <Appointments />
-      </MemoryRouter>,
-    );
+  test("Guardian appointments page routes to the dedicated booking page", async () => {
+    renderWithRoutes("/guardian/appointments", {
+      "/guardian/appointments": <GuardianAppointmentsPage />,
+      "/guardian/appointments/new": <div>GUARDIAN_APPOINTMENT_BOOKING_PAGE</div>,
+    });
 
     await waitFor(() => {
       expect(
-        screen.getAllByRole("button", { name: /schedule new appointment/i })
-          .length,
-      ).toBeGreaterThan(0);
+        screen.getByRole("button", { name: /new appointment/i }),
+      ).toBeInTheDocument();
     });
 
-    fireEvent.click(
-      screen.getAllByRole("button", { name: /schedule new appointment/i })[0],
-    );
+    fireEvent.click(screen.getByRole("button", { name: /new appointment/i }));
 
-    expect(await screen.findByText(/select infant/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText("GUARDIAN_APPOINTMENT_BOOKING_PAGE"),
+    ).toBeInTheDocument();
   });
 
-  test("Appointments page allows switching to calendar view", async () => {
+  test("Guardian appointments page allows switching back to calendar view on mobile", async () => {
+    setViewport(375, 667);
+
     render(
       <MemoryRouter initialEntries={["/guardian/appointments"]}>
-        <Appointments />
+        <GuardianAppointmentsPage />
       </MemoryRouter>,
     );
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /calendar/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /^calendar$/i })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /calendar/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /upcoming/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /^calendar$/i }));
 
     expect(
-      await screen.findByRole("heading", { name: /calendar view/i }),
-    ).toBeInTheDocument();
+      screen.getByRole("tab", { name: /^calendar$/i }),
+    ).toHaveAttribute("aria-selected", "true");
   });
 });

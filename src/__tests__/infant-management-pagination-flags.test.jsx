@@ -190,7 +190,7 @@ describe("InfantManagement pagination", () => {
     });
   });
 
-  test("requests DOB ascending ordering after a custom date range is applied", async () => {
+  test("applies a custom date range without forcing a hardcoded DOB sort", async () => {
     infantService.getAll.mockResolvedValue(buildResponse(1));
 
     render(
@@ -227,8 +227,6 @@ describe("InfantManagement pagination", () => {
         scope: "system",
         start_date: "2026-03-01",
         end_date: "2026-03-31",
-        order_by: "dob",
-        order_direction: "asc",
       });
     });
   });

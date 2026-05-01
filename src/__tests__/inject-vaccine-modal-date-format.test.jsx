@@ -81,12 +81,15 @@ describe("InjectVaccineModal infant dropdown labels", () => {
 
     const infantSelect = await screen.findByRole("button", { name: /select infant/i });
 
-    expect(apiClient.getInfants).toHaveBeenCalledWith({
-      limit: 50,
-      page: 1,
-      search: "2026",
-      scope: "system",
-    });
+    expect(apiClient.getInfants).toHaveBeenCalledWith(
+      expect.objectContaining({
+        limit: 50,
+        page: 1,
+        orderBy: "dob",
+        orderDirection: "DESC",
+        scope: "system",
+      }),
+    );
 
     fireEvent.click(infantSelect);
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { DataTable, Button, Modal, Input, Select, Alert } from "../UI";
 import { SkeletonTable, SkeletonPageHeader } from "../UI/SkeletonLoader";
 import apiClient from "../../utils/api";
+import { matchesTokenizedTextSearch } from "../../utils/infantIdentity";
 
 export const PatientList = () => {
   const [patients, setPatients] = useState([]);
@@ -19,37 +20,6 @@ export const PatientList = () => {
     contactNumber: "",
     healthCenter: "",
   });
-
-  const columns = [
-    { Header: "Name", accessor: "name" },
-    { Header: "Age", accessor: "age" },
-    { Header: "Gender", accessor: "gender" },
-    { Header: "Parent", accessor: "parentName" },
-    { Header: "Contact", accessor: "contactNumber" },
-    { Header: "Last Visit", accessor: "lastVisit" },
-    { Header: "Status", accessor: "status" },
-    {
-      Header: "Actions",
-      Cell: ({ row }) => (
-        <div className="flex gap-2">
-          <Button size="sm" onClick={() => handleViewPatient(row.original)}>
-            View
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => handleEditPatient(row.original)}
-          >
-            Edit
-          </Button>
-        </div>
-      ),
-    },
-  ];
-
-  useEffect(() => {
-    fetchPatients();
-  }, [fetchPatients]);
 
   const fetchPatients = useCallback(async () => {
     try {
@@ -78,6 +48,10 @@ export const PatientList = () => {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    fetchPatients();
+  }, [fetchPatients]);
 
   const calculateAge = (dob) => {
     if (!dob) return "N/A";
@@ -189,11 +163,41 @@ export const PatientList = () => {
     }
   };
 
+  const columns = [
+    { Header: "Name", accessor: "name" },
+    { Header: "Age", accessor: "age" },
+    { Header: "Gender", accessor: "gender" },
+    { Header: "Parent", accessor: "parentName" },
+    { Header: "Contact", accessor: "contactNumber" },
+    { Header: "Last Visit", accessor: "lastVisit" },
+    { Header: "Status", accessor: "status" },
+    {
+      Header: "Actions",
+      Cell: ({ row }) => (
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => handleViewPatient(row.original)}>
+            View
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => handleEditPatient(row.original)}
+          >
+            Edit
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   const filteredPatients = patients.filter(
     (patient) =>
-      patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.parentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.contactNumber.includes(searchTerm),
+      matchesTokenizedTextSearch(
+        [patient.name, patient.parentName, patient.contactNumber]
+          .filter(Boolean)
+          .join(" "),
+        searchTerm,
+      ),
   );
 
   // Skeleton loading state

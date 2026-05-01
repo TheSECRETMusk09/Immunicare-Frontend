@@ -30,6 +30,7 @@ jest.mock("../contexts/AuthContext", () => ({
 jest.mock("../hooks/useCachedData", () => ({
   usePrefetchGuardian: () => ({ prefetchGuardianData: jest.fn() }),
   usePrefetchDashboard: () => ({ prefetchDashboardData: jest.fn() }),
+  useGuardianStats: () => ({ data: { childrenCount: 2 }, isLoading: false }),
   useDashboardStats: () => ({ data: { infants: 12 }, isLoading: false }),
   useDashboardAppointments: () => ({
     data: [{ id: 10, infant_name: "Baby A", scheduled_date: "2026-02-28" }],
@@ -77,6 +78,22 @@ jest.mock("../contexts/SocketContext", () => ({
 jest.mock("../hooks/useDashboard", () => ({
   useVaccinationAnalytics: () => ({ data: [], loading: false }),
   useAppointmentAnalytics: () => ({ data: [], loading: false }),
+}));
+
+jest.mock("../hooks/useGuardianNotifications", () => ({
+  __esModule: true,
+  default: () => ({
+    notifications: [],
+    unreadCount: 0,
+    refresh: jest.fn(),
+  }),
+}));
+
+jest.mock("../contexts/ThemeContext", () => ({
+  useTheme: () => ({
+    darkMode: false,
+    toggleDarkMode: jest.fn(),
+  }),
 }));
 
 describe("Dashboard button functionality audit", () => {
@@ -157,13 +174,13 @@ describe("Dashboard button functionality audit", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /analytics/i }));
     fireEvent.click(screen.getByRole("button", { name: /appointments/i }));
-    fireEvent.click(screen.getByRole("button", { name: /settings/i }));
+    fireEvent.click(screen.getByRole("button", { name: /notifications/i }));
 
     expect(mockNavigate).toHaveBeenCalledWith("/analytics");
     expect(mockNavigate).toHaveBeenCalledWith("/appointments");
-    expect(mockNavigate).toHaveBeenCalledWith("/settings");
+    expect(mockNavigate).toHaveBeenCalledWith("/notifications");
 
-    fireEvent.click(screen.getByRole("button", { name: /logout/i }));
+    fireEvent.click(screen.getByRole("button", { name: /admin user/i }));
     expect(screen.getByText(/confirm logout/i)).toBeInTheDocument();
   });
 
@@ -186,13 +203,13 @@ describe("Dashboard button functionality audit", () => {
       );
 
       const dateTimeText = screen.getByTestId("admin-sidebar-datetime-text");
-      const dashboardButton = screen.getByRole("button", { name: /dashboard/i });
+      const analyticsButton = screen.getByRole("button", { name: /analytics/i });
 
       expect(dateTimeText).toBeInTheDocument();
       expect(dateTimeText.textContent.trim()).toMatch(datetimePattern);
 
       expect(
-        dateTimeText.compareDocumentPosition(dashboardButton) &
+        dateTimeText.compareDocumentPosition(analyticsButton) &
           Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
 
@@ -210,12 +227,14 @@ describe("Dashboard button functionality audit", () => {
   });
 
   test("Analytics page renders resilient shell without crashing", () => {
+    mockPathname = "/analytics";
+
     render(
       <MemoryRouter initialEntries={["/analytics"]}>
         <Analytics />
       </MemoryRouter>,
     );
 
-    expect(screen.getByText(/analytics dashboard/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/period/i)).toBeInTheDocument();
   });
 });

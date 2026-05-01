@@ -286,6 +286,13 @@ export const SocketProvider = ({ children }) => {
         dispatchBrowserEvent("child-data-update", { action: defaultAction, ...data });
       };
 
+      const handleInventorySync = (data, defaultAction = "updated") => {
+        dispatchBrowserEvent("inventory-update", {
+          action: defaultAction,
+          ...data,
+        });
+      };
+
       socket.on("appointment_created", (data) => handleAppointmentSync(data, "created"));
       socket.on("appointment-created", (data) => handleAppointmentSync(data, "created"));
       socket.on("appointment_updated", (data) => handleAppointmentSync(data, "updated"));
@@ -309,6 +316,20 @@ export const SocketProvider = ({ children }) => {
       socket.on("infant_created", (data) => handleChildSync(data, "created"));
       socket.on("infant_deleted", (data) => handleChildSync(data, "deleted"));
       socket.on("child-data-changed", (data) => handleChildSync(data, "updated"));
+
+      socket.on("inventory_item_created", (data) => handleInventorySync(data, "created"));
+      socket.on("inventory_item_updated", (data) => handleInventorySync(data, "updated"));
+      socket.on("inventory_item_deleted", (data) => handleInventorySync(data, "deleted"));
+      socket.on("inventory_transaction_created", (data) => handleInventorySync(data, "created"));
+      socket.on("vaccine_batch_created", (data) => handleInventorySync(data, "created"));
+      socket.on("vaccine_batch_updated", (data) => handleInventorySync(data, "updated"));
+      socket.on("vaccine_inventory_created", (data) => handleInventorySync(data, "created"));
+      socket.on("vaccine_inventory_updated", (data) => handleInventorySync(data, "updated"));
+      socket.on("vaccine_inventory_transaction_created", (data) =>
+        handleInventorySync(data, "created"),
+      );
+      socket.on("vaccine_stock_alert_updated", (data) => handleInventorySync(data, "updated"));
+      socket.on("inventory_updated", (data) => handleInventorySync(data, "updated"));
     }, 800); // Increased delay to 800ms for better page load stability
 
     // Cleanup on unmount

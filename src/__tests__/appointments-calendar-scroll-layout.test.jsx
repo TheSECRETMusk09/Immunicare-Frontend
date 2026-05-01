@@ -64,6 +64,13 @@ jest.mock("../components/Sidebar", () => function SidebarMock() {
   return <div data-testid="admin-sidebar" />;
 });
 
+jest.mock("../contexts/AuthContext", () => ({
+  useAuth: () => ({
+    isAdmin: true,
+    user: { id: 100, role_type: "SYSTEM_ADMIN" },
+  }),
+}));
+
 jest.mock("../contexts/ThemeContext", () => ({
   useTheme: () => ({
     darkMode: false,

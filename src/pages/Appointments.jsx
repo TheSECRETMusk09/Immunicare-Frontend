@@ -78,6 +78,110 @@ const mergeInfantLookupResults = (...collections) => {
   return merged;
 };
 
+const DEFAULT_APPOINTMENTS_ITEMS_PER_PAGE = 20;
+const APPOINTMENT_ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
+
+function AppointmentsPaginationFooter({
+  totalItems,
+  visibleStart,
+  visibleEnd,
+  totalPages,
+  currentPage,
+  rowsPerPage,
+  pageInputValue,
+  onRowsPerPageChange,
+  onPageInputChange,
+  onPageInputKeyDown,
+  onPageJumpSubmit,
+  onPrevious,
+  onNext,
+  disablePrevious,
+  disableNext,
+}) {
+  if (totalItems === 0 || totalPages <= 1) {
+    return null;
+  }
+
+  return (
+    <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex flex-col gap-3 bg-white dark:bg-gray-800 lg:flex-row lg:items-center lg:justify-between">
+      <div className="text-sm text-gray-500">
+        Showing {visibleStart} to {visibleEnd} of {totalItems} appointments
+      </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+        <div className="flex items-center gap-2">
+          <label
+            htmlFor="appointments-rows-per-page"
+            className="text-sm font-medium text-gray-600 dark:text-gray-300"
+          >
+            Rows
+          </label>
+          <select
+            id="appointments-rows-per-page"
+            value={rowsPerPage}
+            onChange={onRowsPerPageChange}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+            aria-label="Rows per page"
+          >
+            {APPOINTMENT_ROWS_PER_PAGE_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onPrevious}
+            disabled={disablePrevious}
+          >
+            Previous
+          </Button>
+          <span className="flex items-center px-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onNext}
+            disabled={disableNext}
+          >
+            Next
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          <label
+            htmlFor="appointments-page-jump"
+            className="text-sm font-medium text-gray-600 dark:text-gray-300"
+          >
+            Go to page
+          </label>
+          <input
+            id="appointments-page-jump"
+            type="number"
+            min="1"
+            max={totalPages}
+            value={pageInputValue}
+            onChange={onPageInputChange}
+            onKeyDown={onPageInputKeyDown}
+            className="w-20 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+            aria-label="Go to page"
+          />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onPageJumpSubmit}
+            disabled={totalPages <= 1}
+          >
+            Go
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Calendar utility functions (matching GuardianAppointmentsPage)
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -327,7 +431,10 @@ export default function Appointments() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(
+    DEFAULT_APPOINTMENTS_ITEMS_PER_PAGE,
+  );
+  const [pageInputValue, setPageInputValue] = useState("1");
 
   // Date filtering state
   const [dateFilterStart, setDateFilterStart] = useState("");
@@ -412,6 +519,10 @@ export default function Appointments() {
   }, [searchQuery]);
 
   useEffect(() => {
+    setPageInputValue(String(currentPage || 1));
+  }, [currentPage]);
+
+  useEffect(() => {
     if (!showBookingModal) {
       setBookingInfantSearchQuery("");
       setBookingInfantOptions(
@@ -482,6 +593,7 @@ export default function Appointments() {
 
   useEffect(() => {
     setCurrentPage(1);
+    setPageInputValue("1");
   }, [debouncedSearchQuery, statusFilter, dateFilterStart, dateFilterEnd, sortField, sortDirection]);
 
   const filteredAppointments = listAppointments;
@@ -499,6 +611,17 @@ export default function Appointments() {
           totalAppointments,
         )
       : 0;
+  const handlePageJumpSubmit = useCallback(() => {
+    const nextPage = Number.parseInt(pageInputValue, 10);
+    if (!Number.isFinite(nextPage)) {
+      setPageInputValue(String(listPage || 1));
+      return;
+    }
+
+    const clampedPage = Math.min(Math.max(nextPage, 1), totalPages);
+    setCurrentPage(clampedPage);
+    setPageInputValue(String(clampedPage));
+  }, [listPage, pageInputValue, totalPages]);
   const [createFormError, setCreateFormError] = useState("");
   const [editFormErrors, setEditFormErrors] = useState({});
   const [cancelModalError, setCancelModalError] = useState("");
@@ -2046,35 +2169,35 @@ export default function Appointments() {
                 </table>
               </div>
 
-              {totalPages > 1 && (
-                <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
-                  <div className="text-sm text-gray-500">
-                    Showing {visibleAppointmentStart} to {visibleAppointmentEnd} of{" "}
-                    {totalAppointments} appointments
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={!listPagination?.hasPrev || listPage === 1}
-                    >
-                      Previous
-                    </Button>
-                    <span className="flex items-center px-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Page {listPage} of {totalPages}
-                    </span>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={!listPagination?.hasNext || listPage === totalPages}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
-              )}
+              <AppointmentsPaginationFooter
+                totalItems={totalAppointments}
+                visibleStart={visibleAppointmentStart}
+                visibleEnd={visibleAppointmentEnd}
+                totalPages={totalPages}
+                currentPage={listPage}
+                rowsPerPage={itemsPerPage}
+                pageInputValue={pageInputValue}
+                onRowsPerPageChange={(event) => {
+                  const nextPageSize =
+                    Number(event.target.value) ||
+                    DEFAULT_APPOINTMENTS_ITEMS_PER_PAGE;
+                  setItemsPerPage(nextPageSize);
+                  setCurrentPage(1);
+                  setPageInputValue("1");
+                }}
+                onPageInputChange={(event) => setPageInputValue(event.target.value)}
+                onPageInputKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handlePageJumpSubmit();
+                  }
+                }}
+                onPageJumpSubmit={handlePageJumpSubmit}
+                onPrevious={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                onNext={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disablePrevious={!listPagination?.hasPrev || listPage === 1}
+                disableNext={!listPagination?.hasNext || listPage === totalPages}
+              />
             </div>
           )}
         </div>

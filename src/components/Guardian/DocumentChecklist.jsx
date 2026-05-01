@@ -104,9 +104,9 @@ const isWordFile = (mimeType = "") =>
   mimeType === "application/msword" ||
   mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
-const CHECKLIST_DESCRIPTION_PREFIX = "guardian_checklist:";
+export const CHECKLIST_DESCRIPTION_PREFIX = "guardian_checklist:";
 
-const CHECKLIST_ITEMS = [
+export const CHECKLIST_ITEMS = [
   {
     id: "birth_cert",
     documentType: "birth_certificate",
@@ -152,6 +152,117 @@ const CHECKLIST_ITEMS = [
     optional: true,
   },
 ];
+
+const normalizeChecklistSearchText = (...values) =>
+  values
+    .flat()
+    .map((value) => String(value || "").trim().toLowerCase())
+    .filter(Boolean)
+    .join(" ");
+
+const includesChecklistKeyword = (text, keywords = []) =>
+  keywords.some((keyword) => text.includes(keyword));
+
+export const resolveChecklistItemIdFromDocument = (doc = {}) => {
+  const explicitChecklistItemId = String(
+    doc.checklist_item_id || doc.checklistItemId || "",
+  ).trim();
+  if (explicitChecklistItemId) {
+    return explicitChecklistItemId;
+  }
+
+  const description = String(doc.description || "");
+  const markerMatch = description.match(
+    new RegExp(`${CHECKLIST_DESCRIPTION_PREFIX}([^\\s|]+)`),
+  );
+  if (markerMatch?.[1]) {
+    return markerMatch[1];
+  }
+
+  const searchText = normalizeChecklistSearchText(
+    description,
+    doc.original_filename,
+    doc.file_name,
+    doc.filename,
+    doc.name,
+    doc.document_type,
+    doc.documentType,
+  );
+
+  if (
+    doc.document_type === "birth_certificate" ||
+    doc.documentType === "birth_certificate" ||
+    includesChecklistKeyword(searchText, ["birth certificate"])
+  ) {
+    return "birth_cert";
+  }
+
+  if (
+    doc.document_type === "medical_record" ||
+    doc.documentType === "medical_record" ||
+    includesChecklistKeyword(searchText, [
+      "medical book",
+      "mother's medical book",
+      "child's medical book",
+      "pink book",
+      "medical record",
+    ])
+  ) {
+    return "medbook";
+  }
+
+  if (
+    doc.document_type === "vaccination_card" ||
+    doc.documentType === "vaccination_card" ||
+    includesChecklistKeyword(searchText, [
+      "previous vaccination",
+      "vaccination record",
+      "vaccination records",
+      "vaccination card",
+      "immunization record",
+    ])
+  ) {
+    return "previous_records";
+  }
+
+  if (
+    includesChecklistKeyword(searchText, [
+      "parent guardian valid id",
+      "parent/guardian valid id",
+      "guardian valid id",
+      "parent valid id",
+      "government id",
+      "guardian id",
+      "parent id",
+      "valid id",
+    ])
+  ) {
+    return "parent_id";
+  }
+
+  if (
+    includesChecklistKeyword(searchText, [
+      "signed consent form",
+      "consent form",
+      "signed consent",
+    ])
+  ) {
+    return "consent_form";
+  }
+
+  if (
+    includesChecklistKeyword(searchText, [
+      "health insurance",
+      "insurance card",
+      "insurance",
+      "philhealth",
+    ])
+  ) {
+    return "insurance";
+  }
+
+  return null;
+};
 
 const DocumentChecklist = ({ showStatus = true, onFilesChange, infantId = null }) => {
   const fileInputRef = useRef(null);
@@ -230,11 +341,11 @@ const DocumentChecklist = ({ showStatus = true, onFilesChange, infantId = null }
   }, [resolvePersistedDocumentId]);
 
   const getChecklistItemFromDocument = useCallback((doc, restoredFiles) => {
-    const description = String(doc.description || "");
-    const markerMatch = description.match(new RegExp(`${CHECKLIST_DESCRIPTION_PREFIX}([^\\s|]+)`));
-
-    if (markerMatch) {
-      return CHECKLIST_ITEMS.find((item) => item.id === markerMatch[1]);
+    const checklistItemId = resolveChecklistItemIdFromDocument(doc);
+    if (checklistItemId) {
+      return CHECKLIST_ITEMS.find(
+        (item) => item.id === checklistItemId && !restoredFiles[item.id],
+      );
     }
 
     return CHECKLIST_ITEMS.find(

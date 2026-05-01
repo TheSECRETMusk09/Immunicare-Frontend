@@ -12,6 +12,10 @@ import Announcements from "./Announcements";
 import Notifications from "./Notifications";
 import infantService from "../services/infantService";
 import { normalizeInfantsResponse } from "../utils/adminDataAdapters";
+import {
+  buildInfantSearchText,
+  matchesTokenizedTextSearch,
+} from "../utils/infantIdentity";
 import VaccineScheduleBooklet from "../components/VaccineScheduleBooklet";
 import ImmunizationRecordBooklet from "../components/ImmunizationRecordBooklet";
 import InfantPersonalRecord from "../components/InfantPersonalRecord";
@@ -51,9 +55,10 @@ export default function ManagementDashboard() {
   // Filter infants based on search
   const filteredInfants = infants.filter(
     (infant) =>
-      infant.first_name?.toLowerCase().includes(infantSearchQuery.toLowerCase()) ||
-      infant.last_name?.toLowerCase().includes(infantSearchQuery.toLowerCase()) ||
-      infant.control_number?.toLowerCase().includes(infantSearchQuery.toLowerCase())
+      matchesTokenizedTextSearch(
+        buildInfantSearchText(infant),
+        infantSearchQuery,
+      )
   );
 
   // Handle infant selection

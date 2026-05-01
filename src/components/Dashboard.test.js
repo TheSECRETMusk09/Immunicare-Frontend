@@ -1,80 +1,73 @@
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
-import Dashboard from "./Dashboard/DashboardOverview";
-import { AuthProvider } from "../contexts/AuthContext";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import DashboardOverview from "./Dashboard/DashboardOverview";
 
-// Mock the useDashboardStats and useDashboard hooks
-jest.mock("../hooks/useDashboard", () => ({
+jest.mock("../hooks/useCachedData", () => ({
   useDashboardStats: () => ({
-    stats: {
-      infants: 0,
-      guardians: 0,
-      appointments: 0,
-      lowStock: 0,
+    data: {
+      vaccination: { total: 12, completed: 8 },
+      inventory: { total_items: 4, low_stock_items: 1, expired_items: 0 },
+      appointments_summary: { total: 5, completed: 2, no_show: 0 },
+      guardians_summary: { total: 3, active: 3 },
+      infants_summary: { total: 6, up_to_date: 5 },
     },
-    loading: false,
+    isLoading: false,
+    refetch: jest.fn(),
   }),
-  useDashboard: () => ({
-    stats: {
-      infants: 0,
-      guardians: 0,
-      appointments: 0,
-      lowStock: 0,
+  useDashboardAppointments: () => ({
+    data: [{ id: 1, first_name: "Baby", last_name: "One", scheduled_date: "2026-03-10" }],
+    isLoading: false,
+    refetch: jest.fn(),
+  }),
+  useDashboardInfants: () => ({
+    data: [{ id: 1 }],
+    isLoading: false,
+    refetch: jest.fn(),
+  }),
+  useVaccineInventory: () => ({
+    data: [{ id: 1, is_critical_stock: true }],
+    isLoading: false,
+    refetch: jest.fn(),
+  }),
+  useAdminVaccinationMonitoring: () => ({
+    data: {
+      summary: { overdueInfants: 1, dueSoonInfants: 2 },
+      data: [
+        {
+          infant_id: 1,
+          first_name: "Baby",
+          last_name: "One",
+          guardian_name: "Guardian One",
+          next_status: "due_soon",
+          next_due_date: "2026-03-12",
+          upcoming_appointments_count: 1,
+        },
+      ],
     },
-    analytics: {},
-    loading: false,
-    error: null,
+    isLoading: false,
+    refetch: jest.fn(),
   }),
 }));
 
-// Mock the useAuth hook
-jest.mock("../contexts/AuthContext", () => ({
-  AuthProvider: ({ children }) => children,
-  useAuth: () => ({
-    isAuthenticated: true,
-    isAdmin: true,
-    isUser: false,
-    user: { name: "Test User" },
-    logout: jest.fn(),
+jest.mock("../contexts/SocketContext", () => ({
+  useSocket: () => ({
+    alerts: [],
+    notifications: [],
+    isConnected: true,
   }),
 }));
 
-describe("Dashboard Component", () => {
-  test("renders dark mode toggle button", () => {
+describe("DashboardOverview", () => {
+  test("renders the admin monitoring overview with current actions", () => {
     render(
-      <AuthProvider>
-        <Dashboard />
-      </AuthProvider>,
+      <MemoryRouter>
+        <DashboardOverview />
+      </MemoryRouter>,
     );
 
-    const darkModeToggle = screen.getByRole("button", {
-      name: /switch to dark mode/i,
-    });
-    expect(darkModeToggle).toBeInTheDocument();
-  });
-
-  test("toggles dark mode when button is clicked", () => {
-    render(
-      <AuthProvider>
-        <Dashboard />
-      </AuthProvider>,
-    );
-
-    const darkModeToggle = screen.getByRole("button", {
-      name: /switch to dark mode/i,
-    });
-    fireEvent.click(darkModeToggle);
-
-    // Check if the dark class is added to the dashboard container
-    const dashboardContainer = screen.getByText((content, element) => {
-      return element.classList?.contains("min-h-screen");
-    });
-    expect(dashboardContainer).toHaveClass("dark");
-
-    // Check if the toggle button changed to light mode
-    const lightModeToggle = screen.getByRole("button", {
-      name: /switch to light mode/i,
-    });
-    expect(lightModeToggle).toBeInTheDocument();
+    expect(screen.getByText(/dashboard overview/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /go to notifications/i })).toBeInTheDocument();
+    expect(screen.getByText(/admin vaccination monitoring/i)).toBeInTheDocument();
   });
 });

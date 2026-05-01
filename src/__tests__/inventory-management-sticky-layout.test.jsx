@@ -267,6 +267,61 @@ describe("Inventory Management sticky layout", () => {
     expect(screen.queryByText("999")).not.toBeInTheDocument();
   });
 
+  test("renders live critical stock and threshold values instead of hardcoded summary placeholders", async () => {
+    apiClient.getVaccineInventory.mockResolvedValue([
+      {
+        id: 1,
+        clinic_id: 7,
+        vaccine_id: 1,
+        vaccine_name: "BCG",
+        beginning_balance: 5,
+        received_during_period: 0,
+        lot_batch_number: "LOT-BCG-001",
+        transferred_in: 0,
+        transferred_out: 0,
+        expired_wasted: 0,
+        issuance: 3,
+        stock_on_hand: 2,
+        low_stock_threshold: 8,
+        critical_stock_threshold: 3,
+      },
+      {
+        id: 2,
+        clinic_id: 7,
+        vaccine_id: 2,
+        vaccine_name: "MMR",
+        beginning_balance: 12,
+        received_during_period: 0,
+        lot_batch_number: "LOT-MMR-001",
+        transferred_in: 0,
+        transferred_out: 0,
+        expired_wasted: 0,
+        issuance: 5,
+        stock_on_hand: 7,
+        low_stock_threshold: 9,
+        critical_stock_threshold: 4,
+      },
+    ]);
+
+    renderInventoryRoute("/inventory?tab=inventory_summary");
+
+    const summaryPanel = await screen.findByTestId("inventory-summary-panel");
+
+    expect(within(summaryPanel).getByText("Critical threshold")).toBeInTheDocument();
+    expect(within(summaryPanel).getByText("Low threshold")).toBeInTheDocument();
+    expect(within(summaryPanel).queryByText("Stock = 0")).not.toBeInTheDocument();
+
+    const rows = within(summaryPanel).getAllByRole("row");
+    const criticalRow = rows.find((row) => within(row).queryByText(/^BCG$/i));
+    const lowStockRow = rows.find((row) => within(row).queryByText(/^MMR$/i));
+
+    expect(criticalRow).toBeTruthy();
+    expect(lowStockRow).toBeTruthy();
+    expect(within(criticalRow).getByText("2")).toBeInTheDocument();
+    expect(within(criticalRow).getByText("CRITICAL")).toBeInTheDocument();
+    expect(within(lowStockRow).getByText("9")).toBeInTheDocument();
+  });
+
   test("paginates persisted stock alerts inside the inventory summary workflow card", async () => {
     apiClient.getVaccineStockAlerts.mockResolvedValue(
       Array.from({ length: 25 }, (_, index) => createPersistedAlert(index + 1)),

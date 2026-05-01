@@ -43,6 +43,34 @@ const mockApi = {
   ])
 };
 
+const primeMockApiResponses = () => {
+  mockApi.submitTransferIn.mockResolvedValue({
+    success: true,
+    case_id: 'TFR-001',
+    status: 'pending_validation'
+  });
+  mockApi.getTransferInStatus.mockResolvedValue({
+    case_id: 'TFR-001',
+    status: 'approved',
+    next_vaccine: 'MMR Dose 1'
+  });
+  mockApi.sendNotification.mockResolvedValue({ success: true });
+  mockApi.getNotificationPreferences.mockResolvedValue([
+    { notification_type: 'appointment_reminder', sms_enabled: true, email_enabled: true }
+  ]);
+  mockApi.updateNotificationPreference.mockResolvedValue({ success: true });
+  mockApi.getAvailableSlots.mockResolvedValue([
+    { date: '2026-03-20', time: '09:00', available: true },
+    { date: '2026-03-20', time: '09:30', available: true },
+    { date: '2026-03-20', time: '10:00', available: false }
+  ]);
+  mockApi.createAppointment.mockResolvedValue({ success: true, appointment_id: 'APT-001' });
+  mockApi.getVaccinationHistory.mockResolvedValue([
+    { vaccine: 'BCG', dose_number: 1, date_received: '2025-06-15' },
+    { vaccine: 'Hepatitis B', dose_number: 1, date_received: '2025-06-15' }
+  ]);
+};
+
 // Simple mock component for Transfer-In form
 const MockTransferInForm = ({ onSubmit, isLoading }) => {
   const [formData, setFormData] = React.useState({
@@ -151,6 +179,7 @@ const MockNotificationSettings = ({ preferences, onToggle, isSaving }) => {
 describe('Transfer-In End-to-End Flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    primeMockApiResponses();
   });
 
   describe('Guardian Transfer-In Form Component', () => {
@@ -304,6 +333,7 @@ describe('Transfer-In End-to-End Flow', () => {
 describe('Notification Flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    primeMockApiResponses();
   });
 
   describe('Notification Preferences Component', () => {

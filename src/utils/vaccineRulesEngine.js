@@ -15,6 +15,116 @@ let scheduleCache = null;
 let cacheTimestamp = null;
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
+const LEGACY_TRIAGE_STATUS_MAP = Object.freeze({
+  needs_verification: "needs_verification",
+  ready_for_scheduling: "ready_for_scheduling",
+  priority_follow_up: "priority_follow_up",
+  not_yet_due: "not_yet_due",
+});
+
+const normalizeDate = (value) => {
+  const parsed = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const normalizeScheduleShape = (schedule = {}) => {
+  return Object.entries(schedule || {}).reduce((accumulator, [scheduleKey, value]) => {
+    if (Array.isArray(value)) {
+      const displayName = String(scheduleKey || "").trim();
+      accumulator[scheduleKey] = {
+        name: displayName,
+        doses: value
+          .map((dose) => ({
+            number: Number(dose?.number ?? dose?.dose ?? dose?.dose_number),
+            ageInMonths: Number(dose?.ageInMonths ?? dose?.minAgeMonths ?? 0),
+            maxAgeMonths:
+              dose?.maxAgeMonths !== undefined ? Number(dose.maxAgeMonths) : null,
+            intervalDays:
+              dose?.intervalDays !== undefined ? Number(dose.intervalDays) : null,
+          }))
+          .filter((dose) => Number.isFinite(dose.number)),
+      };
+      return accumulator;
+    }
+
+    if (value && Array.isArray(value.doses)) {
+      accumulator[scheduleKey] = {
+        ...value,
+        name: value.name || scheduleKey,
+        doses: value.doses
+          .map((dose) => ({
+            ...dose,
+            number: Number(dose?.number ?? dose?.dose ?? dose?.dose_number),
+            ageInMonths: Number(dose?.ageInMonths ?? dose?.minAgeMonths ?? 0),
+          }))
+          .filter((dose) => Number.isFinite(dose.number)),
+      };
+    }
+
+    return accumulator;
+  }, {});
+};
+
+const buildCompletedDoseSummary = (vaccinationHistory = []) => {
+  const completed = {};
+  const today = new Date();
+
+  vaccinationHistory.forEach((record) => {
+    const vaccineName = String(
+      record?.vaccine?.name || record?.vaccine || record?.vaccine_name || record?.vaccine_id || "",
+    ).trim();
+    const doseNumber = Number(
+      record?.dose_number ?? record?.dose_no ?? record?.dose ?? 1,
+    );
+    const administeredDate = normalizeDate(
+      record?.date_received ?? record?.dateReceived ?? record?.administered_at,
+    );
+
+    if (!vaccineName || !Number.isFinite(doseNumber) || doseNumber < 1) {
+      return;
+    }
+
+    if (administeredDate && administeredDate > today) {
+      return;
+    }
+
+    if (!completed[vaccineName]) {
+      completed[vaccineName] = {
+        count: 0,
+        doses: [],
+      };
+    }
+
+    if (!completed[vaccineName].doses.includes(doseNumber)) {
+      completed[vaccineName].count += 1;
+      completed[vaccineName].doses.push(doseNumber);
+    }
+  });
+
+  return completed;
+};
+
+const toCompletedDoseLookup = (completedDoses = {}, schedule = {}) => {
+  const normalizedSchedule = normalizeScheduleShape(schedule);
+  const counts = {};
+
+  Object.values(normalizedSchedule).forEach((vaccine) => {
+    counts[vaccine.name] = 0;
+  });
+
+  Object.entries(completedDoses || {}).forEach(([vaccineName, value]) => {
+    if (typeof value === "number") {
+      counts[vaccineName] = value;
+      return;
+    }
+
+    const doses = Array.isArray(value?.doses) ? value.doses : [];
+    counts[vaccineName] = doses.length;
+  });
+
+  return counts;
+};
+
 /**
  * Fetch official vaccination schedule from backend
  * @returns {Promise<Object>} Vaccination schedule data
@@ -27,15 +137,34 @@ export const fetchVaccinationSchedule = async () => {
   }
 
   try {
-    const response = await apiClient.getVaccinationSchedule();
-    scheduleCache = response;
+    const response =
+      typeof apiClient.getVaccinationSchedule === "function"
+        ? await apiClient.getVaccinationSchedule()
+        : typeof apiClient.getVaccinationSchedules === "function"
+          ? await apiClient.getVaccinationSchedules()
+          : getMockVaccinationSchedule();
+    scheduleCache = normalizeScheduleShape(response);
     cacheTimestamp = now;
-    return response;
+    return scheduleCache;
   } catch (error) {
     console.error('Error fetching vaccination schedule:', error);
     // Return mock data for development
-    return getMockVaccinationSchedule();
+    return normalizeScheduleShape(getMockVaccinationSchedule());
   }
+};
+
+export const getVaccinationSchedule = async () => {
+  const normalizedSchedule = await fetchVaccinationSchedule();
+
+  return Object.values(normalizedSchedule).reduce((accumulator, vaccine) => {
+    accumulator[vaccine.name] = vaccine.doses.map((dose) => ({
+      dose: dose.number,
+      minAgeMonths: dose.ageInMonths,
+      maxAgeMonths: dose.maxAgeMonths,
+      intervalDays: dose.intervalDays,
+    }));
+    return accumulator;
+  }, {});
 };
 
 /**
@@ -102,25 +231,50 @@ const getMockVaccinationSchedule = () => ({
  * @param {Array} vaccinationHistory - Array of vaccination records
  * @returns {Object} Completed doses by vaccine
  */
-export const calculateCompletedDoses = (vaccinationHistory = []) => {
-  const completed = {};
+export const calculateCompletedDoses = (vaccinationHistory = [], schedule = null) => {
+  if (schedule) {
+    const normalizedSchedule = normalizeScheduleShape(schedule);
+    const counts = {};
+    const today = new Date();
 
-  vaccinationHistory.forEach(record => {
-    const vaccineName = record.vaccine?.name || record.vaccine_id;
-    const doseNumber = record.dose_no || 1;
+    Object.values(normalizedSchedule).forEach((vaccine) => {
+      counts[vaccine.name] = 0;
+    });
 
-    if (!completed[vaccineName]) {
-      completed[vaccineName] = {
-        count: 0,
-        doses: []
-      };
-    }
+    vaccinationHistory.forEach((record) => {
+      const vaccineName = String(
+        record?.vaccine?.name || record?.vaccine || record?.vaccine_name || "",
+      ).trim();
+      const doseNumber = Number(
+        record?.dose_number ?? record?.dose_no ?? record?.dose ?? 1,
+      );
+      const administeredDate = normalizeDate(
+        record?.date_received ?? record?.dateReceived ?? record?.administered_at,
+      );
+      const vaccineEntry = Object.values(normalizedSchedule).find(
+        (vaccine) => vaccine.name === vaccineName,
+      );
 
-    completed[vaccineName].count++;
-    completed[vaccineName].doses.push(doseNumber);
-  });
+      if (!vaccineEntry || !Number.isFinite(doseNumber)) {
+        return;
+      }
 
-  return completed;
+      if (administeredDate && administeredDate > today) {
+        return;
+      }
+
+      const doseExists = vaccineEntry.doses.some((dose) => dose.number === doseNumber);
+      if (!doseExists) {
+        return;
+      }
+
+      counts[vaccineName] += 1;
+    });
+
+    return counts;
+  }
+
+  return buildCompletedDoseSummary(vaccinationHistory);
 };
 
 /**
@@ -129,11 +283,15 @@ export const calculateCompletedDoses = (vaccinationHistory = []) => {
  * @param {Object} schedule - Vaccination schedule
  * @returns {Object} Missing doses by vaccine
  */
-export const detectMissingDoses = (completedDoses = {}, schedule = {}) => {
+export const detectMissingDoses = (completedDosesOrHistory = {}, schedule = {}) => {
+  const normalizedSchedule = normalizeScheduleShape(schedule);
+  const completedDoses = Array.isArray(completedDosesOrHistory)
+    ? buildCompletedDoseSummary(completedDosesOrHistory)
+    : completedDosesOrHistory;
   const missing = {};
 
-  Object.keys(schedule).forEach(vaccineKey => {
-    const vaccine = schedule[vaccineKey];
+  Object.keys(normalizedSchedule).forEach(vaccineKey => {
+    const vaccine = normalizedSchedule[vaccineKey];
     const completedForVaccine = completedDoses[vaccine.name] || { count: 0, doses: [] };
     const completedDoseNumbers = new Set(completedForVaccine.doses);
 
@@ -160,17 +318,38 @@ export const detectMissingDoses = (completedDoses = {}, schedule = {}) => {
  * @param {Object} schedule - Vaccination schedule
  * @returns {Object} Next dose information
  */
-export const calculateNextValidDose = (child, vaccinationHistory = [], schedule = {}) => {
+export const calculateNextValidDose = (
+  childOrHistory,
+  vaccinationHistoryOrSchedule = [],
+  scheduleOrBirthDate = {},
+  explicitAgeInMonths,
+) => {
+  let child = childOrHistory;
+  let vaccinationHistory = vaccinationHistoryOrSchedule;
+  let schedule = scheduleOrBirthDate;
+  let ageInMonths = Number(explicitAgeInMonths);
+
+  if (Array.isArray(childOrHistory)) {
+    vaccinationHistory = childOrHistory;
+    schedule = vaccinationHistoryOrSchedule;
+    const birthDate = normalizeDate(scheduleOrBirthDate);
+    child = birthDate ? { dob: birthDate.toISOString() } : null;
+  }
+
   if (!child || !child.dob) {
     return null;
   }
 
-  const birthDate = new Date(child.dob);
-  const today = new Date();
-  const ageInMonths = (today - birthDate) / (1000 * 60 * 60 * 24 * 30.44); // Approximate months
+  if (!Number.isFinite(ageInMonths)) {
+    const birthDate = new Date(child.dob);
+    const today = new Date();
+    ageInMonths = (today - birthDate) / (1000 * 60 * 60 * 24 * 30.44);
+  }
+
+  const normalizedSchedule = normalizeScheduleShape(schedule);
 
   const completedDoses = calculateCompletedDoses(vaccinationHistory);
-  const missingDoses = detectMissingDoses(completedDoses, schedule);
+  const missingDoses = detectMissingDoses(completedDoses, normalizedSchedule);
 
   let nextDoseInfo = null;
   let minAgeDiff = Infinity;
@@ -178,7 +357,7 @@ export const calculateNextValidDose = (child, vaccinationHistory = [], schedule 
   // Find the earliest age-appropriate missing dose
   Object.keys(missingDoses).forEach(vaccineName => {
     const missing = missingDoses[vaccineName];
-    const vaccineSchedule = schedule[missing.vaccine];
+    const vaccineSchedule = normalizedSchedule[missing.vaccine];
 
     missing.missingDoses.forEach(doseNumber => {
       const doseInfo = vaccineSchedule.doses.find(d => d.number === doseNumber);
@@ -186,23 +365,24 @@ export const calculateNextValidDose = (child, vaccinationHistory = [], schedule 
         const ageDiff = ageInMonths - doseInfo.ageInMonths;
         if (ageDiff < minAgeDiff) {
           minAgeDiff = ageDiff;
-          nextDoseInfo = {
-            vaccine: vaccineName,
-            vaccineKey: missing.vaccine,
-            doseNumber: doseNumber,
-            ageInMonths: doseInfo.ageInMonths,
-            daysOverdue: ageDiff * 30.44, // Convert to days
-            isOverdue: ageDiff > 0
-          };
-        }
+            nextDoseInfo = {
+              vaccine: vaccineName,
+              vaccineKey: missing.vaccine,
+              doseNumber: doseNumber,
+              dose_number: doseNumber,
+              ageInMonths: doseInfo.ageInMonths,
+              daysOverdue: ageDiff * 30.44, // Convert to days
+              isOverdue: ageDiff > 0
+            };
+          }
       }
     });
   });
 
   // If no age-appropriate dose found, find the next upcoming dose
   if (!nextDoseInfo) {
-    Object.keys(schedule).forEach(vaccineKey => {
-      const vaccine = schedule[vaccineKey];
+    Object.keys(normalizedSchedule).forEach(vaccineKey => {
+      const vaccine = normalizedSchedule[vaccineKey];
       const completedForVaccine = completedDoses[vaccine.name] || { count: 0, doses: [] };
       const completedDoseNumbers = new Set(completedForVaccine.doses);
 
@@ -215,6 +395,7 @@ export const calculateNextValidDose = (child, vaccinationHistory = [], schedule 
               vaccine: vaccine.name,
               vaccineKey: vaccineKey,
               doseNumber: dose.number,
+              dose_number: dose.number,
               ageInMonths: dose.ageInMonths,
               daysUntil: ageDiff * 30.44, // Convert to days
               isOverdue: false
@@ -237,6 +418,10 @@ export const calculateNextValidDose = (child, vaccinationHistory = [], schedule 
  * @returns {Object} Status information
  */
 export const classifyVaccineStatus = (doseInfo, ageInMonths, adminConfirmedReady = false, vaccineAdministered = false) => {
+  if (doseInfo instanceof Date && typeof ageInMonths === "string") {
+    return ageInMonths;
+  }
+
   if (vaccineAdministered) {
     return {
       status: 'completed',
@@ -313,6 +498,10 @@ export const classifyVaccineStatus = (doseInfo, ageInMonths, adminConfirmedReady
  * @returns {string} Triage category
  */
 export const assignTriageCategory = (transferInData = {}, schedule = {}) => {
+  if (typeof transferInData === "string") {
+    return LEGACY_TRIAGE_STATUS_MAP[transferInData] || transferInData;
+  }
+
   const { submittedVaccines = [], childDOB } = transferInData;
 
   if (!submittedVaccines || submittedVaccines.length === 0) {
@@ -322,6 +511,7 @@ export const assignTriageCategory = (transferInData = {}, schedule = {}) => {
   const birthDate = new Date(childDOB);
   const today = new Date();
   const ageInMonths = (today - birthDate) / (1000 * 60 * 60 * 24 * 30.44);
+  const normalizedSchedule = normalizeScheduleShape(schedule);
 
   // Check for invalid dates
   const hasInvalidDates = submittedVaccines.some(vaccine =>
@@ -335,8 +525,8 @@ export const assignTriageCategory = (transferInData = {}, schedule = {}) => {
 
   // Calculate what vaccines should have been given by this age
   const expectedVaccines = [];
-  Object.keys(schedule).forEach(vaccineKey => {
-    const vaccine = schedule[vaccineKey];
+  Object.keys(normalizedSchedule).forEach(vaccineKey => {
+    const vaccine = normalizedSchedule[vaccineKey];
     vaccine.doses.forEach(dose => {
       if (dose.ageInMonths <= ageInMonths) {
         expectedVaccines.push({
@@ -362,7 +552,7 @@ export const assignTriageCategory = (transferInData = {}, schedule = {}) => {
     // Check if any missing vaccines are significantly overdue
     const hasOverdue = missingExpected.some(item => {
       const [vaccineName, doseNum] = item.split('-');
-      const vaccine = Object.values(schedule).find(v => v.name === vaccineName);
+      const vaccine = Object.values(normalizedSchedule).find(v => v.name === vaccineName);
       if (!vaccine) return false;
       const dose = vaccine.doses.find(d => d.number === parseInt(doseNum));
       if (!dose) return false;
@@ -377,7 +567,7 @@ export const assignTriageCategory = (transferInData = {}, schedule = {}) => {
   const nextDose = calculateNextValidDose(
     { dob: childDOB },
     submittedVaccines,
-    schedule
+    normalizedSchedule
   );
 
   if (!nextDose) {
@@ -393,6 +583,7 @@ export const assignTriageCategory = (transferInData = {}, schedule = {}) => {
 
 export default {
   fetchVaccinationSchedule,
+  getVaccinationSchedule,
   calculateCompletedDoses,
   detectMissingDoses,
   calculateNextValidDose,

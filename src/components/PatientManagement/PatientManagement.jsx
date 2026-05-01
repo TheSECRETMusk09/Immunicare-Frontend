@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Card, Button, Badge, Input, Select, Modal } from "../UI";
 import {
   Search,
@@ -11,17 +11,15 @@ import {
   Shield,
 } from "lucide-react";
 import { usePatientManagement } from "../../hooks/usePatientManagement";
+import { matchesTokenizedTextSearch } from "../../utils/infantIdentity";
 
 export const PatientManagement = () => {
   const {
     patients,
-    loading,
-    error,
     addPatient,
     updatePatient,
     deletePatient,
     searchPatients,
-    getPatientHistory,
   } = usePatientManagement();
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -44,11 +42,6 @@ export const PatientManagement = () => {
   });
 
   const [activeTab, setActiveTab] = useState("list");
-
-  useEffect(() => {
-    // Initial load would be handled by the hook
-  }, []);
-
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
     searchPatients(e.target.value);
@@ -122,10 +115,17 @@ export const PatientManagement = () => {
   };
 
   const filteredPatients = patients.filter((patient) => {
-    const matchesSearch =
-      patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.motherName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.contactNumber.includes(searchTerm);
+    const matchesSearch = matchesTokenizedTextSearch(
+      [
+        patient.name,
+        patient.motherName,
+        patient.fatherName,
+        patient.contactNumber,
+      ]
+        .filter(Boolean)
+        .join(" "),
+      searchTerm,
+    );
 
     const matchesStatus =
       filterStatus === "all" ||
@@ -136,16 +136,6 @@ export const PatientManagement = () => {
 
     return matchesSearch && matchesStatus;
   });
-
-  const patientColumns = [
-    { Header: "Patient Name", accessor: "name" },
-    { Header: "Age", accessor: "age" },
-    { Header: "Sex", accessor: "sex" },
-    { Header: "Contact", accessor: "contactNumber" },
-    { Header: "Status", accessor: "status" },
-    { Header: "Last Visit", accessor: "lastVisit" },
-    { Header: "Actions", accessor: "actions" },
-  ];
 
   return (
     <div className="patient-management space-y-6">

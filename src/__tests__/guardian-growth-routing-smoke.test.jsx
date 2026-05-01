@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { render, waitFor } from '@testing-library/react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import '@testing-library/jest-dom';
 
 import apiClient from '../utils/api';
@@ -17,6 +17,7 @@ import GuardianGrowthChartPage from '../pages/GuardianGrowthChartPage';
 
 // Mock API
 jest.mock('../utils/api', () => ({
+  getInfant: jest.fn(),
   getInfantsByGuardian: jest.fn(),
   getGrowthRecordsByInfant: jest.fn(),
   getAppointmentsByInfant: jest.fn(),
@@ -52,16 +53,12 @@ describe('Guardian Growth Chart Routing Smoke Tests', () => {
     apiClient.getGrowthRecordsByInfant.mockResolvedValue(mockGrowthRecords);
 
     render(
-      <BrowserRouter>
+      <MemoryRouter initialEntries={['/guardian/health-charts/1']}>
         <Routes>
           <Route path="/guardian/health-charts/:childId" element={<GuardianGrowthChartPage />} />
         </Routes>
-      </BrowserRouter>,
-      { wrapper: ({ children }) => <BrowserRouter><Routes><Route path="/guardian/health-charts/:childId" element={children} /></Routes></BrowserRouter> }
+      </MemoryRouter>,
     );
-
-    // Navigate to route with childId
-    window.history.pushState({}, 'Growth Chart', '/guardian/health-charts/1');
 
     await waitFor(() => {
       expect(apiClient.getInfantsByGuardian).toHaveBeenCalled();
@@ -81,9 +78,9 @@ describe('Guardian Growth Chart Routing Smoke Tests', () => {
     apiClient.getGrowthRecordsByInfant.mockResolvedValue(mockGrowthRecords);
 
     render(
-      <BrowserRouter>
+      <MemoryRouter>
         <GuardianGrowthChartPage />
-      </BrowserRouter>
+      </MemoryRouter>
     );
 
     await waitFor(() => {

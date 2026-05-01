@@ -166,6 +166,9 @@ const createInitialFormState = (prefill = {}) => {
       prefill.date_administered ?? prefill.admin_date,
       createTodayDateInput(),
     ),
+    time_administered: String(
+      prefill.time_administered ?? prefill.admin_time ?? INITIAL_FORM.time_administered,
+    ),
     next_appointment_date: formatDateInputValue(
       prefill.next_appointment_date ?? prefill.next_due_date,
       "",
@@ -858,6 +861,11 @@ export default function InjectVaccineModal({
     setShowAdministeredBySuggestions(false);
   }, [isOpen]);
 
+  const batchReferenceDate = useMemo(
+    () => formatDateInputValue(formData.date_administered, createTodayDateInput()),
+    [formData.date_administered],
+  );
+
   useEffect(() => {
     let isCurrent = true;
 
@@ -891,6 +899,7 @@ export default function InjectVaccineModal({
             inventoryRecords,
             vaccineId: formData.vaccine_id,
             clinicId: scopedClinicId,
+            referenceDate: batchReferenceDate,
           }),
         );
       })
@@ -911,7 +920,7 @@ export default function InjectVaccineModal({
     return () => {
       isCurrent = false;
     };
-  }, [formData.vaccine_id, inventoryRecords, isOpen, scopedClinicId]);
+  }, [batchReferenceDate, formData.vaccine_id, inventoryRecords, isOpen, scopedClinicId]);
 
   useEffect(() => {
     if (!isOpen || !formData.vaccine_id) {
@@ -1154,6 +1163,7 @@ export default function InjectVaccineModal({
         vaccine_inventory_id: Number(formData.vaccine_inventory_id) || null,
         site_of_injection: formData.site_of_injection || null,
         route_of_injection: formData.route_of_injection || null,
+        time_administered: formData.time_administered || null,
         reactions:
           formData.reaction === "Other"
             ? formData.reaction_other

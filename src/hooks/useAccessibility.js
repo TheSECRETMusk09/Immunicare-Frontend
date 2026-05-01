@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
+let sharedAnnouncementRegion = null;
+let sharedAnnouncementTimeout = null;
+
 /**
  * useFocusTrap Hook
  * Traps focus within a modal or dialog for keyboard navigation
@@ -62,18 +65,33 @@ export const useFocusTrap = (isActive) => {
  */
 export const useAnnounce = () => {
   const announce = useCallback((message, priority = "polite") => {
-    const announcement = document.createElement("div");
-    announcement.setAttribute("role", "status");
-    announcement.setAttribute("aria-live", priority);
-    announcement.setAttribute("aria-atomic", "true");
-    announcement.className = "sr-only";
-    announcement.textContent = message;
+    if (typeof document === "undefined") {
+      return;
+    }
 
-    document.body.appendChild(announcement);
+    if (!sharedAnnouncementRegion || !document.body.contains(sharedAnnouncementRegion)) {
+      sharedAnnouncementRegion = document.createElement("div");
+      sharedAnnouncementRegion.id = "immunicare-live-region";
+      sharedAnnouncementRegion.setAttribute("role", "status");
+      sharedAnnouncementRegion.setAttribute("aria-atomic", "true");
+      sharedAnnouncementRegion.className = "sr-only";
+      document.body.appendChild(sharedAnnouncementRegion);
+    }
 
-    // Remove after announcement
-    setTimeout(() => {
-      document.body.removeChild(announcement);
+    if (sharedAnnouncementTimeout) {
+      clearTimeout(sharedAnnouncementTimeout);
+      sharedAnnouncementTimeout = null;
+    }
+
+    sharedAnnouncementRegion.setAttribute("aria-live", priority);
+    sharedAnnouncementRegion.textContent = message;
+
+    sharedAnnouncementTimeout = setTimeout(() => {
+      if (sharedAnnouncementRegion?.parentNode) {
+        sharedAnnouncementRegion.parentNode.removeChild(sharedAnnouncementRegion);
+      }
+      sharedAnnouncementRegion = null;
+      sharedAnnouncementTimeout = null;
     }, 1000);
   }, []);
 

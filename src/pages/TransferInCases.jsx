@@ -16,7 +16,24 @@ import {
   Select,
   Checkbox,
 } from "../components/UI";
-import { Search, CheckCircle, XCircle, Eye, Clock, FileText, Download } from "lucide-react";
+import {
+  Search,
+  CheckCircle,
+  XCircle,
+  Eye,
+  Clock,
+  FileText,
+  Download,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  Filter,
+  X,
+} from "lucide-react";
+import {
+  APPROVED_VACCINE_NAMES,
+  normalizeApprovedVaccineName,
+} from "../constants/approvedVaccines";
 
 const TRANSFER_STATUS = {
   FOR_VALIDATION: "for_validation",
@@ -60,6 +77,70 @@ const TRIAGE_LABELS = {
   overdue_priority_followup: { label: "Overdue Priority Follow-up", variant: "danger" },
 };
 
+const DEFAULT_TRANSFER_CASE_SORT_STATE = {
+  key: null,
+  direction: null,
+};
+
+const TRANSFER_CASE_TEXT_COLLATOR = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: "base",
+});
+
+const normalizeTransferCaseDateValue = (value) => {
+  if (!value) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const parsedDate = new Date(value);
+  return Number.isNaN(parsedDate.getTime())
+    ? Number.POSITIVE_INFINITY
+    : parsedDate.getTime();
+};
+
+const normalizeTransferCaseVaccineValue = (value) =>
+  normalizeApprovedVaccineName(value) || String(value || "").trim();
+
+const getTransferCaseSortValue = (caseItem = {}, columnKey) => {
+  if (columnKey === "guardian_name") {
+    return String(caseItem.guardian_name || "").trim();
+  }
+
+  if (columnKey === "created_at") {
+    return normalizeTransferCaseDateValue(caseItem.created_at);
+  }
+
+  return String(caseItem?.[columnKey] || "").trim();
+};
+
+const sortTransferCases = (rows = [], sortState = DEFAULT_TRANSFER_CASE_SORT_STATE) => {
+  if (!sortState?.key || !sortState?.direction) {
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  return [...rows]
+    .map((row, index) => ({ row, index }))
+    .sort((leftEntry, rightEntry) => {
+      const leftValue = getTransferCaseSortValue(leftEntry.row, sortState.key);
+      const rightValue = getTransferCaseSortValue(rightEntry.row, sortState.key);
+
+      const comparison =
+        typeof leftValue === "number" || typeof rightValue === "number"
+          ? Number(leftValue || 0) - Number(rightValue || 0)
+          : TRANSFER_CASE_TEXT_COLLATOR.compare(
+              String(leftValue || ""),
+              String(rightValue || ""),
+            );
+
+      if (comparison !== 0) {
+        return sortState.direction === "asc" ? comparison : -comparison;
+      }
+
+      return leftEntry.index - rightEntry.index;
+    })
+    .map((entry) => entry.row);
+};
+
 const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateChange }, ref) => {
   const { isAdmin } = useAuth();
   const { success, error, warning } = useNotification();
@@ -76,6 +157,10 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
   const [triageFilter, setTriageFilter] = useState("");
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
+  const [sortState, setSortState] = useState(DEFAULT_TRANSFER_CASE_SORT_STATE);
+  const [nextVaccineFilters, setNextVaccineFilters] = useState([]);
+  const [activeHeaderFilter, setActiveHeaderFilter] = useState(null);
+  const [nextVaccineFilterDraft, setNextVaccineFilterDraft] = useState([]);
 
   const [selectedCase, setSelectedCase] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -205,6 +290,22 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
       });
     }
 
+    if (nextVaccineFilters.length > 0) {
+      const activeVaccines = new Set(
+        nextVaccineFilters
+          .map((value) => normalizeTransferCaseVaccineValue(value))
+          .filter(Boolean),
+      );
+
+      result = result.filter((caseItem) =>
+        activeVaccines.has(
+          normalizeTransferCaseVaccineValue(caseItem.auto_computed_next_vaccine),
+        ),
+      );
+    }
+
+    result = sortTransferCases(result, sortState);
+
     setFilteredCases(result);
     setCurrentPage(1);
   }, [
@@ -215,7 +316,29 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
     triageFilter,
     startDateFilter,
     endDateFilter,
+    nextVaccineFilters,
+    sortState,
   ]);
+
+  useEffect(() => {
+    if (!activeHeaderFilter) {
+      return undefined;
+    }
+
+    const handlePointerDownOutside = (event) => {
+      if (event.target?.closest?.("[data-transfer-filter-shell='true']")) {
+        return;
+      }
+
+      setActiveHeaderFilter(null);
+      setNextVaccineFilterDraft([]);
+    };
+
+    document.addEventListener("mousedown", handlePointerDownOutside);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDownOutside);
+    };
+  }, [activeHeaderFilter]);
 
   useEffect(() => {
     onRefreshStateChange?.(refreshing);
@@ -232,6 +355,196 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
       fetchCases(isRefresh);
     },
   }));
+
+  const handleSortToggle = (columnKey) => {
+    setSortState((previousState) => {
+      if (previousState.key !== columnKey) {
+        return {
+          key: columnKey,
+          direction: "asc",
+        };
+      }
+
+      if (previousState.direction === "asc") {
+        return {
+          key: columnKey,
+          direction: "desc",
+        };
+      }
+
+      return DEFAULT_TRANSFER_CASE_SORT_STATE;
+    });
+  };
+
+  const openNextVaccineFilterPanel = () => {
+    if (activeHeaderFilter === "auto_computed_next_vaccine") {
+      setActiveHeaderFilter(null);
+      setNextVaccineFilterDraft([]);
+      return;
+    }
+
+    setActiveHeaderFilter("auto_computed_next_vaccine");
+    setNextVaccineFilterDraft([...nextVaccineFilters]);
+  };
+
+  const toggleNextVaccineDraft = (vaccineName) => {
+    setNextVaccineFilterDraft((previousDraft) => {
+      const nextDraft = Array.isArray(previousDraft) ? [...previousDraft] : [];
+      const existingIndex = nextDraft.indexOf(vaccineName);
+
+      if (existingIndex >= 0) {
+        nextDraft.splice(existingIndex, 1);
+      } else {
+        nextDraft.push(vaccineName);
+      }
+
+      return nextDraft;
+    });
+  };
+
+  const handleNextVaccineFilterApply = () => {
+    setNextVaccineFilters(
+      Array.from(
+        new Set(
+          nextVaccineFilterDraft
+            .map((value) => normalizeTransferCaseVaccineValue(value))
+            .filter(Boolean),
+        ),
+      ),
+    );
+    setActiveHeaderFilter(null);
+    setNextVaccineFilterDraft([]);
+  };
+
+  const handleNextVaccineFilterCancel = () => {
+    setActiveHeaderFilter(null);
+    setNextVaccineFilterDraft([]);
+  };
+
+  const handleNextVaccineFilterClear = () => {
+    setNextVaccineFilters([]);
+
+    if (activeHeaderFilter === "auto_computed_next_vaccine") {
+      setActiveHeaderFilter(null);
+      setNextVaccineFilterDraft([]);
+    }
+  };
+
+  const renderNextVaccineFilterPanel = (column) => {
+    if (column.key !== "auto_computed_next_vaccine" || activeHeaderFilter !== column.key) {
+      return null;
+    }
+
+    return (
+      <div
+        className="absolute left-0 top-full z-[1200] mt-2 w-72 rounded-xl border border-gray-200 bg-white p-3 text-left normal-case tracking-normal shadow-xl dark:border-gray-700 dark:bg-gray-800"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-label={`${column.label} filter`}
+      >
+        <div className="mb-3">
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            Filter {column.label}
+          </p>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Show only transfer-in cases with matching next due vaccines.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          {APPROVED_VACCINE_NAMES.map((vaccineName) => (
+            <label
+              key={vaccineName}
+              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700/60"
+            >
+              <input
+                type="checkbox"
+                checked={nextVaccineFilterDraft.includes(vaccineName)}
+                onChange={() => toggleNextVaccineDraft(vaccineName)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span>{vaccineName}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleNextVaccineFilterCancel}
+            type="button"
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleNextVaccineFilterApply}
+            type="button"
+          >
+            Filter
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderHeaderCellContent = (column) => {
+    const activeSortForColumn = sortState.key === column.key ? sortState.direction : null;
+    const isNextVaccineFilterActive =
+      column.key === "auto_computed_next_vaccine" && nextVaccineFilters.length > 0;
+
+    return (
+      <div
+        className={`relative flex min-h-[1.5rem] items-center justify-between gap-2 ${
+          activeHeaderFilter === column.key ? "z-[1200]" : "z-10"
+        }`}
+        data-transfer-filter-shell="true"
+      >
+        <span className="flex-1 leading-4">{column.label}</span>
+        <div className="flex items-center gap-1">
+          {column.sortable && (
+            <button
+              type="button"
+              onClick={() => handleSortToggle(column.key)}
+              className={`rounded-md p-1 transition hover:bg-gray-200/80 dark:hover:bg-gray-600/80 ${
+                activeSortForColumn
+                  ? "text-blue-600 dark:text-blue-300"
+                  : "text-gray-400 dark:text-gray-300"
+              }`}
+              aria-label={`Sort ${column.label}`}
+              title={`Sort ${column.label}`}
+            >
+              {activeSortForColumn === "asc" ? (
+                <ArrowUp className="h-3.5 w-3.5" />
+              ) : activeSortForColumn === "desc" ? (
+                <ArrowDown className="h-3.5 w-3.5" />
+              ) : (
+                <ArrowUpDown className="h-3.5 w-3.5" />
+              )}
+            </button>
+          )}
+          {column.filterable && (
+            <button
+              type="button"
+              onClick={openNextVaccineFilterPanel}
+              className={`rounded-md p-1 transition hover:bg-gray-200/80 dark:hover:bg-gray-600/80 ${
+                isNextVaccineFilterActive || activeHeaderFilter === column.key
+                  ? "text-blue-600 dark:text-blue-300"
+                  : "text-gray-400 dark:text-gray-300"
+              }`}
+              aria-label={`Filter ${column.label}`}
+              title={`Filter ${column.label}`}
+            >
+              <Filter className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        {renderNextVaccineFilterPanel(column)}
+      </div>
+    );
+  };
 
   const handleViewDetails = (caseItem) => {
     setSelectedCase(caseItem);
@@ -362,6 +675,7 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
     {
       key: "guardian_name",
       label: "Guardian",
+      sortable: true,
       render: (val, row) => (
         <div className="font-medium text-gray-900 dark:text-gray-100">
           {val || "N/A"}
@@ -383,6 +697,7 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
     {
       key: "auto_computed_next_vaccine",
       label: "Next Vaccine",
+      filterable: true,
       render: (val) => (
         <div className="max-w-xs truncate" title={val || "N/A"}>
           {val || "N/A"}
@@ -429,6 +744,7 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
     {
       key: "created_at",
       label: "Submitted Date",
+      sortable: true,
       render: (val) => {
         if (!val) return "N/A";
         // Convert ISO string to readable format
@@ -676,6 +992,23 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
             </Button>
           </div>
 
+          {nextVaccineFilters.length > 0 && (
+            <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
+              <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-200">
+                <span>{`Next Vaccine: ${nextVaccineFilters.join(", ")}`}</span>
+                <button
+                  type="button"
+                  onClick={handleNextVaccineFilterClear}
+                  className="rounded-full p-0.5 transition hover:bg-blue-100 dark:hover:bg-blue-500/20"
+                  aria-label={`Remove Next Vaccine: ${nextVaccineFilters.join(", ")}`}
+                  title={`Remove Next Vaccine: ${nextVaccineFilters.join(", ")}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            </div>
+          )}
+
           <div className="flex-1 min-h-0 overflow-auto auto-hide-scrollbar scroll-smooth">
             <table className="min-w-full w-full table-auto divide-y divide-gray-200 dark:divide-gray-700 relative">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
@@ -684,9 +1017,11 @@ const TransferInCases = React.forwardRef(({ showHeader = true, onRefreshStateCha
                     <th
                       key={column.key}
                       scope="col"
-                      className={`px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 ${column.headerClassName || ""}`}
+                      className={`relative px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 ${
+                        activeHeaderFilter === column.key ? "z-[1200]" : "z-10"
+                      } ${column.headerClassName || ""}`}
                     >
-                      {column.label}
+                      {renderHeaderCellContent(column)}
                     </th>
                   ))}
                   <th

@@ -1056,6 +1056,22 @@ export default function ImmunizationRecordBooklet({ infantId }) {
   const requestIdRef = useRef(0);
   const printAreaRef = useRef(null);
 
+  const fetchScheduleData = useCallback(async () => {
+    if (typeof apiClient.getInfantVaccinationSchedule === "function") {
+      return apiClient.getInfantVaccinationSchedule(infantId);
+    }
+
+    if (typeof apiClient.getVaccinationSchedulesByInfant === "function") {
+      return apiClient.getVaccinationSchedulesByInfant(infantId);
+    }
+
+    if (typeof apiClient.getVaccinationSchedules === "function") {
+      return apiClient.getVaccinationSchedules({ infant_id: infantId });
+    }
+
+    return [];
+  }, [infantId]);
+
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -1086,7 +1102,7 @@ export default function ImmunizationRecordBooklet({ infantId }) {
       const [infantData, vaccinationData, schedulesData] = await Promise.all([
         apiClient.getInfant(infantId),
         apiClient.getVaccinationRecordsByInfant(infantId),
-        apiClient.getInfantVaccinationSchedule(infantId),
+        fetchScheduleData(),
       ]);
 
       if (!isMountedRef.current || requestId !== requestIdRef.current) {
@@ -1120,7 +1136,7 @@ export default function ImmunizationRecordBooklet({ infantId }) {
 
       setLoading(false);
     }
-  }, [infantId]);
+  }, [fetchScheduleData, infantId]);
 
   useEffect(() => {
     void fetchData();

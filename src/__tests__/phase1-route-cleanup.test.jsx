@@ -45,6 +45,7 @@ jest.mock("../contexts/NotificationContext", () => ({
 jest.mock("../hooks/useCachedData", () => ({
   usePrefetchGuardian: () => ({ prefetchGuardianData: jest.fn() }),
   usePrefetchDashboard: () => ({ prefetchDashboardData: jest.fn() }),
+  useGuardianStats: () => ({ data: { childrenCount: 1 } }),
 }));
 
 jest.mock("../hooks/useGuardianNotifications", () => () => ({
@@ -85,8 +86,8 @@ describe("Phase 1 route cleanup", () => {
     mockPathname = "/guardian/dashboard";
   });
 
-  test("admin sidebar surfaces Transfer-In Cases and Digital Papers routes", () => {
-    mockPathname = "/dashboard";
+  test("admin sidebar keeps transfer-in and digital papers out of the primary navigation", () => {
+    mockPathname = "/analytics";
 
     render(
       <MemoryRouter>
@@ -99,12 +100,15 @@ describe("Phase 1 route cleanup", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /transfer-in cases/i }));
-
-    expect(mockNavigate).toHaveBeenCalledWith(adminRoutePaths.transferInCases);
+    expect(
+      screen.queryByRole("button", { name: /transfer-in cases/i }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /digital papers/i }),
     ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /analytics/i }));
+    expect(mockNavigate).toHaveBeenCalledWith(adminRoutePaths.analytics);
   });
 
   test("mobile bottom navigation standardizes guardian account access under profile", () => {

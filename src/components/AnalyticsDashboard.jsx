@@ -3167,6 +3167,7 @@ const AnalyticsDashboard = () => {
     const windowListeners = [
       "appointment-update",
       "vaccination-update",
+      "inventory-update",
       "guardian-data-update",
       "child-data-update",
     ].map((eventName) => {

@@ -13,6 +13,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import apiClient from "../utils/api";
 import {
   downloadWordDocument,
+  downloadPdfFromHtml,
   PRINT_PAGE_PRESETS,
 } from "../utils/printDocumentExport";
 import InventoryManagement, {
@@ -21,12 +22,14 @@ import InventoryManagement, {
 
 const mockPdfSave = jest.fn();
 const mockPdfConfigs = [];
+const mockPdfInstances = [];
 
 jest.mock("jspdf", () => {
   class MockJsPDF {
     constructor(config = {}) {
       this.config = config;
       mockPdfConfigs.push(config);
+      mockPdfInstances.push(this);
       this.internal = {
         pageSize: {
           getWidth: () => 356,
@@ -47,6 +50,7 @@ jest.mock("jspdf", () => {
     line = jest.fn();
     setTextColor = jest.fn();
     autoTable = jest.fn((options = {}) => {
+      this.autoTableOptions = options;
       if (typeof options.startY === "number") {
         this.lastAutoTable = { finalY: options.startY + 24 };
       }
@@ -80,6 +84,7 @@ jest.mock("../utils/printDocumentExport", () => {
   return {
     __esModule: true,
     ...actual,
+    downloadPdfFromHtml: jest.fn(),
     downloadWordDocument: jest.fn(),
   };
 });
@@ -201,8 +206,10 @@ describe("Inventory Management print and export behavior", () => {
     localStorage.clear();
     sessionStorage.clear();
     downloadWordDocument.mockClear();
+    downloadPdfFromHtml.mockClear();
     mockPdfSave.mockClear();
     mockPdfConfigs.length = 0;
+    mockPdfInstances.length = 0;
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
     });
@@ -247,8 +254,25 @@ describe("Inventory Management print and export behavior", () => {
       within(modal).getByRole("option", { name: /pdf document/i }),
     ).toBeInTheDocument();
     expect(
-      within(modal).getByRole("option", { name: /word document/i }),
-    ).toBeInTheDocument();
+      within(modal).queryByRole("option", { name: /word document/i }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(within(modal).getByLabelText(/report type/i), {
+      target: { value: "doh-lgu-stock-form" },
+    });
+
+    expect(
+      within(modal).queryByRole("option", { name: /word document/i }),
+    ).not.toBeInTheDocument();
+    expect(within(modal).getByLabelText(/^format/i)).toHaveValue("print");
+
+    fireEvent.change(within(modal).getByLabelText(/report type/i), {
+      target: { value: "requisition-issue-slip" },
+    });
+
+    expect(
+      within(modal).queryByRole("option", { name: /word document/i }),
+    ).not.toBeInTheDocument();
   });
 
   test("inventory sheet print action shows the restored inventory-sheet report and removes the print class after printing", async () => {
@@ -327,7 +351,82 @@ describe("Inventory Management print and export behavior", () => {
     jest.useRealTimers();
   });
 
-  test("stock form print report follows the DOH/LGU header structure and maps DOH versus LGU values", async () => {
+  test("inventory sheet keeps the latest row actionable while showing historical totals across saved periods", async () => {
+    apiClient.getVaccineInventory.mockResolvedValueOnce([
+      {
+        id: 10,
+        clinic_id: 7,
+        vaccine_id: 1,
+        vaccine_name: "BCG",
+        beginning_balance: 1000,
+        received_during_period: 500,
+        lot_batch_number: "LOT-BCG-OLD",
+        transferred_in: 25,
+        transferred_out: 10,
+        expired_wasted: 4,
+        issuance: 300,
+        stock_on_hand: 1211,
+        period_start: "2025-11-01",
+        period_end: "2025-11-30",
+        updated_at: "2025-11-30T08:00:00.000Z",
+      },
+      {
+        id: 11,
+        clinic_id: 7,
+        vaccine_id: 1,
+        vaccine_name: "BCG",
+        beginning_balance: 10,
+        received_during_period: 4,
+        lot_batch_number: "LOT-BCG-NEW",
+        transferred_in: 0,
+        transferred_out: 1,
+        expired_wasted: 0,
+        issuance: 5,
+        stock_on_hand: 8,
+        period_start: "2026-11-01",
+        period_end: "2026-11-30",
+        updated_at: "2026-11-30T08:00:00.000Z",
+      },
+      inventoryRecords[1],
+    ]);
+
+    renderInventoryRoute("/inventory?tab=inventory_sheet");
+
+    await waitForInventoryModuleReady();
+
+    const inventoryPanel = screen.getByTestId("inventory-sheet-panel");
+    const inventoryRows = within(inventoryPanel).getAllByRole("row");
+    const bcgRow = inventoryRows.find((row) => within(row).queryByText("BCG"));
+    expect(bcgRow).toBeDefined();
+
+    const bcgCells = within(bcgRow).getAllByRole("cell", { hidden: true });
+    expect(bcgCells[2]).toHaveTextContent("1000");
+    expect(bcgCells[3]).toHaveTextContent("504");
+    expect(bcgCells[4]).toHaveTextContent("MULTIPLE LOTS (2)");
+    expect(bcgCells[5]).toHaveTextContent("25");
+    expect(bcgCells[5]).toHaveTextContent("11");
+    expect(bcgCells[6]).toHaveTextContent("4");
+    expect(bcgCells[7]).toHaveTextContent("1504");
+    expect(bcgCells[8]).toHaveTextContent("305");
+    expect(bcgCells[9]).toHaveTextContent("8");
+    expect(
+      within(bcgRow).getByRole("button", { name: /receive/i }),
+    ).toBeInTheDocument();
+    expect(bcgRow).not.toHaveTextContent("LOT-BCG-NEW");
+
+    const totalRow = inventoryRows.find((row) => within(row).queryByText(/^TOTAL$/));
+    expect(totalRow).toBeDefined();
+
+    const totalCells = within(totalRow).getAllByRole("cell", { hidden: true });
+    expect(totalCells[1]).toHaveTextContent("1002");
+    expect(totalCells[2]).toHaveTextContent("505");
+    expect(totalCells[6]).toHaveTextContent("1507");
+    expect(totalCells[7]).toHaveTextContent("306");
+    expect(totalCells[8]).toHaveTextContent("10");
+    expect(totalRow).not.toHaveTextContent("1517");
+  });
+
+  test("stock form print report uses the dedicated DOH/LGU stock form layout and preserves the report month", async () => {
     renderInventoryRoute();
 
     await waitForInventoryModuleReady();
@@ -361,79 +460,101 @@ describe("Inventory Management print and export behavior", () => {
     expect(printHeader).toHaveTextContent(
       "DOH and LGU Utilization / Stock Inventory Form",
     );
-    expect(printHeader).toHaveTextContent("Facility: San Nicolas Health Center");
-    expect(printHeader).toHaveTextContent("Address: San Nicolas, Pasig, Metro Manila");
-    expect(printHeader).toHaveTextContent("LGU: Pasig");
-    expect(printHeader).toHaveTextContent("Reporting Period: NOVEMBER 2026");
-    expect(printReport).toHaveTextContent("Address: San Nicolas, Pasig, Metro Manila");
-    expect(printMonthYear).toHaveTextContent("NOVEMBER 2026");
+    expect(printHeader).toHaveTextContent("Facility:");
+    expect(printHeader).toHaveTextContent("SAN NICOLAS HEALTH CENTER");
+    expect(printHeader).toHaveTextContent("LGU:");
+    expect(printHeader).toHaveTextContent("PASIG CITY");
+    expect(printHeader).toHaveTextContent("Address:");
+    expect(printHeader).toHaveTextContent("SAN NICOLAS, PASIG, METRO MANILA");
+    expect(printMonthYear).toHaveTextContent("Reporting Period: NOVEMBER 2026");
+    expect(printHeader).not.toHaveTextContent("Health Facility:");
+    expect(printHeader).not.toHaveTextContent("Year:");
+    expect(printHeader).not.toHaveTextContent("Date:");
+    expect(printHeader).not.toHaveTextContent("For the Month:");
 
     expect(
-      within(printTable).getByText(/NATIONAL IMMUNIZATION PROGRAM/i),
+      within(printHeader).getByAltText(/department of health seal/i),
     ).toBeInTheDocument();
-    expect(within(printTable).getAllByText(/Received/i).length).toBeGreaterThan(0);
-    expect(within(printTable).getAllByText(/Transferred/i).length).toBeGreaterThan(0);
-    expect(within(printTable).getAllByText(/^DOH$/i).length).toBeGreaterThan(0);
-    expect(within(printTable).getAllByText(/^LGU$/i).length).toBeGreaterThan(0);
+    expect(
+      within(printHeader).getByAltText(/municipality of pasig seal/i),
+    ).toBeInTheDocument();
+    expect(
+      within(printTable).getByText(/national immunization program \(nip\)/i),
+    ).toBeInTheDocument();
+    expect(
+      within(printTable).getByText(/ending inventory from the previous month/i),
+    ).toBeInTheDocument();
+    expect(
+      within(printTable).getByText(/stock transfer \(dm 2014-0317\)/i),
+    ).toBeInTheDocument();
+    expect(
+      within(printTable).getByText(/monthly consumption \(d\)/i),
+    ).toBeInTheDocument();
+    expect(
+      within(printTable).getByText(
+        /number of patients received the vaccine for this month/i,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(printTable).getByText(/end of month stocks \(a\+b\) - \(c\+d\)/i),
+    ).toBeInTheDocument();
+    expect(within(printTable).queryByText(/^Items$/i)).not.toBeInTheDocument();
 
     const printBcgRow = within(printTable)
       .getAllByRole("row", { hidden: true })
       .find((row) => within(row).queryByText("BCG") !== null);
-    const printBcgCellValues = within(printBcgRow)
-      .getAllByRole("cell", { hidden: true })
-      .map((cell) => cell.textContent.trim());
+    expect(printBcgRow).toBeDefined();
+    const printBcgCells = within(printBcgRow).getAllByRole("cell", {
+      hidden: true,
+    });
 
-    expect(printBcgCellValues).toEqual([
-      "1",
-      "BCG",
-      "10",
-      "0",
-      "4",
-      "0",
-      "1",
-      "0",
-      "LOT-BCG-001",
-      "12/31/2026",
-      "11/02/2026 / 11/10/2026",
-      "5",
-      "0",
-      "5",
-      "8",
-      "0",
-    ]);
+    expect(printBcgCells[0]).toHaveTextContent("1");
+    expect(printBcgCells[1]).toHaveTextContent("BCG");
+    expect(printBcgCells[2]).toHaveTextContent("10");
+    expect(printBcgCells[3]).toHaveTextContent("0");
+    expect(printBcgCells[4]).toHaveTextContent("4");
+    expect(printBcgCells[5]).toHaveTextContent("0");
+    expect(printBcgCells[6]).toHaveTextContent("1");
+    expect(printBcgCells[7]).toHaveTextContent("0");
+    expect(printBcgCells[8]).toHaveTextContent("LOT-BCG-001");
+    expect(printBcgCells[9]).toHaveTextContent("12/31/2026");
+    expect(printBcgCells[10]).toHaveTextContent("11/02/2026");
+    expect(printBcgCells[10]).toHaveTextContent("11/10/2026");
+    expect(printBcgCells[11]).toHaveTextContent("5");
+    expect(printBcgCells[12]).toHaveTextContent("0");
+    expect(printBcgCells[13]).toHaveTextContent("5");
+    expect(printBcgCells[14]).toHaveTextContent("0");
+    expect(printBcgCells[15]).toHaveTextContent("8");
+    expect(printBcgCells[16]).toHaveTextContent("0");
 
     const printMmrRow = within(printTable)
       .getAllByRole("row", { hidden: true })
       .find(
         (row) =>
-          within(row).queryByText("Measles, Mumps and Rubella (MMR)") !== null,
+          within(row).queryByText(/measles, mumps and rubella \(mmr\)/i) !== null,
       );
-    const printMmrCellValues = within(printMmrRow)
-      .getAllByRole("cell", { hidden: true })
-      .map((cell) => cell.textContent.trim());
+    expect(printMmrRow).toBeDefined();
+    const printMmrCells = within(printMmrRow).getAllByRole("cell", {
+      hidden: true,
+    });
 
-    expect(printMmrCellValues).toEqual([
-      "7",
-      "Measles, Mumps and Rubella (MMR)",
-      "0",
-      "2",
-      "0",
-      "1",
-      "0",
-      "0",
-      "MMR-LGU-002",
-      "03/20/2027",
-      "11/05/2026",
-      "0",
-      "1",
-      "1",
-      "0",
-      "2",
-    ]);
-
-    expect(
-      within(printTable).queryByTestId("inventory-print-total-row"),
-    ).not.toBeInTheDocument();
+    expect(printMmrCells[0]).toHaveTextContent("7");
+    expect(printMmrCells[1]).toHaveTextContent(/measles, mumps and rubella \(mmr\)/i);
+    expect(printMmrCells[2]).toHaveTextContent("0");
+    expect(printMmrCells[3]).toHaveTextContent("2");
+    expect(printMmrCells[4]).toHaveTextContent("0");
+    expect(printMmrCells[5]).toHaveTextContent("1");
+    expect(printMmrCells[6]).toHaveTextContent("0");
+    expect(printMmrCells[7]).toHaveTextContent("0");
+    expect(printMmrCells[8]).toHaveTextContent("MMR-LGU-002");
+    expect(printMmrCells[9]).toHaveTextContent("03/20/2027");
+    expect(printMmrCells[10]).toHaveTextContent("11/05/2026");
+    expect(printMmrCells[11]).toHaveTextContent("0");
+    expect(printMmrCells[12]).toHaveTextContent("1");
+    expect(printMmrCells[13]).toHaveTextContent("0");
+    expect(printMmrCells[14]).toHaveTextContent("1");
+    expect(printMmrCells[15]).toHaveTextContent("0");
+    expect(printMmrCells[16]).toHaveTextContent("2");
 
     act(() => {
       jest.advanceTimersByTime(200);
@@ -441,7 +562,7 @@ describe("Inventory Management print and export behavior", () => {
     jest.useRealTimers();
   });
 
-  test("deduplicates overlapping facility address parts in printable report headers", async () => {
+  test("deduplicates overlapping facility address parts in RIS printable report headers", async () => {
     apiClient.getFacilityInfo.mockResolvedValueOnce({
       name: "San Nicolas Health Center",
       address: "Barangay San Nicolas, Pasig City, NCR",
@@ -456,14 +577,15 @@ describe("Inventory Management print and export behavior", () => {
 
     jest.useFakeTimers();
     fireEvent.change(screen.getByLabelText(/report format/i), {
-      target: { value: "doh-lgu-stock-form" },
+      target: { value: "requisition-issue-slip" },
     });
     fireEvent.click(screen.getByRole("button", { name: /print report/i }));
 
-    const printHeader = screen.getByTestId("inventory-print-header");
+    const printHeader = screen.getByTestId("inventory-ris-print-header");
 
+    expect(printHeader).toHaveTextContent("Address:");
     expect(printHeader).toHaveTextContent(
-      "Address: Barangay San Nicolas, Pasig City, NCR",
+      "Barangay San Nicolas, Pasig City, NCR",
     );
     expect(printHeader.textContent).not.toContain(
       "Barangay San Nicolas, Pasig City, NCR, Barangay San Nicolas",
@@ -556,47 +678,35 @@ describe("Inventory Management print and export behavior", () => {
     jest.useRealTimers();
   });
 
-  test("locks RIS Word export to legal portrait without changing other inventory report templates", async () => {
+  test("keeps the generate report modal on print/pdf only for inventory sheet and RIS form", async () => {
     renderInventoryRoute();
 
     await waitForInventoryModuleReady();
 
-    await generateReportFromModal({
-      reportType: "requisition-issue-slip",
-      format: "word",
+    const modal = await openGenerateReportModal();
+
+    expect(within(modal).getByLabelText(/^format/i)).toHaveValue("print");
+    expect(
+      within(modal).queryByRole("option", { name: /word document/i }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(within(modal).getByLabelText(/report type/i), {
+      target: { value: "requisition-issue-slip" },
     });
 
-    await waitFor(() => {
-      expect(downloadWordDocument).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: "REQUISITION AND ISSUE SLIP",
-          page: PRINT_PAGE_PRESETS.legalPortrait,
-        }),
-      );
+    expect(within(modal).getByLabelText(/^format/i)).toHaveValue("print");
+    expect(
+      within(modal).queryByRole("option", { name: /word document/i }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(within(modal).getByLabelText(/report type/i), {
+      target: { value: "inventory-sheet" },
     });
 
-    const risWordCall = downloadWordDocument.mock.calls.at(-1)?.[0] || {};
-    expect(risWordCall.headerText).toBe("");
-    expect(risWordCall.html).toContain("ris-word-header-table");
-
-    await generateReportFromModal({
-      reportType: "inventory-sheet",
-      format: "word",
-    });
-
-    await waitFor(() => {
-      expect(downloadWordDocument).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          title: "EPI VACCINE AND OTHER LOGISTICS INVENTORY FORM",
-          page: expect.objectContaining({ orientation: "landscape" }),
-          headerText: "",
-          footerText: "",
-          html: expect.stringContaining(
-            "inventory-sheet-summary-print-header__branding",
-          ),
-        }),
-      );
-    });
+    expect(within(modal).getByLabelText(/^format/i)).toHaveValue("print");
+    expect(
+      within(modal).queryByRole("option", { name: /word document/i }),
+    ).not.toBeInTheDocument();
   });
 
   test("locks RIS PDF export to legal portrait without changing other inventory report templates", async () => {
@@ -629,6 +739,7 @@ describe("Inventory Management print and export behavior", () => {
     expect(mockPdfConfigs.at(-1)).toEqual(
       expect.objectContaining({ orientation: "landscape", format: "legal" }),
     );
+    expect(mockPdfInstances.at(-1).autoTableOptions.didDrawPage).toBeUndefined();
 
     await generateReportFromModal({
       reportType: "requisition-issue-slip",
@@ -643,6 +754,54 @@ describe("Inventory Management print and export behavior", () => {
     expect(mockPdfConfigs.at(-1)).toEqual(
       expect.objectContaining({ orientation: "portrait", format: "legal" }),
     );
+  });
+
+  test("doh lgu pdf export keeps the requested report month label for april 2026", async () => {
+    renderInventoryRoute();
+
+    await waitForInventoryModuleReady();
+
+    await generateReportFromModal({
+      reportType: "doh-lgu-stock-form",
+      format: "pdf",
+      reportDate: "2026-04-08",
+    });
+
+    await waitFor(() => {
+      expect(mockPdfSave).toHaveBeenCalledWith(
+        expect.stringMatching(/^doh-lgu-stock-inventory-report-/i),
+      );
+    });
+    expect(
+      mockPdfInstances.at(-1).text.mock.calls.some((call) =>
+        String(call[0]).includes("APRIL 2026"),
+      ),
+    ).toBe(true);
+  });
+
+  test("ris print preview keeps the requested reporting period label for april 2026", async () => {
+    renderInventoryRoute();
+
+    await waitForInventoryModuleReady();
+
+    fireEvent.change(document.getElementById("inventory-report-date"), {
+      target: { value: "2026-04-08" },
+    });
+    fireEvent.change(screen.getByLabelText(/report format/i), {
+      target: { value: "requisition-issue-slip" },
+    });
+
+    jest.useFakeTimers();
+    fireEvent.click(screen.getByRole("button", { name: /print report/i }));
+
+    expect(
+      screen.getByTestId("inventory-ris-print-period"),
+    ).toHaveTextContent("APRIL 2026");
+
+    act(() => {
+      jest.advanceTimersByTime(200);
+    });
+    jest.useRealTimers();
   });
 
   test("inventory sheet PDF download stays legal landscape and uses the inventory-sheet filename", async () => {

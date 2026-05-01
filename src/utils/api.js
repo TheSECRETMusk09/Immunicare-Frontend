@@ -518,8 +518,6 @@ axiosClient.interceptors.request.use(
         const isTerminalFailure = isTerminalRefreshFailure(refreshError);
         if (isTerminalFailure) {
           markProactiveRefreshTerminalFailure();
-          clearAuthStorage();
-          redirectToLoginIfNeeded();
         }
         if (
           !isTerminalFailure &&

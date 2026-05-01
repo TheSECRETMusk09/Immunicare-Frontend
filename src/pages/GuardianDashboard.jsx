@@ -345,16 +345,23 @@ const GuardianDashboard = () => {
   const [dashboardWarnings, setDashboardWarnings] = useState([]);
   const [dismissedNotificationIds, setDismissedNotificationIds] = useState([]);
   const hasTracked = React.useRef(false);
-  const {
-    notifications: guardianNotifications,
-    loading: notificationsLoading,
-    error: notificationsError,
-    markAsRead,
-    refresh: refreshNotifications,
-  } = useGuardianNotifications({
+  const notificationsState = useGuardianNotifications({
     limit: 5,
     pollingInterval: 60000,
   });
+  const guardianNotifications = Array.isArray(notificationsState?.notifications)
+    ? notificationsState.notifications
+    : [];
+  const notificationsLoading = Boolean(notificationsState?.loading);
+  const notificationsError = notificationsState?.error || null;
+  const markAsRead =
+    typeof notificationsState?.markAsRead === "function"
+      ? notificationsState.markAsRead
+      : async () => false;
+  const refreshNotifications =
+    typeof notificationsState?.refresh === "function"
+      ? notificationsState.refresh
+      : async () => {};
 
   // Fetch data from API
   const fetchDashboardData = useCallback(async (isSilentRefresh = false) => {
@@ -508,11 +515,20 @@ const GuardianDashboard = () => {
 
   // Update dismissed notifications when guardianNotifications change
   useEffect(() => {
-    setDismissedNotificationIds((previous) =>
-      previous.filter((notificationId) =>
+    setDismissedNotificationIds((previous) => {
+      const next = previous.filter((notificationId) =>
         guardianNotifications.some((notification) => notification.id === notificationId),
-      ),
-    );
+      );
+
+      if (
+        next.length === previous.length &&
+        next.every((notificationId, index) => notificationId === previous[index])
+      ) {
+        return previous;
+      }
+
+      return next;
+    });
   }, [guardianNotifications]);
 
   // Accessibility: Focus main content when loaded

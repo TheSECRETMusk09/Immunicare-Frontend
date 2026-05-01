@@ -352,14 +352,14 @@ describe("Admin integration sync and mapping checks", () => {
           vaccine_id: 2,
           lot_no: "PENTA-LATER-002",
           qty_current: 6,
-          expiry_date: "2026-06-01",
+          expiry_date: "2027-06-01",
         },
         {
           id: 301,
           vaccine_id: 2,
           lot_no: "PENTA-FEFO-001",
           qty_current: 9,
-          expiry_date: "2026-04-20",
+          expiry_date: "2027-04-20",
         },
       ],
     });
@@ -385,6 +385,10 @@ describe("Admin integration sync and mapping checks", () => {
     const batchSourceSelect = await screen.findByLabelText(/batch source/i);
     const doseInput = screen.getByLabelText(/dose number/i);
     const adminDateInput = screen.getByLabelText(/date administered/i);
+    const adminTimeSelect = screen.getByLabelText(/time administered/i);
+    const siteOfInjectionSelect = screen.getByLabelText(/site of injection/i);
+    const administeredByRoleSelect = screen.getByLabelText(/administered by role/i);
+    const administeredByNameInput = screen.getByLabelText(/administered by name/i);
 
     fireEvent.change(childSelect, { target: { value: "2" } });
     fireEvent.change(vaccineSelect, { target: { value: "2" } });
@@ -400,8 +404,20 @@ describe("Admin integration sync and mapping checks", () => {
     expect(
       screen.getByText(/FEFO recommended batch selected automatically/i),
     ).toBeInTheDocument();
+    fireEvent.change(administeredByRoleSelect, { target: { value: "nurse" } });
+    fireEvent.change(administeredByNameInput, { target: { value: "nurse.one" } });
+    fireEvent.blur(administeredByNameInput);
+    await waitFor(() => {
+      expect(screen.getByText(/selected nurse:/i)).toBeInTheDocument();
+    });
     fireEvent.change(doseInput, { target: { value: "1" } });
     fireEvent.change(adminDateInput, { target: { value: "2026-03-01" } });
+    fireEvent.change(adminTimeSelect, { target: { value: "09:00" } });
+    fireEvent.change(siteOfInjectionSelect, { target: { value: "Left Arm" } });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /save record/i })).toBeEnabled();
+    });
 
     fireEvent.click(screen.getByRole("button", { name: /save record/i }));
 
@@ -415,6 +431,8 @@ describe("Admin integration sync and mapping checks", () => {
         vaccine_id: 2,
         batch_id: 301,
         lot_batch_number: "PENTA-FEFO-001",
+        time_administered: "09:00",
+        site_of_injection: "Left Arm",
       }),
     );
 
@@ -448,14 +466,14 @@ describe("Admin integration sync and mapping checks", () => {
           vaccine_id: 2,
           lot_no: "PENTA-LATER-002",
           qty_current: 6,
-          expiry_date: "2026-06-01",
+          expiry_date: "2027-06-01",
         },
         {
           id: 301,
           vaccine_id: 2,
           lot_no: "PENTA-FEFO-001",
           qty_current: 9,
-          expiry_date: "2026-04-20",
+          expiry_date: "2027-04-20",
         },
       ],
     });

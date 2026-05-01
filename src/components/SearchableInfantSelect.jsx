@@ -14,18 +14,8 @@ import {
   getInfantControlNumber,
   getInfantDisplayLabel,
   getInfantFullName,
+  matchesTokenizedTextSearch,
 } from "../utils/infantIdentity";
-
-const normalizeSearchTerm = (value) => String(value || "").trim().toLowerCase();
-
-const matchesTokenizedQuery = (searchText, query) => {
-  const normalized = normalizeSearchTerm(query);
-  if (!normalized) return true;
-  const tokens = normalized.split(/\s+/).filter(Boolean);
-  if (tokens.length === 0) return true;
-  const haystack = normalizeSearchTerm(searchText);
-  return tokens.every((token) => haystack.includes(token));
-};
 
 const SearchableInfantSelect = ({
   infants = [],
@@ -129,7 +119,7 @@ const SearchableInfantSelect = ({
     if (!deferredSearchQuery.trim()) return infantsWithSearchData;
 
     return infantsWithSearchData.filter((infant) =>
-      matchesTokenizedQuery(infant.searchText, deferredSearchQuery)
+      matchesTokenizedTextSearch(infant.searchText, deferredSearchQuery)
     );
   }, [deferredSearchQuery, infantsWithSearchData]);
 

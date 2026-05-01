@@ -15,6 +15,7 @@ import { normalizeInfantsResponse } from "../utils/adminDataAdapters";
 import {
   buildInfantRecordPrefillContext,
   getInfantDisplayLabel,
+  getInfantFullName,
 } from "../utils/infantIdentity";
 import { getVaccinationPeriodRange } from "../utils/vaccinationPeriods";
 import {
@@ -28,6 +29,9 @@ import {
 } from "../components/UI";
 import {
   ArrowLeft,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   User,
   Calendar,
   BookOpen,
@@ -36,7 +40,9 @@ import {
   Search,
   Syringe,
   Baby,
+  Filter,
   RefreshCw,
+  X,
 } from "lucide-react";
 
 const getPeriodDateRange = (period, customFrom = "", customTo = "") => {
@@ -63,6 +69,19 @@ const WORKFLOW_STATUS_META = {
   in_progress: { label: "In Progress", variant: "success" },
   up_to_date: { label: "Up to Date", variant: "secondary" },
 };
+
+const REVIEW_VALIDATION_STATUSES = new Set([
+  "for_validation",
+  "needs_clarification",
+  "pending_validation",
+  "pending",
+  "under_review",
+]);
+
+const INFANT_NAME_COLLATOR = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: "base",
+});
 
 const TRANSFER_STATUS_META = {
   approved: { label: "Transfer Approved", variant: "success" },
@@ -125,6 +144,396 @@ const normalizePaginationState = (pagination, currentPage, itemsPerPage, itemCou
   };
 };
 
+const DEFAULT_ITEMS_PER_PAGE = 20;
+const ITEMS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
+const DEFAULT_SORT_STATE = {
+  key: null,
+  direction: null,
+};
+const DEFAULT_COLUMN_FILTERS = {
+  dob: {
+    start: "",
+    end: "",
+  },
+  sex: [],
+  workflow_status: [],
+  vaccination_progress: {
+    min: "",
+    max: "",
+    preset: "",
+  },
+};
+const VACCINATION_PROGRESS_PRESETS = [
+  { value: "", label: "Any Count", min: "", max: "" },
+  { value: "0-1", label: "0 to 1 doses", min: "0", max: "1" },
+  { value: "2-4", label: "2 to 4 doses", min: "2", max: "4" },
+  { value: "5-plus", label: "5+ doses", min: "5", max: "" },
+];
+
+const createColumnFilterState = (filters = DEFAULT_COLUMN_FILTERS) => ({
+  dob: {
+    start: String(filters?.dob?.start || ""),
+    end: String(filters?.dob?.end || ""),
+  },
+  sex: Array.isArray(filters?.sex) ? [...filters.sex] : [],
+  workflow_status: Array.isArray(filters?.workflow_status)
+    ? filters.workflow_status
+        .map((value) => normalizeWorkflowStatusValue(value))
+        .filter(Boolean)
+    : [],
+  vaccination_progress: {
+    min: String(filters?.vaccination_progress?.min ?? ""),
+    max: String(filters?.vaccination_progress?.max ?? ""),
+    preset: String(filters?.vaccination_progress?.preset || ""),
+  },
+});
+
+const cloneColumnFilterValue = (columnKey, filters = DEFAULT_COLUMN_FILTERS) => {
+  const normalizedFilters = createColumnFilterState(filters);
+  const columnValue = normalizedFilters[columnKey];
+
+  if (Array.isArray(columnValue)) {
+    return [...columnValue];
+  }
+
+  if (columnValue && typeof columnValue === "object") {
+    return { ...columnValue };
+  }
+
+  return columnValue;
+};
+
+const normalizeDateOnlyValue = (value) => {
+  if (!value) return "";
+
+  const normalizedString = String(value).trim();
+  const directMatch = normalizedString.match(/^\d{4}-\d{2}-\d{2}/);
+  if (directMatch) {
+    return directMatch[0];
+  }
+
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "";
+  }
+
+  return parsedDate.toISOString().slice(0, 10);
+};
+
+const getInfantNameValue = (row = {}) => getInfantFullName(row) || "";
+
+const getSexLabel = (value) => {
+  const normalizedValue = String(value || "").trim().toLowerCase();
+  if (normalizedValue === "male" || normalizedValue === "m") return "Male";
+  if (normalizedValue === "female" || normalizedValue === "f") return "Female";
+  return "Other";
+};
+
+const getSexFilterValue = (value) => getSexLabel(value).toLowerCase();
+
+const normalizeWorkflowStatusValue = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+
+const getInfantWorkflowStatusValue = (row = {}) => {
+  const explicitWorkflowStatus = normalizeWorkflowStatusValue(row.workflow_status);
+  if (WORKFLOW_STATUS_META[explicitWorkflowStatus]) {
+    return explicitWorkflowStatus;
+  }
+
+  const validationStatus = normalizeWorkflowStatusValue(
+    row.validation_status ?? row.latest_transfer_case_status,
+  );
+
+  if (REVIEW_VALIDATION_STATUSES.has(validationStatus)) {
+    return "needs_review";
+  }
+
+  if (Number(row.pending_vaccinations || 0) > 0) {
+    return "pending_doses";
+  }
+
+  if (
+    Number(row.completed_vaccinations || 0) > 0 ||
+    Number(row.imported_vaccinations || 0) > 0
+  ) {
+    return "in_progress";
+  }
+
+  return "up_to_date";
+};
+
+const getWorkflowLabel = (workflowStatus) =>
+  WORKFLOW_STATUS_META[normalizeWorkflowStatusValue(workflowStatus)]?.label ||
+  "Up to Date";
+
+const getVaccinationProgressCount = (row = {}) =>
+  Number(row.completed_vaccinations || 0) + Number(row.imported_vaccinations || 0);
+
+const getInfantNameSortValue = (row = {}) =>
+  getInfantFullName(row)
+    .replace(/\s+/g, " ")
+    .trim();
+
+const getInfantDobSortValue = (row = {}) => {
+  const normalizedDob = normalizeDateOnlyValue(row.dob);
+  if (!normalizedDob) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const parsedDob = new Date(`${normalizedDob}T00:00:00.000Z`);
+  return Number.isNaN(parsedDob.getTime())
+    ? Number.POSITIVE_INFINITY
+    : parsedDob.getTime();
+};
+
+const normalizeProgressFilterRange = (range = {}) => {
+  const minValue =
+    range.min === "" || range.min === null || range.min === undefined
+      ? ""
+      : String(range.min);
+  const maxValue =
+    range.max === "" || range.max === null || range.max === undefined
+      ? ""
+      : String(range.max);
+  const parsedMin =
+    minValue === "" || Number.isNaN(Number(minValue))
+      ? ""
+      : String(Math.max(0, Number(minValue)));
+  const parsedMax =
+    maxValue === "" || Number.isNaN(Number(maxValue))
+      ? ""
+      : String(Math.max(0, Number(maxValue)));
+
+  if (parsedMin !== "" && parsedMax !== "" && Number(parsedMin) > Number(parsedMax)) {
+    return {
+      min: parsedMax,
+      max: parsedMin,
+      preset: "",
+    };
+  }
+
+  return {
+    min: parsedMin,
+    max: parsedMax,
+    preset: String(range.preset || ""),
+  };
+};
+
+const isColumnFilterActive = (columnKey, filters = DEFAULT_COLUMN_FILTERS) => {
+  switch (columnKey) {
+    case "dob":
+      return Boolean(filters?.dob?.start || filters?.dob?.end);
+    case "sex":
+      return Array.isArray(filters?.sex) && filters.sex.length > 0;
+    case "workflow_status":
+      return (
+        Array.isArray(filters?.workflow_status) &&
+        filters.workflow_status.length > 0
+      );
+    case "vaccination_progress":
+      return Boolean(
+        filters?.vaccination_progress?.min !== "" ||
+          filters?.vaccination_progress?.max !== "",
+      );
+    default:
+      return false;
+  }
+};
+
+const filterInfantRows = (rows = [], filters = DEFAULT_COLUMN_FILTERS) =>
+  (Array.isArray(rows) ? rows : []).filter((row) => {
+    const dobFilterStart = normalizeDateOnlyValue(filters?.dob?.start);
+    const dobFilterEnd = normalizeDateOnlyValue(filters?.dob?.end);
+    if (dobFilterStart || dobFilterEnd) {
+      const infantDob = normalizeDateOnlyValue(row.dob);
+      if (!infantDob) {
+        return false;
+      }
+
+      if (dobFilterStart && infantDob < dobFilterStart) {
+        return false;
+      }
+
+      if (dobFilterEnd && infantDob > dobFilterEnd) {
+        return false;
+      }
+    }
+
+    if (Array.isArray(filters?.sex) && filters.sex.length > 0) {
+      if (!filters.sex.includes(getSexFilterValue(row.sex))) {
+        return false;
+      }
+    }
+
+    if (
+      Array.isArray(filters?.workflow_status) &&
+      filters.workflow_status.length > 0
+    ) {
+      const activeWorkflowFilters = new Set(
+        filters.workflow_status
+          .map((value) => normalizeWorkflowStatusValue(value))
+          .filter(Boolean),
+      );
+
+      if (!activeWorkflowFilters.has(getInfantWorkflowStatusValue(row))) {
+        return false;
+      }
+    }
+
+    const progressRange = normalizeProgressFilterRange(
+      filters?.vaccination_progress || {},
+    );
+    const progressCount = getVaccinationProgressCount(row);
+    if (
+      progressRange.min !== "" &&
+      progressCount < Number(progressRange.min)
+    ) {
+      return false;
+    }
+
+    if (
+      progressRange.max !== "" &&
+      progressCount > Number(progressRange.max)
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+
+const getSortableColumnValue = (row = {}, columnKey) => {
+  switch (columnKey) {
+    case "name":
+      return getInfantNameSortValue(row);
+    case "dob":
+      return getInfantDobSortValue(row);
+    case "sex":
+      return getSexLabel(row.sex);
+    case "workflow_status":
+      return getWorkflowLabel(getInfantWorkflowStatusValue(row));
+    case "vaccination_progress":
+      return getVaccinationProgressCount(row);
+    default:
+      return row?.[columnKey] ?? "";
+  }
+};
+
+const compareInfantRowsByColumn = (leftRow = {}, rightRow = {}, columnKey) => {
+  if (columnKey === "name") {
+    return INFANT_NAME_COLLATOR.compare(
+      getInfantNameSortValue(leftRow),
+      getInfantNameSortValue(rightRow),
+    );
+  }
+
+  if (columnKey === "dob") {
+    return getInfantDobSortValue(leftRow) - getInfantDobSortValue(rightRow);
+  }
+
+  const leftValue = getSortableColumnValue(leftRow, columnKey);
+  const rightValue = getSortableColumnValue(rightRow, columnKey);
+
+  if (typeof leftValue === "number" || typeof rightValue === "number") {
+    return Number(leftValue || 0) - Number(rightValue || 0);
+  }
+
+  return INFANT_NAME_COLLATOR.compare(
+    String(leftValue || ""),
+    String(rightValue || ""),
+  );
+};
+
+const sortInfantRows = (rows = [], sortState = DEFAULT_SORT_STATE) => {
+  if (!sortState?.key || !sortState?.direction) {
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  return [...rows]
+    .map((row, index) => ({ row, index }))
+    .sort((leftEntry, rightEntry) => {
+      const comparison = compareInfantRowsByColumn(
+        leftEntry.row,
+        rightEntry.row,
+        sortState.key,
+      );
+
+      if (comparison !== 0) {
+        return sortState.direction === "asc" ? comparison : -comparison;
+      }
+
+      return leftEntry.index - rightEntry.index;
+    })
+    .map((entry) => entry.row);
+};
+
+const getInfantServerSortQuery = (sortState = DEFAULT_SORT_STATE) => {
+  if (!sortState?.key || !sortState?.direction) {
+    return {};
+  }
+
+  if (sortState.key === "name") {
+    return {
+      order_by: "full_name",
+      order_direction: sortState.direction,
+    };
+  }
+
+  if (sortState.key === "dob") {
+    return {
+      order_by: "dob",
+      order_direction: sortState.direction,
+    };
+  }
+
+  return {};
+};
+
+const buildColumnFilterChips = (filters = DEFAULT_COLUMN_FILTERS) => {
+  const chips = [];
+
+  if (isColumnFilterActive("dob", filters)) {
+    const start = filters.dob?.start || "Any";
+    const end = filters.dob?.end || "Any";
+    chips.push({
+      key: "dob",
+      label: `Date of Birth: ${start} to ${end}`,
+    });
+  }
+
+  if (isColumnFilterActive("sex", filters)) {
+    chips.push({
+      key: "sex",
+      label: `Gender: ${filters.sex.map((value) => getSexLabel(value)).join(", ")}`,
+    });
+  }
+
+  if (isColumnFilterActive("workflow_status", filters)) {
+    chips.push({
+      key: "workflow_status",
+      label: `Workflow: ${filters.workflow_status
+        .map((status) => getWorkflowLabel(normalizeWorkflowStatusValue(status)))
+        .join(", ")}`,
+    });
+  }
+
+  if (isColumnFilterActive("vaccination_progress", filters)) {
+    const normalizedRange = normalizeProgressFilterRange(
+      filters.vaccination_progress,
+    );
+    const minLabel = normalizedRange.min === "" ? "Any" : normalizedRange.min;
+    const maxLabel = normalizedRange.max === "" ? "Any" : normalizedRange.max;
+    chips.push({
+      key: "vaccination_progress",
+      label: `Vaccination Progress: ${minLabel} to ${maxLabel} doses`,
+    });
+  }
+
+  return chips;
+};
+
 export default function InfantManagement() {
   const { isAdmin } = useAuth();
   const location = useLocation();
@@ -144,11 +553,22 @@ export default function InfantManagement() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
   const [period, setPeriod] = useState("all");
   const [periodStartDate, setPeriodStartDate] = useState("");
   const [periodEndDate, setPeriodEndDate] = useState("");
   const [transferCasesRefreshing, setTransferCasesRefreshing] = useState(false);
+  const [sortState, setSortState] = useState(DEFAULT_SORT_STATE);
+  const [columnFilters, setColumnFilters] = useState(() =>
+    createColumnFilterState(),
+  );
+  const [activeFilterPanel, setActiveFilterPanel] = useState(null);
+  const [filterDraft, setFilterDraft] = useState(null);
+  const [pageInputValue, setPageInputValue] = useState("1");
+  const serverSortQuery = React.useMemo(
+    () => getInfantServerSortQuery(sortState),
+    [sortState],
+  );
   const [infantPagination, setInfantPagination] = useState({
     page: 1,
     limit: itemsPerPage,
@@ -183,6 +603,30 @@ export default function InfantManagement() {
   useEffect(() => {
     setCurrentPage(1);
   }, [debouncedSearchQuery, period, periodStartDate, periodEndDate]);
+
+  useEffect(() => {
+    setPageInputValue(String(currentPage || 1));
+  }, [currentPage]);
+
+  useEffect(() => {
+    if (!activeFilterPanel) {
+      return undefined;
+    }
+
+    const handlePointerDownOutside = (event) => {
+      if (event.target?.closest?.("[data-infant-filter-shell='true']")) {
+        return;
+      }
+
+      setActiveFilterPanel(null);
+      setFilterDraft(null);
+    };
+
+    document.addEventListener("mousedown", handlePointerDownOutside);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDownOutside);
+    };
+  }, [activeFilterPanel]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -252,7 +696,6 @@ export default function InfantManagement() {
       setError(null);
 
       const activePeriodRange = getPeriodDateRange(period, periodStartDate, periodEndDate);
-      const shouldSortByDobAscending = period === "custom";
       const result = await infantService.getAll({
         page: currentPage,
         limit: itemsPerPage,
@@ -260,12 +703,7 @@ export default function InfantManagement() {
         ...(debouncedSearchQuery ? { search: debouncedSearchQuery } : {}),
         ...(!debouncedSearchQuery && activePeriodRange.from ? { start_date: activePeriodRange.from } : {}),
         ...(!debouncedSearchQuery && activePeriodRange.to ? { end_date: activePeriodRange.to } : {}),
-        ...(shouldSortByDobAscending
-          ? {
-              order_by: "dob",
-              order_direction: "asc",
-            }
-          : {}),
+        ...serverSortQuery,
       });
       const infantsData = normalizeInfantsResponse(result?.data ?? result);
       const nextPagination = normalizePaginationState(
@@ -343,6 +781,7 @@ export default function InfantManagement() {
     hasLoadedInitialData,
     isAdmin,
     itemsPerPage,
+    serverSortQuery,
     selectedInfant?.id,
   ]);
 
@@ -408,33 +847,177 @@ export default function InfantManagement() {
     setReadinessTargetInfant(null);
   };
 
-  const filteredInfants = infants;
-  const paginatedInfants = infants;
+  const openColumnFilterPanel = (columnKey) => {
+    if (activeFilterPanel === columnKey) {
+      setActiveFilterPanel(null);
+      setFilterDraft(null);
+      return;
+    }
+
+    setActiveFilterPanel(columnKey);
+    setFilterDraft(cloneColumnFilterValue(columnKey, columnFilters));
+  };
+
+  const handleColumnFilterDraftChange = (updater) => {
+    setFilterDraft((previousDraft) => {
+      if (typeof updater === "function") {
+        return updater(previousDraft);
+      }
+
+      return updater;
+    });
+  };
+
+  const handleColumnFilterCancel = () => {
+    setActiveFilterPanel(null);
+    setFilterDraft(null);
+  };
+
+  const handleColumnFilterApply = (columnKey) => {
+    setColumnFilters((previousFilters) => {
+      const nextFilters = createColumnFilterState(previousFilters);
+
+      if (columnKey === "vaccination_progress") {
+        nextFilters[columnKey] = normalizeProgressFilterRange(filterDraft || {});
+      } else if (columnKey === "dob") {
+        const normalizedDraft = {
+          start: String(filterDraft?.start || ""),
+          end: String(filterDraft?.end || ""),
+        };
+
+        if (
+          normalizedDraft.start &&
+          normalizedDraft.end &&
+          normalizedDraft.start > normalizedDraft.end
+        ) {
+          nextFilters[columnKey] = {
+            start: normalizedDraft.end,
+            end: normalizedDraft.start,
+          };
+        } else {
+          nextFilters[columnKey] = normalizedDraft;
+        }
+      } else if (columnKey === "sex") {
+        nextFilters[columnKey] = Array.isArray(filterDraft) ? [...filterDraft] : [];
+      } else if (columnKey === "workflow_status") {
+        nextFilters[columnKey] = Array.isArray(filterDraft)
+          ? filterDraft
+              .map((value) => normalizeWorkflowStatusValue(value))
+              .filter(Boolean)
+          : [];
+      } else {
+        nextFilters[columnKey] = String(filterDraft || "");
+      }
+
+      return nextFilters;
+    });
+
+    setActiveFilterPanel(null);
+    setFilterDraft(null);
+  };
+
+  const handleColumnFilterRemoval = (columnKey) => {
+    setColumnFilters((previousFilters) => {
+      const nextFilters = createColumnFilterState(previousFilters);
+      nextFilters[columnKey] = cloneColumnFilterValue(columnKey, DEFAULT_COLUMN_FILTERS);
+      return nextFilters;
+    });
+
+    if (activeFilterPanel === columnKey) {
+      setActiveFilterPanel(null);
+      setFilterDraft(null);
+    }
+  };
+
+  const handleSortToggle = (columnKey) => {
+    setSortState((previousState) => {
+      if (previousState.key !== columnKey) {
+        return {
+          key: columnKey,
+          direction: "asc",
+        };
+      }
+
+      if (previousState.direction === "asc") {
+        return {
+          key: columnKey,
+          direction: "desc",
+        };
+      }
+
+      return DEFAULT_SORT_STATE;
+    });
+  };
+
+  const handlePageJumpSubmit = () => {
+    const nextPage = Number.parseInt(pageInputValue, 10);
+    if (!Number.isFinite(nextPage)) {
+      setPageInputValue(String(currentPage || 1));
+      return;
+    }
+
+    const clampedPage = Math.min(Math.max(nextPage, 1), totalPages);
+    setCurrentPage(clampedPage);
+    setPageInputValue(String(clampedPage));
+  };
+
+  const filteredInfants = filterInfantRows(infants, columnFilters);
+  const paginatedInfants = sortInfantRows(filteredInfants, sortState);
+  const activeFilterChips = buildColumnFilterChips(columnFilters);
+  const hasActiveColumnFilters = activeFilterChips.length > 0;
   const totalPages = Math.max(
     1,
     Number(infantPagination?.totalPages || 0) || 1,
   );
   const totalInfants = Number(infantPagination?.total || infants.length || 0) || 0;
+  const filteredInfantCount = paginatedInfants.length;
+  const summaryTotalInfants = hasActiveColumnFilters
+    ? filteredInfantCount
+    : totalInfants;
   const visibleInfantStart =
-    totalInfants > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
+    filteredInfantCount > 0
+      ? hasActiveColumnFilters
+        ? 1
+        : (currentPage - 1) * itemsPerPage + 1
+      : 0;
   const visibleInfantEnd =
-    totalInfants > 0
-      ? Math.min(currentPage * itemsPerPage, totalInfants)
+    filteredInfantCount > 0
+      ? hasActiveColumnFilters
+        ? filteredInfantCount
+        : Math.min(currentPage * itemsPerPage, totalInfants)
       : 0;
   const contentShellClassName = "flex w-full flex-col";
-  const actionButtonClassName =
-    "gap-1 whitespace-nowrap rounded-md px-2.5 shadow-none";
-  const actionsColumnWidth = "21rem";
+  const iconOnlyActionButtonClassName =
+    "h-8 w-8 min-h-[32px] rounded-md px-0 shadow-none";
+  const readinessActionButtonClassName =
+    "whitespace-nowrap rounded-md px-2.5 shadow-none";
+  const actionsColumnWidth = "10.5rem";
+  const actionsColumnMinWidth = "10.5rem";
+  const buildColumnStyle = (width, minWidth = width) => ({
+    width,
+    minWidth,
+  });
+  const tableSummaryText = `Showing ${visibleInfantStart} to ${visibleInfantEnd} of ${summaryTotalInfants} infants${
+    hasActiveColumnFilters ? " on this page" : ""
+  }`;
+  const topSummaryText = hasActiveColumnFilters
+    ? `Showing ${filteredInfantCount} of ${filteredInfantCount} infants`
+    : `Showing ${visibleInfantEnd} of ${totalInfants} infants`;
 
   const columns = [
     {
       key: "name",
       label: "Name",
-      width: "11.5rem",
+      width: "11rem",
+      minWidth: "11rem",
+      sortable: true,
       headerClassName: "whitespace-nowrap",
-      cellClassName: "whitespace-normal break-words",
+      cellClassName: "overflow-hidden whitespace-nowrap text-ellipsis",
       render: (val, row) => (
-        <div className="font-semibold leading-5 text-gray-900 dark:text-gray-100">
+        <div
+          className="truncate font-semibold leading-5 text-gray-900 dark:text-gray-100"
+          title={`${row.first_name} ${row.last_name}`.trim()}
+        >
           {row.first_name} {row.last_name}
         </div>
       ),
@@ -442,11 +1025,15 @@ export default function InfantManagement() {
     {
       key: "control_number",
       label: "Infant Control Number",
-      width: "13rem",
+      width: "12.5rem",
+      minWidth: "12.5rem",
       headerClassName: "whitespace-nowrap",
-      cellClassName: "whitespace-nowrap",
+      cellClassName: "overflow-hidden whitespace-nowrap text-ellipsis",
       render: (val, row) => (
-        <span className="inline-flex max-w-full overflow-hidden rounded-md bg-gray-100 px-2 py-1 font-mono text-[11px] text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+        <span
+          className="inline-flex max-w-full truncate overflow-hidden rounded-md bg-gray-100 px-2 py-1 font-mono text-[11px] text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+          title={formatControlNumberDisplay(val, row.dob)}
+        >
           {formatControlNumberDisplay(val, row.dob)}
         </span>
       ),
@@ -454,7 +1041,10 @@ export default function InfantManagement() {
     {
       key: "dob",
       label: "Date of Birth",
-      width: "7rem",
+      width: "8rem",
+      minWidth: "8rem",
+      sortable: true,
+      filterable: true,
       headerClassName: "whitespace-nowrap",
       cellClassName: "whitespace-nowrap",
       type: "date",
@@ -462,7 +1052,9 @@ export default function InfantManagement() {
     {
       key: "sex",
       label: "Gender",
-      width: "5.5rem",
+      width: "6.5rem",
+      minWidth: "6.5rem",
+      sortable: true,
       headerClassName: "whitespace-nowrap",
       cellClassName: "whitespace-nowrap",
       render: (val) => {
@@ -481,9 +1073,10 @@ export default function InfantManagement() {
     {
       key: "parents",
       label: "Parents/Guardian",
-      width: "18.5rem",
+      width: "17rem",
+      minWidth: "17rem",
       headerClassName: "whitespace-nowrap",
-      cellClassName: "whitespace-normal break-words",
+      cellClassName: "overflow-hidden whitespace-nowrap text-ellipsis",
       render: (val, row) => {
         const parents = [];
         if (row.mother_name) parents.push(`Mother: ${row.mother_name}`);
@@ -493,10 +1086,13 @@ export default function InfantManagement() {
           parents.push(row.guardian_name);
         }
         return (
-          <div className="space-y-0.5 text-[13px] leading-5">
+          <div
+            className="space-y-0.5 overflow-hidden text-[13px] leading-5"
+            title={parents.join("\n")}
+          >
             {parents.length > 0 ? (
               parents.map((p, i) => (
-                <div key={i} className="text-gray-700 dark:text-gray-300">
+                <div key={i} className="truncate text-gray-700 dark:text-gray-300">
                   {p}
                 </div>
               ))
@@ -510,24 +1106,37 @@ export default function InfantManagement() {
     {
       key: "contact",
       label: "Contact",
-      width: "8rem",
+      width: "9rem",
+      minWidth: "9rem",
       headerClassName: "whitespace-nowrap",
-      cellClassName: "whitespace-nowrap",
-      render: (val, row) => (
-        <div className="text-[13px] leading-5 text-gray-700 dark:text-gray-300">
-          {row.cellphone_number || row.guardian_phone || "Not specified"}
-        </div>
-      ),
+      cellClassName: "overflow-hidden whitespace-nowrap text-ellipsis",
+      render: (val, row) => {
+        const contactValue =
+          row.cellphone_number || row.guardian_phone || "Not specified";
+        return (
+          <div
+            className="truncate text-[13px] leading-5 text-gray-700 dark:text-gray-300"
+            title={contactValue}
+          >
+            {contactValue}
+          </div>
+        );
+      },
     },
     {
       key: "workflow_status",
       label: "Workflow",
-      width: "8rem",
+      width: "9rem",
+      minWidth: "9rem",
+      sortable: true,
+      filterable: true,
+      filterPanelAlignment: "right",
       headerClassName: "whitespace-nowrap",
       cellClassName: "whitespace-nowrap",
       render: (val, row) => {
+        const workflowStatus = getInfantWorkflowStatusValue(row);
         const workflowMeta =
-          WORKFLOW_STATUS_META[row.workflow_status] || WORKFLOW_STATUS_META.up_to_date;
+          WORKFLOW_STATUS_META[workflowStatus] || WORKFLOW_STATUS_META.up_to_date;
 
         return (
           <div className="space-y-1">
@@ -552,7 +1161,10 @@ export default function InfantManagement() {
     {
       key: "vaccination_progress",
       label: "Vaccination Progress",
-      width: "10rem",
+      width: "10.5rem",
+      minWidth: "10.5rem",
+      filterable: true,
+      filterPanelAlignment: "right",
       headerClassName: "whitespace-nowrap",
       cellClassName: "whitespace-nowrap",
       render: (val, row) => (
@@ -566,11 +1178,15 @@ export default function InfantManagement() {
     {
       key: "latest_transfer_source_facility",
       label: "Transfer Source",
-      width: "9rem",
+      width: "8.5rem",
+      minWidth: "8.5rem",
       headerClassName: "whitespace-nowrap",
-      cellClassName: "whitespace-normal break-words",
+      cellClassName: "overflow-hidden whitespace-nowrap text-ellipsis",
       render: (val) => (
-        <div className="text-[13px] leading-5 text-gray-700 dark:text-gray-300 whitespace-normal break-words">
+        <div
+          className="truncate text-[13px] leading-5 text-gray-700 dark:text-gray-300"
+          title={val || "—"}
+        >
           {val || "—"}
         </div>
       ),
@@ -578,54 +1194,356 @@ export default function InfantManagement() {
   ];
 
   const tableActions = (row) => (
-    <div className="ml-auto flex max-w-[21rem] flex-row flex-wrap items-center justify-end gap-1.5">
+    <div className="ml-auto flex max-w-[10.5rem] flex-row flex-wrap items-center justify-end gap-1.5">
       <Button
         variant="primary"
         size="xs"
         onClick={() => handleViewBooklet(row, "personal")}
-        className={actionButtonClassName}
-        title="Personal Information Record"
+        className={iconOnlyActionButtonClassName}
+        title="Personal Record"
+        aria-label="Personal Record"
       >
-        <User className="h-3.5 w-3.5" /> Personal
+        <User className="h-3.5 w-3.5" />
       </Button>
       <Button
         variant="success"
         size="xs"
         onClick={() => handleViewBooklet(row, "schedule")}
-        className={actionButtonClassName}
-        title="Vaccine Schedule Booklet"
+        className={iconOnlyActionButtonClassName}
+        title="Vaccine Schedule"
+        aria-label="Vaccine Schedule"
       >
-        <Calendar className="h-3.5 w-3.5" /> Schedule
+        <Calendar className="h-3.5 w-3.5" />
       </Button>
       <Button
         variant="info"
         size="xs"
         onClick={() => handleViewBooklet(row, "records")}
-        className={actionButtonClassName}
-        title="Immunization Record Booklet"
+        className={iconOnlyActionButtonClassName}
+        title="Immunization Records"
+        aria-label="Immunization Records"
       >
-        <BookOpen className="h-3.5 w-3.5" /> Records
+        <BookOpen className="h-3.5 w-3.5" />
       </Button>
       <Button
         variant="warning"
         size="xs"
         onClick={() => handleViewBooklet(row, "chart")}
-        className={actionButtonClassName}
+        className={iconOnlyActionButtonClassName}
         title="Immunization Chart"
+        aria-label="Immunization Chart"
       >
-        <BarChart2 className="h-3.5 w-3.5" /> Chart
+        <BarChart2 className="h-3.5 w-3.5" />
       </Button>
       <Button
         variant="secondary"
         size="xs"
         onClick={() => openReadinessManager(row)}
-        className={actionButtonClassName}
+        className={readinessActionButtonClassName}
         title="Manage vaccine readiness"
       >
         Ready
       </Button>
     </div>
   );
+
+  const compactFieldClassName =
+    "w-full rounded-md border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
+
+  const toggleDraftSelection = (value) => {
+    handleColumnFilterDraftChange((previousDraft) => {
+      const nextDraft = Array.isArray(previousDraft) ? [...previousDraft] : [];
+      const existingIndex = nextDraft.indexOf(value);
+
+      if (existingIndex >= 0) {
+        nextDraft.splice(existingIndex, 1);
+      } else {
+        nextDraft.push(value);
+      }
+
+      return nextDraft;
+    });
+  };
+
+  const renderColumnFilterPanel = (column) => {
+    if (activeFilterPanel !== column.key) {
+      return null;
+    }
+
+    const panelAlignmentClassName =
+      column.filterPanelAlignment === "right" ? "right-0" : "left-0";
+
+    return (
+      <div
+        className={`absolute ${panelAlignmentClassName} top-full z-[1000] mt-2 w-72 rounded-xl border border-gray-200 bg-white p-3 text-left normal-case tracking-normal shadow-xl dark:border-gray-700 dark:bg-gray-800`}
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-label={`${column.label} filter`}
+      >
+        <div className="mb-3">
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            Filter {column.label}
+          </p>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Apply a focused filter for this column.
+          </p>
+        </div>
+
+        {column.key === "name" && (
+          <div className="space-y-3">
+            <input
+              type="text"
+              value={String(filterDraft || "")}
+              onChange={(event) => handleColumnFilterDraftChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  handleColumnFilterApply(column.key);
+                }
+              }}
+              className={compactFieldClassName}
+              placeholder="Search infant name"
+              aria-label="Filter infant name"
+              autoFocus
+            />
+          </div>
+        )}
+
+        {column.key === "dob" && (
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={filterDraft?.start || ""}
+                onChange={(event) =>
+                  handleColumnFilterDraftChange((previousDraft) => ({
+                    ...(previousDraft || {}),
+                    start: event.target.value,
+                  }))
+                }
+                className={compactFieldClassName}
+                aria-label="Date of birth start"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">
+                End Date
+              </label>
+              <input
+                type="date"
+                value={filterDraft?.end || ""}
+                onChange={(event) =>
+                  handleColumnFilterDraftChange((previousDraft) => ({
+                    ...(previousDraft || {}),
+                    end: event.target.value,
+                  }))
+                }
+                className={compactFieldClassName}
+                aria-label="Date of birth end"
+              />
+            </div>
+          </div>
+        )}
+
+        {column.key === "sex" && (
+          <div className="space-y-2">
+            {[
+              { value: "male", label: "Male" },
+              { value: "female", label: "Female" },
+            ].map((option) => (
+              <label
+                key={option.value}
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700/60"
+              >
+                <input
+                  type="checkbox"
+                  checked={Array.isArray(filterDraft) && filterDraft.includes(option.value)}
+                  onChange={() => toggleDraftSelection(option.value)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span>{option.label}</span>
+              </label>
+            ))}
+          </div>
+        )}
+
+        {column.key === "workflow_status" && (
+          <div className="space-y-2">
+            {Object.entries(WORKFLOW_STATUS_META).map(([workflowKey, workflowMeta]) => (
+              <label
+                key={workflowKey}
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700/60"
+              >
+                <input
+                  type="checkbox"
+                  checked={
+                    Array.isArray(filterDraft) && filterDraft.includes(workflowKey)
+                  }
+                  onChange={() => toggleDraftSelection(workflowKey)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span>{workflowMeta.label}</span>
+              </label>
+            ))}
+          </div>
+        )}
+
+        {column.key === "vaccination_progress" && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">
+                  Start Count
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={filterDraft?.min ?? ""}
+                  onChange={(event) =>
+                    handleColumnFilterDraftChange((previousDraft) => ({
+                      ...(previousDraft || {}),
+                      min: event.target.value,
+                      preset: "",
+                    }))
+                  }
+                  className={compactFieldClassName}
+                  placeholder="0"
+                  aria-label="Vaccination progress start count"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">
+                  End Count
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={filterDraft?.max ?? ""}
+                  onChange={(event) =>
+                    handleColumnFilterDraftChange((previousDraft) => ({
+                      ...(previousDraft || {}),
+                      max: event.target.value,
+                      preset: "",
+                    }))
+                  }
+                  className={compactFieldClassName}
+                  placeholder="Any"
+                  aria-label="Vaccination progress end count"
+                />
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-medium text-gray-600 dark:text-gray-300">
+                Quick ranges
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {VACCINATION_PROGRESS_PRESETS.map((preset) => {
+                  const isActive = String(filterDraft?.preset || "") === preset.value;
+                  return (
+                    <button
+                      key={preset.value || "any"}
+                      type="button"
+                      onClick={() =>
+                        handleColumnFilterDraftChange({
+                          min: preset.min,
+                          max: preset.max,
+                          preset: preset.value,
+                        })
+                      }
+                      className={`rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+                        isActive
+                          ? "border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/10 dark:text-blue-200"
+                          : "border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/60"
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleColumnFilterCancel}
+            type="button"
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => handleColumnFilterApply(column.key)}
+            type="button"
+          >
+            Filter
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderHeaderCellContent = (column) => {
+    const activeSortForColumn = sortState.key === column.key ? sortState.direction : null;
+    const activeFilterForColumn = isColumnFilterActive(column.key, columnFilters);
+
+    return (
+      <div
+        className={`relative flex min-h-[1.5rem] items-center justify-between gap-2 ${
+          activeFilterPanel === column.key ? "z-[1000]" : "z-10"
+        }`}
+        data-infant-filter-shell="true"
+      >
+        <span className="flex-1 leading-4">{column.label}</span>
+        <div className="flex items-center gap-1">
+          {column.sortable && (
+            <button
+              type="button"
+              onClick={() => handleSortToggle(column.key)}
+              className={`rounded-md p-1 transition hover:bg-gray-200/80 dark:hover:bg-gray-600/80 ${
+                activeSortForColumn
+                  ? "text-blue-600 dark:text-blue-300"
+                  : "text-gray-400 dark:text-gray-300"
+              }`}
+              aria-label={`Sort ${column.label}`}
+              title={`Sort ${column.label}`}
+            >
+              {activeSortForColumn === "asc" ? (
+                <ArrowUp className="h-3.5 w-3.5" />
+              ) : activeSortForColumn === "desc" ? (
+                <ArrowDown className="h-3.5 w-3.5" />
+              ) : (
+                <ArrowUpDown className="h-3.5 w-3.5" />
+              )}
+            </button>
+          )}
+          {column.filterable && (
+            <button
+              type="button"
+              onClick={() => openColumnFilterPanel(column.key)}
+              className={`rounded-md p-1 transition hover:bg-gray-200/80 dark:hover:bg-gray-600/80 ${
+                activeFilterForColumn || activeFilterPanel === column.key
+                  ? "text-blue-600 dark:text-blue-300"
+                  : "text-gray-400 dark:text-gray-300"
+              }`}
+              aria-label={`Filter ${column.label}`}
+              title={`Filter ${column.label}`}
+            >
+              <Filter className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        {renderColumnFilterPanel(column)}
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -676,11 +1594,13 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Badge
                   variant={
-                    WORKFLOW_STATUS_META[selectedInfant.workflow_status]?.variant ||
+                    WORKFLOW_STATUS_META[getInfantWorkflowStatusValue(selectedInfant)]
+                      ?.variant ||
                     "secondary"
                   }
                 >
-                  {WORKFLOW_STATUS_META[selectedInfant.workflow_status]?.label ||
+                  {WORKFLOW_STATUS_META[getInfantWorkflowStatusValue(selectedInfant)]
+                    ?.label ||
                     "Workflow Active"}
                 </Badge>
                 {selectedInfant.latest_transfer_case_status && (
@@ -988,7 +1908,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                 <span className="mr-1">🔄</span> {refreshing ? 'Refreshing...' : 'Refresh'}
               </Button>
               <div className="self-center whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                Showing {visibleInfantEnd} of {totalInfants} infants
+                {topSummaryText}
               </div>
             </div>
           </div>
@@ -1000,28 +1920,56 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
               Registered Infants - Click to View Digital Booklets
             </h3>
           </div>
+          {activeFilterChips.length > 0 && (
+            <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-5 py-3 dark:border-gray-700 dark:bg-gray-800">
+              {activeFilterChips.map((chip) => (
+                <span
+                  key={chip.key}
+                  className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-200"
+                >
+                  <span>{chip.label}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleColumnFilterRemoval(chip.key)}
+                    className="rounded-full p-0.5 transition hover:bg-blue-100 dark:hover:bg-blue-500/20"
+                    aria-label={`Remove ${chip.label}`}
+                    title={`Remove ${chip.label}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="flex-1 overflow-auto auto-hide-scrollbar">
             <table className="relative min-w-[1320px] w-full table-fixed divide-y divide-gray-200 dark:divide-gray-700">
               <colgroup>
                 {columns.map((col) => (
-                  <col key={col.key} style={col.width ? { width: col.width } : undefined} />
+                  <col
+                    key={col.key}
+                    style={buildColumnStyle(col.width, col.minWidth)}
+                  />
                 ))}
-                <col style={{ width: actionsColumnWidth }} />
+                <col style={buildColumnStyle(actionsColumnWidth, actionsColumnMinWidth)} />
               </colgroup>
-              <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
+              <thead className="sticky top-0 z-10 overflow-visible bg-gray-50 shadow-sm dark:bg-gray-700">
                 <tr>
                   {columns.map((col) => (
                     <th
                       key={col.key}
                       scope="col"
-                      className={`bg-gray-50 px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500 dark:bg-gray-700 dark:text-gray-300 ${col.headerClassName || ""}`}
+                      style={buildColumnStyle(col.width, col.minWidth)}
+                      className={`relative align-middle overflow-visible bg-gray-50 px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500 dark:bg-gray-700 dark:text-gray-300 ${
+                        activeFilterPanel === col.key ? "z-[1200]" : "z-10"
+                      } focus-within:z-[1200] ${col.headerClassName || ""}`}
                     >
-                      {col.label}
+                      {renderHeaderCellContent(col)}
                     </th>
                   ))}
                   <th
                     scope="col"
-                    className="bg-gray-50 px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500 dark:bg-gray-700 dark:text-gray-300 whitespace-nowrap"
+                    style={buildColumnStyle(actionsColumnWidth, actionsColumnMinWidth)}
+                    className="relative z-10 align-middle overflow-visible bg-gray-50 px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500 dark:bg-gray-700 dark:text-gray-300 whitespace-nowrap"
                   >
                     Actions
                   </th>
@@ -1033,7 +1981,11 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                     <td colSpan={columns.length + 1} className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
                       <div className="flex flex-col items-center justify-center">
                         <span className="text-4xl mb-3">👶</span>
-                        <p className="text-lg font-medium">No infants registered yet.</p>
+                        <p className="text-lg font-medium">
+                          {hasActiveColumnFilters
+                            ? "No infants match the selected column filters."
+                            : "No infants registered yet."}
+                        </p>
                       </div>
                     </td>
                   </tr>
@@ -1043,7 +1995,8 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                       {columns.map((col, colIndex) => (
                         <td
                           key={col.key || colIndex}
-                          className={`px-3 py-3 align-top text-sm text-gray-900 dark:text-gray-100 ${col.cellClassName || "whitespace-nowrap"}`}
+                          style={buildColumnStyle(col.width, col.minWidth)}
+                          className={`overflow-hidden px-3 py-3 align-top text-sm text-gray-900 dark:text-gray-100 ${col.cellClassName || "whitespace-nowrap"}`}
                         >
                           {col.render
                             ? col.render(row[col.key], row)
@@ -1052,7 +2005,10 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                               : row[col.key]}
                         </td>
                       ))}
-                      <td className="px-3 py-3 align-middle text-right text-sm font-medium">
+                      <td
+                        style={buildColumnStyle(actionsColumnWidth, actionsColumnMinWidth)}
+                        className="overflow-hidden px-3 py-3 align-middle text-right text-sm font-medium"
+                      >
                         {tableActions(row)}
                       </td>
                     </tr>
@@ -1062,31 +2018,90 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
             </table>
           </div>
 
-          {totalPages > 1 && (
-            <div className="flex flex-shrink-0 items-center justify-between border-t border-gray-200 bg-white px-5 py-3 dark:border-gray-700 dark:bg-gray-800">
+          {totalInfants > 0 && (
+            <div className="flex flex-shrink-0 flex-col gap-3 border-t border-gray-200 bg-white px-5 py-3 dark:border-gray-700 dark:bg-gray-800 lg:flex-row lg:items-center lg:justify-between">
               <div className="text-sm text-gray-500">
-                Showing {visibleInfantStart} to {visibleInfantEnd} of {totalInfants} infants
+                {tableSummaryText}
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={!infantPagination?.hasPrev || currentPage === 1}
-                >
-                  Previous
-                </Button>
-                <span className="flex items-center px-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={!infantPagination?.hasNext || currentPage === totalPages}
-                >
-                  Next
-                </Button>
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                <div className="flex items-center gap-2">
+                  <label
+                    htmlFor="infant-rows-per-page"
+                    className="text-sm font-medium text-gray-600 dark:text-gray-300"
+                  >
+                    Rows
+                  </label>
+                  <select
+                    id="infant-rows-per-page"
+                    value={itemsPerPage}
+                    onChange={(event) => {
+                      const nextPageSize = Number(event.target.value) || DEFAULT_ITEMS_PER_PAGE;
+                      setItemsPerPage(nextPageSize);
+                      setCurrentPage(1);
+                    }}
+                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    aria-label="Rows per page"
+                  >
+                    {ITEMS_PER_PAGE_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={!infantPagination?.hasPrev || currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="flex items-center px-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={!infantPagination?.hasNext || currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label
+                    htmlFor="infant-page-jump"
+                    className="text-sm font-medium text-gray-600 dark:text-gray-300"
+                  >
+                    Go to page
+                  </label>
+                  <input
+                    id="infant-page-jump"
+                    type="number"
+                    min="1"
+                    max={totalPages}
+                    value={pageInputValue}
+                    onChange={(event) => setPageInputValue(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handlePageJumpSubmit();
+                      }
+                    }}
+                    className="w-20 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    aria-label="Go to page"
+                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handlePageJumpSubmit}
+                    disabled={totalPages <= 1}
+                  >
+                    Go
+                  </Button>
+                </div>
               </div>
             </div>
           )}
