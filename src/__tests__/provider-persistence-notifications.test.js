@@ -3,10 +3,10 @@
  * Tests the new functionality added in the system
  */
 
-const { expect, describe, it, beforeAll, afterAll } = require('@jest/globals');
+const { expect, describe, it                      } = require('@jest/globals');
 
 // Test constants
-const TEST_INFANT_ID = 1;
+
 const TEST_APPOINTMENT_ID = 1;
 const TEST_GUARDIAN_PHONE = '+639123456789';
 

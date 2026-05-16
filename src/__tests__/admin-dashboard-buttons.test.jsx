@@ -16,13 +16,13 @@
  */
 
 import React from "react";
-import { BrowserRouter, MemoryRouter } from "react-router-dom";
+import {                MemoryRouter } from "react-router-dom";
 import {
   render,
   screen,
   fireEvent,
   waitFor,
-  act,
+
   cleanup,
 } from "@testing-library/react";
 import "@testing-library/jest-dom";
@@ -41,30 +41,6 @@ const mockAdminContext = {
   },
   isAuthenticated: true,
   isAdmin: true,
-  logout: jest.fn(),
-};
-
-const mockNurseContext = {
-  user: {
-    id: 2,
-    username: 'nurse1',
-    role: 'nurse',
-    facility_id: 1
-  },
-  isAuthenticated: true,
-  isAdmin: false,
-  logout: jest.fn(),
-};
-
-const mockDoctorContext = {
-  user: {
-    id: 3,
-    username: 'doctor1',
-    role: 'doctor',
-    facility_id: 1
-  },
-  isAuthenticated: true,
-  isAdmin: false,
   logout: jest.fn(),
 };
 
@@ -100,11 +76,11 @@ const mockApi = {
 };
 
 // Mock components that contain buttons
-jest.mock("../components/AddInfantModal", () => ({
+jest.mock("../components/AddInfantModal", () =>( {
   __esModule: true,
   default: ({ isOpen, onClose, onSubmit }) => {
     if (!isOpen) return null;
-    return (
+    return(
       <div role="dialog" aria-modal="true">
         <h2>Add New Infant</h2>
         <form onSubmit={(e) => {
@@ -121,16 +97,16 @@ jest.mock("../components/AddInfantModal", () => ({
           <button type="submit" data-testid="submit-button">Add Infant</button>
           <button type="button" onClick={onClose} data-testid="cancel-button">Cancel</button>
         </form>
-      </div>
-    );
+      </div>)
+     ;
   }
 }));
 
-jest.mock("../components/AppointmentBooking", () => ({
+jest.mock("../components/AppointmentBooking", () =>( {
   __esModule: true,
   default: ({ isOpen, onClose, onSubmit }) => {
     if (!isOpen) return null;
-    return (
+    return(
       <div role="dialog" aria-modal="true">
         <h2>Schedule Appointment</h2>
         <form onSubmit={(e) => {
@@ -148,16 +124,16 @@ jest.mock("../components/AppointmentBooking", () => ({
           <button type="submit" data-testid="schedule-button">Schedule</button>
           <button type="button" onClick={onClose} data-testid="cancel-button">Cancel</button>
         </form>
-      </div>
-    );
+      </div>)
+     ;
   }
 }));
 
-jest.mock("../components/Announcements", () => ({
+jest.mock("../components/Announcements", () =>( {
   __esModule: true,
   default: ({ isOpen, onClose, onSubmit }) => {
     if (!isOpen) return null;
-    return (
+    return(
       <div role="dialog" aria-modal="true">
         <h2>Create Announcement</h2>
         <form onSubmit={(e) => {
@@ -175,12 +151,12 @@ jest.mock("../components/Announcements", () => ({
           <button type="submit" data-testid="create-button">Create</button>
           <button type="button" onClick={onClose} data-testid="cancel-button">Cancel</button>
         </form>
-      </div>
-    );
+      </div>)
+     ;
   }
 }));
 
-jest.mock("../contexts/AuthContext", () => ({
+jest.mock("../contexts/AuthContext", () =>( {
   useAuth: () => mockAdminContext,
 }));
 
@@ -206,7 +182,7 @@ describe("Admin Dashboard - Create Buttons", () => {
   describe("Add Infant Modal", () => {
     test("Add Infant button opens modal", async () => {
       // Simulate Add Infant button behavior
-      const isOpen = false;
+
       const onOpen = jest.fn();
 
       render(
@@ -517,7 +493,7 @@ describe("Admin Dashboard - Delete Buttons", () => {
 
   describe("Delete Confirmation", () => {
     test("Delete button shows confirmation dialog", async () => {
-      const handleDelete = jest.fn();
+                           jest.fn();
 
       // Initial state - show delete button
       render(
@@ -561,7 +537,7 @@ describe("Admin Dashboard - Delete Buttons", () => {
     });
 
     test("Delete button is disabled during processing", async () => {
-      const handleDelete = jest.fn();
+                           jest.fn();
 
       render(
         <button disabled>Deleting...</button>
@@ -680,9 +656,9 @@ describe("Admin Dashboard - View Buttons", () => {
 
       render(
         <ul>
-          {vaccinations.map(v => (
-            <li key={v.id}>{v.vaccine} - {v.date}</li>
-          ))}
+          {vaccinations.map(     (v
+
+          )                   =>(<li key={v.id}>{v.vaccine} - {v.date}</li>))}
         </ul>
       );
 
@@ -810,7 +786,7 @@ describe("Admin Dashboard - Permission-Based Buttons", () => {
 
   test("Nurse has limited permissions", () => {
     const nursePermissions = ['view', 'create_appointments'];
-    const adminOnlyPermissions = ['manage_users', 'delete_infants'];
+
 
     // Nurse should see view and create_appointments
     nursePermissions.forEach(perm => {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { API_BASE_URL } from "../utils/apiConfig";
 
-const HEALTH_CHECK_TIMEOUT_MS = 10000; // Increased from 5s to 10s for production network latency
+const HEALTH_CHECK_TIMEOUT_MS = 10000;
 
 const resolveHealthCheckUrl = () => {
   const trimmedBaseUrl = String(API_BASE_URL || "").replace(/\/+$/, "");
@@ -36,14 +36,12 @@ export const useNetworkStatus = () => {
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
-    // Initial check with a small delay to ensure component is mounted
     const initialCheckTimeout = setTimeout(() => {
       if (mountedRef.current) {
         checkBackendReachability();
       }
     }, 100);
 
-    // Check backend reachability periodically (every 30 seconds)
     const interval = setInterval(() => {
       if (mountedRef.current) {
         checkBackendReachability();
@@ -56,7 +54,6 @@ export const useNetworkStatus = () => {
       window.removeEventListener("offline", handleOffline);
       clearTimeout(initialCheckTimeout);
       clearInterval(interval);
-      // Abort any ongoing request on cleanup
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
@@ -64,16 +61,14 @@ export const useNetworkStatus = () => {
   }, []);
 
   const checkBackendReachability = async () => {
-    // Cancel previous request if still ongoing
     if (abortControllerRef.current) {
       try {
         abortControllerRef.current.abort();
-      } catch (e) {
-        // Ignore abort errors
+      } catch (_e) {
+        // swallow
       }
     }
 
-    // Skip check if component is unmounted
     if (!mountedRef.current) return;
 
     if (!navigator.onLine) {
@@ -109,14 +104,12 @@ export const useNetworkStatus = () => {
 
       clearTimeout(timeoutId);
 
-      // Skip if component is unmounted
       if (!mountedRef.current) return;
 
       setIsBackendReachable(response.ok);
     } catch (error) {
       clearTimeout(timeoutId);
 
-      // Skip if component is unmounted
       if (!mountedRef.current) return;
 
       if (error.name === "AbortError") {
@@ -126,7 +119,6 @@ export const useNetworkStatus = () => {
         }
         return;
       } else if (error.message.includes('Failed to fetch') || error.message.includes('Network request failed')) {
-        // Network errors are common in production, just log and set to false
         console.warn("Backend reachability check failed (network error):", error.message);
         setIsBackendReachable(false);
       }

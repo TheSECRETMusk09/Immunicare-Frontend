@@ -6,20 +6,20 @@ import {
   ListItem,
   ListItemText,
   ListItemAvatar,
-  Avatar,
+
   Divider,
-  Chip,
+  Chip   ,
   Button,
   TextField,
-  MenuItem,
-  Select,
+  MenuItem ,
+  Select  ,
   FormControl,
-  InputLabel,
-  Switch,
+  InputLabel ,
+  Switch    ,
   FormControlLabel,
-  IconButton,
-  Menu,
-  ListItemIcon,
+
+
+
   CircularProgress,
 } from "@mui/material";
 import {
@@ -30,10 +30,10 @@ import {
   Email as EmailIcon,
   Sms as SmsIcon,
   Settings as SettingsIcon,
-  MoreVert as MoreVertIcon,
-  ArrowForward as ArrowForwardIcon,
-  Check as CheckIcon,
-  Close as CloseIcon,
+
+
+
+
 } from "@mui/icons-material";
 import { useAuth } from "../../contexts/AuthContext";
 import { format } from "date-fns";
@@ -41,7 +41,7 @@ import { format } from "date-fns";
 import { apiClient as api } from "../../utils/api";
 
 const NotificationsDashboard = () => {
-  const { user } = useAuth();
+  useAuth();
   const [notifications, setNotifications] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [filter, setFilter] = useState("all");
@@ -54,8 +54,6 @@ const NotificationsDashboard = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedNotification, setSelectedNotification] = useState(null);
-  const [contextMenuPosition, setContextMenuPosition] = useState(null);
 
   // Fetch notifications and alerts from API with error handling and fallback
   useEffect(() => {
@@ -131,7 +129,7 @@ const NotificationsDashboard = () => {
       });
 
       setNotifications(
-        notifications.map((notif) => ({ ...notif, isRead: true })),
+        notifications.map((notif) =>( { ...notif, isRead: true })),
       );
     } catch (error) {
       console.error("Failed to mark all notifications as read:", error);
@@ -140,7 +138,7 @@ const NotificationsDashboard = () => {
 
   const handleSettingsChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setSettings((prev) => ({
+    setSettings((prev) =>( {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
@@ -165,47 +163,33 @@ const NotificationsDashboard = () => {
     }
   };
 
-  const handleContextMenuOpen = (event, notification) => {
-    event.preventDefault();
-    setSelectedNotification(notification);
-    setContextMenuPosition({
-      top: event.clientY,
-      left: event.clientX,
-    });
-  };
 
-  const handleContextMenuClose = () => {
-    setContextMenuPosition(null);
-    setSelectedNotification(null);
-  };
 
-  const handleQuickAction = (actionType) => {
-    if (!selectedNotification) return;
 
-    switch (actionType) {
-      case "mark-read":
-        handleMarkAsRead(selectedNotification.id);
-        break;
-      case "view-details":
-        console.log("View details for:", selectedNotification.id);
-        // Navigate to detailed view or show modal
-        break;
-      case "take-action":
-        console.log("Take action for:", selectedNotification.id);
-        // Handle specific action based on notification type
-        break;
-      default:
-        break;
-    }
 
-    handleContextMenuClose();
-  };
 
-  const handleNavigate = (notification) => {
-    // Navigate based on notification type
-    console.log("Navigate to:", notification);
-    // Example: navigate(`/notifications/${notification.id}`);
-  };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   const getSeverityColor = (severity) => {
     switch (severity) {
@@ -239,14 +223,14 @@ const NotificationsDashboard = () => {
       : notifications.filter((notif) => notif.category === filter);
 
   if (isLoading) {
-    return (
+    return(
       <Card sx={{ p: 3, mt: 3 }}>
         <Typography variant="h6">Loading notifications...</Typography>
-      </Card>
-    );
+      </Card>)
+     ;
   }
 
-  return (
+  return(
     <div>
       <Card sx={{ p: 3, mt: 3, mb: 3 }}>
         <div
@@ -302,9 +286,9 @@ const NotificationsDashboard = () => {
           Active Alerts ({alerts.length})
         </Typography>
 
-        {alerts.length > 0 ? (
+        {alerts.length > 0 ?(
           <List sx={{ mb: 3 }}>
-            {alerts.map((alert) => (
+            {alerts.map((alert) =>(
               <ListItem
                 key={alert.id}
                 secondaryAction={
@@ -342,15 +326,15 @@ const NotificationsDashboard = () => {
                     </React.Fragment>
                   }
                 />
-              </ListItem>
-            ))}
-          </List>
-        ) : (
+              </ListItem>)
+             )}
+          </List>)
+          :(
           <Card sx={{ p: 2, textAlign: "center", backgroundColor: "#f5f5f5" }}>
             <CheckCircleIcon color="success" sx={{ fontSize: 40, mb: 1 }} />
             <Typography variant="body1">No active alerts</Typography>
-          </Card>
-        )}
+          </Card>)
+         }
 
         <Divider sx={{ my: 3 }} />
 
@@ -358,16 +342,16 @@ const NotificationsDashboard = () => {
           Recent Notifications ({filteredNotifications.length})
         </Typography>
 
-        {filteredNotifications.length > 0 ? (
+        {filteredNotifications.length > 0 ?(
           <List>
-            {filteredNotifications.map((notification) => (
+            {filteredNotifications.map((notification) =>(
               <React.Fragment key={notification.id}>
                 <ListItem
                   alignItems="flex-start"
                   secondaryAction={
-                    !notification.read && (
-                      <Chip label="New" color="primary" size="small" />
-                    )
+                    !notification.read &&(
+                      <Chip label="New" color="primary" size="small" />)
+
                   }
                   sx={{
                     backgroundColor: notification.read ? "inherit" : "#f0f7ff",
@@ -411,15 +395,15 @@ const NotificationsDashboard = () => {
                   />
                 </ListItem>
                 <Divider component="li" />
-              </React.Fragment>
-            ))}
-          </List>
-        ) : (
+              </React.Fragment>)
+             )}
+          </List>)
+          :(
           <Card sx={{ p: 2, textAlign: "center", backgroundColor: "#f5f5f5" }}>
             <InfoIcon color="info" sx={{ fontSize: 40, mb: 1 }} />
             <Typography variant="body1">No notifications found</Typography>
-          </Card>
-        )}
+          </Card>)
+         }
       </Card>
 
       <Card id="settings-section" sx={{ p: 3, mt: 3 }}>
@@ -516,11 +500,11 @@ const NotificationsDashboard = () => {
             variant="contained"
             color="primary"
             startIcon={
-              isSaving ? (
-                <CircularProgress size={20} color="inherit" />
-              ) : (
-                <SettingsIcon />
-              )
+              isSaving ?(
+                <CircularProgress size={20} color="inherit" />)
+                :(
+                <SettingsIcon />)
+
             }
             onClick={handleSaveSettings}
             disabled={isSaving}
@@ -579,8 +563,8 @@ const NotificationsDashboard = () => {
           </Card>
         </div>
       </Card>
-    </div>
-  );
-};
+    </div>)
+   ;           }
+ ;
 
 export default NotificationsDashboard;

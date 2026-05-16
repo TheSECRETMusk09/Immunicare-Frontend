@@ -4,39 +4,25 @@ import apiClient from "../utils/api";
 import { queryKeys } from "./useCachedData";
 import { useAuth } from "../contexts/AuthContext";
 
-/**
- * Normalizes API response data to ensure it's always an array.
- * Handles cases where API returns wrapped objects like { data: [...] } or { guardians: [...] }
- * @param {any} data - The data to normalize
- * @param {string} [wrapperKey] - Optional specific wrapper key to look for
- * @returns {Array} - Normalized array
- */
+// Normalizes API responses to always return an array, handling common wrapper shapes
 export const normalizeToArray = (data, wrapperKey = null) => {
-  // Handle null/undefined
   if (data == null) {
     console.warn("API returned null/undefined data");
     return [];
   }
 
-  // Handle direct arrays
-  if (Array.isArray(data)) {
-    return data;
-  }
+  if (Array.isArray(data)) return data;
 
-  // Handle count-only responses like {count: 5}
-  if (typeof data === "object" && data !== null) {
-    // Check for count-based pagination responses
+  if (typeof data === "object") {
     if ("count" in data && Object.keys(data).length === 1) {
       console.warn("API returned count-only response:", data);
       return [];
     }
 
-    // If a specific wrapper key is provided, use it first
     if (wrapperKey && Array.isArray(data[wrapperKey])) {
       return data[wrapperKey];
     }
 
-    // Check for common API response wrapper keys
     const wrapperKeys = [
       "data",
       "results",
@@ -52,17 +38,13 @@ export const normalizeToArray = (data, wrapperKey = null) => {
       "templates",
     ];
     for (const key of wrapperKeys) {
-      if (Array.isArray(data[key])) {
-        return data[key];
-      }
+      if (Array.isArray(data[key])) return data[key];
     }
 
-    // If it's an empty object or non-array object, warn and return empty array
     console.warn("API returned an object instead of an array:", data);
     return [];
   }
 
-  // Handle other types (string, number, etc.)
   console.warn(`API returned unexpected data type: ${typeof data}`);
   return [];
 };
@@ -193,7 +175,6 @@ export const useDashboardStats = () => {
     const fetchStats = async () => {
       try {
         const data = await apiClient.getDashboardStats();
-        // Stats endpoint returns an object, not an array
         setStats(data || {});
       } catch (err) {
         setError(err.message);

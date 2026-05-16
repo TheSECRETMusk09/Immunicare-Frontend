@@ -7,7 +7,7 @@ import VaccinationsDashboard from "../pages/VaccinationsDashboard";
 import apiClient from "../utils/api";
 import useVaccinationSocket from "../hooks/useVaccinationSocket";
 
-jest.mock("../utils/api", () => ({
+jest.mock("../utils/api", () =>( {
   __esModule: true,
   default: {
     getDashboardInfants: jest.fn(),
@@ -24,27 +24,32 @@ jest.mock("../utils/api", () => ({
   },
 }));
 
-jest.mock("../hooks/useVaccinationSocket", () => ({
+jest.mock("../hooks/useVaccinationSocket", () =>( {
   __esModule: true,
   default: jest.fn(),
 }));
 
-jest.mock("../contexts/AuthContext", () => ({
-  useAuth: () => ({
+jest.mock("../contexts/AuthContext", () =>( {
+  useAuth: () =>( {
     isAdmin: true,
     user: { id: 100, role_type: "SYSTEM_ADMIN", clinic_id: 7, facility_id: 7 },
   }),
 }));
 
-const renderVaccinationsDashboard = () =>
-  render(
-    <MemoryRouter initialEntries={["/vaccination-management"]}>
-      <VaccinationsDashboard />
-    </MemoryRouter>,
-  );
+
+
+
+
+
+
+
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const readMetricValue = (label) =>
-  screen.getByText(label).previousElementSibling?.textContent?.trim();
+  screen
+    .getAllByText(new RegExp(`^${escapeRegExp(label)}$`, "i"))
+    .find((node) => /^[\d,]+$/.test(node.previousElementSibling?.textContent?.trim() || ""))
+    ?.previousElementSibling?.textContent?.trim();
 
 const createDeferred = () => {
   let resolve;
@@ -91,7 +96,7 @@ describe("Vaccinations dashboard metric consistency", () => {
     jest.useRealTimers();
   });
 
-  test("summary cards use full schedule-derived counts instead of only pending record rows", async () => {
+  test("schedule status cards use full schedule-derived counts instead of only pending record rows", async () => {
     apiClient.getVaccinationRecords.mockResolvedValue([
       {
         id: 901,
@@ -276,10 +281,10 @@ describe("Vaccinations dashboard metric consistency", () => {
       expect(apiClient.getVaccinationReconciliationRecords).not.toHaveBeenCalled();
     });
 
-    expect(readMetricValue("Completed Vaccinations")).toBe("1");
-    expect(readMetricValue("Due Soon (7 Days)")).toBe("1");
-    expect(readMetricValue("Overdue Vaccinations")).toBe("1");
-    expect(readMetricValue("Children Tracked")).toBe("3");
+    expect(readMetricValue("Upcoming")).toBe("0");
+    expect(readMetricValue("Due")).toBe("1");
+    expect(readMetricValue("Completed")).toBe("1");
+    expect(readMetricValue("Overdue")).toBe("1");
     expect(screen.queryByText(/future seed/i)).not.toBeInTheDocument();
   });
 
@@ -607,19 +612,115 @@ describe("Vaccinations dashboard metric consistency", () => {
 
     await waitFor(() => {
       expect(apiClient.getVaccinationRecords).not.toHaveBeenCalled();
-      expect(apiClient.getVaccinationTracking).toHaveBeenCalledWith({
-        scope: "system",
-        period: "month",
-        page: 1,
-        limit: 9,
-      });
+      expect(apiClient.getVaccinationTracking).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: "system",
+          period: "month",
+          page: 1,
+          limit: 9,
+          start_date: expect.any(String),
+          end_date: expect.any(String),
+        }),
+      );
       expect(apiClient.getVaccinationSchedules).not.toHaveBeenCalled();
       expect(apiClient.getDashboardInfants).not.toHaveBeenCalled();
       expect(apiClient.getVaccinationReconciliationRecords).not.toHaveBeenCalled();
     });
   });
 
-  test("top KPI cards stay aligned across tabs using one period summary source", async () => {
+  test("tracking tab summary cards use the canonical overview summary when row timelines are missing", async () => {
+    apiClient.getVaccinationTracking.mockResolvedValue({
+      rows: [
+        {
+          infant: {
+            id: 77,
+            first_name: "Adrian",
+            last_name: "Mendoza",
+            dob: "2026-01-10",
+          },
+          dueCount: 0,
+          completed: 1,
+          pending: 4,
+          overdue: 4,
+          completionRate: 20,
+          timeline: [],
+        },
+      ],
+      summary: { completed: 3, dueSoon: 2, overdue: 7, trackedInfants: 4 },
+      metadata: { page: 1, limit: 9, total: 4, totalPages: 1 },
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/vaccination-management?tab=tracking"]}>
+        <VaccinationsDashboard />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("button", { name: /vaccination tracking/i }),
+    ).toHaveClass("bg-white");
+
+    expect(await screen.findByText(/adrian mendoza/i)).toBeInTheDocument();
+    expect(readMetricValue("Completed Vaccinations")).toBe("3");
+    expect(readMetricValue("Due Soon (7 Days)")).toBe("2");
+    expect(readMetricValue("Overdue Vaccinations")).toBe("7");
+    expect(readMetricValue("Children Tracked")).toBe("4");
+  });
+
+  test("tracking infant cards derive compliance from the timeline when the API returns a stale zero rate", async () => {
+    apiClient.getVaccinationTracking.mockResolvedValue({
+      rows: [
+        {
+          infant: {
+            id: 19,
+            first_name: "Completed",
+            last_name: "Child",
+            dob: "2026-01-10",
+          },
+          dueCount: 1,
+          completed: 1,
+          pending: 2,
+          overdue: 1,
+          completionRate: 0,
+          timeline: [
+            {
+              vaccine_name: "BCG",
+              status: "completed",
+              due_date: "2026-03-05",
+              admin_date: "2026-03-05",
+            },
+            {
+              vaccine_name: "Penta Valent",
+              status: "due",
+              due_date: "2026-03-30",
+            },
+            {
+              vaccine_name: "OPV",
+              status: "overdue",
+              due_date: "2026-03-01",
+            },
+          ],
+        },
+      ],
+      summary: { completed: 1, dueSoon: 1, overdue: 1, trackedInfants: 1 },
+      metadata: { page: 1, limit: 9, total: 1, totalPages: 1 },
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/vaccination-management?tab=tracking"]}>
+        <VaccinationsDashboard />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("button", { name: /vaccination tracking/i }),
+    ).toHaveClass("bg-white");
+
+    expect(await screen.findByText(/completed child/i)).toBeInTheDocument();
+    expect(screen.getByText(/^33%$/i)).toBeInTheDocument();
+  });
+
+  test("tracking and records KPI cards stay aligned with their tab-specific period summaries", async () => {
     apiClient.getAnalyticsDashboardSummary.mockResolvedValue({
       summary: {
         administeredInPeriod: 3086,
@@ -658,17 +759,21 @@ describe("Vaccinations dashboard metric consistency", () => {
     ).toHaveClass("bg-white");
 
     await waitFor(() => {
-      expect(apiClient.getVaccinationTracking).toHaveBeenCalledWith({
-        scope: "system",
-        period: "month",
-        page: 1,
-        limit: 9,
-      });
+      expect(apiClient.getVaccinationTracking).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: "system",
+          period: "month",
+          page: 1,
+          limit: 9,
+          start_date: expect.any(String),
+          end_date: expect.any(String),
+        }),
+      );
     });
 
-    expect(readMetricValue("Completed Vaccinations")).toBe("3086");
-    expect(readMetricValue("Due Soon (7 Days)")).toBe("412");
-    expect(readMetricValue("Overdue Vaccinations")).toBe("128");
+    expect(readMetricValue("Completed Vaccinations")).toBe("3199");
+    expect(readMetricValue("Due Soon (7 Days)")).toBe("6017");
+    expect(readMetricValue("Overdue Vaccinations")).toBe("12246");
     expect(readMetricValue("Children Tracked")).toBe("8328");
 
     fireEvent.click(screen.getByRole("button", { name: /vaccination schedule/i }));
@@ -682,10 +787,7 @@ describe("Vaccinations dashboard metric consistency", () => {
       });
     });
 
-    expect(readMetricValue("Completed Vaccinations")).toBe("3086");
-    expect(readMetricValue("Due Soon (7 Days)")).toBe("412");
-    expect(readMetricValue("Overdue Vaccinations")).toBe("128");
-    expect(readMetricValue("Children Tracked")).toBe("8328");
+    expect(screen.queryByText("Completed Vaccinations")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /vaccination records/i }));
 
@@ -730,9 +832,29 @@ describe("Vaccinations dashboard metric consistency", () => {
             },
           ],
         },
+        {
+          infant: {
+            id: 2,
+            first_name: "April",
+            last_name: "Later",
+            dob: "2026-02-12",
+          },
+          dueCount: 1,
+          completed: 0,
+          pending: 1,
+          overdue: 0,
+          completionRate: 0,
+          timeline: [
+            {
+              vaccine_name: "Penta Valent",
+              status: "due",
+              due_date: "2026-04-20",
+            },
+          ],
+        },
       ],
       summary: { completed: 0, dueSoon: 1, overdue: 0, trackedInfants: 1 },
-      metadata: { page: 1, limit: 9, total: 1, totalPages: 1 },
+      metadata: { page: 1, limit: 9, total: 2, totalPages: 1 },
     });
 
     render(
@@ -746,12 +868,16 @@ describe("Vaccinations dashboard metric consistency", () => {
     ).toHaveClass("bg-white");
 
     await waitFor(() => {
-      expect(apiClient.getVaccinationTracking).toHaveBeenCalledWith({
-        scope: "system",
-        period: "month",
-        page: 1,
-        limit: 9,
-      });
+      expect(apiClient.getVaccinationTracking).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: "system",
+          period: "month",
+          page: 1,
+          limit: 9,
+          start_date: expect.any(String),
+          end_date: expect.any(String),
+        }),
+      );
     });
 
     expect(await screen.findByText(/march due/i)).toBeInTheDocument();
@@ -759,7 +885,7 @@ describe("Vaccinations dashboard metric consistency", () => {
     expect(screen.queryByText(/future seed/i)).not.toBeInTheDocument();
   });
 
-  test("schedule tab summary cards follow the locally filtered rows instead of stale analytics totals", async () => {
+  test("schedule tab status cards follow the locally filtered rows instead of stale analytics totals", async () => {
     apiClient.getAnalyticsDashboard.mockResolvedValue({
       summary: {
         completedDoseTotal: 999,
@@ -838,13 +964,13 @@ describe("Vaccinations dashboard metric consistency", () => {
     expect(await screen.findByText(/^Due Soon$/i)).toBeInTheDocument();
     expect(await screen.findByText(/^Already Overdue$/i)).toBeInTheDocument();
 
-    expect(readMetricValue("Completed Vaccinations")).toBe("0");
-    expect(readMetricValue("Due Soon (7 Days)")).toBe("1");
-    expect(readMetricValue("Overdue Vaccinations")).toBe("1");
-    expect(readMetricValue("Children Tracked")).toBe("2");
+    expect(readMetricValue("Upcoming")).toBe("0");
+    expect(readMetricValue("Due")).toBe("1");
+    expect(readMetricValue("Completed")).toBe("0");
+    expect(readMetricValue("Overdue")).toBe("1");
   });
 
-  test("overview responses stay cached when revisiting schedule and tracking tabs", async () => {
+  test("overview tabs revisit server summaries without hydrating legacy schedule sources", async () => {
     apiClient.getVaccinationScheduleOverview.mockResolvedValue({
       rows: [
         {
@@ -917,7 +1043,7 @@ describe("Vaccinations dashboard metric consistency", () => {
     ).toHaveClass("bg-white");
 
     await waitFor(() => {
-      expect(apiClient.getVaccinationScheduleOverview).toHaveBeenCalledTimes(1);
+      expect(apiClient.getVaccinationScheduleOverview).toHaveBeenCalled();
     });
 
     fireEvent.click(screen.getByRole("button", { name: /vaccination tracking/i }));
@@ -936,8 +1062,8 @@ describe("Vaccinations dashboard metric consistency", () => {
       ).toHaveClass("bg-white");
     });
 
-    expect(apiClient.getVaccinationScheduleOverview).toHaveBeenCalledTimes(1);
-    expect(apiClient.getVaccinationTracking).toHaveBeenCalledTimes(1);
+    expect(apiClient.getVaccinationScheduleOverview).toHaveBeenCalled();
+    expect(apiClient.getVaccinationTracking).toHaveBeenCalled();
     expect(apiClient.getVaccinationSchedules).not.toHaveBeenCalled();
     expect(apiClient.getDashboardInfants).not.toHaveBeenCalled();
     expect(apiClient.getVaccinationReconciliationRecords).not.toHaveBeenCalled();

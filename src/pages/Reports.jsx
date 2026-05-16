@@ -29,15 +29,10 @@ import { useSocket } from "../contexts/SocketContext";
 
 const REPORT_TYPES = Object.freeze([
   "vaccination",
-  "inventory",
   "appointment",
   "guardian",
   "infant",
-  "system",
   "barangay",
-  "compliance",
-  "healthcenter",
-  "consolidated",
 ]);
 
 const REPORT_FORMATS = Object.freeze(["pdf"]);
@@ -92,11 +87,6 @@ const DEFAULT_REPORT_TEMPLATES = Object.freeze([
     description: "Comprehensive vaccination administration and compliance report",
   },
   {
-    type: "inventory",
-    name: "Inventory Report",
-    description: "Vaccine and medical supply inventory tracking report",
-  },
-  {
     type: "appointment",
     name: "Appointment Report",
     description: "Appointment scheduling and attendance analysis",
@@ -112,29 +102,9 @@ const DEFAULT_REPORT_TEMPLATES = Object.freeze([
     description: "Infant health monitoring and vaccination status",
   },
   {
-    type: "system",
-    name: "System Report",
-    description: "System user and access activity report",
-  },
-  {
     type: "barangay",
     name: "Barangay Health Report",
     description: "Barangay-specific health statistics",
-  },
-  {
-    type: "compliance",
-    name: "Compliance Report",
-    description: "Vaccination compliance and coverage analysis",
-  },
-  {
-    type: "healthcenter",
-    name: "Health Center Report",
-    description: "Health center performance and statistics",
-  },
-  {
-    type: "consolidated",
-    name: "Consolidated Report",
-    description: "All-in-one comprehensive report",
   },
 ]);
 
@@ -720,7 +690,7 @@ const Reports = () => {
             title="Download Report"
             disabled={downloadingReportId === row.id || isGenerating}
           >
-            {downloadingReportId === row.id ? "⏳" : "⬇️"}
+            {downloadingReportId === row.id ? "..." : "Download"}
           </Button>
           <Button
             variant="ghost"
@@ -729,7 +699,7 @@ const Reports = () => {
             title="Delete Report"
             disabled={downloadingReportId === row.id || isGenerating}
           >
-            🗑️
+Delete
           </Button>
         </div>
       ),
@@ -772,7 +742,7 @@ const Reports = () => {
 
       {/* Admin Dashboard Summary */}
       {adminSummary && (
-        <Card title="📈 Dashboard Overview" className="flex-shrink-0">
+        <Card title="Dashboard Overview" className="flex-shrink-0">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-3 sm:gap-4">
             {/* Vaccination Summary */}
             <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
@@ -892,7 +862,7 @@ const Reports = () => {
       )}
 
       {/* Quick Report Generation Cards */}
-      <Card title="🚀 Quick Report Generation" className="flex-shrink-0">
+      <Card title="Quick Report Generation" className="flex-shrink-0">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
           {reportTemplates.slice(0, 5).map((template) => (
             <Button
@@ -904,17 +874,6 @@ const Reports = () => {
               }}
               className="h-auto py-4 flex flex-col items-center gap-2"
             >
-              <span className="text-2xl">
-                {template.type === "vaccination" && "💉"}
-                {template.type === "inventory" && "📦"}
-                {template.type === "appointment" && "📅"}
-                {template.type === "guardian" && "👨‍👩‍👧"}
-                {template.type === "infant" && "👶"}
-                {template.type === "barangay" && "🏘️"}
-                {template.type === "compliance" && "✅"}
-                {template.type === "healthcenter" && "🏥"}
-                {template.type === "consolidated" && "📋"}
-              </span>
               <span className="text-sm font-medium">{template.name}</span>
             </Button>
           ))}
@@ -927,7 +886,7 @@ const Reports = () => {
       </Card>
 
       {/* Generated Reports */}
-      <Card title="📁 Generated Reports" className="flex-shrink-0">
+      <Card title="Generated Reports" className="flex-shrink-0">
         <div className="flex justify-between items-center mb-4 flex-shrink-0">
           <div className="text-sm text-gray-600 dark:text-gray-400">
             Total Reports: <strong>{reportTotal}</strong>
@@ -956,7 +915,6 @@ const Reports = () => {
 
         {reports.length === 0 ? (
           <div className="text-center py-12">
-            <div className="text-4xl mb-4">📊</div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
               No Reports Available
             </h3>
@@ -1146,7 +1104,6 @@ const Reports = () => {
       >
         <div className="text-center py-4">
           <div className="mb-4">
-            <span className="text-4xl">⚠️</span>
           </div>
           <p className="text-gray-700 dark:text-gray-300 text-lg">
             Are you sure you want to delete this report?

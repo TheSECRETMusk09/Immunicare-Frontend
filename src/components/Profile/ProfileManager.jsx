@@ -12,19 +12,19 @@ import {
   Tab,
   Divider,
   Switch,
-  FormControlLabel,
-  Alert,
+
+  Alert           ,
   Snackbar,
-  Dialog,
+  Dialog  ,
   DialogTitle,
   DialogContent,
   DialogActions,
-  IconButton,
-  List,
-  ListItem,
+
+  List         ,
+  ListItem  ,
   ListItemText,
   ListItemSecondaryAction,
-  Chip,
+  Chip        ,
 } from "@mui/material";
 import {
   Person,
@@ -35,10 +35,10 @@ import {
   Save,
   Cancel,
   Phone,
-  Email,
+
   LocationOn,
-  DarkMode,
-  Language,
+  DarkMode  ,
+
 } from "@mui/icons-material";
 import { useForm, Controller } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -207,7 +207,7 @@ const ProfileManager = () => {
     setEditMode(false);
   };
 
-  return (
+  return(
     <Box sx={{ p: 3, maxWidth: 1200, margin: "0 auto" }}>
       <Typography variant="h4" component="h1" fontWeight="bold" mb={3}>
         Profile Management
@@ -302,15 +302,15 @@ const ProfileManager = () => {
                 mb={3}
               >
                 <Typography variant="h6">Personal Information</Typography>
-                {!editMode ? (
+                {!editMode ?(
                   <Button
                     variant="outlined"
                     startIcon={<Edit />}
                     onClick={() => setEditMode(true)}
                   >
                     Edit
-                  </Button>
-                ) : (
+                  </Button>)
+                  :(
                   <Box display="flex" gap={1}>
                     <Button
                       variant="contained"
@@ -328,8 +328,8 @@ const ProfileManager = () => {
                     >
                       Save
                     </Button>
-                  </Box>
-                )}
+                  </Box>)
+                 }
               </Box>
 
               <Grid container spacing={3}>
@@ -337,7 +337,7 @@ const ProfileManager = () => {
                   <Controller
                     name="firstName"
                     control={profileControl}
-                    render={({ field }) => (
+                    render={({ field }) =>(
                       <TextField
                         {...field}
                         fullWidth
@@ -345,15 +345,15 @@ const ProfileManager = () => {
                         disabled={!editMode}
                         error={!!profileErrors.firstName}
                         helperText={profileErrors.firstName?.message}
-                      />
-                    )}
+                      />)
+                     }
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <Controller
                     name="lastName"
                     control={profileControl}
-                    render={({ field }) => (
+                    render={({ field }) =>(
                       <TextField
                         {...field}
                         fullWidth
@@ -361,8 +361,8 @@ const ProfileManager = () => {
                         disabled={!editMode}
                         error={!!profileErrors.lastName}
                         helperText={profileErrors.lastName?.message}
-                      />
-                    )}
+                      />)
+                     }
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -378,7 +378,7 @@ const ProfileManager = () => {
                   <Controller
                     name="phone"
                     control={profileControl}
-                    render={({ field }) => (
+                    render={({ field }) =>(
                       <TextField
                         {...field}
                         fullWidth
@@ -386,15 +386,15 @@ const ProfileManager = () => {
                         disabled={!editMode}
                         error={!!profileErrors.phone}
                         helperText={profileErrors.phone?.message}
-                      />
-                    )}
+                      />)
+                     }
                   />
                 </Grid>
                 <Grid item xs={12}>
                   <Controller
                     name="address"
                     control={profileControl}
-                    render={({ field }) => (
+                    render={({ field }) =>(
                       <TextField
                         {...field}
                         fullWidth
@@ -404,8 +404,8 @@ const ProfileManager = () => {
                         disabled={!editMode}
                         error={!!profileErrors.address}
                         helperText={profileErrors.address?.message}
-                      />
-                    )}
+                      />)
+                     }
                   />
                 </Grid>
               </Grid>
@@ -619,7 +619,7 @@ const ProfileManager = () => {
             <Controller
               name="currentPassword"
               control={passwordControl}
-              render={({ field }) => (
+              render={({ field }) =>(
                 <TextField
                   {...field}
                   fullWidth
@@ -629,7 +629,7 @@ const ProfileManager = () => {
                   error={!!passwordErrors.currentPassword}
                   helperText={passwordErrors.currentPassword?.message}
                   InputProps={{
-                    endAdornment: (
+                    endAdornment:(
                       <PasswordToggleButton
                         visible={showPassword.current}
                         onToggle={() =>
@@ -641,17 +641,17 @@ const ProfileManager = () => {
                         showLabel="Show current password"
                         hideLabel="Hide current password"
                         className="p-2 rounded-md text-gray-600 hover:text-gray-900"
-                      />
-                    ),
+                      />)
+                     ,
                   }}
-                />
-              )}
+                />)
+               }
             />
 
             <Controller
               name="newPassword"
               control={passwordControl}
-              render={({ field }) => (
+              render={({ field }) =>(
                 <TextField
                   {...field}
                   fullWidth
@@ -661,7 +661,7 @@ const ProfileManager = () => {
                   error={!!passwordErrors.newPassword}
                   helperText={passwordErrors.newPassword?.message}
                   InputProps={{
-                    endAdornment: (
+                    endAdornment:(
                       <PasswordToggleButton
                         visible={showPassword.new}
                         onToggle={() =>
@@ -673,17 +673,17 @@ const ProfileManager = () => {
                         showLabel="Show new password"
                         hideLabel="Hide new password"
                         className="p-2 rounded-md text-gray-600 hover:text-gray-900"
-                      />
-                    ),
+                      />)
+                     ,
                   }}
-                />
-              )}
+                />)
+               }
             />
 
             <Controller
               name="confirmNewPassword"
               control={passwordControl}
-              render={({ field }) => (
+              render={({ field }) =>(
                 <TextField
                   {...field}
                   fullWidth
@@ -693,7 +693,7 @@ const ProfileManager = () => {
                   error={!!passwordErrors.confirmNewPassword}
                   helperText={passwordErrors.confirmNewPassword?.message}
                   InputProps={{
-                    endAdornment: (
+                    endAdornment:(
                       <PasswordToggleButton
                         visible={showPassword.confirm}
                         onToggle={() =>
@@ -705,11 +705,11 @@ const ProfileManager = () => {
                         showLabel="Show confirm new password"
                         hideLabel="Hide confirm new password"
                         className="p-2 rounded-md text-gray-600 hover:text-gray-900"
-                      />
-                    ),
+                      />)
+                     ,
                   }}
-                />
-              )}
+                />)
+               }
             />
           </form>
         </DialogContent>
@@ -744,8 +744,8 @@ const ProfileManager = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Box>
-  );
+    </Box>)
+   ;
 };
 
 export default ProfileManager;

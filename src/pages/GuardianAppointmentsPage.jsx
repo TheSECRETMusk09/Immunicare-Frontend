@@ -5,7 +5,7 @@ import apiClient from "../utils/api";
 import { Alert, Button, Input, Modal, Select } from "../components/UI";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
 import GuardianTopHeader from "../components/GuardianTopHeader";
-import { Calendar, Plus, RefreshCw, Bell, User } from "lucide-react";
+import { Calendar, Plus } from "lucide-react";
 import moment from "moment";
 
 // FullCalendar imports (same as Admin Dashboard)
@@ -22,7 +22,15 @@ import {
   getHolidayTypeClass,
 } from "../utils/holidays";
 import { trackEvent } from "../utils/telemetry";
-import { toDateKey, toMonthKey, fromDateKey, formatDateTime, formatTimeSlotLabel } from "../utils/dateUtils";
+import {
+  toDateKey,
+  toMonthKey,
+  fromDateKey,
+  formatClinicDateLabel,
+  formatTimeSlotLabel,
+  getClinicDateTimeParts,
+  toClinicDateKey,
+} from "../utils/dateUtils";
 import { getStatusPillClass } from "../constants/statusMappings";
 import { normalizeArrayPayload } from "../utils/apiUtils";
 
@@ -46,7 +54,8 @@ const getEventColor = (status) => {
 };
 
 const canMutateAppointment = (status) => !["completed", "attended", "cancelled"].includes(status);
-const CALENDAR_WEEK_START = 0; // Sunday-first column order (Sun ... Sat)
+const CALENDAR_WEEK_START = 0;
+const MAX_DAILY_VACCINATION_SLOTS = 400;
 
 const normalizeAppointmentDateDetails = (details) => {
   if (!details || typeof details !== "object") {
@@ -64,10 +73,63 @@ const normalizeAppointmentDateDetails = (details) => {
     appointments: isUnavailable ? [] : appointments,
     summary: {
       ...(details.summary || {}),
-      total: isUnavailable ? 0 : (details?.summary?.total ?? appointments.length),
+      total: isUnavailable ? 0 :( details?.summary?.total ?? appointments.length),
     },
   };
 };
+
+const normalizeTimeValue = (value) => {
+  const match = String(value || "").trim().match(/^(\d{2}):(\d{2})/);
+  if (!match) {
+    return "";
+  }
+
+  return `${match[1]}:${match[2]}`;
+};
+
+const parseLocalDateTimeFromClinicParts = (dateKey, timeValue = "00:00") => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey || "").trim())) {
+    return null;
+  }
+
+  const [year, month, day] = String(dateKey).split("-").map((part) => Number.parseInt(part, 10));
+  const normalizedTime = normalizeTimeValue(timeValue) || "00:00";
+  const [hours, minutes] = normalizedTime.split(":").map((part) => Number.parseInt(part, 10));
+
+  if ([year, month, day, hours, minutes].some((part) => Number.isNaN(part))) {
+    return null;
+  }
+
+  const date = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const resolveAppointmentClinicDateParts = (appointment) => {
+  const scheduledDateTimeParts = getClinicDateTimeParts(appointment?.scheduled_date);
+  const dateKey = scheduledDateTimeParts?.dateKey || toClinicDateKey(appointment?.scheduled_date);
+  if (!dateKey) {
+    return null;
+  }
+
+  return {
+    dateKey,
+    time:
+      normalizeTimeValue(appointment?.scheduled_time) ||
+      scheduledDateTimeParts?.time ||
+      "09:00",
+  };
+};
+
+const buildAppointmentDateSummary = (appointmentsForDate = []) =>
+  appointmentsForDate.reduce(
+    (summary, appointment) => {
+      const status = appointment?.status || "unknown";
+      summary.total += 1;
+      summary.byStatus[status] = (summary.byStatus[status] || 0) + 1;
+      return summary;
+    },
+    { total: 0, byStatus: {} },
+  );
 
 export default function GuardianAppointmentsPage() {
   const navigate = useNavigate();
@@ -90,6 +152,7 @@ export default function GuardianAppointmentsPage() {
   const [selectedDateDetails, setSelectedDateDetails] = useState(null);
   const [blockedDates, setBlockedDates] = useState({});
   const [calendarAvailabilityByDate, setCalendarAvailabilityByDate] = useState({});
+  const [calendarDailyCapacities, setCalendarDailyCapacities] = useState({});
 
   const [pageLoading, setPageLoading] = useState(true);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
@@ -171,10 +234,10 @@ export default function GuardianAppointmentsPage() {
   const upcomingAppointments = useMemo(() => {
     const now = new Date();
     return sortedAppointments.filter((appointment) => {
-      return (
+      return(
         new Date(appointment.scheduled_date).getTime() >= now.getTime() &&
-        appointment.status !== "cancelled"
-      );
+        appointment.status !== "cancelled")
+       ;
     });
   }, [sortedAppointments]);
 
@@ -182,49 +245,72 @@ export default function GuardianAppointmentsPage() {
     const now = new Date();
     return sortedAppointments.filter((appointment) => {
       const appointmentDate = new Date(appointment.scheduled_date).getTime();
-      return (
+      return(
         appointmentDate < now.getTime() ||
         appointment.status === "cancelled" ||
         appointment.status === "completed" ||
-        appointment.status === "attended"
-      );
+        appointment.status === "attended")
+       ;
     });
   }, [sortedAppointments]);
 
-  // Transform appointments for FullCalendar
+  const selectedDateAppointments = useMemo(
+    () =>
+      appointments.filter((appointment) => {
+        const appointmentDateParts = resolveAppointmentClinicDateParts(appointment);
+        return appointmentDateParts?.dateKey === selectedDate;
+      }),
+    [appointments, selectedDate],
+  );
+
+  // Transform appointments for FullCalendar.
+  //
+  // IMPORTANT: We pass `start`/`end` as floating ISO strings (no timezone
+  // suffix) so FullCalendar plots the event on the clinic-local Manila date
+  // regardless of the viewer's browser timezone. Previously we used
+  // `new Date(year, month-1, day, ...)` (local browser time) which caused the
+  // appointment to render on the wrong calendar cell whenever the viewer's
+  // browser timezone differed from Asia/Manila.
   const transformAppointmentsForCalendar = (appointments) => {
     return appointments
       .filter((appointment) => {
-        const scheduledDate = appointment?.scheduled_date;
-        if (!scheduledDate) {
+        const appointmentDateParts = resolveAppointmentClinicDateParts(appointment);
+        if (!appointmentDateParts?.dateKey) {
           return false;
         }
 
-        const dateAvailability = isDateAvailableForBooking(scheduledDate, {
+        const dateAvailability = isDateAvailableForBooking(appointmentDateParts.dateKey, {
           allowPast: true,
-          blockedDate: blockedDates[toDateKey(scheduledDate)] || null,
+          blockedDate: blockedDates[appointmentDateParts.dateKey] || null,
         });
 
         return dateAvailability.isAvailable;
       })
       .map((appointment) => {
-        const dateStr = appointment.scheduled_date;
-        const timeStr = appointment.scheduled_time || "09:00";
-        const startDateTime = new Date(dateStr);
+        const appointmentDateParts = resolveAppointmentClinicDateParts(appointment);
+        if (!appointmentDateParts) {
+          return null;
+        }
 
-        // Parse time
-        const [hours, minutes] = timeStr.split(":").map(Number);
-        startDateTime.setHours(hours || 9, minutes || 0, 0, 0);
+        const { dateKey, time } = appointmentDateParts;
+        const [hour, minute] = String(time || "08:00").split(":").map((part) => Number.parseInt(part, 10));
+        if (Number.isNaN(hour) || Number.isNaN(minute)) {
+          return null;
+        }
 
-        // End time (30 min duration)
-        const endDateTime = new Date(startDateTime);
-        endDateTime.setMinutes(startDateTime.getMinutes() + 30);
+        // End time (30 min duration), kept in clinic-local floating time.
+        const totalEndMinutes = hour * 60 + minute + 30;
+        const endHour = Math.floor(totalEndMinutes / 60) % 24;
+        const endMinute = totalEndMinutes % 60;
+        const pad = (value) => String(value).padStart(2, "0");
+        const startIso = `${dateKey}T${pad(hour)}:${pad(minute)}:00`;
+        const endIso = `${dateKey}T${pad(endHour)}:${pad(endMinute)}:00`;
 
         return {
           id: appointment.id,
           title: `${appointment.first_name || "Infant"} - ${appointment.type || "Vaccination"}`,
-          start: startDateTime,
-          end: endDateTime,
+          start: startIso,
+          end: endIso,
           backgroundColor: getEventColor(appointment.status),
           borderColor: getEventColor(appointment.status),
           textColor: "#ffffff",
@@ -233,7 +319,7 @@ export default function GuardianAppointmentsPage() {
           },
         };
       })
-      .filter((event) => event.start);
+      .filter((event) => event?.start);
   };
 
   // Handle calendar date change (from Admin Dashboard)
@@ -287,8 +373,8 @@ export default function GuardianAppointmentsPage() {
     const calendarDate = calendarApi?.getDate?.();
     const fallbackDate = currentDate instanceof Date ? currentDate : new Date();
     const anchorDate =
-      selectedDateObject ||
-      (calendarDate instanceof Date ? calendarDate : fallbackDate);
+      selectedDateObject ||(
+       calendarDate instanceof Date ? calendarDate : fallbackDate);
 
     if (viewName === "timeGridDay") {
       calendarApi.changeView(viewName, anchorDate);
@@ -334,7 +420,9 @@ export default function GuardianAppointmentsPage() {
   // Handle event click - open appointment details
   const handleEventClick = (info) => {
     const appointment = info.event.extendedProps.appointment;
-    const appointmentDateKey = toDateKey(appointment?.scheduled_date);
+    const appointmentDateKey =
+      resolveAppointmentClinicDateParts(appointment)?.dateKey ||
+      toClinicDateKey(appointment?.scheduled_date);
     if (appointmentDateKey) {
       setSelectedDate(appointmentDateKey);
     }
@@ -380,7 +468,6 @@ export default function GuardianAppointmentsPage() {
   const getDayCellClassNames = useCallback((args) => {
     const classNames = [];
     const dateKey = toDateKey(args.date);
-    const availability = calendarAvailabilityByDate[dateKey] || null;
     const blockedDate = blockedDates[dateKey];
 
     if (isWeekendDate(args.date)) {
@@ -417,21 +504,21 @@ export default function GuardianAppointmentsPage() {
     const isToday = day.isSame(new Date(), "day");
 
     if (args.view.type === "timeGridDay") {
-      return (
+      return(
         <span className={`guardian-appointments-day-header ${isToday ? "is-today" : ""}`}>
           {day.format("dddd, MMMM D, YYYY")}
-        </span>
-      );
+        </span>)
+       ;
     }
 
     if (args.view.type === "timeGridWeek") {
-      return (
+      return(
         <span
           className={`guardian-appointments-day-header-compact ${isToday ? "is-today" : ""}`}
         >
           {day.format("ddd D")}
-        </span>
-      );
+        </span>)
+       ;
     }
 
     return day.format("ddd");
@@ -477,12 +564,46 @@ export default function GuardianAppointmentsPage() {
         }
         return accumulator;
       }, {});
+      const todayDateKey = toDateKey(new Date());
+      const capacityEntries = await Promise.all(
+        calendarDates
+          .filter((entry) =>
+            entry?.date &&
+            entry.date >= todayDateKey &&
+            !entry.isWeekend &&
+            !entry.isHoliday &&
+            !entry.isAdminBlocked &&
+            entry.blocked !== true,
+          )
+          .map(async (entry) => {
+            try {
+              const capacity = await apiClient.getAppointmentDailyCapacity(
+                { date: entry.date },
+                { signal },
+              );
+              return [entry.date, capacity];
+            } catch (capacityError) {
+              if (capacityError.name === 'CanceledError' || capacityError.code === 'ERR_CANCELED') {
+                throw capacityError;
+              }
+              return [entry.date, null];
+            }
+          }),
+      );
+      const capacitiesByDate = capacityEntries.reduce((accumulator, [dateKey, capacity]) => {
+        if (dateKey && capacity) {
+          accumulator[dateKey] = capacity;
+        }
+        return accumulator;
+      }, {});
 
       setCalendarAvailabilityByDate(availabilityByDate);
+      setCalendarDailyCapacities(capacitiesByDate);
       setBlockedDates(result?.blockedDates || {});
     } catch (err) {
       if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       setCalendarAvailabilityByDate({});
+      setCalendarDailyCapacities({});
       setBlockedDates({});
     } finally {
       setCalendarLoading(false);
@@ -498,14 +619,82 @@ export default function GuardianAppointmentsPage() {
     setDateDetailsLoading(true);
     try {
       const details = await apiClient.getAppointmentDateDetails(selectedDate, {}, { signal });
-      setSelectedDateDetails(normalizeAppointmentDateDetails(details));
+      const baseDetails = details && typeof details === "object" ? details : {};
+      const selectedDateAvailability = calendarAvailabilityByDate[selectedDate] || null;
+      const selectedDateValidation = isDateAvailableForBooking(selectedDate, {
+        allowPast: true,
+        blockedDate: blockedDates[selectedDate] || null,
+      });
+      const fallbackAvailability = selectedDateAvailability?.blocked === true || !selectedDateValidation.isAvailable
+        ? {
+            available: false,
+            message:
+              selectedDateAvailability?.blockedReason === "no_vaccine_available"
+                ? "No slots available for this date."
+                : selectedDateValidation.reason,
+          }
+        : {
+            available: true,
+            message: "This date is open for booking and monitoring.",
+          };
+      setSelectedDateDetails(
+        normalizeAppointmentDateDetails({
+          date: selectedDate,
+          ...baseDetails,
+          appointments: selectedDateAppointments,
+          summary: buildAppointmentDateSummary(selectedDateAppointments),
+          availability:
+            selectedDateAvailability?.blocked === true || !selectedDateValidation.isAvailable
+              ? fallbackAvailability
+              : (baseDetails.availability || fallbackAvailability),
+          isWeekend: Boolean(baseDetails.isWeekend ?? selectedDateAvailability?.isWeekend),
+          holiday:
+            baseDetails.holiday ||
+            (selectedDateAvailability?.isHoliday
+              ? {
+                  name: selectedDateAvailability.holidayName || "Holiday",
+                }
+              : null),
+          inventory: baseDetails.inventory || null,
+        }),
+      );
     } catch (err) {
       if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
-      setSelectedDateDetails(null);
+      const selectedDateAvailability = calendarAvailabilityByDate[selectedDate] || null;
+      const selectedDateValidation = isDateAvailableForBooking(selectedDate, {
+        allowPast: true,
+        blockedDate: blockedDates[selectedDate] || null,
+      });
+      setSelectedDateDetails(
+        normalizeAppointmentDateDetails({
+          date: selectedDate,
+          availability:
+            selectedDateAvailability?.blocked === true || !selectedDateValidation.isAvailable
+              ? {
+                  available: false,
+                  message:
+                    selectedDateAvailability?.blockedReason === "no_vaccine_available"
+                      ? "No slots available for this date."
+                      : selectedDateValidation.reason,
+                }
+              : {
+                  available: true,
+                  message: "This date is open for booking and monitoring.",
+                },
+          isWeekend: Boolean(selectedDateAvailability?.isWeekend),
+          holiday: selectedDateAvailability?.isHoliday
+            ? {
+                name: selectedDateAvailability.holidayName || "Holiday",
+              }
+            : null,
+          appointments: selectedDateAppointments,
+          summary: buildAppointmentDateSummary(selectedDateAppointments),
+        }),
+      );
     } finally {
       setDateDetailsLoading(false);
     }
-  }, [guardianId, selectedDate]);
+  }, [blockedDates, calendarAvailabilityByDate, guardianId, selectedDate, selectedDateAppointments]);
 
   const bootstrapPage = useCallback(async () => {
     if (!guardianId) {
@@ -643,7 +832,7 @@ export default function GuardianAppointmentsPage() {
         available: false,
         message: slotError?.message || "Failed to load time slots.",
       });
-      setFormData((previous) => ({ ...previous, scheduled_time: "" }));
+      setFormData((previous) =>( { ...previous, scheduled_time: "" }));
     } finally {
       setTimeSlotsLoading(false);
     }
@@ -677,15 +866,15 @@ export default function GuardianAppointmentsPage() {
   );
 
   const openEditModal = (appointment) => {
-    const schedule = new Date(appointment.scheduled_date);
+    const appointmentDateParts = resolveAppointmentClinicDateParts(appointment);
     setEditingAppointment(appointment);
     setTimeSlots([]);
     setTimeSlotsFeedback(null);
     setFormData({
       infant_id: String(appointment.infant_id || ""),
       vaccine_id: "",
-      scheduled_date: toDateKey(schedule),
-      scheduled_time: schedule.toTimeString().slice(0, 5),
+      scheduled_date: appointmentDateParts?.dateKey || "",
+      scheduled_time: appointmentDateParts?.time || "",
       type: appointment.type || "Vaccination",
       notes: appointment.notes || "",
     });
@@ -796,17 +985,17 @@ export default function GuardianAppointmentsPage() {
   };
 
   if (pageLoading) {
-    return (
+    return(
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <span className="loading loading-infinity loading-xl text-primary-600" />
           <p className="mt-3 text-sm text-gray-500">Loading guardian appointments...</p>
         </div>
-      </div>
-    );
+      </div>)
+     ;
   }
 
-  return (
+  return(
     <div className="guardian-page-wrapper min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 guardian-module-mobile-header-spacing">
       <div className="min-[1025px]:hidden fixed top-0 left-0 right-0 z-40 w-full bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-200">
         <GuardianTopHeader
@@ -825,34 +1014,6 @@ export default function GuardianAppointmentsPage() {
           actionsClassName="guardian-appointments-header-actions"
           actions={
             <div className="flex flex-wrap items-center justify-end gap-2">
-              <div className="hidden min-[1025px]:flex guardian-desktop-pageheader-actions mr-2">
-                <button
-                  type="button"
-                  onClick={refreshAppointments}
-                  className="guardian-desktop-pageheader-icon-btn"
-                  aria-label="Refresh Appointments"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => navigate('/guardian/notifications')}
-                  className="guardian-desktop-pageheader-icon-btn guardian-desktop-pageheader-icon-btn--notif"
-                  aria-label="Open notifications"
-                >
-                  <Bell className="w-4 h-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => navigate('/guardian/profile')}
-                  className="guardian-desktop-pageheader-icon-btn"
-                  aria-label="Open profile"
-                >
-                  <User className="w-4 h-4" />
-                </button>
-              </div>
               <div className="guardian-appointments-header-actions-inner flex flex-wrap items-center justify-end gap-2 sm:gap-3">
                 <Button variant="secondary" size="sm" onClick={handleToday}>
                   Today
@@ -935,20 +1096,6 @@ export default function GuardianAppointmentsPage() {
                 >
                   Month
                 </Button>
-                <Button
-                  variant={calendarView === "timeGridWeek" ? "primary" : "secondary"}
-                  size="sm"
-                  onClick={() => handleViewChange("timeGridWeek")}
-                >
-                  Week
-                </Button>
-                <Button
-                  variant={calendarView === "timeGridDay" ? "primary" : "secondary"}
-                  size="sm"
-                  onClick={() => handleViewChange("timeGridDay")}
-                >
-                  Day
-                </Button>
               </div>
             </div>
 
@@ -972,32 +1119,61 @@ export default function GuardianAppointmentsPage() {
                 dayCellContent={(arg) => {
                   const dateKey = toDateKey(arg.date);
                   const holiday = isPhilippineHoliday(arg.date);
-                  const availability = calendarAvailabilityByDate[dateKey] || null;
                   const blockedDate = blockedDates[dateKey];
                   const isUnavailable =
                     Boolean(blockedDate?.is_blocked) ||
                     Boolean(holiday) ||
                     isWeekendDate(arg.date);
-                  return (
+                  const isPastDate = !isUnavailable && dateKey < toDateKey(new Date());
+                  const dateCapacity = calendarDailyCapacities[dateKey] || null;
+                  const totalBooked = calendarAvailabilityByDate[dateKey]?.totalAppointments ?? null;
+                  const slotsRemaining = (!isUnavailable && !isPastDate)
+                    ? (
+                        dateCapacity?.remaining ??
+                        (totalBooked !== null
+                          ? Math.max(
+                              0,
+                              (dateCapacity?.maximum ?? MAX_DAILY_VACCINATION_SLOTS) - totalBooked,
+                            )
+                          : null)
+                      )
+                    : null;
+                  return(
                     <div className="flex flex-col w-full h-full min-h-[4rem]">
                       <div className="text-right p-1 text-sm">{arg.dayNumberText}</div>
-                      {holiday && (
+                      {holiday &&(
                         <div className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 truncate px-1 text-right bg-amber-50 dark:bg-amber-900/20 rounded mx-1 mb-1">
                           {holiday.name}
-                        </div>
-                      )}
-                      {!holiday && blockedDate?.is_blocked && (
+                        </div>)
+                       }
+                      {!holiday && blockedDate?.is_blocked &&(
                         <div className="text-[10px] font-semibold text-red-700 dark:text-red-300 truncate px-1 text-right bg-red-50 dark:bg-red-900/20 rounded mx-1 mb-1">
                           Blocked
-                        </div>
-                      )}
-                      {!holiday && !blockedDate?.is_blocked && isUnavailable && (
+                        </div>)
+                       }
+                      {!holiday && !blockedDate?.is_blocked && isUnavailable &&(
                         <div className="text-[10px] font-semibold text-yellow-700 dark:text-yellow-300 truncate px-1 text-right bg-yellow-50 dark:bg-yellow-900/20 rounded mx-1 mb-1">
                           Unavailable
-                        </div>
-                      )}
-                    </div>
-                  );
+                        </div>)
+                       }
+                      {isPastDate &&(
+                        <div className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 truncate px-1 text-right rounded mx-1 mb-1">
+                          Past
+                        </div>)
+                       }
+                      {slotsRemaining !== null &&(
+                        <div className={`text-[10px] font-semibold truncate px-1 text-right rounded mx-1 mb-1 ${
+                          slotsRemaining === 0
+                            ? 'text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20'
+                            : slotsRemaining <= 50
+                              ? 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20'
+                              : 'text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20'
+                        }`}>
+                          {slotsRemaining === 0 ? 'Full' : `${slotsRemaining} slots`}
+                        </div>)
+                       }
+                    </div>)
+                   ;
                 }}
                 selectAllow={(selectInfo) =>
                   isDateAvailableForBooking(selectInfo.start, {
@@ -1014,31 +1190,22 @@ export default function GuardianAppointmentsPage() {
                 allDaySlot={true}
                 nowIndicator
                 firstDay={CALENDAR_WEEK_START}
-                slotLabelFormat={{
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: true,
-                }}
-                eventTimeFormat={{
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: true,
-                }}
-                eventContent={(eventInfo) => (
+                displayEventTime={false}
+                eventContent={(eventInfo) =>(
                   <div className="fc-event-custom overflow-hidden">
                     <div className="text-xs truncate">
-                      {eventInfo.timeText} {eventInfo.event.title}
+                      {eventInfo.event.title}
                     </div>
-                  </div>
-                )}
+                  </div>)
+                 }
               />
 
-              {calendarLoading && (
+              {calendarLoading &&(
                 <div className="guardian-appointments-calendar-loading-overlay absolute inset-0 z-10 flex flex-col items-center justify-center rounded-b-xl bg-white/75 dark:bg-gray-900/65 backdrop-blur-[1px]">
                   <span className="loading loading-infinity loading-lg text-primary-600" />
                   <p className="text-sm text-gray-500 mt-2">Synchronizing calendar availability...</p>
-                </div>
-              )}
+                </div>)
+               }
             </div>
 
             {/* Calendar Legend */}
@@ -1103,11 +1270,11 @@ export default function GuardianAppointmentsPage() {
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">{selectedDate || ""}</p>
 
-              {selectedDateDetails?.availability?.available === false ? (
-                <Alert variant="warning">{selectedDateDetails.availability.message}</Alert>
-              ) : (
-                <Alert variant="info">This date is open for booking and monitoring.</Alert>
-              )}
+              {selectedDateDetails?.availability?.available === false ?(
+                <Alert variant="warning">{selectedDateDetails.availability.message}</Alert>)
+                :(
+                <Alert variant="info">This date is open for booking and monitoring.</Alert>)
+               }
 
               <div className="mt-4 space-y-2 text-sm">
                 <p className="flex items-center justify-between">
@@ -1134,18 +1301,18 @@ export default function GuardianAppointmentsPage() {
                 {appointmentsLoading && <span className="loading loading-infinity loading-sm text-primary-600" />}
               </div>
 
-              {upcomingAppointments.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400">No upcoming appointments found.</p>
-              ) : (
+              {upcomingAppointments.length === 0 ?(
+                <p className="text-sm text-gray-500 dark:text-gray-400">No upcoming appointments found.</p>)
+                :(
                 <div className="space-y-3 max-h-[350px] overflow-y-auto modern-scrollbar pr-1">
-                  {upcomingAppointments.map((appointment) => (
+                  {upcomingAppointments.map((appointment) =>(
                     <div key={appointment.id} className="guardian-appointment-card rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40 flex flex-col gap-3 min-[640px]:flex-row min-[640px]:items-start min-[640px]:justify-between">
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-gray-900 dark:text-gray-100 truncate">
-                          {(appointment.first_name || "Infant") + " " + (appointment.last_name || "")}
+                          {(appointment.first_name || "Infant") + " " +( appointment.last_name || "")}
                         </p>
                         <p className="text-sm text-gray-500 dark:text-gray-400">{appointment.type || "Vaccination"}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{formatDateTime(appointment.scheduled_date)}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{formatClinicDateLabel(appointment.scheduled_date)}</p>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 mt-2 sm:mt-0">
@@ -1153,7 +1320,7 @@ export default function GuardianAppointmentsPage() {
                           {appointment.status}
                         </span>
 
-                        {canMutateAppointment(appointment.status) && (
+                        {canMutateAppointment(appointment.status) &&(
                           <>
                             <Button
                               size="sm"
@@ -1175,20 +1342,20 @@ export default function GuardianAppointmentsPage() {
                             >
                               Cancel
                             </Button>
-                          </>
-                        )}
+                          </>)
+                         }
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    </div>)
+                   )}
+                </div>)
+               }
 
-              {(appointmentsLoading || postTransactionSyncing) && (
+              {(appointmentsLoading || postTransactionSyncing) &&(
                 <div className="flex items-center gap-2 mt-3 text-xs text-gray-500 dark:text-gray-400">
                   <span className="loading loading-infinity loading-xs text-primary-600" />
                   {postTransactionSyncing ? "Finalizing update and syncing schedule..." : "Refreshing appointments..."}
-                </div>
-              )}
+                </div>)
+               }
             </section>
 
             {/* Appointment History Card */}
@@ -1202,18 +1369,18 @@ export default function GuardianAppointmentsPage() {
                 {appointmentsLoading && <span className="loading loading-infinity loading-sm text-primary-600" />}
               </div>
 
-              {appointmentHistory.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400">No appointment history found.</p>
-              ) : (
+              {appointmentHistory.length === 0 ?(
+                <p className="text-sm text-gray-500 dark:text-gray-400">No appointment history found.</p>)
+                :(
                 <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 mobile-scrollbar">
-                  {appointmentHistory.map((appointment) => (
+                  {appointmentHistory.map((appointment) =>(
                     <div key={appointment.id} className="guardian-appointment-card rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40 flex flex-col gap-3 min-[640px]:flex-row min-[640px]:items-start min-[640px]:justify-between">
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-gray-900 dark:text-gray-100 truncate">
-                          {(appointment.first_name || "Infant") + " " + (appointment.last_name || "")}
+                          {(appointment.first_name || "Infant") + " " +( appointment.last_name || "")}
                         </p>
                         <p className="text-sm text-gray-500 dark:text-gray-400">{appointment.type || "Vaccination"}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{formatDateTime(appointment.scheduled_date)}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{formatClinicDateLabel(appointment.scheduled_date)}</p>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 mt-2 sm:mt-0">
@@ -1221,16 +1388,16 @@ export default function GuardianAppointmentsPage() {
                           {appointment.status}
                         </span>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    </div>)
+                   )}
+                </div>)
+               }
 
-              {appointmentHistory.length > 5 && (
+              {appointmentHistory.length > 5 &&(
                 <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-3">
                   Showing {Math.min(5, appointmentHistory.length)} of {appointmentHistory.length} past appointments
-                </p>
-              )}
+                </p>)
+               }
             </section>
           </aside>
         </div>
@@ -1249,40 +1416,40 @@ export default function GuardianAppointmentsPage() {
             <Select
               label="Child"
               value={formData.infant_id}
-              onChange={(event) => setFormData((previous) => ({ ...previous, infant_id: event.target.value }))}
+              onChange={(event) => setFormData((previous) =>( { ...previous, infant_id: event.target.value }))}
               disabled={Boolean(editingAppointment)}
               required
             >
               <option value="">Select child</option>
-              {children.map((child) => (
+              {children.map((child) =>(
                 <option key={child.id} value={child.id}>
                   {child.first_name} {child.last_name}
-                </option>
-              ))}
+                </option>)
+               )}
             </Select>
 
             <Select
               label="Vaccine (optional)"
               value={formData.vaccine_id}
-              onChange={(event) => setFormData((previous) => ({ ...previous, vaccine_id: event.target.value }))}
+              onChange={(event) => setFormData((previous) =>( { ...previous, vaccine_id: event.target.value }))}
             >
               <option value="">Auto-assign based on schedule</option>
-              {vaccines.map((vaccine) => (
+              {vaccines.map((vaccine) =>(
                 <option key={vaccine.id} value={vaccine.id}>
                   {vaccine.name || vaccine.vaccine_name}
-                </option>
-              ))}
+                </option>)
+               )}
             </Select>
 
             {formData.scheduled_date && !isDateAvailableForBooking(formData.scheduled_date, {
               blockedDate: blockedDates[formData.scheduled_date] || null,
-            }).isAvailable && (
+            }).isAvailable &&(
               <Alert variant="warning">
                 {isDateAvailableForBooking(formData.scheduled_date, {
                   blockedDate: blockedDates[formData.scheduled_date] || null,
                 }).reason}
-              </Alert>
-            )}
+              </Alert>)
+             }
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
@@ -1296,7 +1463,7 @@ export default function GuardianAppointmentsPage() {
                   }).isAvailable
                 }
                 onChange={(event) =>
-                  setFormData((previous) => ({ ...previous, scheduled_date: event.target.value }))
+                  setFormData((previous) =>( { ...previous, scheduled_date: event.target.value }))
                 }
                 required
               />
@@ -1304,41 +1471,41 @@ export default function GuardianAppointmentsPage() {
                 label="Appointment Time (8AM - 4PM)"
                 value={formData.scheduled_time}
                 onChange={(event) =>
-                  setFormData((previous) => ({ ...previous, scheduled_time: event.target.value }))
+                  setFormData((previous) =>( { ...previous, scheduled_time: event.target.value }))
                 }
                 required
-                disabled={timeSlotsLoading || (timeSlotsFeedback && !timeSlotsFeedback.available)}
+                disabled={timeSlotsLoading ||( timeSlotsFeedback && !timeSlotsFeedback.available)}
               >
                 <option value="">
                   {timeSlotsLoading ? "Loading time slots..." : "Select time"}
                 </option>
-                {timeSlots.map((slot) => (
+                {timeSlots.map((slot) =>(
                   <option key={slot} value={slot}>
                     {formatTimeSlotLabel(slot)}
-                  </option>
-                ))}
+                  </option>)
+                 )}
               </Select>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 sm:col-span-2">
                 Available from 8:00 AM to 4:00 PM (12:00 PM - 1:00 PM lunch break).
               </p>
             </div>
 
-            {timeSlotsLoading ? (
+            {timeSlotsLoading ?(
               <div className="flex items-center gap-2 text-xs text-gray-500">
                 <span className="loading loading-infinity loading-xs text-primary-600" />
                 Loading available time slots...
-              </div>
-            ) : (
-              timeSlotsFeedback &&
-              !timeSlotsFeedback.available && (
-                <Alert variant="warning">{timeSlotsFeedback.message}</Alert>
+              </div>)
+              :
+
+                                              (timeSlotsFeedback&&!timeSlotsFeedback.available&&(
+                <Alert variant="warning">{timeSlotsFeedback.message}</Alert>)
               )
-            )}
+             }
 
             <Select
               label="Appointment Type"
               value={formData.type}
-              onChange={(event) => setFormData((previous) => ({ ...previous, type: event.target.value }))}
+              onChange={(event) => setFormData((previous) =>( { ...previous, type: event.target.value }))}
               required
             >
               <option value="Vaccination">Vaccination</option>
@@ -1351,24 +1518,24 @@ export default function GuardianAppointmentsPage() {
               <textarea
                 rows={3}
                 value={formData.notes}
-                onChange={(event) => setFormData((previous) => ({ ...previous, notes: event.target.value }))}
+                onChange={(event) => setFormData((previous) =>( { ...previous, notes: event.target.value }))}
                 className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm"
                 placeholder="Optional notes for the health center"
               />
             </label>
 
-            {availabilityChecking ? (
+            {availabilityChecking ?(
               <div className="flex items-center gap-2 text-xs text-gray-500">
                 <span className="loading loading-infinity loading-xs text-primary-600" />
                 Checking booking availability...
-              </div>
-            ) : (
-              availabilityFeedback && (
+              </div>)
+              :
+                                      (availabilityFeedback&&(
                 <Alert variant={availabilityFeedback.available ? "success" : "warning"}>
                   {availabilityFeedback.message}
-                </Alert>
+                </Alert>)
               )
-            )}
+             }
 
             <div
               className="guardian-form-actions guardian-form-actions--guardian-order guardian-form-actions--booking-modal"
@@ -1380,8 +1547,8 @@ export default function GuardianAppointmentsPage() {
                 loading={formSubmitting}
                 disabled={
                   (availabilityFeedback ? !availabilityFeedback.available : false) ||
-                  timeSlotsLoading ||
-                  (timeSlotsFeedback ? !timeSlotsFeedback.available : false) ||
+                  timeSlotsLoading ||(
+                   timeSlotsFeedback ? !timeSlotsFeedback.available : false) ||
                   Boolean(formData.scheduled_date && !isDateAvailableForBooking(formData.scheduled_date, {
                     blockedDate: blockedDates[formData.scheduled_date] || null,
                   }).isAvailable)
@@ -1414,16 +1581,16 @@ export default function GuardianAppointmentsPage() {
           }`}
           size="lg"
         >
-          {dateDetailsLoading ? (
+          {dateDetailsLoading ?(
             <div className="py-10 text-center">
               <span className="loading loading-infinity loading-lg text-primary-600" />
               <p className="text-sm text-gray-500 mt-2">Loading date details...</p>
-            </div>
-          ) : (
+            </div>)
+            :(
             <div className="space-y-4 guardian-modal-body-density--guardian">
-              {selectedDateDetails?.availability?.available === false && (
-                <Alert variant="warning">{selectedDateDetails.availability.message}</Alert>
-              )}
+              {selectedDateDetails?.availability?.available === false &&(
+                <Alert variant="warning">{selectedDateDetails.availability.message}</Alert>)
+               }
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
@@ -1447,14 +1614,14 @@ export default function GuardianAppointmentsPage() {
               </div>
 
               <div className="space-y-2 max-h-[320px] overflow-y-auto modern-scrollbar pr-1">
-                {(selectedDateDetails?.appointments || []).length === 0 ? (
-                  <p className="text-sm text-gray-500">No appointments scheduled for this date.</p>
-                ) : (
-                  selectedDateDetails.appointments.map((appointment) => (
+                {(selectedDateDetails?.appointments || []).length === 0 ?(
+                  <p className="text-sm text-gray-500">No appointments scheduled for this date.</p>)
+                  :
+                                                      (selectedDateDetails.appointments.map((appointment)=>(
                     <div key={appointment.id} className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
                       <div className="flex items-center justify-between gap-2">
                         <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
-                          {(appointment.first_name || "Infant") + " " + (appointment.last_name || "")}
+                          {(appointment.first_name || "Infant") + " " +( appointment.last_name || "")}
                         </p>
                         <span
                           className={`px-2 py-1 rounded-full text-[11px] font-semibold capitalize ${getStatusPillClass(appointment.status)}`}
@@ -1462,13 +1629,13 @@ export default function GuardianAppointmentsPage() {
                           {appointment.status}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">{formatDateTime(appointment.scheduled_date)}</p>
-                    </div>
-                  ))
-                )}
+                      <p className="text-xs text-gray-500 mt-1">{formatClinicDateLabel(appointment.scheduled_date)}</p>
+                    </div>)
+                   ))
+                 }
               </div>
-            </div>
-          )}
+            </div>)
+           }
         </Modal>
 
         {/* Cancel Modal */}
@@ -1529,6 +1696,6 @@ export default function GuardianAppointmentsPage() {
           </div>
         </Modal>
       </main>
-    </div>
-  );
+    </div>)
+   ;
 }

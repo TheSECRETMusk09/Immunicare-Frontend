@@ -27,7 +27,6 @@ export default function HolidayDisplay({
     return (
       <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-lg">🎉</span>
           <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-200">
             Upcoming Holidays
           </h4>
@@ -59,7 +58,6 @@ export default function HolidayDisplay({
     return (
       <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-lg">🎉</span>
           <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-200">
             Upcoming Holiday
           </h4>
@@ -84,7 +82,6 @@ export default function HolidayDisplay({
       >
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
-            <span className="text-xl">🎉</span>
           </div>
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -196,7 +193,6 @@ export function HolidayMiniWidget() {
   return (
     <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-lg">🎉</span>
         <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-200">
           Upcoming Holidays
         </h4>

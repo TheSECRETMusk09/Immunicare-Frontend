@@ -206,7 +206,7 @@ describe("UserManagement tab actions", () => {
   test("blocks empty staff submissions and surfaces inline validation", async () => {
     renderPage("/users?tab=system");
 
-    fireEvent.click(screen.getByRole("button", { name: /add new staff/i }));
+    fireEvent.click(screen.getAllByRole("button", { name: /add new user/i })[0]);
     fireEvent.click(screen.getByRole("button", { name: /^add user$/i }));
 
     expect(
@@ -280,7 +280,9 @@ describe("UserManagement tab actions", () => {
     renderPage("/users?tab=admins");
 
     expect(screen.getByRole("button", { name: /disable user/i })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /delete user/i })).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: /delete user/i }),
+    ).not.toBeInTheDocument();
   });
 
   test("shows the Reset Password primary action when opened from the admins tab", async () => {
@@ -353,16 +355,21 @@ describe("UserManagement tab actions", () => {
   test("blocks invalid admin account submissions before the create action runs", async () => {
     renderPage("/users?tab=admins");
 
-    fireEvent.click(screen.getByRole("button", { name: /add new admin/i }));
-    fireEvent.click(
-      screen.getByRole("button", { name: /create admin account/i }),
-    );
+    fireEvent.click(screen.getAllByRole("button", { name: /add new user/i })[0]);
+
+    const dialog = await screen.findByRole("dialog", {
+      name: /add new user/i,
+    });
+
+    expect(within(dialog).getByLabelText(/role/i)).toHaveValue("2");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /^add user$/i }));
 
     expect(
       (await screen.findAllByText(/username is required/i)).length,
     ).toBeGreaterThan(0);
-    expect(screen.getAllByText(/please select a role/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/password is required/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/please select a role/i)).not.toBeInTheDocument();
     expect(createUser).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Card, Button, Badge, Table, Alert } from "../UI";
+import { Card, Button, Badge,        Alert } from "../UI";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../../utils/api";
 
@@ -55,7 +55,7 @@ const CityDashboard = () => {
   const facilities = dashboard?.facilities || {};
   const recentReports = dashboard?.recentReports || {};
 
-  return (
+  return(
     <div className="city-dashboard">
       <div className="dashboard-header">
         <h1>City Health Office Dashboard</h1>
@@ -73,13 +73,13 @@ const CityDashboard = () => {
       </div>
 
       {/* Alerts Section */}
-      {alerts && alerts.total > 0 && (
+      {alerts && alerts.total > 0 &&(
         <Alert type="warning" className="mb-4">
           <strong>Active Alerts:</strong> {alerts.temperature.length}{" "}
           temperature alerts, {alerts.lowStock.length} low stock alerts,{" "}
           {alerts.expiring.length} expiring vaccines
-        </Alert>
-      )}
+        </Alert>)
+       }
 
       {/* Stats Cards */}
       <div className="stats-grid">
@@ -203,8 +203,8 @@ const CityDashboard = () => {
           </Button>
         </div>
       </div>
-    </div>
-  );
+    </div>)
+   ;
 };
 
 export default CityDashboard;

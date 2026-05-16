@@ -1,12 +1,6 @@
-/* ==========================================================================
-   Accessibility Enhancements
-   Immunicare Vaccination Management System
-   WCAG 2.1 AA Compliant
-   ========================================================================== */
+/* Accessibility helpers */
 
-/* ==========================================================================
-   Focus States (WCAG 2.4.7)
-   ========================================================================== */
+/* Focus states */
 
 /* Default Focus Visible */
 :focus-visible {
@@ -61,9 +55,7 @@ textarea:focus-visible,
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
 }
 
-/* ==========================================================================
-   Skip Links (WCAG 2.4.1)
-   ========================================================================== */
+/* Skip links */
 
 .skip-link {
   position: absolute;
@@ -103,9 +95,7 @@ textarea:focus-visible,
   top: var(--space-4);
 }
 
-/* ==========================================================================
-   Screen Reader Only Content (WCAG 1.3.1)
-   ========================================================================== */
+/* Screen reader only */
 
 .sr-only {
   position: absolute;
@@ -132,9 +122,7 @@ textarea:focus-visible,
   white-space: normal;
 }
 
-/* ==========================================================================
-   Reduced Motion (WCAG 2.3.3)
-   ========================================================================== */
+/* Reduced motion */
 
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -242,9 +230,7 @@ textarea:focus-visible,
   }
 }
 
-/* ==========================================================================
-   High Contrast Mode (WCAG 1.4.11)
-   ========================================================================== */
+/* High contrast mode */
 
 @media (prefers-contrast: high) {
   :root {
@@ -366,9 +352,7 @@ textarea:focus-visible,
   }
 }
 
-/* ==========================================================================
-   Touch Target Sizes (WCAG 2.5.5)
-   ========================================================================== */
+/* Touch target sizes */
 
 /* Minimum Touch Target Size */
 .touch-target {
@@ -446,9 +430,7 @@ a,
   flex-shrink: 0;
 }
 
-/* ==========================================================================
-   Text Spacing (WCAG 1.4.12)
-   ========================================================================== */
+/* Text spacing */
 
 .text-spaced {
   line-height: 1.5;
@@ -483,9 +465,7 @@ a,
   word-spacing: 0.1em;
 }
 
-/* ==========================================================================
-   Visible Focus Indicators
-   ========================================================================== */
+/* Visible focus indicators */
 
 /* Always show focus outline */
 .keyboard-navigation :focus {
@@ -520,9 +500,7 @@ textarea:focus {
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
 }
 
-/* ==========================================================================
-   Error Identification (WCAG 3.3.1)
-   ========================================================================== */
+/* Error identification */
 
 .error-border {
   border-color: var(--color-danger-500) !important;
@@ -556,9 +534,7 @@ textarea:focus {
   font-weight: bold;
 }
 
-/* ==========================================================================
-   Status Messages (WCAG 4.1.3)
-   ========================================================================== */
+/* Status messages */
 
 [role="status"],
 [role="alert"],
@@ -587,9 +563,7 @@ textarea:focus {
   left: -10000px;
 }
 
-/* ==========================================================================
-   ARIA Widget Accessibility
-   ========================================================================== */
+/* ARIA widget helpers */
 
 /* Tab Panel */
 [role="tabpanel"] {
@@ -669,9 +643,7 @@ textarea:focus {
   visibility: visible;
 }
 
-/* ==========================================================================
-   Loading State Accessibility
-   ========================================================================== */
+/* Loading state */
 
 [aria-busy="true"] {
   cursor: wait;
@@ -695,9 +667,7 @@ button[aria-busy="true"]::before {
   display: none;
 }
 
-/* ==========================================================================
-   Disabled State Accessibility
-   ========================================================================== */
+/* Disabled state */
 
 [aria-disabled="true"],
 [disabled] {
@@ -710,9 +680,7 @@ button[aria-busy="true"]::before {
   outline: none;
 }
 
-/* ==========================================================================
-   Hidden Content Accessibility
-   ========================================================================== */
+/* Hidden content */
 
 [hidden],
 [hidden="true"] {
@@ -726,13 +694,9 @@ button[aria-busy="true"]::before {
  * make the whole page appear blank when a dropdown opens.
  */
 
-/* ==========================================================================
-   Landmark Regions (WCAG 1.3.1)
-   ========================================================================== */
+/* Landmark regions */
 
-/* ==========================================================================
-   Form Accessibility
-   ========================================================================== */
+/* Form accessibility */
 
 /* Required Field Indicator */
 .required-indicator {
@@ -753,9 +717,7 @@ legend {
   padding: 0 var(--space-2);
 }
 
-/* ==========================================================================
-   List Accessibility
-   ========================================================================== */
+/* List accessibility */
 
 [role="list"] {
   list-style: none;
@@ -767,9 +729,7 @@ legend {
   list-style-position: inside;
 }
 
-/* ==========================================================================
-   Table Accessibility
-   ========================================================================== */
+/* Table accessibility */
 
 [role="table"] {
   border-collapse: collapse;
@@ -789,9 +749,7 @@ td {
   border: var(--border-width) solid var(--color-border-light);
 }
 
-/* ==========================================================================
-   Link Accessibility
-   ========================================================================== */
+/* Link accessibility */
 
 /* Distinguishable Links */
 a:not(.c-button):not([role="button"]) {
@@ -810,9 +768,7 @@ a:not(.c-button):not([role="button"]):hover {
   color: var(--color-text-muted);
 }
 
-/* ==========================================================================
-   Focus Management for Modals/Dialogs
-   ========================================================================== */
+/* Focus management for dialogs */
 
 /* Focus trap indicator */
 .focus-trap-active :focus {
@@ -820,9 +776,7 @@ a:not(.c-button):not([role="button"]):hover {
   outline-offset: 2px;
 }
 
-/* ==========================================================================
-   Color Contrast Utilities (WCAG 1.4.3)
-   ========================================================================== */
+/* Color contrast utilities */
 
 /* Ensure minimum 4.5:1 contrast ratio */
 .text-contrast-high {
@@ -847,9 +801,7 @@ a:not(.c-button):not([role="button"]):hover {
   background-color: var(--color-bg-inverse);
 }
 
-/* ==========================================================================
-   Print Accessibility
-   ========================================================================== */
+/* Print */
 
 @media print {
   /* Ensure links are readable when printed */

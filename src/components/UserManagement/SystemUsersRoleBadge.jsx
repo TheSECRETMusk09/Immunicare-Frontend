@@ -1,5 +1,6 @@
 import React from "react";
 import { Badge } from "../UI";
+import { normalizeRoleLabel } from "../../utils/roleLabels";
 
 const normalizeRoleName = (value) => String(value || "").trim().toLowerCase();
 
@@ -10,11 +11,11 @@ const getRoleVariant = (roleName) => {
     return "danger";
   }
 
-  if (["admin", "clinic_manager"].includes(normalizedRole)) {
+  if (["admin"].includes(normalizedRole)) {
     return "warning";
   }
 
-  if (["doctor", "physician", "nurse", "midwife"].includes(normalizedRole)) {
+  if (["doctor", "physician", "nurse", "midwife", "healthcare_worker", "hcw"].includes(normalizedRole)) {
     return "primary";
   }
 
@@ -22,7 +23,7 @@ const getRoleVariant = (roleName) => {
 };
 
 const getRoleLabel = (user = {}) => {
-  return user.display_name || user.role_name || "Unknown";
+  return normalizeRoleLabel(user.display_name || user.role_name || "Unknown");
 };
 
 export default function SystemUsersRoleBadge({ user }) {

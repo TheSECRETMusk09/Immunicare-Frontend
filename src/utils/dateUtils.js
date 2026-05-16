@@ -439,3 +439,68 @@ export function formatDateTime(value) {
 export function formatTimeSlotLabel(value) {
   return formatClinicTime(value);
 }
+
+const infantDobLongFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Asia/Manila',
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
+const infantDobShortFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Asia/Manila',
+  month: 'numeric',
+  day: 'numeric',
+  year: 'numeric',
+});
+
+function parseInfantDobToDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const dateOnlyMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    const [, y, m, d] = dateOnlyMatch;
+    const date = new Date(Number(y), Number(m) - 1, Number(d));
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+export function formatInfantDob(value) {
+  const date = parseInfantDobToDate(value);
+  return date ? infantDobLongFormatter.format(date) : '';
+}
+
+export function formatInfantDobShort(value) {
+  const date = parseInfantDobToDate(value);
+  return date ? infantDobShortFormatter.format(date) : '';
+}
+
+export function getInfantDobParts(value) {
+  const date = parseInfantDobToDate(value);
+  if (!date) return null;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date).reduce((acc, part) => {
+    if (part.type !== 'literal') acc[part.type] = part.value;
+    return acc;
+  }, {});
+  const year = Number(parts.year);
+  const month = Number(parts.month);
+  const day = Number(parts.day);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return null;
+  }
+  return { year, month, day };
+}

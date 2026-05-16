@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import apiClient from "../utils/api";
 import { Button, Alert, LoadingSpinner } from "./UI";
-import PrintDateRangeControls from "./PrintDateRangeControls";
 import usePrintDateRange from "../hooks/usePrintDateRange";
 import {
   filterItemsByPrintDateRange,
@@ -379,29 +378,29 @@ export default function VaccineScheduleBooklet({ infantId }) {
 </html>`;
   }, [scheduleData]);
 
-  const handlePrint = () => {
-    if (!printDateRange.ensureReadyForPrint()) {
-      return;
-    }
 
-    const printableHtml = buildPrintableDocument();
-    if (!printableHtml) {
-      return;
-    }
 
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(printableHtml);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-      }, 250);
-    }
-  };
 
-  const handleDownload = useCallback(async () => {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                         useCallback(async () => {
     if (!printDateRange.ensureReadyForPrint()) {
       return;
     }
@@ -433,7 +432,7 @@ export default function VaccineScheduleBooklet({ infantId }) {
     }
   }, [infantId, printDateRange]);
 
-  const handleDownloadWord = useCallback(() => {
+                             useCallback(() => {
     if (!printDateRange.ensureReadyForPrint()) {
       return;
     }
@@ -454,7 +453,7 @@ export default function VaccineScheduleBooklet({ infantId }) {
   }, [buildPrintableDocument, infantId, printDateRange]);
 
   const printableSummary = useMemo(
-    () => ({
+    () =>( {
       totalScheduled: printableSchedules.length,
       completedCount: printableSchedules.filter((entry) => entry?.status === "completed")
         .length,
@@ -467,18 +466,18 @@ export default function VaccineScheduleBooklet({ infantId }) {
   );
 
   if (loading) {
-    return (
+    return(
       <div className="flex flex-col items-center justify-center py-10">
         <LoadingSpinner size="lg" />
         <span className="mt-3 text-gray-600 dark:text-gray-400">
           Loading vaccine schedule...
         </span>
-      </div>
-    );
+      </div>)
+     ;
   }
 
   if (error) {
-    return (
+    return(
       <Alert variant="error" title="Error loading schedule">
         {error}
         <div className="mt-4">
@@ -486,16 +485,16 @@ export default function VaccineScheduleBooklet({ infantId }) {
             Retry
           </Button>
         </div>
-      </Alert>
-    );
+      </Alert>)
+     ;
   }
 
   if (!scheduleData || printableSchedules.length === 0) {
-    return (
+    return(
       <Alert variant="info" title="No vaccination schedule found">
         No schedule entries are currently available for this infant.
-      </Alert>
-    );
+      </Alert>)
+     ;
   }
 
   const infantInfo = scheduleData?.infantInfo || {};
@@ -504,11 +503,11 @@ export default function VaccineScheduleBooklet({ infantId }) {
     `${infantInfo.firstName || ""} ${infantInfo.lastName || ""}`.trim() ||
     "Child";
 
-  const renderScheduleTable = () => (
+  const renderScheduleTable = () =>(
     <>
       {/* Mobile Card View */}
       <div className="guardian-table-card-list min-[768px]:hidden mt-2">
-        {printableSchedules.map((schedule, index) => (
+        {printableSchedules.map((schedule, index) =>(
           <article key={index} className="guardian-table-card">
             <div className="guardian-table-card__header">
               <div className="min-w-0">
@@ -544,8 +543,8 @@ export default function VaccineScheduleBooklet({ infantId }) {
                 </span>
               </div>
             </div>
-          </article>
-        ))}
+          </article>)
+         )}
       </div>
 
       {/* Desktop Table View */}
@@ -574,7 +573,7 @@ export default function VaccineScheduleBooklet({ infantId }) {
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            {printableSchedules.map((schedule, index) => (
+            {printableSchedules.map((schedule, index) =>(
               <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                 <td className="px-4 py-3">
                   <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -616,15 +615,15 @@ export default function VaccineScheduleBooklet({ infantId }) {
                     {formatDays(schedule.daysOverdue)}
                   </span>
                 </td>
-              </tr>
-            ))}
+              </tr>)
+             )}
           </tbody>
         </table>
       </div>
-    </>
-  );
+    </>)
+   ;
 
-  return (
+  return(
     <div className="space-y-6">
       <div ref={printAreaRef} className="hidden" aria-hidden="true">
         <style>{VACCINE_SCHEDULE_PRINTABLE_STYLES}</style>
@@ -658,7 +657,7 @@ export default function VaccineScheduleBooklet({ infantId }) {
                 <p className="schedule-booklet-export__summary-value">
                   {printDateRange.hasAppliedDateRange
                     ? printableSummary.totalScheduled
-                    : (summary.totalScheduled || 0)}
+                    :( summary.totalScheduled || 0)}
                 </p>
               </div>
               <div className="schedule-booklet-export__summary-card">
@@ -666,7 +665,7 @@ export default function VaccineScheduleBooklet({ infantId }) {
                 <p className="schedule-booklet-export__summary-value">
                   {printDateRange.hasAppliedDateRange
                     ? printableSummary.completedCount
-                    : (summary.completedCount || 0)}
+                    :( summary.completedCount || 0)}
                 </p>
               </div>
               <div className="schedule-booklet-export__summary-card">
@@ -674,7 +673,7 @@ export default function VaccineScheduleBooklet({ infantId }) {
                 <p className="schedule-booklet-export__summary-value">
                   {printDateRange.hasAppliedDateRange
                     ? printableSummary.overdueCount
-                    : (summary.overdueCount || 0)}
+                    :( summary.overdueCount || 0)}
                 </p>
               </div>
               <div className="schedule-booklet-export__summary-card">
@@ -682,7 +681,7 @@ export default function VaccineScheduleBooklet({ infantId }) {
                 <p className="schedule-booklet-export__summary-value">
                   {printDateRange.hasAppliedDateRange
                     ? printableSummary.upcomingCount
-                    : (summary.upcomingCount || 0)}
+                    :( summary.upcomingCount || 0)}
                 </p>
               </div>
             </div>
@@ -699,7 +698,7 @@ export default function VaccineScheduleBooklet({ infantId }) {
                 </tr>
               </thead>
               <tbody>
-                {printableSchedules.map((schedule) => (
+                {printableSchedules.map((schedule) =>(
                   <tr
                     key={`${schedule.vaccineId}-${schedule.doseNumber}-${schedule.dueDate || schedule.adminDate || "row"}`}
                   >
@@ -726,8 +725,8 @@ export default function VaccineScheduleBooklet({ infantId }) {
                     <td>{formatDate(schedule.dueDate)}</td>
                     <td>{formatDate(schedule.adminDate)}</td>
                     <td>{formatDays(schedule.daysOverdue) || "-"}</td>
-                  </tr>
-                ))}
+                  </tr>)
+                 )}
               </tbody>
             </table>
 
@@ -756,37 +755,33 @@ export default function VaccineScheduleBooklet({ infantId }) {
             <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
               Child Immunization Schedule Booklet
             </h3>
-            {infantInfo && (
+            {infantInfo &&(
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 {infantInfo.firstName} {infantInfo.lastName} • DOB: {formatDate(infantInfo.dateOfBirth)}
-              </p>
-            )}
-          </div>
-
-          <div className="mt-4">
-            <PrintDateRangeControls controller={printDateRange} />
+              </p>)
+             }
           </div>
 
           {/* Summary badges */}
           <div className="mt-4 flex flex-wrap gap-3">
             <div className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 rounded-full">
               <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
-                Total: {printDateRange.hasAppliedDateRange ? printableSummary.totalScheduled : (summary.totalScheduled || 0)}
+                Total: {printDateRange.hasAppliedDateRange ? printableSummary.totalScheduled :( summary.totalScheduled || 0)}
               </span>
             </div>
             <div className="px-3 py-1 bg-green-100 dark:bg-green-900/30 rounded-full">
               <span className="text-xs font-medium text-green-700 dark:text-green-300">
-                ✓ Completed: {printDateRange.hasAppliedDateRange ? printableSummary.completedCount : (summary.completedCount || 0)}
+                ✓ Completed: {printDateRange.hasAppliedDateRange ? printableSummary.completedCount :( summary.completedCount || 0)}
               </span>
             </div>
             <div className="px-3 py-1 bg-red-100 dark:bg-red-900/30 rounded-full">
               <span className="text-xs font-medium text-red-700 dark:text-red-300">
-                ⚠ Overdue: {printDateRange.hasAppliedDateRange ? printableSummary.overdueCount : (summary.overdueCount || 0)}
+                ⚠ Overdue: {printDateRange.hasAppliedDateRange ? printableSummary.overdueCount :( summary.overdueCount || 0)}
               </span>
             </div>
             <div className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
               <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">
-                ⏰ Upcoming: {printDateRange.hasAppliedDateRange ? printableSummary.upcomingCount : (summary.upcomingCount || 0)}
+                ⏰ Upcoming: {printDateRange.hasAppliedDateRange ? printableSummary.upcomingCount :( summary.upcomingCount || 0)}
               </span>
             </div>
           </div>
@@ -825,6 +820,5 @@ export default function VaccineScheduleBooklet({ infantId }) {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
+    </div>)
+   ;}

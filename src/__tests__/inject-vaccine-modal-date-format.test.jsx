@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
 import InjectVaccineModal from "../components/InjectVaccineModal";
@@ -104,5 +104,90 @@ describe("InjectVaccineModal infant dropdown labels", () => {
       }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/2025-10-09T16:00:00\.000Z/i)).not.toBeInTheDocument();
+  });
+
+  test("keeps the selected searched infant name visible after the base infant list refreshes", async () => {
+    jest.useFakeTimers();
+
+    apiClient.getInfants
+      .mockResolvedValueOnce([
+        {
+          id: 1,
+          first_name: "Alvin",
+          last_name: "Torres",
+          dob: "2026-02-26T16:00:00.000Z",
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 1,
+          first_name: "Alvin",
+          last_name: "Torres",
+          dob: "2026-02-26T16:00:00.000Z",
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 77,
+          first_name: "Christian",
+          last_name: "Samorin",
+          dob: "2026-03-15T16:00:00.000Z",
+          control_number: "INF-2026-357447",
+        },
+      ])
+      .mockResolvedValue([
+        {
+          id: 1,
+          first_name: "Alvin",
+          last_name: "Torres",
+          dob: "2026-02-26T16:00:00.000Z",
+        },
+      ]);
+
+    render(
+      <InjectVaccineModal
+        isOpen
+        onClose={jest.fn()}
+        onSuccess={jest.fn()}
+      />,
+    );
+
+    const infantSelect = await screen.findByRole("button", { name: /select infant/i });
+
+    act(() => {
+      jest.advanceTimersByTime(300);
+    });
+
+    fireEvent.click(infantSelect);
+
+    const searchInput = await screen.findByPlaceholderText(
+      /search by name, control number, or date of birth/i,
+    );
+
+    fireEvent.change(searchInput, { target: { value: "christian samorin" } });
+
+    act(() => {
+      jest.advanceTimersByTime(300);
+    });
+
+    const christianOption = await screen.findByRole("button", {
+      name: /christian samorin/i,
+    });
+
+    fireEvent.click(christianOption);
+
+    act(() => {
+      jest.advanceTimersByTime(300);
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /christian samorin \(mar 16, 2026\)/i }),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/^Infant record$/i)).not.toBeInTheDocument();
+
+    jest.useRealTimers();
   });
 });

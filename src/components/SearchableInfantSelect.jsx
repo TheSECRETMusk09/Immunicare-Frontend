@@ -142,8 +142,13 @@ const SearchableInfantSelect = ({
     ) {
       return {
         ...selectedInfantOverride,
+        displayName: getInfantDisplayLabel(selectedInfantOverride),
+        fullName: getInfantFullName(selectedInfantOverride),
+        controlNumber: getInfantControlNumber(selectedInfantOverride),
+        dobDisplay: formatInfantDate(getInfantDateOfBirthValue(selectedInfantOverride)),
         searchText:
           selectedInfantOverride.searchText ||
+          selectedInfantOverride.search_text ||
           buildInfantSearchText(selectedInfantOverride),
       };
     }

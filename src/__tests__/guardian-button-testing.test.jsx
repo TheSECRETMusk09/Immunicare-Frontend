@@ -269,7 +269,7 @@ afterEach(() => {
 });
 
 describe("Guardian dashboard journey smoke tests", () => {
-  test("Appointments quick action navigates to appointments page", async () => {
+  test("Appointments section view-all button navigates to appointments page", async () => {
     setViewport(1280, 800);
 
     renderWithRoutes("/guardian/dashboard", {
@@ -278,12 +278,15 @@ describe("Guardian dashboard journey smoke tests", () => {
     });
 
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /^appointments$/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /^appointments$/i })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /^appointments$/i }));
+    const appointmentsHeading = screen.getByRole("heading", { name: /^appointments$/i });
+    const appointmentsSectionHeader = appointmentsHeading.parentElement?.parentElement;
+    const appointmentsViewAllButton = appointmentsSectionHeader?.querySelector("button");
+
+    expect(appointmentsViewAllButton).toBeTruthy();
+    fireEvent.click(appointmentsViewAllButton);
 
     expect(await screen.findByText("GUARDIAN_APPOINTMENTS_PAGE")).toBeInTheDocument();
   });
@@ -298,13 +301,14 @@ describe("Guardian dashboard journey smoke tests", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Quick Actions")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /^my children$/i })).toBeInTheDocument();
     });
 
-    expect(screen.getByRole("button", { name: /^records$/i })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /^immunization$/i }),
-    ).toBeInTheDocument();
+    expect(screen.queryByText("Quick Actions")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^records$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^immunization$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^appointments$/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^notifications$/i })).toBeInTheDocument();
   });
 });
 

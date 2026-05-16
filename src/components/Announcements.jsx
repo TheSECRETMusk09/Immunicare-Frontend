@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Megaphone } from "lucide-react";
+import { Megaphone, X } from "lucide-react";
 import apiClient from "../utils/api";
 import { Button, Input, Card, Modal, Select, Tabs, Tab, PageHeader } from "./UI";
 import { useAuth } from "../contexts/AuthContext";
@@ -237,31 +237,31 @@ export default function Announcements() {
       general: {
         color:
           "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400",
-        icon: "📢",
+        icon: "",
       },
       urgent: {
         color: "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400",
-        icon: "🚨",
+        icon: "",
       },
       maintenance: {
         color:
           "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400",
-        icon: "🔧",
+        icon: "",
       },
       policy: {
         color:
           "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400",
-        icon: "📋",
+        icon: "",
       },
       update: {
         color:
           "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400",
-        icon: "✨",
+        icon: "",
       },
       alert: {
         color:
           "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400",
-        icon: "⚠️",
+        icon: "",
       },
     };
     const variant = variants[type] || variants.general;
@@ -657,7 +657,7 @@ export default function Announcements() {
       {/* Search */}
       <Card className="p-4">
         <div className="flex gap-4">
-          <div className="flex-1">
+          <div className="flex-1 relative">
             <Input
               type="text"
               placeholder="Search announcements..."
@@ -665,8 +665,20 @@ export default function Announcements() {
               onChange={(e) =>
                 setFilters({ ...filters, searchQuery: e.target.value })
               }
-              className="w-full"
+              className="w-full pr-9"
             />
+            {filters.searchQuery && (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() =>
+                  setFilters({ ...filters, searchQuery: "" })
+                }
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <X className="w-4 h-4" aria-hidden="true" />
+              </button>
+            )}
           </div>
           <Button variant="outline" onClick={fetchData}>
             <svg
@@ -688,7 +700,7 @@ export default function Announcements() {
 
       {/* Tabs */}
       <Tabs activeTab={activeTab} onTabChange={setActiveTab}>
-        <Tab id="list" label="All Announcements" icon="📋">
+        <Tab id="list" label="All Announcements">
           {/* Announcements Table */}
           <Card className="overflow-hidden">
             <div className="overflow-x-auto">
@@ -808,7 +820,7 @@ export default function Announcements() {
           </Card>
         </Tab>
 
-        <Tab id="my-announcements" label="My Announcements" icon="📬">
+        <Tab id="my-announcements" label="My Announcements">
           {/* My Announcements List */}
           <div className="space-y-4">
             {myAnnouncements.map((announcement) => (

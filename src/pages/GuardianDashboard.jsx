@@ -3,13 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import {
   Users,
   Calendar,
-  Activity,
   Plus,
-  FileText,
   AlertCircle,
   RefreshCw,
   Bell,
-  User,
   ChevronRight,
   Clock,
   Syringe,
@@ -21,7 +18,6 @@ import {
   MessageSquare,
   Info,
   X,
-  ArrowRightCircle,
 } from 'lucide-react';
 import GuardianTopHeader from '../components/GuardianTopHeader';
 import GuardianModuleHeader from '../components/GuardianModuleHeader';
@@ -35,9 +31,7 @@ import { unwrapApiPayload } from '../utils/apiUtils';
 import { inferNotificationType } from '../utils/notificationUtils';
 import { TRANSFER_STATUS_META, getAppointmentStatusMeta } from '../constants/statusMappings';
 
-// ============================================
-// SKELETON LOADING COMPONENTS
-// ============================================
+// Skeletons
 
 const StatCardSkeleton = () => (
   <div className="bg-theme-bg-secondary rounded-2xl p-5 animate-pulse min-h-[120px]">
@@ -87,9 +81,7 @@ const NotificationSkeleton = () => (
   </div>
 );
 
-// ============================================
-// ENHANCED STAT CARD COMPONENT
-// ============================================
+// Stat card
 
 const StatCard = ({ label, value, subLabel, icon: Icon, variant = 'emerald', onClick }) => (
   <div
@@ -113,9 +105,7 @@ const StatCard = ({ label, value, subLabel, icon: Icon, variant = 'emerald', onC
   </div>
 );
 
-// ============================================
-// PROGRESS CARD COMPONENT
-// ============================================
+// Progress card
 
 const ProgressCard = ({ title, completed, pending, total, icon: Icon, color = 'emerald' }) => {
   const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -148,9 +138,7 @@ const ProgressCard = ({ title, completed, pending, total, icon: Icon, color = 'e
   );
 };
 
-// ============================================
-// DUE VACCINE ALERT CARD
-// ============================================
+// Due vaccine alert
 
 const DueVaccineCard = ({ vaccine, infantName, dueDate, daysUntilDue, status, onBook }) => {
   const isOverdue = daysUntilDue < 0;
@@ -205,9 +193,7 @@ const DueVaccineCard = ({ vaccine, infantName, dueDate, daysUntilDue, status, on
   );
 };
 
-// ============================================
-// NOTIFICATION ITEM COMPONENT
-// ============================================
+// Notification item
 
 const NotificationItem = ({ notification, onDismiss }) => {
   const getIcon = (type) => {
@@ -272,9 +258,7 @@ const NotificationItem = ({ notification, onDismiss }) => {
   );
 };
 
-// ============================================
-// EMPTY STATE COMPONENT
-// ============================================
+// Empty state
 
 const EmptyState = ({ icon: Icon, title, description, actionLabel, onAction, variant = 'default' }) => (
   <div className="bg-theme-bg-card rounded-2xl p-6 sm:p-8 border border-theme-border-primary text-center shadow-sm">
@@ -297,9 +281,7 @@ const EmptyState = ({ icon: Icon, title, description, actionLabel, onAction, var
   </div>
 );
 
-// ============================================
-// ERROR STATE COMPONENT
-// ============================================
+// Error state
 
 const ErrorState = ({ message, onRetry }) => (
   <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-2xl p-8 text-center">
@@ -319,9 +301,7 @@ const ErrorState = ({ message, onRetry }) => (
   </div>
 );
 
-// ============================================
-// MAIN GUARDIAN DASHBOARD COMPONENT
-// ============================================
+// Guardian dashboard
 
 const GuardianDashboard = () => {
   const navigate = useNavigate();
@@ -505,7 +485,7 @@ const GuardianDashboard = () => {
   // Auto-refresh dashboard data every 60 seconds - stable dependencies
   useEffect(() => {
     if (!guardianId) return;
-    
+
     const intervalId = window.setInterval(() => {
       fetchDashboardData(true);
       void refreshNotifications();
@@ -642,39 +622,6 @@ const GuardianDashboard = () => {
           title="Guardian Dashboard"
           subtitle="Welcome back! "
           icon={<Calendar className="w-8 h-8 text-white" />}
-          actions={(
-            <div className="hidden min-[1025px]:flex guardian-desktop-pageheader-actions">
-              <button
-                type="button"
-                onClick={handleRetry}
-                className="guardian-desktop-pageheader-icon-btn"
-                aria-label="Refresh Guardian Dashboard"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate('/guardian/notifications')}
-                className="guardian-desktop-pageheader-icon-btn guardian-desktop-pageheader-icon-btn--notif"
-                aria-label="Open notifications"
-              >
-                <Bell className="w-4 h-4" />
-                {notifications.length > 0 && (
-                  <span className="guardian-desktop-pageheader-notif-dot" aria-hidden="true" />
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate('/guardian/profile')}
-                className="guardian-desktop-pageheader-icon-btn"
-                aria-label="Open profile"
-              >
-                <User className="w-4 h-4" />
-              </button>
-            </div>
-          )}
         />
 
         <main className="guardian-page-content space-y-4 md:space-y-5 lg:space-y-6">
@@ -787,7 +734,7 @@ const GuardianDashboard = () => {
                   }}
                 />
                 <StatCard
-                  label="NEXT APPT"
+                  label="NEXT APPOINTMENT"
                   value={stats.nextAppointment}
                   icon={Calendar}
                   variant="blue"
@@ -803,7 +750,7 @@ const GuardianDashboard = () => {
                 />
                 {stats.overdueCount > 0 ? (
                   <StatCard
-                    label="OVERDUE"
+                    label="OVERDUE VACCINES"
                     value={stats.overdueCount}
                     icon={AlertCircle}
                     variant="red"
@@ -894,58 +841,6 @@ const GuardianDashboard = () => {
             </div>
           </div>
         )}
-
-        {/* Quick Actions Section */}
-        <div className="pt-4">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
-              <Activity className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <h2 className="text-base sm:text-lg font-bold text-theme-primary">Quick Actions</h2>
-          </div>
-          <div className="grid grid-cols-2 min-[768px]:grid-cols-3 min-[1025px]:grid-cols-5 gap-4">
-            <button
-              onClick={() => navigate('/guardian/appointments')}
-              className="guardian-quick-action-btn guardian-dashboard-quick-action flex flex-col items-center justify-center p-4 sm:p-5 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 min-h-[100px] sm:min-h-[120px]"
-            >
-              <Calendar className="w-6 h-6 sm:w-7 sm:h-7 guardian-dashboard-quick-action__icon mb-2" />
-              <span className="text-xs sm:text-sm font-semibold guardian-dashboard-quick-action__label text-center">Appointments</span>
-            </button>
-            <button
-              onClick={() => navigate('/guardian/children')}
-              className="guardian-quick-action-btn guardian-dashboard-quick-action flex flex-col items-center justify-center p-4 sm:p-5 bg-gradient-to-br from-emerald-500 to-emerald-600 dark:from-emerald-600 dark:to-emerald-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 min-h-[100px] sm:min-h-[120px]"
-            >
-              <Users className="w-6 h-6 sm:w-7 sm:h-7 guardian-dashboard-quick-action__icon mb-2" />
-              <span className="text-xs sm:text-sm font-semibold guardian-dashboard-quick-action__label text-center">My Children</span>
-            </button>
-            <button
-              onClick={() => navigate('/guardian/immunization-chart')}
-              className="guardian-quick-action-btn guardian-dashboard-quick-action flex flex-col items-center justify-center p-4 sm:p-5 bg-gradient-to-br from-violet-500 to-violet-600 dark:from-violet-600 dark:to-violet-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 min-h-[100px] sm:min-h-[120px]"
-            >
-              <Syringe className="w-6 h-6 sm:w-7 sm:h-7 guardian-dashboard-quick-action__icon mb-2" />
-              <span className="text-xs sm:text-sm font-semibold guardian-dashboard-quick-action__label text-center">Immunization</span>
-            </button>
-            <button
-              onClick={() => navigate('/guardian/vaccination-records')}
-              className="guardian-quick-action-btn guardian-dashboard-quick-action flex flex-col items-center justify-center p-4 sm:p-5 bg-gradient-to-br from-amber-500 to-amber-600 dark:from-amber-600 dark:to-amber-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 min-h-[100px] sm:min-h-[120px]"
-            >
-              <FileText className="w-6 h-6 sm:w-7 sm:h-7 guardian-dashboard-quick-action__icon mb-2" />
-              <span className="text-xs sm:text-sm font-semibold guardian-dashboard-quick-action__label text-center">Records</span>
-            </button>
-            <button
-              onClick={() => navigate('/guardian/children', {
-                state: {
-                  openGuardianRegistrationModal: true,
-                  registrationType: 'transfer',
-                },
-              })}
-              className="guardian-quick-action-btn guardian-dashboard-quick-action flex flex-col items-center justify-center p-4 sm:p-5 bg-gradient-to-br from-cyan-500 to-cyan-600 dark:from-cyan-600 dark:to-cyan-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 min-h-[100px] sm:min-h-[120px]"
-            >
-              <ArrowRightCircle className="w-6 h-6 sm:w-7 sm:h-7 guardian-dashboard-quick-action__icon mb-2" />
-              <span className="text-xs sm:text-sm font-semibold guardian-dashboard-quick-action__label text-center">Transfer</span>
-            </button>
-          </div>
-        </div>
 
         {/* Three Column Layout - Children, Appointments, Notifications */}
         <div className="grid grid-cols-1 min-[768px]:grid-cols-2 min-[1025px]:grid-cols-3 gap-4 md:gap-6 pt-4 md:pt-6">
@@ -1058,126 +953,6 @@ const GuardianDashboard = () => {
                       className="w-full py-3 text-sm font-bold text-theme-secondary hover:text-theme-primary transition-colors"
                     >
                       + {children.length - 2} more children
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Upcoming Appointments Section */}
-            <div>
-              <div className="flex flex-col gap-3 min-[640px]:flex-row min-[640px]:items-center min-[640px]:justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
-                    <Calendar className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                  <h2 className="text-base sm:text-lg font-bold text-theme-primary">Appointments</h2>
-                </div>
-                <button
-                  onClick={() => navigate('/guardian/appointments')}
-                  className="text-sm font-bold text-theme-secondary hover:text-theme-primary flex items-center gap-1 transition-colors"
-                >
-                  View All
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-
-              {loading ? (
-                <AppointmentCardSkeleton />
-              ) : appointments.length === 0 ? (
-                <div className="lg:px-0">
-                  <EmptyState
-                    icon={Calendar}
-                    title="No Upcoming Appointments"
-                    description="Your appointments will appear here when scheduled"
-                  />
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {appointments.slice(0, 3).map((appointment) => {
-                    const dateInfo = formatAppointmentDate(appointment.scheduledDate || appointment.date);
-                    const statusMeta = getAppointmentStatusMeta(appointment.status);
-                    return (
-                      <div
-                        key={appointment.id}
-                        onClick={() => navigate(`/guardian/appointments/${appointment.id}`)}
-                        className="bg-theme-bg-card rounded-2xl p-4 sm:p-5 border border-theme-border-primary shadow-sm hover:shadow-md transition-all cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3 sm:gap-4">
-                          <div className="w-12 h-12 sm:w-14 sm:h-14 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl flex flex-col items-center justify-center border border-emerald-100 dark:border-emerald-800 flex-shrink-0">
-                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase">{dateInfo.month}</span>
-                            <span className="text-lg sm:text-xl font-bold text-emerald-700 dark:text-emerald-300">{dateInfo.day}</span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-bold text-theme-primary truncate">
-                              {appointment.type || appointment.vaccineName || 'Vaccination'}
-                            </h3>
-                            <p className="text-sm text-theme-secondary">
-                              {dateInfo.time} • {appointment.doctorName || 'Provider unavailable'}
-                            </p>
-                            {appointment.infantName && (
-                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                                For: {appointment.infantName}
-                              </p>
-                            )}
-                          </div>
-                          <span className={`px-2.5 py-1 text-xs font-bold rounded-full flex-shrink-0 ${statusMeta.className}`}>
-                            {statusMeta.label}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Recent Notifications Section */}
-            <div className="min-[768px]:col-span-2 min-[1025px]:col-span-1">
-              <div className="flex flex-col gap-3 min-[640px]:flex-row min-[640px]:items-center min-[640px]:justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                    <Bell className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <h2 className="text-base sm:text-lg font-bold text-theme-primary">Notifications</h2>
-                </div>
-                <button
-                  onClick={() => navigate('/guardian/notifications')}
-                  className="text-sm font-bold text-theme-secondary hover:text-theme-primary flex items-center gap-1 transition-colors"
-                >
-                  View All
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-
-              {loading || (notificationsLoading && notifications.length === 0) ? (
-                <div className="space-y-3">
-                  <NotificationSkeleton />
-                  <NotificationSkeleton />
-                </div>
-              ) : notifications.length === 0 ? (
-                <div className="lg:px-0">
-                  <EmptyState
-                    icon={Bell}
-                    title="No Notifications"
-                    description="You will receive notifications about appointments and vaccinations here"
-                  />
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {notifications.slice(0, 4).map((notification) => (
-                    <NotificationItem
-                      key={notification.id}
-                      notification={notification}
-                      onDismiss={handleDismissNotification}
-                    />
-                  ))}
-                  {notifications.length > 4 && (
-                    <button
-                      onClick={() => navigate('/guardian/notifications')}
-                      className="w-full py-3 text-sm font-bold text-theme-secondary hover:text-theme-primary transition-colors"
-                    >
-                      + {notifications.length - 4} more notifications
                     </button>
                   )}
                 </div>

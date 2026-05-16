@@ -1,12 +1,6 @@
-/* ==========================================================================
-   Immunicare Vaccination Management System
-   Legacy CSS Entry Point
-   
-   DEPRECATED: Use ./css/index.css instead
-   This file is kept for backward compatibility.
-   ========================================================================== */
+/* Legacy CSS entry point (use ./css/index.css). */
 
-/* Import the new modular CSS architecture */
+/* Import modular CSS */
 @import "./css/index.css";
 
 /* Legacy styles that haven't been migrated yet can be added below */

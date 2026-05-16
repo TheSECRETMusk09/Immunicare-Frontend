@@ -2,15 +2,15 @@ import React, { useState, useEffect, useCallback } from "react";
 import apiClient from "../utils/api";
 import { LoadingSpinner, Alert } from "./UI";
 
-const formatDate = (date) => {
-  if (!date) return "-";
-  const d = new Date(date);
-  return d.toLocaleDateString('en-PH', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  });
-};
+
+
+
+
+
+
+
+
+
 
 const getStatusColor = (status) => {
   switch (status) {
@@ -108,33 +108,33 @@ export default function ImmunizationStatusSummary({ infantId, compact = false, s
 
   if (loading) {
     if (compact) {
-      return (
+      return(
         <div className="flex items-center justify-center p-4">
           <LoadingSpinner size="sm" />
-        </div>
-      );
+        </div>)
+       ;
     }
-    return (
+    return(
       <div className="flex flex-col items-center justify-center py-8">
         <LoadingSpinner size="md" />
         <span className="mt-2 text-sm text-gray-500">Loading status...</span>
-      </div>
-    );
+      </div>)
+     ;
   }
 
   if (error) {
     if (compact) {
-      return (
+      return(
         <div className="text-red-500 text-sm p-2">
           Error loading status
-        </div>
-      );
+        </div>)
+       ;
     }
-    return (
+    return(
       <Alert variant="error" title="Error">
         {error}
-      </Alert>
-    );
+      </Alert>)
+     ;
   }
 
   if (!statusData) {
@@ -144,7 +144,7 @@ export default function ImmunizationStatusSummary({ infantId, compact = false, s
   const { overallStatus, totalScheduled, completedCount, overdueCount, upcomingCount, completionPercentage } = statusData;
 
   if (compact) {
-    return (
+    return(
       <div className="flex items-center gap-2">
         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(overallStatus)}`}>
           {getStatusIcon(overallStatus)} {getStatusLabel(overallStatus)}
@@ -152,16 +152,16 @@ export default function ImmunizationStatusSummary({ infantId, compact = false, s
         <span className="text-sm text-gray-600 dark:text-gray-400">
           {completedCount}/{totalScheduled} completed
         </span>
-        {overdueCount > 0 && (
+        {overdueCount > 0 &&(
           <span className="text-xs text-red-600 font-medium">
             ({overdueCount} overdue)
-          </span>
-        )}
-      </div>
-    );
+          </span>)
+         }
+      </div>)
+     ;
   }
 
-  return (
+  return(
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
@@ -210,10 +210,9 @@ export default function ImmunizationStatusSummary({ infantId, compact = false, s
       </div>
 
       {/* Alert for overdue */}
-      {overdueCount > 0 && showDetails && (
+      {overdueCount > 0 && showDetails &&(
         <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
           <div className="flex items-start">
-            <span className="text-red-500 mr-2">⚠️</span>
             <div>
               <p className="text-sm font-medium text-red-800 dark:text-red-300">
                 {overdueCount} vaccine{overdueCount > 1 ? 's are' : ' is'} overdue
@@ -223,11 +222,11 @@ export default function ImmunizationStatusSummary({ infantId, compact = false, s
               </p>
             </div>
           </div>
-        </div>
-      )}
+        </div>)
+       }
 
       {/* Upcoming alert */}
-      {upcomingCount > 0 && overdueCount === 0 && showDetails && (
+      {upcomingCount > 0 && overdueCount === 0 && showDetails &&(
         <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
           <div className="flex items-start">
             <span className="text-yellow-500 mr-2">⏰</span>
@@ -240,14 +239,13 @@ export default function ImmunizationStatusSummary({ infantId, compact = false, s
               </p>
             </div>
           </div>
-        </div>
-      )}
+        </div>)
+       }
 
       {/* All complete celebration */}
-      {overallStatus === 'up_to_date' && (
+      {overallStatus === 'up_to_date' &&(
         <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
           <div className="flex items-start">
-            <span className="text-green-500 mr-2">🎉</span>
             <div>
               <p className="text-sm font-medium text-green-800 dark:text-green-300">
                 All vaccinations are up to date!
@@ -257,8 +255,8 @@ export default function ImmunizationStatusSummary({ infantId, compact = false, s
               </p>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>)
+       }
+    </div>)
+   ;
 }

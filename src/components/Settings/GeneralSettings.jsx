@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Save, RotateCcw, Globe, Clock, Palette, Calendar } from "lucide-react";
+import { Save, RotateCcw, Globe,        Palette, Calendar } from "lucide-react";
 
 const GeneralSettings = ({ settings, onSave, onReset }) => {
   const [localSettings, setLocalSettings] = useState(settings);
@@ -7,10 +7,10 @@ const GeneralSettings = ({ settings, onSave, onReset }) => {
   const [errors, setErrors] = useState({});
 
   const handleChange = (key, value) => {
-    setLocalSettings((prev) => ({ ...prev, [key]: value }));
+    setLocalSettings((prev) =>( { ...prev, [key]: value }));
     // Clear error for this field when user starts typing
     if (errors[key]) {
-      setErrors((prev) => ({ ...prev, [key]: null }));
+      setErrors((prev) =>( { ...prev, [key]: null }));
     }
   };
 
@@ -52,7 +52,7 @@ const GeneralSettings = ({ settings, onSave, onReset }) => {
     setErrors({});
   };
 
-  return (
+  return(
     <div className="space-y-6">
       {/* Language & Region */}
       <div>
@@ -78,11 +78,11 @@ const GeneralSettings = ({ settings, onSave, onReset }) => {
               <option value="zh">Chinese</option>
               <option value="ja">Japanese</option>
             </select>
-            {errors.language && (
+            {errors.language &&(
               <p className="mt-1.5 text-sm text-red-600 dark:text-red-400">
                 {errors.language}
-              </p>
-            )}
+              </p>)
+             }
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
@@ -103,11 +103,11 @@ const GeneralSettings = ({ settings, onSave, onReset }) => {
               <option value="Europe/London">Europe/London (UTC+0)</option>
               <option value="Asia/Tokyo">Asia/Tokyo (UTC+9)</option>
             </select>
-            {errors.timezone && (
+            {errors.timezone &&(
               <p className="mt-1.5 text-sm text-red-600 dark:text-red-400">
                 {errors.timezone}
-              </p>
-            )}
+              </p>)
+             }
           </div>
         </div>
       </div>
@@ -124,7 +124,7 @@ const GeneralSettings = ({ settings, onSave, onReset }) => {
               Theme
             </label>
             <div className="grid grid-cols-3 gap-2 sm:gap-3">
-              {["light", "dark", "auto"].map((theme) => (
+              {["light", "dark", "auto"].map((theme) =>(
                 <button
                   key={theme}
                   type="button"
@@ -137,14 +137,14 @@ const GeneralSettings = ({ settings, onSave, onReset }) => {
                     }`}
                 >
                   {theme}
-                </button>
-              ))}
+                </button>)
+               )}
             </div>
-            {errors.theme && (
+            {errors.theme &&(
               <p className="mt-1.5 text-sm text-red-600 dark:text-red-400">
                 {errors.theme}
-              </p>
-            )}
+              </p>)
+             }
           </div>
         </div>
       </div>
@@ -200,21 +200,21 @@ const GeneralSettings = ({ settings, onSave, onReset }) => {
           disabled={saving}
           className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 min-h-[48px] sm:min-h-[40px] touch-manipulation"
         >
-          {saving ? (
+          {saving ?(
             <>
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               Saving...
-            </>
-          ) : (
+            </>)
+            :(
             <>
               <Save className="w-4 h-4" />
               Save Changes
-            </>
-          )}
+            </>)
+           }
         </button>
       </div>
-    </div>
-  );
+    </div>)
+   ;
 };
 
 export default GeneralSettings;

@@ -21,6 +21,7 @@ import {
   PRINT_PAGE_PRESETS,
 } from "../utils/printDocumentExport";
 import { resolveLotBatchValue } from "../utils/vaccinationFormOptions";
+import { normalizeRoleLabel } from "../utils/roleLabels";
 
 const sanitizeFileSegment = (value) =>
   String(value || "document")
@@ -130,7 +131,7 @@ const normalizeHealthWorkersResponse = (response, scopedClinicId = null) => {
         ...rawUser,
         id,
         displayName,
-        roleLabel: role.replace(/_/g, " "),
+        roleLabel: normalizeRoleLabel(role.replace(/_/g, " ")),
       };
     })
     .filter(Boolean)

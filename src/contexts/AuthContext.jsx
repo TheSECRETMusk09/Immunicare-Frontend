@@ -22,7 +22,6 @@ import {
   normalizePermissions,
 } from "../utils/authPermissions";
 
-// Create the AuthContext
 const AuthContext = createContext(null);
 
 const CANONICAL_ROLES = {
@@ -212,7 +211,6 @@ export const __resetAuthBootstrapCacheForTests = () => {
   resetAuthBootstrapCache();
 };
 
-// AuthProvider component
 export function AuthProvider({ children }) {
   const initialStoredAuthState = useMemo(() => readStoredAuthUser(), []);
   const [user, setUser] = useState(initialStoredAuthState.user);
@@ -221,7 +219,6 @@ export function AuthProvider({ children }) {
     Boolean(initialStoredAuthState.user?.forcePasswordChange),
   );
 
-  // Check if user is authenticated on mount
   useEffect(() => {
     let mounted = true;
 
@@ -263,23 +260,15 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  // Login function
   const login = useCallback(async (credentials) => {
     try {
       setLoading(true);
       resetAuthBootstrapCache();
-      console.log("[AuthContext] Starting login for:", credentials.username);
 
-      // Use the apiClient login method which handles the proper endpoint
       const response = await apiClient.login(credentials);
-      console.log("[AuthContext] Login response:", response);
-
       const accessToken = response.accessToken || response.token || null;
       const refreshToken = response.refreshToken || null;
-      const { user: rawUserData } = response;
-      const userData = normalizeAuthUser(rawUserData);
-      console.log("[AuthContext] Token received:", accessToken ? "yes" : "no");
-      console.log("[AuthContext] User data:", userData);
+      const userData = normalizeAuthUser(response.user);
 
       if (!accessToken) {
         throw new Error("Login succeeded without an access token");
@@ -296,9 +285,7 @@ export function AuthProvider({ children }) {
       });
 
       setUser(userData);
-      console.log("[AuthContext] User set, isAuthenticated should be true");
 
-      // Check if password change is required
       if (
         userData.role_type === CANONICAL_ROLES.GUARDIAN &&
         userData.forcePasswordChange
@@ -316,7 +303,6 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Logout function
   const logout = useCallback(async () => {
     try {
       await apiClient.logout();
@@ -330,7 +316,6 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Update user data
   const updateUser = useCallback((updatedUserData) => {
     setUser((prevUser) => {
       const newUser = normalizeAuthUser({ ...prevUser, ...updatedUserData });
@@ -339,7 +324,6 @@ export function AuthProvider({ children }) {
     });
   }, []);
 
-  // Update password status
   const updateUserPasswordStatus = useCallback(
     (needsChange) => {
       setForcePasswordChange(needsChange);
@@ -350,7 +334,6 @@ export function AuthProvider({ children }) {
     [updateUser],
   );
 
-  // Check if user has specific role
   const hasRole = useCallback(
     (role) => {
       return user?.role_type === role || user?.role === role;
@@ -358,7 +341,6 @@ export function AuthProvider({ children }) {
     [user],
   );
 
-  // Computed properties - use role_type from backend response
   const normalizedRoleType = user?.role_type || null;
   const normalizedLegacyRole = String(user?.legacy_role || "").toLowerCase();
 
@@ -386,7 +368,6 @@ export function AuthProvider({ children }) {
     [permissions],
   );
 
-  // Context value
   const value = useMemo(
     () => ({
       user,
@@ -435,7 +416,6 @@ export function AuthProvider({ children }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-// Custom hook to use the auth context
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
@@ -444,5 +424,4 @@ export function useAuth() {
   return context;
 }
 
-// Export both the provider and hook
 export default AuthContext;

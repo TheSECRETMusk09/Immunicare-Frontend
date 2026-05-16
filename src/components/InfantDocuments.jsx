@@ -2,17 +2,16 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import documentService from "../services/documentService";
 import { Modal, Button, Input } from "./UI";
 
-/**
- * InfantDocuments Component
- * Handles document upload, viewing, and management for infant profiles
- *
- * Features:
- * - File upload dropzone
- * - Document list with thumbnails for images, icons for PDF/DOCX
- * - View/Download buttons
- * - Delete button with confirmation
- * - Document type filter
- */
+const getErrorMessage = (error, fallbackMessage) =>
+  error?.response?.data?.message ||
+  error?.response?.data?.error ||
+  error?.message ||
+  fallbackMessage;
+
+const isInlinePreviewUrl = (url) => {
+  const normalizedUrl = String(url || "");
+  return normalizedUrl.startsWith("blob:") || normalizedUrl.startsWith("data:");
+};
 
 export default function InfantDocuments({ infantId, onDocumentChange }) {
   const [documents, setDocuments] = useState([]);
@@ -77,12 +76,12 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
       if (response.success && response.data) {
         setDocuments(response.data);
       } else {
+        setError(response.error || response.message || null);
         setDocuments([]);
       }
     } catch (err) {
       console.error("Error loading documents:", err);
-      const errorMessage = err.response?.data?.error || err.message || "";
-      // Gracefully handle 404 errors (often happens when infant records migrate tables or are newly created)
+      const errorMessage = getErrorMessage(err, "");
       if (err.response?.status === 404 || errorMessage.includes("Infant not found")) {
         setDocuments([]);
         setError(null);
@@ -195,19 +194,17 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
       setUploadProgress(100);
 
       if (response.success) {
-        // Reload documents
         await loadDocuments();
 
-        // Notify parent component
         if (onDocumentChange) {
           onDocumentChange(response.data);
         }
       } else {
-        setError(response.message || "Failed to upload document");
+        setError(response.error || response.message || "Failed to upload document");
       }
     } catch (err) {
       console.error("Error uploading document:", err);
-      setError(err.response?.data?.error || err.message || "Failed to upload document");
+      setError(getErrorMessage(err, "Failed to upload document"));
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -230,7 +227,7 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Error downloading document:", err);
-      setError(err.response?.data?.error || err.message || "Failed to download document");
+      setError(getErrorMessage(err, "Failed to download document"));
     }
   };
 
@@ -248,7 +245,6 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
       setError(null);
       const response = await documentService.downloadDocument(documentId);
 
-      // Revoke any previously created view blob URL
       if (viewBlobUrlRef.current) {
         URL.revokeObjectURL(viewBlobUrlRef.current);
       }
@@ -264,7 +260,7 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
       setViewDocModal({ doc, blobUrl, mimeType });
     } catch (err) {
       console.error("Error viewing document:", err);
-      setError(err.response?.data?.error || err.message || "Failed to view document");
+      setError(getErrorMessage(err, "Failed to view document"));
     } finally {
       setViewDocLoading(null);
     }
@@ -276,19 +272,17 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
       const response = await documentService.deleteDocument(documentId);
 
       if (response.success) {
-        // Reload documents
         await loadDocuments();
 
-        // Notify parent component
         if (onDocumentChange) {
           onDocumentChange(null);
         }
       } else {
-        setError(response.message || "Failed to delete document");
+        setError(response.error || response.message || "Failed to delete document");
       }
     } catch (err) {
       console.error("Error deleting document:", err);
-      setError(err.response?.data?.error || err.message || "Failed to delete document");
+      setError(getErrorMessage(err, "Failed to delete document"));
     } finally {
       setShowDeleteConfirm(null);
     }
@@ -347,6 +341,22 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
     if (documentService.isPDF(mimeType)) {
       if (!url) {
         return null;
+      }
+
+      if (!isInlinePreviewUrl(url)) {
+        return (
+          <div className="flex items-center gap-3 rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-700/50">
+            <div className="flex-shrink-0">{getFileIcon(mimeType)}</div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                {fileName || "PDF document"}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Preview opens in the viewer to avoid browser frame restrictions.
+              </p>
+            </div>
+          </div>
+        );
       }
 
       return (
@@ -413,7 +423,7 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
             onClick={() => setError(null)}
             className="float-right font-bold"
           >
-            ✕
+            x
           </button>
         </div>
       )}
@@ -526,7 +536,7 @@ export default function InfantDocuments({ infantId, onDocumentChange }) {
                       {documentService.getDocumentTypeLabel(doc.document_type)}
                     </span>
                     <span>{documentService.formatFileSize(doc.file_size)}</span>
-                    <span>•</span>
+                    <span>&bull;</span>
                     <span>{documentService.formatDate(doc.uploaded_at)}</span>
                   </div>
                   {doc.description && (

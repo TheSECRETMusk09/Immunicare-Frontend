@@ -2,23 +2,13 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../utils/api";
 
-/**
- * ActivityFeed Component
- * Displays recent activity timeline for an infant
- *
- * Wireframe Specification:
- * - Timeline of activities: vaccination completed, appointment scheduled, growth check
- * - Icons for each activity type
- * - Timestamps (e.g., "2 days ago", "1 week ago")
- * - "View All Activity" functionality
- * - Mobile responsive layout
- */
+// Recent activity timeline for a child.
 
 const activityIcons = {
-  vaccination: "💉",
-  appointment: "📅",
-  growth: "📊",
-  certificate: "📋",
+  vaccination: "",
+  appointment: "",
+  growth: "",
+  certificate: "",
 };
 
 const activityColors = {
@@ -41,7 +31,7 @@ export default function ActivityFeed({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
-  // Use ref to store the fetch function for retry functionality
+  // Keep latest fetch for retries.
   const fetchActivitiesRef = useRef(null);
 
   const fetchActivities = useCallback(async () => {
@@ -66,7 +56,7 @@ export default function ActivityFeed({
     }
   }, [maxItems]);
 
-  // Store the fetch function in ref for retry
+  // Store latest fetch for retry.
   fetchActivitiesRef.current = fetchActivities;
 
   useEffect(() => {
@@ -173,7 +163,6 @@ export default function ActivityFeed({
 
       {activities.length === 0 ? (
         <div className="text-center py-8">
-          <div className="text-4xl mb-2">📋</div>
           <p className="text-gray-600 dark:text-gray-400">No recent activity</p>
           <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
             Activities will appear here as you use the system
@@ -186,7 +175,7 @@ export default function ActivityFeed({
               key={activity.id}
               className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
               onClick={() => {
-                // Navigate based on activity type
+                // Route by activity type.
                 if (activity.type === "vaccination") {
                   navigate(`/vaccination-records/${infantId}`);
                 } else if (activity.type === "appointment") {

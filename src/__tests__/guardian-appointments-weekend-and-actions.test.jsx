@@ -397,6 +397,51 @@ describe("Guardian appointments weekend blocking and action order", () => {
     });
   });
 
+  test("calendar events and date details stay on the clinic-local appointment date", async () => {
+    apiClient.getGuardianAppointments.mockResolvedValueOnce([
+      {
+        id: 202,
+        infant_id: 1,
+        first_name: "Christian",
+        last_name: "Samorin",
+        scheduled_date: "2030-03-04T00:00:00.000Z",
+        scheduled_time: "08:00",
+        type: "Vaccination",
+        status: "scheduled",
+      },
+    ]);
+
+    render(
+      <MemoryRouter>
+        <GuardianAppointmentsPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(mockFullCalendarProps.current?.events?.[0]?.start).toBeInstanceOf(Date);
+    });
+
+    const calendarEvent = mockFullCalendarProps.current.events[0];
+    expect(calendarEvent.start.getFullYear()).toBe(2030);
+    expect(calendarEvent.start.getMonth()).toBe(2);
+    expect(calendarEvent.start.getDate()).toBe(4);
+
+    fireEvent.click(screen.getByTestId("fc-date-click-monday"));
+
+    await waitFor(() => {
+      expect(screen.getByText("2030-03-04")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /open date detail panel/i }));
+
+    const dialog = await screen.findByRole("dialog", { name: /date details/i });
+    const totalAppointmentsLabel = within(dialog).getByText(/total appointments/i);
+
+    expect(totalAppointmentsLabel.nextElementSibling).toHaveTextContent("1");
+    expect(within(dialog).getByText("Christian Samorin")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/no appointments scheduled for this date/i)).not.toBeInTheDocument();
+  });
+
   test("guardian appointments page hides vaccine stock details from guardians", async () => {
     apiClient.getAppointmentCalendarAvailability.mockResolvedValueOnce({
       inventory: {

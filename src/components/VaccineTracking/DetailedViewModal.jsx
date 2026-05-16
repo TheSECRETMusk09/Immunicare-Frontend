@@ -221,10 +221,10 @@ const DetailedViewModal = ({
                 }`}
               >
                 {complianceRate >= 80
-                  ? "On Track 😊"
+                  ? "On Track"
                   : complianceRate >= 50
-                    ? "Needs Attention ⚠️"
-                    : "At Risk 😟"}
+                    ? "Needs Attention"
+                    : "At Risk"}
               </p>
             </div>
           </div>

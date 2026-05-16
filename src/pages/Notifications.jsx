@@ -685,9 +685,6 @@ const Notifications = () => {
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                   Unread
                 </p>
-                <span className="text-lg" aria-hidden="true">
-                  🔔
-                </span>
               </div>
               <p
                 data-testid="summary-unread-count"
@@ -718,9 +715,6 @@ const Notifications = () => {
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                   Critical
                 </p>
-                <span className="text-lg" aria-hidden="true">
-                  🚨
-                </span>
               </div>
               <p
                 data-testid="summary-critical-count"
@@ -857,9 +851,6 @@ const Notifications = () => {
 
           {filteredNotifications.length === 0 ? (
             <Card className="border border-dashed border-slate-300 bg-white/80 p-8 text-center dark:border-slate-600 dark:bg-slate-900/70">
-              <div className="text-3xl" aria-hidden="true">
-                🔍
-              </div>
               <h3 className="mt-3 text-base font-semibold text-slate-900 dark:text-slate-100">
                 No notifications matched the active filters
               </h3>
@@ -1009,9 +1000,6 @@ const Notifications = () => {
 
       {!hasData && !loading && (
         <Card className="flex-shrink-0 border border-dashed border-slate-300 bg-white/80 p-8 text-center text-slate-600 dark:border-slate-600 dark:bg-slate-900/70 dark:text-slate-300">
-          <div className="text-3xl" aria-hidden="true">
-            🧭
-          </div>
           <h3 className="mt-3 text-base font-semibold text-slate-900 dark:text-slate-100">
             Notification feed is currently clear
           </h3>

@@ -159,6 +159,38 @@ describe("Button Component - States", () => {
     expect(button).toBeDisabled();
     expect(button.querySelector('.animate-spin')).toBeInTheDocument();
   });
+
+  test('Button renders its child element directly when asChild is enabled', () => {
+    render(
+      <Button asChild variant="secondary">
+        <a href="/guardian/profile">Open Profile</a>
+      </Button>,
+    );
+
+    const link = screen.getByRole('link', { name: /open profile/i });
+    expect(link).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /open profile/i })).not.toBeInTheDocument();
+    expect(link).not.toHaveAttribute('aschild');
+    expect(link).toHaveClass('bg-[var(--color-bg-tertiary)]');
+  });
+
+  test('Button asChild preserves child clicks and respects the outer click handler', () => {
+    const childClick = jest.fn();
+    const outerClick = jest.fn();
+
+    render(
+      <Button asChild onClick={outerClick}>
+        <a href="/guardian/notifications" onClick={childClick}>
+          Open Notifications
+        </a>
+      </Button>,
+    );
+
+    fireEvent.click(screen.getByRole('link', { name: /open notifications/i }));
+
+    expect(childClick).toHaveBeenCalledTimes(1);
+    expect(outerClick).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("Button Component - Click Handling", () => {

@@ -2,11 +2,11 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../utils/api";
-import { Button, Card, PageHeader } from "../../components/UI";
+import { Button,       PageHeader } from "../../components/UI";
 import { normalizeGuardianChildren } from "../../utils/guardianDataNormalizers";
 
 export default function UserDownloadCenter() {
-  const { user, guardianId } = useAuth();
+  const {       guardianId } = useAuth();
   const navigate = useNavigate();
   const [children, setChildren] = useState([]);
   const [selectedChild, setSelectedChild] = useState(null);
@@ -169,25 +169,25 @@ export default function UserDownloadCenter() {
     });
 
   if (loading) {
-    return (
+    return(
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+      </div>)
+     ;
   }
 
   if (error) {
-    return (
+    return(
       <div className="text-center py-8">
         <div className="text-red-600">Error: {error}</div>
         <Button onClick={fetchChildren} className="mt-4">
           Retry
         </Button>
-      </div>
-    );
+      </div>)
+     ;
   }
 
-  return (
+  return(
     <div className="space-y-6">
       {/* Header */}
       <PageHeader
@@ -196,7 +196,7 @@ export default function UserDownloadCenter() {
         actions={<Button>📄 Generate New Report</Button>}
       />
 
-      {children.length === 0 ? (
+      {children.length === 0 ?(
         <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center">
           <div className="text-6xl mb-4">📁</div>
           <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">
@@ -208,8 +208,8 @@ export default function UserDownloadCenter() {
           <Button onClick={() => navigate("/guardian/children")}>
             Register Child
           </Button>
-        </div>
-      ) : (
+        </div>)
+        :(
         <>
           {/* Child Selector */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6">
@@ -217,7 +217,7 @@ export default function UserDownloadCenter() {
               Select Child
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {children.map((child) => (
+              {children.map((child) =>(
                 <button
                   key={child.id}
                   onClick={() => setSelectedChild(child)}
@@ -242,13 +242,13 @@ export default function UserDownloadCenter() {
                       </p>
                     </div>
                   </div>
-                </button>
-              ))}
+                </button>)
+               )}
             </div>
           </div>
 
           {/* Filters and Sorting */}
-          {selectedChild && (
+          {selectedChild &&(
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6">
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1">
@@ -282,11 +282,11 @@ export default function UserDownloadCenter() {
                   </select>
                 </div>
               </div>
-            </div>
-          )}
+            </div>)
+           }
 
           {/* Download History */}
-          {selectedChild && (
+          {selectedChild &&(
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
               <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
@@ -295,7 +295,7 @@ export default function UserDownloadCenter() {
                 </h3>
               </div>
 
-              {filteredAndSortedHistory.length === 0 ? (
+              {filteredAndSortedHistory.length === 0 ?(
                 <div className="p-8 text-center">
                   <div className="text-6xl mb-4">📄</div>
                   <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">
@@ -306,8 +306,8 @@ export default function UserDownloadCenter() {
                       ? "You haven't downloaded any documents yet."
                       : "No documents match the current filter."}
                   </p>
-                </div>
-              ) : (
+                </div>)
+                :(
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50 dark:bg-gray-700">
@@ -330,7 +330,7 @@ export default function UserDownloadCenter() {
                       </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                      {filteredAndSortedHistory.map((item) => (
+                      {filteredAndSortedHistory.map((item) =>(
                         <tr
                           key={item.id}
                           className="hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -381,17 +381,17 @@ export default function UserDownloadCenter() {
                               </Button>
                             </div>
                           </td>
-                        </tr>
-                      ))}
+                        </tr>)
+                       )}
                     </tbody>
                   </table>
-                </div>
-              )}
-            </div>
-          )}
+                </div>)
+               }
+            </div>)
+           }
 
           {/* Quick Download Options */}
-          {selectedChild && (
+          {selectedChild &&(
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
                 Quick Downloads
@@ -418,7 +418,7 @@ export default function UserDownloadCenter() {
                     icon: "🏫",
                     description: "For school enrollment",
                   },
-                ].map((option) => (
+                ].map((option) =>(
                   <div
                     key={option.type}
                     className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
@@ -440,13 +440,13 @@ export default function UserDownloadCenter() {
                     >
                       📄 Generate
                     </Button>
-                  </div>
-                ))}
+                  </div>)
+                 )}
               </div>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
+            </div>)
+           }
+        </>)
+       }
+    </div>)
+   ;
 }

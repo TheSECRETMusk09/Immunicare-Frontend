@@ -1,6 +1,6 @@
 import React from "react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
 import UserVaccinationRecords from "../pages/UserVaccinationRecords";
@@ -57,6 +57,9 @@ jest.mock("../utils/telemetry", () => ({
   trackEvent: jest.fn(),
 }));
 
+const byTextContent = (pattern) => (_, node) =>
+  pattern.test(node?.textContent?.replace(/\s+/g, " ").trim() || "");
+
 describe("guardian vaccination records summary", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -99,6 +102,14 @@ describe("guardian vaccination records summary", () => {
         { vaccineId: 2, vaccineName: "BCG", doseNumber: 1, status: "upcoming" },
         { vaccineId: 3, vaccineName: "MMR", doseNumber: 1, status: "upcoming" },
         { vaccineId: 4, vaccineName: "PCV", doseNumber: 1, status: "overdue" },
+        {
+          vaccineId: 6,
+          vaccineName: "Penta Valent",
+          vaccineFullName: "Pentavalent Vaccine (DPT-Hep B-HIB)",
+          doseNumber: 1,
+          ageDescription: "1.5 months",
+          status: "upcoming",
+        },
         { vaccineId: 5, vaccineName: "IPV", doseNumber: 1, status: "pending_confirmation" },
       ],
     });
@@ -133,13 +144,27 @@ describe("guardian vaccination records summary", () => {
       expect(apiClient.getInfantVaccinationSchedule).toHaveBeenCalledWith(101);
     });
 
-    const completedCard = screen.getAllByText("Completed")[0].closest("div");
-    const upcomingCard = screen.getAllByText("Upcoming")[0].closest("div");
-    const overdueCard = screen.getAllByText("Overdue")[0].closest("div");
-
-    expect(within(completedCard).getByText("2")).toBeInTheDocument();
-    expect(within(upcomingCard).getByText("3")).toBeInTheDocument();
-    expect(within(overdueCard).getByText("1")).toBeInTheDocument();
+    expect(screen.getAllByText(byTextContent(/^2\s*Completed$/i)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(byTextContent(/^3\s*Upcoming$/i)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(byTextContent(/^1\s*Overdue$/i)).length).toBeGreaterThan(0);
     expect(screen.getByText(/2\s*\/\s*7/)).toBeInTheDocument();
+  });
+
+  test("prefers booklet-ready schedule labels for vaccine names and age slots", async () => {
+    render(
+      <MemoryRouter initialEntries={["/guardian/vaccination-records/101"]}>
+        <Routes>
+          <Route
+            path="/guardian/vaccination-records/:childId"
+            element={<UserVaccinationRecords />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByText("Pentavalent Vaccine (DPT-Hep B-HIB)"),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("1½ mos").length).toBeGreaterThan(0);
   });
 });

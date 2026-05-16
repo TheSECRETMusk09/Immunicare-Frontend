@@ -21,8 +21,6 @@ import {
    Trash2,
    User,
    AlertTriangle,
-   RefreshCw,
-   Bell,
    CheckCircle,
    Clock,
    AlertCircle,
@@ -93,6 +91,9 @@ const mapInfantFieldErrors = (fields = {}) => {
   if (fields.birth_height) {
     mapped.birth_length = fields.birth_height;
   }
+  if (fields.birth_head_circumference) {
+    mapped.birth_head_circumference = fields.birth_head_circumference;
+  }
   if (fields.place_of_birth) {
     mapped.birthplace = fields.place_of_birth;
   }
@@ -119,6 +120,7 @@ const createInitialChildForm = () => ({
   sex: "M",
   birth_weight: "",
   birth_length: "",
+  birth_head_circumference: "",
   birthplace: "",
   purok: "",
   street_color: "",
@@ -148,8 +150,8 @@ const validateChildRegistrationForm = (values = {}) => {
   if (!dobValue) {
     errors.dob = "Date of birth is required";
   } else {
-    const parsedDob = new Date(dobValue);
-    if (Number.isNaN(parsedDob.getTime())) {
+    const parsedDob = parseDobLocal(dobValue);
+    if (!parsedDob) {
       errors.dob = "Date of birth must be a valid date";
     } else {
       const today = new Date();
@@ -204,6 +206,20 @@ const getActionErrorMessage = (error, fallback) => {
 };
 
 const READINESS_REQUEST_TIMEOUT_MS = 25000;
+const DOB_MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
 const withTimeout = (promise, timeoutMs, message) =>
   new Promise((resolve, reject) => {
@@ -221,6 +237,147 @@ const withTimeout = (promise, timeoutMs, message) =>
         reject(error);
       });
   });
+
+const parseDobLocal = (value) => {
+  if (typeof value !== "string") return null;
+
+  const raw = value.trim();
+  if (!raw || !raw.includes("-")) return null;
+
+  const hasTime = raw.includes("T") || /[Zz]|[+-]\d{2}:?\d{2}$/.test(raw);
+  let year;
+  let month;
+  let day;
+
+  if (hasTime) {
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return null;
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Manila",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(parsed).reduce((acc, part) => {
+      if (part.type !== "literal") acc[part.type] = part.value;
+      return acc;
+    }, {});
+    year = Number.parseInt(parts.year, 10);
+    month = Number.parseInt(parts.month, 10);
+    day = Number.parseInt(parts.day, 10);
+  } else {
+    const parts = raw.split("-");
+    if (parts.length !== 3) return null;
+    year = Number.parseInt(parts[0], 10);
+    month = Number.parseInt(parts[1], 10);
+    day = Number.parseInt(parts[2], 10);
+  }
+
+  if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
+    return null;
+  }
+
+  const date = new Date(year, month - 1, day);
+  if (Number.isNaN(date.getTime())) return null;
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
+};
+
+const formatDobInputValue = (value) => {
+  const date = parseDobLocal(value);
+  if (!date) return "";
+
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const formatDobDisplay = (value) => {
+  const date = parseDobLocal(value);
+  if (!date) return "";
+
+  return `${DOB_MONTH_NAMES[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+};
+
+const parseLocalDateFromYMD = (value) => {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const datePart = raw.split("T")[0];
+  const parts = datePart.split("-");
+  if (parts.length === 3) {
+    const year = Number.parseInt(parts[0], 10);
+    const month = Number.parseInt(parts[1], 10);
+    const day = Number.parseInt(parts[2], 10);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+      return null;
+    }
+    const date = new Date(year, month - 1, day);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+};
+
+const toLocalDateString = (value) => {
+  const date = parseLocalDateFromYMD(value);
+  if (!date) return "";
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const getAgeDisplay = (value) => {
+  const dob = parseDobLocal(value);
+  if (!dob) return "Unknown";
+
+  const today = new Date();
+  const birthYear = dob.getFullYear();
+  const birthMonth = dob.getMonth();
+  const birthDay = dob.getDate();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
+  const currentDay = today.getDate();
+
+  let yearDiff = currentYear - birthYear;
+  const hasHadBirthday =
+    currentMonth > birthMonth ||
+    (currentMonth === birthMonth && currentDay >= birthDay);
+
+  if (!hasHadBirthday) {
+    yearDiff -= 1;
+  }
+
+  if (yearDiff <= 0) {
+    let monthDiff = (currentYear - birthYear) * 12 + (currentMonth - birthMonth);
+    if (currentDay < birthDay) {
+      monthDiff -= 1;
+    }
+    if (monthDiff < 0) monthDiff = 0;
+    return `${monthDiff} month${monthDiff === 1 ? "" : "s"}`;
+  }
+
+  return `${yearDiff} year${yearDiff === 1 ? "" : "s"}`;
+};
 
 export default function MyChildren() {
   const { guardianId } = useAuth();
@@ -392,14 +549,27 @@ export default function MyChildren() {
       setError(null);
       const response = await apiClient.getInfantsByGuardian(guardianId);
       const childrenData = normalizeArrayPayload(response, ["infants", "children", "patients"]);
-      setChildren(childrenData);
+      const normalizedChildrenData = childrenData.map((child) => {
+        const normalizedDob = formatDobInputValue(child?.dob);
+
+        if (!normalizedDob) {
+          return child;
+        }
+
+        return {
+          ...child,
+          dob: normalizedDob,
+        };
+      });
+
+      setChildren(normalizedChildrenData);
       setChildrenReadiness({});
       setLoading(false);
 
       // Fetch readiness for each child without blocking the primary child list.
       const requestId = readinessRequestIdRef.current + 1;
       readinessRequestIdRef.current = requestId;
-      void fetchAllChildrenReadiness(childrenData, requestId);
+      void fetchAllChildrenReadiness(normalizedChildrenData, requestId);
     } catch (err) {
       setError(err.message);
       setLoading(false);
@@ -412,14 +582,8 @@ export default function MyChildren() {
     }
   }, [guardianId, fetchChildren]);
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
+  const formatDate = (dateString) => formatDobDisplay(dateString);
+  const todayDateString = toLocalDateString(new Date());
 
   // Edit form state
   const [editFormData, setEditFormData] = useState({
@@ -429,20 +593,25 @@ export default function MyChildren() {
     sex: "M",
     birth_weight: "",
     birth_length: "",
+    birth_head_circumference: "",
     birthplace: "",
   });
 
   // Normalize sex value for display (handles both "M"/"F" and "male"/"female" from backend)
   const normalizeSexForDisplay = (sex) => {
-    if (!sex) return 'M'; // Default to Male
-    const normalized = String(sex).toUpperCase().charAt(0);
-    return normalized === 'M' || normalized === 'F' ? normalized : 'M';
+    if (!sex) return "M";
+    const normalized = String(sex).trim().toUpperCase();
+    if (normalized === "M" || normalized === "MALE") return "M";
+    if (normalized === "F" || normalized === "FEMALE") return "F";
+    return "O";
   };
 
   // Normalize sex for form submission (converts "M"/"F" to "male"/"female" for backend)
   const normalizeSexForSubmission = (sex) => {
     const normalized = normalizeSexForDisplay(sex);
-    return normalized === 'M' ? 'male' : 'female';
+    if (normalized === "M") return "male";
+    if (normalized === "F") return "female";
+    return "other";
   };
 
   // Handle edit form changes
@@ -469,10 +638,11 @@ export default function MyChildren() {
     setEditFormData({
       first_name: child.first_name || "",
       last_name: child.last_name || "",
-      dob: child.dob ? child.dob.split("T")[0] : "",
+      dob: formatDobInputValue(child.dob),
       sex: normalizeSexForDisplay(child.sex),
       birth_weight: child.birth_weight || "",
       birth_length: child.birth_height || "",
+      birth_head_circumference: child.birth_head_circumference || "",
       birthplace: child.place_of_birth || "",
     });
     setEditError(null);
@@ -508,6 +678,7 @@ export default function MyChildren() {
         sex: normalizeSexForSubmission(editFormData.sex),
         birth_weight: editFormData.birth_weight || null,
         birth_height: editFormData.birth_length || null,
+        birth_head_circumference: editFormData.birth_head_circumference || null,
         place_of_birth: editFormData.birthplace || null,
       };
 
@@ -556,7 +727,7 @@ export default function MyChildren() {
       await apiClient.deleteGuardianInfant(selectedChild.id);
 
       // Optimistic UI update - remove child from list immediately
-      setChildren(children.filter((c) => c.id !== selectedChild.id));
+      setChildren((prev) => prev.filter((c) => c.id !== selectedChild.id));
 
       setShowDeleteModal(false);
       setSelectedChild(null);
@@ -748,6 +919,7 @@ export default function MyChildren() {
         sex: normalizeSexForSubmission(formData.sex),
         birth_weight: formData.birth_weight || null,
         birth_height: formData.birth_length || null,
+        birth_head_circumference: formData.birth_head_circumference || null,
         place_of_birth: formData.birthplace || null,
         purok: formData.purok,
         street_color: formData.street_color,
@@ -874,6 +1046,7 @@ export default function MyChildren() {
         guardian_id: guardianId,
         birth_weight: formData.birth_weight || null,
         birth_height: formData.birth_length || null,
+        birth_head_circumference: formData.birth_head_circumference || null,
         place_of_birth: formData.birthplace || null,
         purok: formData.purok,
         street_color: formData.street_color,
@@ -928,47 +1101,23 @@ export default function MyChildren() {
         title="My Children"
         subtitle="Manage your children’s health records and vaccination schedules"
         icon={<Baby className="w-8 h-8 text-white" />}
+        showOnDesktop={false}
         actions={(
-          <>
-            <Button
-              onClick={() => setShowRegisterModal(true)}
-              className="guardian-module-hero__primary-btn min-[1025px]:hidden"
-              size="sm"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add New Child
-            </Button>
-            <div className="hidden min-[1025px]:flex guardian-desktop-pageheader-actions guardian-desktop-pageheader-actions--with-primary">
-              <button
-                type="button"
-                onClick={fetchChildren}
-                className="guardian-desktop-pageheader-icon-btn"
-                aria-label="Refresh My Children"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate("/guardian/notifications")}
-                className="guardian-desktop-pageheader-icon-btn guardian-desktop-pageheader-icon-btn--notif"
-                aria-label="Open notifications"
-              >
-                <Bell className="w-4 h-4" />
-                <span className="guardian-desktop-pageheader-notif-dot" aria-hidden="true" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate("/guardian/profile")}
-                className="guardian-desktop-pageheader-icon-btn"
-                aria-label="Open profile"
-              >
-                <User className="w-4 h-4" />
-              </button>
-            </div>
-          </>
+          <Button
+            onClick={() => setShowRegisterModal(true)}
+            className="guardian-module-hero__primary-btn min-[1025px]:hidden"
+            size="sm"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add New Child
+          </Button>
         )}
+      />
+      <GuardianModuleHeader
+        title="My Children"
+        subtitle="Manage your childrenâ€™s health records and vaccination schedules"
+        icon={<Baby className="w-8 h-8 text-white" />}
+        showOnMobile={false}
       />
 
       <main className="guardian-page-content space-y-4 md:space-y-5 lg:space-y-6">
@@ -1004,21 +1153,23 @@ export default function MyChildren() {
           </div>
         ) : (
           <div className="guardian-children-grid grid grid-cols-1 min-[640px]:grid-cols-2 min-[1025px]:grid-cols-3 gap-4 md:gap-5 lg:gap-6">
-            {children.map((child) => (
-              <div
-                key={child.id}
-                className="guardian-child-card guardian-theme-card glassmorphism-card rounded-xl border border-transparent backdrop-blur-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group overflow-hidden bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-blue-500/10"
-              >
+            {children.map((child) => {
+              const normalizedSex = normalizeSexForDisplay(child.sex);
+              const sexLabel =
+                normalizedSex === "M"
+                  ? "Male"
+                  : normalizedSex === "F"
+                    ? "Female"
+                    : "Other";
+
+              return (
+                <div
+                  key={child.id}
+                  className="guardian-child-card guardian-theme-card glassmorphism-card rounded-xl border border-transparent backdrop-blur-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group overflow-hidden bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-blue-500/10"
+                >
                 <div className="p-6">
                   <div className="flex items-start justify-between gap-3 mb-6">
-                    <div className="w-14 h-14 bg-gradient-to-br from-blue-400/30 to-purple-500/30 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                      {normalizeSexForDisplay(child.sex) === "M" ? (
-                        <User className="w-8 h-8 guardian-card-icon-accent guardian-card-icon-accent--blue" />
-                      ) : (
-                        <User className="w-8 h-8 guardian-card-icon-accent guardian-card-icon-accent--pink" />
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
+                    <div className="ml-auto flex flex-col items-end gap-1">
                       <span className="guardian-status-pill guardian-status-pill--active px-3 py-1 text-xs font-bold rounded-full uppercase tracking-wider">
                         Active
                       </span>
@@ -1063,17 +1214,13 @@ export default function MyChildren() {
                       <div className="flex flex-col gap-1 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between py-2 border-b border-theme-border-primary">
                         <span className="guardian-card-text-secondary">Age</span>
                       <span className="font-semibold guardian-card-text-primary">
-                        {Math.floor(
-                          (new Date() - new Date(child.dob)) /
-                            (1000 * 60 * 60 * 24 * 365),
-                        )}{" "}
-                        years
+                        {getAgeDisplay(child.dob)}
                       </span>
                     </div>
                       <div className="flex flex-col gap-1 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between py-2 border-b border-theme-border-primary">
                         <span className="guardian-card-text-secondary">Sex</span>
                       <span className="font-semibold guardian-card-text-primary">
-                        {normalizeSexForDisplay(child.sex) === "M" ? "Male" : "Female"}
+                        {sexLabel}
                       </span>
                     </div>
                       <div className="flex flex-col gap-1 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between py-2">
@@ -1138,67 +1285,11 @@ export default function MyChildren() {
                   </Button>
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
 
-        {/* Quick Actions */}
-        {children.length > 0 && (
-          <section className="bg-theme-bg-card rounded-2xl p-4 sm:p-5 border border-theme-border-primary shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base sm:text-lg font-bold text-theme-primary">Quick Actions</h3>
-            </div>
-            <div className="grid grid-cols-3 gap-2 sm:gap-4">
-              <Button
-                variant="secondary"
-                className="p-3 sm:p-6 h-auto flex-col items-center justify-center text-center guardian-quick-action-card guardian-quick-action-card--blue"
-                onClick={() => navigate(guardianRoutePaths.vaccinationRecords)}
-              >
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-400/30 to-purple-500/30 backdrop-blur-sm flex items-center justify-center mb-2 sm:mb-3">
-                  <FileText className="w-5 h-5 sm:w-6 sm:h-6 guardian-card-icon-accent guardian-card-icon-accent--blue" />
-                </div>
-                <span className="text-xs sm:text-sm font-bold guardian-quick-action-title leading-tight">
-                  Records
-                </span>
-                <span className="hidden sm:block text-xs guardian-quick-action-description mt-1">
-                  Complete history for all children
-                </span>
-              </Button>
-
-              <Button
-                variant="secondary"
-                className="p-3 sm:p-6 h-auto flex-col items-center justify-center text-center guardian-quick-action-card guardian-quick-action-card--emerald"
-                onClick={() => navigate(guardianRoutePaths.appointmentBooking())}
-              >
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-emerald-400/30 to-teal-500/30 backdrop-blur-sm flex items-center justify-center mb-2 sm:mb-3">
-                  <Calendar className="w-5 h-5 sm:w-6 sm:h-6 guardian-card-icon-accent guardian-card-icon-accent--emerald" />
-                </div>
-                <span className="text-xs sm:text-sm font-bold guardian-quick-action-title leading-tight">
-                  Schedule
-                </span>
-                <span className="hidden sm:block text-xs guardian-quick-action-description mt-1">
-                  Schedule a new vaccination visit
-                </span>
-              </Button>
-
-              <Button
-                variant="secondary"
-                className="p-3 sm:p-6 h-auto flex-col items-center justify-center text-center guardian-quick-action-card guardian-quick-action-card--purple"
-                onClick={() => navigate(guardianRoutePaths.documents)}
-              >
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-purple-400/30 to-pink-500/30 backdrop-blur-sm flex items-center justify-center mb-2 sm:mb-3">
-                  <FileText className="w-5 h-5 sm:w-6 sm:h-6 guardian-card-icon-accent guardian-card-icon-accent--purple" />
-                </div>
-                <span className="text-xs sm:text-sm font-bold guardian-quick-action-title leading-tight">
-                  Documents
-                </span>
-                <span className="hidden sm:block text-xs guardian-quick-action-description mt-1">
-                  Open current charts, records, and document-ready views
-                </span>
-              </Button>
-            </div>
-          </section>
-        )}
 
           {/* Registration Modal */}
           <Modal
@@ -1377,7 +1468,7 @@ export default function MyChildren() {
                     <h4 className="text-sm font-medium text-theme-secondary mb-3">
                       Birth Information (Optional)
                     </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <Input
                         label="Birth Weight (kg)"
                         name="birth_weight"
@@ -1397,6 +1488,16 @@ export default function MyChildren() {
                         onChange={handleRegisterChange}
                         error={registerFieldErrors.birth_length}
                         placeholder="e.g., 50"
+                      />
+                      <Input
+                        label="Head Circumference at Birth (cm)"
+                        name="birth_head_circumference"
+                        type="number"
+                        step="0.1"
+                        value={formData.birth_head_circumference}
+                        onChange={handleRegisterChange}
+                        error={registerFieldErrors.birth_head_circumference}
+                        placeholder="e.g., 34"
                       />
                     </div>
                     <div className="mt-4 space-y-4">
@@ -1497,7 +1598,7 @@ export default function MyChildren() {
                     <h4 className="text-sm font-medium text-theme-secondary mb-3">
                       Birth Information (Optional)
                     </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <Input
                         label="Birth Weight (kg)"
                         name="birth_weight"
@@ -1517,6 +1618,16 @@ export default function MyChildren() {
                         onChange={handleRegisterChange}
                         error={registerFieldErrors.birth_length}
                         placeholder="e.g., 50"
+                      />
+                      <Input
+                        label="Head Circumference at Birth (cm)"
+                        name="birth_head_circumference"
+                        type="number"
+                        step="0.1"
+                        value={formData.birth_head_circumference}
+                        onChange={handleRegisterChange}
+                        error={registerFieldErrors.birth_head_circumference}
+                        placeholder="e.g., 34"
                       />
                     </div>
                     <div className="mt-4 space-y-4">
@@ -1832,6 +1943,7 @@ export default function MyChildren() {
                 value={editFormData.dob}
                 onChange={handleEditChange}
                 error={editFieldErrors.dob}
+                max={todayDateString}
                 required
               />
               <div className="space-y-1">
@@ -1849,6 +1961,7 @@ export default function MyChildren() {
                 >
                   <option value="M" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">Male</option>
                   <option value="F" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">Female</option>
+                  <option value="O" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">Other</option>
                 </select>
                 {editFieldErrors.sex && (
                   <p className="mt-1.5 text-sm font-medium text-red-600 dark:text-red-400">{editFieldErrors.sex}</p>
@@ -1861,7 +1974,7 @@ export default function MyChildren() {
               <h4 className="text-sm font-medium text-theme-secondary mb-3">
                 Birth Information (Optional)
               </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Input
                   label="Birth Weight (kg)"
                   name="birth_weight"
@@ -1881,6 +1994,16 @@ export default function MyChildren() {
                   onChange={handleEditChange}
                   error={editFieldErrors.birth_length}
                   placeholder="e.g., 50"
+                />
+                <Input
+                  label="Head Circumference at Birth (cm)"
+                  name="birth_head_circumference"
+                  type="number"
+                  step="0.1"
+                  value={editFormData.birth_head_circumference}
+                  onChange={handleEditChange}
+                  error={editFieldErrors.birth_head_circumference}
+                  placeholder="e.g., 34"
                 />
               </div>
               <div className="mt-4">
@@ -1953,8 +2076,8 @@ export default function MyChildren() {
               Are you sure you want to delete this child?
             </h3>
             <p className="text-theme-secondary">
-              This action cannot be undone. All records associated with this child
-              will be permanently removed.
+              This child's record will be deactivated and removed from your active list.
+              The record will be kept in the system for health center records.
             </p>
           </div>
 

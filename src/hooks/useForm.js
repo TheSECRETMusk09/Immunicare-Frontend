@@ -1,34 +1,33 @@
 import { useState, useCallback } from "react";
 
 export const useForm = (initialValues = {}, validationRules = {}) => {
-  const [values, setValues] = useState(initialValues);
-  const [errors, setErrors] = useState({});
+  const [fields, setValues] = useState(initialValues);
+  const [errs, setErrors] = useState({});
   const [touched, setTouched] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitting, setIsSubmitting] = useState(false);
 
   const setValue = useCallback(
     (name, value) => {
       setValues((prev) => ({ ...prev, [name]: value }));
 
-      // Clear error when user starts typing
-      if (errors[name]) {
+      if (errs[name]) {
         setErrors((prev) => ({ ...prev, [name]: "" }));
       }
     },
-    [errors]
+    [errs]
   );
 
   const setFieldTouched = useCallback((name, isTouched = true) => {
     setTouched((prev) => ({ ...prev, [name]: isTouched }));
   }, []);
 
-  const validateField = useCallback(
+  const chkField = useCallback(
     (name, value) => {
       const rule = validationRules[name];
       if (!rule) return "";
 
       if (typeof rule === "function") {
-        return rule(value, values);
+        return rule(value, fields);
       }
 
       if (rule.required && (!value || value.toString().trim() === "")) {
@@ -53,20 +52,20 @@ export const useForm = (initialValues = {}, validationRules = {}) => {
       }
 
       if (rule.custom && typeof rule.custom === "function") {
-        return rule.custom(value, values);
+        return rule.custom(value, fields);
       }
 
       return "";
     },
-    [validationRules, values]
+    [validationRules, fields]
   );
 
-  const validateAll = useCallback(() => {
+  const chkAll = useCallback(() => {
     const newErrors = {};
     let isValid = true;
 
     Object.keys(validationRules).forEach((name) => {
-      const error = validateField(name, values[name]);
+      const error = chkField(name, fields[name]);
       if (error) {
         newErrors[name] = error;
         isValid = false;
@@ -75,7 +74,7 @@ export const useForm = (initialValues = {}, validationRules = {}) => {
 
     setErrors(newErrors);
     return isValid;
-  }, [values, validationRules, validateField]);
+  }, [fields, validationRules, chkField]);
 
   const handleChange = useCallback(
     (e) => {
@@ -91,13 +90,12 @@ export const useForm = (initialValues = {}, validationRules = {}) => {
       const { name, value } = e.target;
       setFieldTouched(name, true);
 
-      // Validate field on blur
-      const error = validateField(name, value);
+      const error = chkField(name, value);
       if (error) {
         setErrors((prev) => ({ ...prev, [name]: error }));
       }
     },
-    [validateField, setFieldTouched]
+    [chkField, setFieldTouched]
   );
 
   const handleSubmit = useCallback(
@@ -109,17 +107,17 @@ export const useForm = (initialValues = {}, validationRules = {}) => {
 
         setIsSubmitting(true);
         setTouched(
-          Object.keys(values).reduce(
+          Object.keys(fields).reduce(
             (acc, key) => ({ ...acc, [key]: true }),
             {}
           )
         );
 
-        const isValid = validateAll();
+        const isValid = chkAll();
 
         if (isValid && onSubmit) {
           try {
-            await onSubmit(values);
+            await onSubmit(fields);
           } catch (error) {
             console.error("Form submission error:", error);
           }
@@ -129,7 +127,7 @@ export const useForm = (initialValues = {}, validationRules = {}) => {
         return isValid;
       };
     },
-    [values, validateAll]
+    [fields, chkAll]
   );
 
   const reset = useCallback(() => {
@@ -144,10 +142,10 @@ export const useForm = (initialValues = {}, validationRules = {}) => {
   }, []);
 
   return {
-    values,
-    errors,
+    values: fields,
+    errors: errs,
     touched,
-    isSubmitting,
+    isSubmitting: submitting,
     setValue,
     setFieldTouched,
     handleChange,
@@ -155,7 +153,7 @@ export const useForm = (initialValues = {}, validationRules = {}) => {
     handleSubmit,
     reset,
     setFieldError,
-    validateAll,
+    validateAll: chkAll,
   };
 };
 

@@ -96,7 +96,7 @@ export const useLiveAnnouncer = (politeness = 'polite') => {
     };
   }, []);
 
-  const announcer = (
+  const announcer =(
     <div
       role="status"
       aria-live={politeness}
@@ -104,8 +104,8 @@ export const useLiveAnnouncer = (politeness = 'polite') => {
       className="sr-only"
     >
       {message}
-    </div>
-  );
+    </div>)
+   ;
 
   return { announce, announcer };
 };
@@ -180,7 +180,7 @@ export const useModalFocus = (isOpen) => {
  */
 export const useAriaDescribedBy = (id, descriptions = []) => {
   const descriptionIds = descriptions
-    .map((desc) => (desc.id ? desc.id : null))
+    .map((desc) =>( desc.id ? desc.id : null))
     .filter(Boolean);
 
   if (id) {
@@ -218,11 +218,11 @@ export const useLoadingAnnouncer = () => {
     message,
     startLoading,
     stopLoading,
-    announcer: loading ? (
+    announcer: loading ?(
       <div role="status" aria-live="polite" className="sr-only">
         {message}
-      </div>
-    ) : null
+      </div>)
+      : null
   };
 };
 
@@ -261,7 +261,7 @@ export const IconButton = ({
 }) => {
   const buttonLabel = ariaLabel || label;
 
-  return (
+  return(
     <button
       onClick={onClick}
       aria-label={buttonLabel}
@@ -269,15 +269,15 @@ export const IconButton = ({
       {...props}
     >
       {Icon && <Icon className="w-6 h-6" aria-hidden="true" />}
-    </button>
-  );
+    </button>)
+   ;
 };
 
 /**
  * Skip link component
  */
 export const SkipLink = ({ targetRef, children = 'Skip to main content' }) => {
-  return (
+  return(
     <a
       href="#main-content"
       onClick={(e) => {
@@ -287,8 +287,8 @@ export const SkipLink = ({ targetRef, children = 'Skip to main content' }) => {
       className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded-md"
     >
       {children}
-    </a>
-  );
+    </a>)
+   ;
 };
 
 /**
@@ -304,9 +304,8 @@ export const FormField = ({
 }) => {
   const errorId = error ? `${id}-error` : undefined;
   const helpId = helpText ? `${id}-help` : undefined;
-  const describedBy = [errorId, helpText].filter(Boolean).join(' ') || undefined;
 
-  return (
+  return(
     <div className="space-y-1">
       <label
         htmlFor={id}
@@ -318,19 +317,19 @@ export const FormField = ({
 
       {children}
 
-      {helpText && (
+      {helpText &&(
         <p id={helpId} className="text-sm text-gray-500 dark:text-gray-400">
           {helpText}
-        </p>
-      )}
+        </p>)
+       }
 
-      {error && (
+      {error &&(
         <p id={errorId} role="alert" className="text-sm text-red-600 dark:text-red-400">
           {error}
-        </p>
-      )}
-    </div>
-  );
+        </p>)
+       }
+    </div>)
+   ;
 };
 
 export default {

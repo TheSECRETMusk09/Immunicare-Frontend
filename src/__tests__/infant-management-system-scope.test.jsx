@@ -103,6 +103,74 @@ describe("Infant management system scope loading", () => {
     expect(await screen.findByText("5001")).toBeInTheDocument();
     expect(screen.getByText(/showing 20 of 5001 infants/i)).toBeInTheDocument();
     expect(screen.getByText(/christian samorin/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(infantService.getAll).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  test("derives the needs review card from the same visible workflow logic when the summary payload is absent", async () => {
+    infantService.getAll.mockResolvedValueOnce({
+      data: [
+        {
+          id: 1,
+          first_name: "Isaac",
+          last_name: "Navarro",
+          dob: "2026-05-01",
+          sex: "male",
+          guardian_name: "Guardian One",
+          control_number: "INF-0001",
+          pending_vaccinations: 0,
+          completed_vaccinations: 0,
+          imported_vaccinations: 0,
+          validation_status: "for_validation",
+        },
+        {
+          id: 2,
+          first_name: "Jerome",
+          last_name: "Navarro",
+          dob: "2026-05-02",
+          sex: "male",
+          guardian_name: "Guardian Two",
+          control_number: "INF-0002",
+          pending_vaccinations: 1,
+          completed_vaccinations: 0,
+          imported_vaccinations: 0,
+          validation_status: "under_review",
+        },
+        {
+          id: 3,
+          first_name: "Samuel",
+          last_name: "Dela Cruz",
+          dob: "2026-05-03",
+          sex: "male",
+          guardian_name: "Guardian Three",
+          control_number: "INF-0003",
+          pending_vaccinations: 0,
+          completed_vaccinations: 0,
+          imported_vaccinations: 0,
+          validation_status: "pending_validation",
+        },
+      ],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 3,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/infants"]}>
+        <InfantManagement />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText(/isaac navarro/i);
+
+    const needsReviewLabel = screen.getByText(/^Needs Review$/i, { selector: "p" });
+    expect(needsReviewLabel.nextElementSibling?.textContent?.trim()).toBe("2");
   });
 
   test("opens the transfer-in cases view from the header button without leaving the infant workflow", async () => {

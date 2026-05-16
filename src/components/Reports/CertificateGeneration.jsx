@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { Card, Button, Modal, Select, Badge } from "../UI";
+import { Card, Button, Modal,         Badge } from "../UI";
 import {
   FileText,
   Download,
   Share2,
   Printer,
-  Smartphone,
-  Mail,
-  Calendar,
-  CheckCircle,
-  AlertTriangle,
-  Clock,
+
+
+  Calendar  ,
+
+
+
   Users,
-  Plus,
-  Eye,
+  Plus    ,
+  Eye        ,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
@@ -282,7 +282,7 @@ export const CertificateGeneration = () => {
     }
   };
 
-  const CertificatePreview = () => (
+  const CertificatePreview = () =>(
     <div className="certificate-preview space-y-6">
       {/* Header */}
       <div className="text-center">
@@ -354,7 +354,7 @@ export const CertificateGeneration = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {selectedPatient?.vaccinationHistory.map((vaccine, index) => (
+              {selectedPatient?.vaccinationHistory.map((vaccine, index) =>(
                 <tr key={index} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {vaccine.name}
@@ -374,8 +374,8 @@ export const CertificateGeneration = () => {
                       {vaccine.status}
                     </Badge>
                   </td>
-                </tr>
-              ))}
+                </tr>)
+               )}
             </tbody>
           </table>
         </div>
@@ -406,10 +406,10 @@ export const CertificateGeneration = () => {
           </div>
         </div>
       </Card>
-    </div>
-  );
+    </div>)
+   ;
 
-  return (
+  return(
     <div className="certificate-generation space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
@@ -485,7 +485,7 @@ export const CertificateGeneration = () => {
       <Card>
         <h3 className="text-lg font-semibold mb-4">Select Patient</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {patients.map((patient) => (
+          {patients.map((patient) =>(
             <div
               key={patient.id}
               className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
@@ -535,8 +535,8 @@ export const CertificateGeneration = () => {
                   View History
                 </Button>
               </div>
-            </div>
-          ))}
+            </div>)
+           )}
         </div>
       </Card>
 
@@ -576,7 +576,7 @@ export const CertificateGeneration = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {certificates.map((cert) => (
+              {certificates.map((cert) =>(
                 <tr key={cert.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -626,15 +626,15 @@ export const CertificateGeneration = () => {
                       Print
                     </Button>
                   </td>
-                </tr>
-              ))}
+                </tr>)
+               )}
             </tbody>
           </table>
         </div>
       </Card>
 
       {/* Certificate Generation Modal */}
-      {showCertificateModal && (
+      {showCertificateModal &&(
         <Modal
           title={`Generate Certificate for ${selectedPatient?.name}`}
           onClose={() => setShowCertificateModal(false)}
@@ -671,7 +671,7 @@ export const CertificateGeneration = () => {
                     description: "Detailed vaccination summary report",
                     icon: "📊",
                   },
-                ].map((type) => (
+                ].map((type) =>(
                   <div
                     key={type.value}
                     className="flex items-center space-x-4 p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
@@ -697,8 +697,8 @@ export const CertificateGeneration = () => {
                         </div>
                       </div>
                     </label>
-                  </div>
-                ))}
+                  </div>)
+                 )}
               </div>
             </Card>
 
@@ -731,8 +731,8 @@ export const CertificateGeneration = () => {
               </Button>
             </div>
           </div>
-        </Modal>
-      )}
-    </div>
-  );
+        </Modal>)
+       }
+    </div>)
+   ;
 };

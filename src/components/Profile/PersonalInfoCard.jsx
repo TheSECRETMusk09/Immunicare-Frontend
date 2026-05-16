@@ -1,5 +1,5 @@
 import React from "react";
-import { User, Mail, Phone, MapPin, Save, X } from "lucide-react";
+import { User, Mail, Phone, MapPin, Save, X, Key, ChevronRight } from "lucide-react";
 import { Button, Input } from "../UI";
 
 /**
@@ -20,6 +20,7 @@ const PersonalInfoCard = ({
   isEditing,
   onSave,
   onCancel,
+  onChangePassword,
   loading = false,
   fieldErrors = {},
 }) => {
@@ -117,6 +118,29 @@ const PersonalInfoCard = ({
             );
           })}
         </div>
+
+        {typeof onChangePassword === "function" && (
+          <div className="mt-6 border-t border-gray-100 dark:border-gray-700 pt-6">
+            <button
+              type="button"
+              onClick={onChangePassword}
+              className="w-full flex items-center gap-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors group text-left min-h-[56px] sm:min-h-[48px] p-3 sm:p-4"
+            >
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-amber-100 dark:bg-gray-700 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-all duration-300">
+                <Key className="w-5 h-5 sm:w-6 sm:h-6 text-amber-600 dark:text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">
+                  Change Password
+                </p>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                  Update your security credentials
+                </p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors flex-shrink-0" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Card Footer - Actions */}

@@ -1,13 +1,4 @@
-/**
- * Notification Context
- * Global notification system for success, error, warning, and info messages
- *
- * Features:
- * - Toast notifications with auto-dismiss
- * - Consistent error handling across the app
- * - Queue management for multiple notifications
- * - WCAG compliant announcements
- */
+// Global notification context + toast helpers.
 
 import React, {
   createContext,

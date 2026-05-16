@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Card, Button, Modal, Badge, Table } from "../UI";
-import { Eye, Calendar, Syringe, AlertTriangle } from "lucide-react";
+import { Eye, Calendar,          AlertTriangle } from "lucide-react";
 import apiClient from "../../utils/api";
 
 export const InfantVaccinationCard = ({ infant, onRefresh }) => {
@@ -9,18 +9,18 @@ export const InfantVaccinationCard = ({ infant, onRefresh }) => {
   const [vaccinationRecords, setVaccinationRecords] = useState([]);
   const [vaccinationSchedule, setVaccinationSchedule] = useState([]);
 
-  const getVaccineStatus = (date) => {
-    if (!date) return { status: "pending", variant: "warning" };
 
-    const vaccinatedDate = new Date(date);
-    const today = new Date();
 
-    if (vaccinatedDate <= today) {
-      return { status: "completed", variant: "success" };
-    } else {
-      return { status: "pending", variant: "warning" };
-    }
-  };
+
+
+
+
+
+
+
+
+
+
 
   const getNextVaccination = () => {
     if (!vaccinationSchedule.length) return null;
@@ -58,7 +58,7 @@ export const InfantVaccinationCard = ({ infant, onRefresh }) => {
 
   const nextVaccination = getNextVaccination();
 
-  return (
+  return(
     <>
       <Card className="hover:shadow-lg transition-shadow">
         <div className="flex items-start justify-between">
@@ -72,7 +72,7 @@ export const InfantVaccinationCard = ({ infant, onRefresh }) => {
             </p>
 
             <div className="mt-3 space-y-2">
-              {nextVaccination ? (
+              {nextVaccination ?(
                 <div className="flex items-center space-x-2">
                   <Calendar className="w-4 h-4 text-primary-500" />
                   <span className="text-sm">
@@ -90,13 +90,13 @@ export const InfantVaccinationCard = ({ infant, onRefresh }) => {
                   >
                     {nextVaccination.vaccine_name}
                   </Badge>
-                </div>
-              ) : (
+                </div>)
+                :(
                 <div className="flex items-center space-x-2 text-gray-500">
                   <AlertTriangle className="w-4 h-4" />
                   <span className="text-sm">No upcoming vaccinations</span>
-                </div>
-              )}
+                </div>)
+               }
             </div>
           </div>
 
@@ -138,7 +138,7 @@ export const InfantVaccinationCard = ({ infant, onRefresh }) => {
       </Card>
 
       {/* Details Modal */}
-      {showDetailsModal && (
+      {showDetailsModal &&(
         <Modal
           title={`${infant.first_name} ${infant.last_name} - Vaccination Details`}
           onClose={() => setShowDetailsModal(false)}
@@ -186,9 +186,9 @@ export const InfantVaccinationCard = ({ infant, onRefresh }) => {
                   {
                     Header: "Vaccine",
                     accessor: "vaccine_name",
-                    Cell: ({ value }) => (
-                      <span className="font-medium">{value}</span>
-                    ),
+                    Cell: ({ value }) =>(
+                      <span className="font-medium">{value}</span>)
+                     ,
                   },
                   {
                     Header: "Date Administered",
@@ -209,13 +209,13 @@ export const InfantVaccinationCard = ({ infant, onRefresh }) => {
                   {
                     Header: "Status",
                     accessor: "status",
-                    Cell: ({ value }) => (
+                    Cell: ({ value }) =>(
                       <Badge
                         variant={value === "completed" ? "success" : "warning"}
                       >
                         {value}
-                      </Badge>
-                    ),
+                      </Badge>)
+                     ,
                   },
                 ]}
                 data={vaccinationRecords}
@@ -229,9 +229,9 @@ export const InfantVaccinationCard = ({ infant, onRefresh }) => {
                   {
                     Header: "Vaccine",
                     accessor: "vaccine_name",
-                    Cell: ({ value }) => (
-                      <span className="font-medium">{value}</span>
-                    ),
+                    Cell: ({ value }) =>(
+                      <span className="font-medium">{value}</span>)
+                     ,
                   },
                   {
                     Header: "Scheduled Date",
@@ -246,13 +246,13 @@ export const InfantVaccinationCard = ({ infant, onRefresh }) => {
                   {
                     Header: "Status",
                     accessor: "status",
-                    Cell: ({ value }) => (
+                    Cell: ({ value }) =>(
                       <Badge
                         variant={value === "pending" ? "warning" : "success"}
                       >
                         {value}
-                      </Badge>
-                    ),
+                      </Badge>)
+                     ,
                   },
                 ]}
                 data={vaccinationSchedule}
@@ -262,23 +262,23 @@ export const InfantVaccinationCard = ({ infant, onRefresh }) => {
             {/* Medical History */}
             <Card title="Medical History">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {infant.allergies && (
+                {infant.allergies &&(
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Allergies
                     </label>
                     <p className="text-gray-900">{infant.allergies}</p>
-                  </div>
-                )}
-                {infant.medical_conditions && (
+                  </div>)
+                 }
+                {infant.medical_conditions &&(
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Medical Conditions
                     </label>
                     <p className="text-gray-900">{infant.medical_conditions}</p>
-                  </div>
-                )}
-                {infant.family_medical_history && (
+                  </div>)
+                 }
+                {infant.family_medical_history &&(
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Family Medical History
@@ -286,8 +286,8 @@ export const InfantVaccinationCard = ({ infant, onRefresh }) => {
                     <p className="text-gray-900">
                       {infant.family_medical_history}
                     </p>
-                  </div>
-                )}
+                  </div>)
+                 }
               </div>
             </Card>
 
@@ -303,8 +303,8 @@ export const InfantVaccinationCard = ({ infant, onRefresh }) => {
               </Button>
             </div>
           </div>
-        </Modal>
-      )}
-    </>
-  );
-};
+        </Modal>)
+       }
+    </>)
+   ;                                                          }
+ ;

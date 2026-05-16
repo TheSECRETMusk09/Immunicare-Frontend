@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import useGuardianNotifications from "../hooks/useGuardianNotifications";
 import { useSocket } from "../contexts/SocketContext";
 import { format, isToday, isYesterday, isThisWeek } from "date-fns";
@@ -25,8 +25,6 @@ import {
   ChevronRight,
   MoreVertical,
   MailOpen,
-  RefreshCw,
-  User
 } from 'lucide-react';
 
 const NOTIFICATION_CATEGORY_CONFIG = {
@@ -62,10 +60,12 @@ const NOTIFICATION_CATEGORY_CONFIG = {
   },
 };
 
-const GUARDIAN_FILTER_TABS = GUARDIAN_CATEGORY_FILTER_OPTIONS.map((option) => ({
-  id: option.value,
-  label: option.label,
-}));
+const GUARDIAN_FILTER_TABS = GUARDIAN_CATEGORY_FILTER_OPTIONS
+  .filter((option) => option.value === 'all' || option.value === 'unread')
+  .map((option) => ({
+    id: option.value,
+    label: option.label,
+  }));
 
 const normalizeGuardianNotification = (notification = {}) => {
   const category =
@@ -247,7 +247,6 @@ const NotificationItem = ({ notification, onMarkRead, onMarkUnread, onDelete }) 
 };
 
 const GuardianNotificationsPage = () => {
-  const navigate = useNavigate();
 
   // Use the hook for notifications with caching
   const {
@@ -425,27 +424,6 @@ const GuardianNotificationsPage = () => {
         title="Notifications"
         subtitle="Stay updated with your children's health"
         icon={<Bell className="w-8 h-8 text-white" />}
-        actions={
-          <div className="hidden min-[1025px]:flex guardian-desktop-pageheader-actions">
-            <button
-              type="button"
-              onClick={handleRefresh}
-              className="guardian-desktop-pageheader-icon-btn"
-              aria-label="Refresh notifications"
-            >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate('/guardian/profile')}
-              className="guardian-desktop-pageheader-icon-btn"
-              aria-label="Open profile"
-            >
-              <User className="w-4 h-4" />
-            </button>
-          </div>
-        }
       />
 
       <main className="guardian-page-content space-y-4 md:space-y-5 lg:space-y-6">

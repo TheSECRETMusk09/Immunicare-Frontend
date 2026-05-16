@@ -223,14 +223,10 @@ export const buildInfantSearchText = (infant = {}) => {
     controlNumber,
     infant.infant_control_number,
     infant.patient_control_number,
-    infant.guardian_name,
-    infant.mother_name,
-    infant.father_name,
-    infant.cellphone_number,
-    infant.contact,
-    infant.contact_number,
-    infant.guardian_phone,
-    infant.primary_contact,
+    // FIX: Client-side child search must NOT match against guardian/parent
+    // names or contact numbers. Including those fields caused 'samorin' to
+    // surface every child whose GUARDIAN was named Samorin, regardless of
+    // the child's own last name. Restricted haystack to child identity only.
     rawDob,
     buildDateSearchTokens(rawDob),
   ];

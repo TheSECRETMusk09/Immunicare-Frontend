@@ -446,13 +446,12 @@ const Settings = () => {
     () => ({
       facility: {
         label: "Facility",
-        icon: "🏥",
+        icon: "",
         description: "Clinic information and operating details",
         sections: [
           {
             id: "clinicInfo",
             title: "Clinic Information",
-            icon: "📋",
             fields: [
               {
                 key: "clinicName",
@@ -502,13 +501,12 @@ const Settings = () => {
       },
       preferences: {
         label: "Preferences",
-        icon: "🎨",
+        icon: "",
         description: "Display and system preferences",
         sections: [
           {
             id: "appearance",
             title: "Appearance",
-            icon: "🌗",
             fields: [
               {
                 key: "theme",
@@ -526,7 +524,6 @@ const Settings = () => {
           {
             id: "localization",
             title: "Date & Time Format",
-            icon: "📅",
             fields: [
               {
                 key: "dateFormat",
@@ -553,13 +550,12 @@ const Settings = () => {
       },
       alerts: {
         label: "Alerts & Thresholds",
-        icon: "🔔",
+        icon: "",
         description: "Configure system alerts and reminders",
         sections: [
           {
             id: "inventoryAlerts",
             title: "Inventory Alerts",
-            icon: "📦",
             fields: [
               {
                 key: "lowStockThreshold",
@@ -573,7 +569,6 @@ const Settings = () => {
           {
             id: "appointmentAlerts",
             title: "Appointment Reminders",
-            icon: "📅",
             fields: [
               {
                 key: "appointmentReminderLeadTime",
@@ -589,13 +584,13 @@ const Settings = () => {
       },
       security: {
         label: "Security",
-        icon: "🔒",
+        icon: "",
         description: "Session and access controls",
         sections: [
           {
             id: "session",
             title: "Session Settings",
-            icon: "⏱️",
+            icon: "",
             fields: [
               {
                 key: "sessionTimeout",
@@ -817,8 +812,7 @@ const Settings = () => {
             {/* Left side: Icon + Title + Subtitle */}
             <div className="flex items-center gap-3 min-w-0">
               <div className="text-xl sm:text-2xl flex-shrink-0">
-                <span>⚙️</span>
-              </div>
+                </div>
               <div className="min-w-0">
                 <h2 className="text-lg sm:text-xl lg:text-2xl font-bold truncate">
                   Settings

@@ -2,61 +2,61 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Card,
-  CardContent,
-  Typography,
-  Button,
+
+  Typography ,
+  Button    ,
   TextField,
-  Table,
+  Table    ,
   TableBody,
   TableCell,
   TableContainer,
-  TableHead,
-  TableRow,
+  TableHead     ,
+  TableRow ,
   TablePagination,
-  Paper,
+  Paper          ,
   IconButton,
-  Chip,
+  Chip      ,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Grid,
+  Grid         ,
   FormControl,
-  InputLabel,
-  Select,
+  InputLabel ,
+  Select    ,
   MenuItem,
   InputAdornment,
-  Skeleton,
-  Alert,
+  Skeleton      ,
+  Alert   ,
   Snackbar,
-  Tooltip,
+  Tooltip ,
   Divider,
-  Avatar,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar,
+  Avatar ,
+
+
+
+
   Checkbox,
-  FormControlLabel,
-  Toolbar,
+
+
 } from "@mui/material";
 import {
   Search,
   FilterList,
-  Download,
+
   Visibility,
-  LocalHospital,
-  CalendarToday,
-  Person,
-  PictureAsPdf,
-  TableChart,
-  Print,
-  Close,
-  Refresh,
+
+
+  Person    ,
+  PictureAsPdf ,
+  TableChart   ,
+
+  Close ,
+  Refresh     ,
   CheckCircle,
-  Warning,
+
   AccessTime,
-  MoreVert,
+
   ChildCare,
 } from "@mui/icons-material";
 import { format, parseISO, differenceInMonths } from "date-fns";
@@ -87,7 +87,7 @@ const VaccinationRecordsManager = () => {
   const [selectedRecord, setSelectedRecord] = useState(null);
 
   // Certificate generation
-  const [certificateOpen, setCertificateOpen] = useState(false);
+                                                useState(false);
   const [generatingCertificate, setGeneratingCertificate] = useState(false);
 
   // Vaccines list for filter
@@ -356,7 +356,7 @@ const VaccinationRecordsManager = () => {
   };
 
   if (error) {
-    return (
+    return(
       <Box sx={{ p: 3 }}>
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
@@ -368,11 +368,11 @@ const VaccinationRecordsManager = () => {
         >
           Retry
         </Button>
-      </Box>
-    );
+      </Box>)
+     ;
   }
 
-  return (
+  return(
     <Box sx={{ p: 3 }}>
       {/* Header */}
       <Box
@@ -385,15 +385,15 @@ const VaccinationRecordsManager = () => {
           Vaccination Records
         </Typography>
         <Box display="flex" gap={1}>
-          {selectedRecords.length > 0 && (
+          {selectedRecords.length > 0 &&(
             <Button
               variant="outlined"
               startIcon={<TableChart />}
               onClick={() => exportRecords("csv")}
             >
               Export Selected ({selectedRecords.length})
-            </Button>
-          )}
+            </Button>)
+           }
           <Button
             variant="contained"
             startIcon={<FilterList />}
@@ -405,7 +405,7 @@ const VaccinationRecordsManager = () => {
       </Box>
 
       {/* Filters */}
-      {showFilters && (
+      {showFilters &&(
         <Paper sx={{ p: 2, mb: 3 }}>
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} md={3}>
@@ -415,11 +415,11 @@ const VaccinationRecordsManager = () => {
                 value={searchQuery}
                 onChange={handleSearch}
                 InputProps={{
-                  startAdornment: (
+                  startAdornment:(
                     <InputAdornment position="start">
                       <Search />
-                    </InputAdornment>
-                  ),
+                    </InputAdornment>)
+                   ,
                 }}
                 placeholder="Search by name..."
               />
@@ -433,11 +433,11 @@ const VaccinationRecordsManager = () => {
                   label="Vaccine"
                 >
                   <MenuItem value="">All Vaccines</MenuItem>
-                  {vaccines.map((v) => (
+                  {vaccines.map((v) =>(
                     <MenuItem key={v.id} value={v.id}>
                       {v.name}
-                    </MenuItem>
-                  ))}
+                    </MenuItem>)
+                   )}
                 </Select>
               </FormControl>
             </Grid>
@@ -469,8 +469,8 @@ const VaccinationRecordsManager = () => {
               </Button>
             </Grid>
           </Grid>
-        </Paper>
-      )}
+        </Paper>)
+       }
 
       {/* Records Table */}
       <Card>
@@ -502,26 +502,26 @@ const VaccinationRecordsManager = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {loading ? (
-                Array.from(new Array(rowsPerPage)).map((_, idx) => (
+              {loading ?
+                                                      (Array.from(new Array(rowsPerPage)).map((_,idx)=>(
                   <TableRow key={idx}>
-                    {Array.from(new Array(9)).map((_, colIdx) => (
+                    {Array.from(new Array(9)).map((_, colIdx) =>(
                       <TableCell key={colIdx}>
                         <Skeleton variant="text" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : records.length === 0 ? (
+                      </TableCell>)
+                     )}
+                  </TableRow>)
+                 ))
+                : records.length === 0 ?(
                 <TableRow>
                   <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
                     <Typography color="textSecondary">
                       No vaccination records found
                     </Typography>
                   </TableCell>
-                </TableRow>
-              ) : (
-                records.map((record) => (
+                </TableRow>)
+                :
+                           (records.map((record)=>(
                   <TableRow
                     key={record.id}
                     hover
@@ -599,11 +599,11 @@ const VaccinationRecordsManager = () => {
                         color={getStatusColor(record.status)}
                         size="small"
                         icon={
-                          record.status === "completed" ? (
-                            <CheckCircle />
-                          ) : (
-                            <AccessTime />
-                          )
+                          record.status === "completed" ?(
+                            <CheckCircle />)
+                            :(
+                            <AccessTime />)
+
                         }
                       />
                     </TableCell>
@@ -626,9 +626,9 @@ const VaccinationRecordsManager = () => {
                         </IconButton>
                       </Tooltip>
                     </TableCell>
-                  </TableRow>
-                ))
-              )}
+                  </TableRow>)
+                 ))
+               }
             </TableBody>
           </Table>
         </TableContainer>
@@ -667,7 +667,7 @@ const VaccinationRecordsManager = () => {
           </Box>
         </DialogTitle>
         <DialogContent>
-          {selectedRecord && (
+          {selectedRecord &&(
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <Typography variant="subtitle2" color="textSecondary">
@@ -738,7 +738,7 @@ const VaccinationRecordsManager = () => {
                 </Typography>
               </Grid>
 
-              {selectedRecord.notes && (
+              {selectedRecord.notes &&(
                 <Grid item xs={12}>
                   <Typography variant="subtitle2" color="textSecondary">
                     Notes
@@ -746,10 +746,10 @@ const VaccinationRecordsManager = () => {
                   <Typography variant="body2">
                     {selectedRecord.notes}
                   </Typography>
-                </Grid>
-              )}
-            </Grid>
-          )}
+                </Grid>)
+               }
+            </Grid>)
+           }
         </DialogContent>
         <DialogActions>
           <Button
@@ -786,8 +786,8 @@ const VaccinationRecordsManager = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Box>
-  );
+    </Box>)
+   ;
 };
 
 export default VaccinationRecordsManager;

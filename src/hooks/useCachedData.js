@@ -7,7 +7,7 @@ import {
   normalizeGuardianNotifications,
 } from "../utils/guardianDataNormalizers";
 
-const STALE_TIMES = {
+const staleTimes = {
   dashboardStats: 3 * 60 * 1000,
   dashboardLists: 10 * 60 * 1000,
   guardian: 10 * 60 * 1000,
@@ -16,11 +16,11 @@ const STALE_TIMES = {
   monitoring: 60 * 1000,
 };
 
-const GC_TIMES = {
+const gcTimes = {
   standard: 30 * 60 * 1000,
 };
 
-const isQueryFresh = (queryClient, queryKey, staleTime) => {
+const isFresh = (queryClient, queryKey, staleTime) => {
   const state = queryClient.getQueryState(queryKey);
   if (!state?.dataUpdatedAt) {
     return false;
@@ -29,7 +29,6 @@ const isQueryFresh = (queryClient, queryKey, staleTime) => {
   return Date.now() - state.dataUpdatedAt < staleTime;
 };
 
-// Query keys for consistent caching
 export const queryKeys = {
   dashboard: {
     stats: ["dashboard", "stats"],
@@ -83,10 +82,6 @@ export const queryKeys = {
   },
 };
 
-/**
- * Hook for fetching dashboard statistics
- * Cached briefly to keep admin metrics responsive after mutations
- */
 export const useDashboardStats = () => {
   return useQuery({
     queryKey: queryKeys.dashboard.stats,
@@ -94,17 +89,13 @@ export const useDashboardStats = () => {
       const response = await apiClient.getDashboardStats();
       return response;
     },
-    staleTime: STALE_TIMES.dashboardStats,
-    gcTime: GC_TIMES.standard,
+    staleTime: staleTimes.dashboardStats,
+    gcTime: gcTimes.standard,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });
 };
 
-/**
- * Hook for fetching dashboard appointments
- * Cached for 10 minutes
- */
 export const useDashboardAppointments = (limit = 10) => {
   return useQuery({
     queryKey: [...queryKeys.dashboard.appointments, limit],
@@ -114,17 +105,13 @@ export const useDashboardAppointments = (limit = 10) => {
       if (Array.isArray(response)) return response;
       return response?.appointments || [];
     },
-    staleTime: STALE_TIMES.dashboardLists,
-    gcTime: GC_TIMES.standard,
+    staleTime: staleTimes.dashboardLists,
+    gcTime: gcTimes.standard,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });
 };
 
-/**
- * Hook for fetching dashboard infants
- * Cached for 10 minutes
- */
 export const useDashboardInfants = () => {
   return useQuery({
     queryKey: queryKeys.dashboard.infants,
@@ -135,17 +122,13 @@ export const useDashboardInfants = () => {
       if (Array.isArray(response)) return response;
       return response?.infants || [];
     },
-    staleTime: STALE_TIMES.dashboardLists,
-    gcTime: GC_TIMES.standard,
+    staleTime: staleTimes.dashboardLists,
+    gcTime: gcTimes.standard,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });
 };
 
-/**
- * Hook for fetching dashboard guardians
- * Cached for 10 minutes
- */
 export const useDashboardGuardians = () => {
   return useQuery({
     queryKey: queryKeys.dashboard.guardians,
@@ -156,17 +139,13 @@ export const useDashboardGuardians = () => {
       if (Array.isArray(response)) return response;
       return response?.guardians || [];
     },
-    staleTime: STALE_TIMES.dashboardLists,
-    gcTime: GC_TIMES.standard,
+    staleTime: staleTimes.dashboardLists,
+    gcTime: gcTimes.standard,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });
 };
 
-/**
- * Hook for fetching vaccine inventory
- * Cached for 10 minutes
- */
 export const useVaccineInventory = () => {
   return useQuery({
     queryKey: queryKeys.dashboard.inventory,
@@ -177,17 +156,13 @@ export const useVaccineInventory = () => {
       if (Array.isArray(response)) return response;
       return response?.inventory || [];
     },
-    staleTime: STALE_TIMES.dashboardLists,
-    gcTime: GC_TIMES.standard,
+    staleTime: staleTimes.dashboardLists,
+    gcTime: gcTimes.standard,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });
 };
 
-/**
- * Hook for fetching vaccination analytics
- * Cached for 10 minutes
- */
 export const useVaccinationAnalytics = (period = "month") => {
   return useQuery({
     queryKey: [...queryKeys.dashboard.analytics, period],
@@ -195,17 +170,13 @@ export const useVaccinationAnalytics = (period = "month") => {
       const response = await apiClient.getVaccinationAnalytics({ period });
       return response;
     },
-    staleTime: STALE_TIMES.dashboardLists,
-    gcTime: GC_TIMES.standard,
+    staleTime: staleTimes.dashboardLists,
+    gcTime: gcTimes.standard,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });
 };
 
-/**
- * Hook for fetching admin vaccination monitoring data
- * Includes full infant vaccination history + next-dose/upcoming appointment rollups
- */
 export const useAdminVaccinationMonitoring = (filters = {}, options = {}) => {
   const { enabled = true, refetchInterval = 60 * 1000 } = options;
 
@@ -216,17 +187,13 @@ export const useAdminVaccinationMonitoring = (filters = {}, options = {}) => {
       return response || { success: true, summary: {}, data: [] };
     },
     enabled,
-    staleTime: STALE_TIMES.monitoring,
-    gcTime: GC_TIMES.standard,
+    staleTime: staleTimes.monitoring,
+    gcTime: gcTimes.standard,
     refetchInterval,
     refetchOnWindowFocus: false,
   });
 };
 
-/**
- * Hook for fetching guardian's children
- * Cached for 10 minutes
- */
 export const useGuardianChildren = (guardianId) => {
   return useQuery({
     queryKey: queryKeys.guardian.children(guardianId),
@@ -235,18 +202,14 @@ export const useGuardianChildren = (guardianId) => {
       const response = await apiClient.getInfantsByGuardian(guardianId);
       return normalizeGuardianChildren(response);
     },
-    staleTime: STALE_TIMES.guardian,
-    gcTime: GC_TIMES.standard,
+    staleTime: staleTimes.guardian,
+    gcTime: gcTimes.standard,
     enabled: !!guardianId,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });
 };
 
-/**
- * Hook for fetching guardian's appointments
- * Cached for 10 minutes
- */
 export const useGuardianAppointments = (guardianId, options = {}) => {
   const { limit = 10 } = options;
   return useQuery({
@@ -258,18 +221,14 @@ export const useGuardianAppointments = (guardianId, options = {}) => {
       });
       return normalizeGuardianAppointments(response);
     },
-    staleTime: STALE_TIMES.guardian,
-    gcTime: GC_TIMES.standard,
+    staleTime: staleTimes.guardian,
+    gcTime: gcTimes.standard,
     enabled: !!guardianId,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });
 };
 
-/**
- * Hook for fetching guardian stats
- * Cached for 10 minutes
- */
 export const useGuardianStats = (guardianId) => {
   return useQuery({
     queryKey: queryKeys.guardian.stats(guardianId),
@@ -278,18 +237,14 @@ export const useGuardianStats = (guardianId) => {
       const response = await apiClient.getGuardianStats(guardianId);
       return normalizeGuardianStats(response);
     },
-    staleTime: STALE_TIMES.guardian,
-    gcTime: GC_TIMES.standard,
+    staleTime: staleTimes.guardian,
+    gcTime: gcTimes.standard,
     enabled: !!guardianId,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });
 };
 
-/**
- * Hook for fetching guardian notifications
- * Cached for 2 minutes
- */
 export const useGuardianNotifications = (limit = 10) => {
   return useQuery({
     queryKey: queryKeys.guardian.notifications("self", limit),
@@ -297,17 +252,13 @@ export const useGuardianNotifications = (limit = 10) => {
       const response = await apiClient.getGuardianNotifications({ limit });
       return normalizeGuardianNotifications(response);
     },
-    staleTime: STALE_TIMES.notifications,
-    gcTime: GC_TIMES.standard,
+    staleTime: staleTimes.notifications,
+    gcTime: gcTimes.standard,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });
 };
 
-/**
- * Hook for fetching appointment suggestions for an infant
- * Cached for 1 minute to balance freshness with performance
- */
 export const useAppointmentSuggestions = (
   infantId,
   guardianId = null,
@@ -324,17 +275,13 @@ export const useAppointmentSuggestions = (
       });
       return response?.data || response;
     },
-    staleTime: STALE_TIMES.appointmentSuggestions,
-    gcTime: GC_TIMES.standard,
+    staleTime: staleTimes.appointmentSuggestions,
+    gcTime: gcTimes.standard,
     enabled: !!infantId,
     refetchOnWindowFocus: false,
   });
 };
 
-/**
- * Prefetch dashboard data
- * Call this on route hover to prefetch data before navigation
- */
 export const usePrefetchDashboard = () => {
   const queryClient = useQueryClient();
 
@@ -343,52 +290,52 @@ export const usePrefetchDashboard = () => {
     const appointmentsKey = [...queryKeys.dashboard.appointments, 10];
 
     if (
-      !isQueryFresh(
+      !isFresh(
         queryClient,
         queryKeys.dashboard.stats,
-        STALE_TIMES.dashboardStats,
+        staleTimes.dashboardStats,
       )
     ) {
       prefetchTasks.push(
         queryClient.prefetchQuery({
           queryKey: queryKeys.dashboard.stats,
           queryFn: () => apiClient.getDashboardStats(),
-          staleTime: STALE_TIMES.dashboardStats,
-          gcTime: GC_TIMES.standard,
+          staleTime: staleTimes.dashboardStats,
+          gcTime: gcTimes.standard,
         }),
       );
     }
 
     if (
-      !isQueryFresh(
+      !isFresh(
         queryClient,
         appointmentsKey,
-        STALE_TIMES.dashboardLists,
+        staleTimes.dashboardLists,
       )
     ) {
       prefetchTasks.push(
         queryClient.prefetchQuery({
           queryKey: appointmentsKey,
           queryFn: () => apiClient.getDashboardAppointments({ limit: 10 }),
-          staleTime: STALE_TIMES.dashboardLists,
-          gcTime: GC_TIMES.standard,
+          staleTime: staleTimes.dashboardLists,
+          gcTime: gcTimes.standard,
         }),
       );
     }
 
     if (
-      !isQueryFresh(
+      !isFresh(
         queryClient,
         queryKeys.dashboard.infants,
-        STALE_TIMES.dashboardLists,
+        staleTimes.dashboardLists,
       )
     ) {
       prefetchTasks.push(
         queryClient.prefetchQuery({
           queryKey: queryKeys.dashboard.infants,
           queryFn: () => apiClient.getDashboardInfants(),
-          staleTime: STALE_TIMES.dashboardLists,
-          gcTime: GC_TIMES.standard,
+          staleTime: staleTimes.dashboardLists,
+          gcTime: gcTimes.standard,
         }),
       );
     }
@@ -403,10 +350,6 @@ export const usePrefetchDashboard = () => {
   return { prefetchDashboardData };
 };
 
-/**
- * Prefetch guardian data
- * Call this on guardian route hover
- */
 export const usePrefetchGuardian = () => {
   const queryClient = useQueryClient();
 
@@ -418,7 +361,7 @@ export const usePrefetchGuardian = () => {
     const statsKey = queryKeys.guardian.stats(guardianId);
     const prefetchTasks = [];
 
-    if (!isQueryFresh(queryClient, childrenKey, STALE_TIMES.guardian)) {
+    if (!isFresh(queryClient, childrenKey, staleTimes.guardian)) {
       prefetchTasks.push(
         queryClient.prefetchQuery({
           queryKey: childrenKey,
@@ -426,14 +369,14 @@ export const usePrefetchGuardian = () => {
             const response = await apiClient.getInfantsByGuardian(guardianId);
             return normalizeGuardianChildren(response);
           },
-          staleTime: STALE_TIMES.guardian,
-          gcTime: GC_TIMES.standard,
+          staleTime: staleTimes.guardian,
+          gcTime: gcTimes.standard,
         }),
       );
     }
 
     if (
-      !isQueryFresh(queryClient, appointmentsKey, STALE_TIMES.guardian)
+      !isFresh(queryClient, appointmentsKey, staleTimes.guardian)
     ) {
       prefetchTasks.push(
         queryClient.prefetchQuery({
@@ -444,13 +387,13 @@ export const usePrefetchGuardian = () => {
             });
             return normalizeGuardianAppointments(response);
           },
-          staleTime: STALE_TIMES.guardian,
-          gcTime: GC_TIMES.standard,
+          staleTime: staleTimes.guardian,
+          gcTime: gcTimes.standard,
         }),
       );
     }
 
-    if (!isQueryFresh(queryClient, statsKey, STALE_TIMES.guardian)) {
+    if (!isFresh(queryClient, statsKey, staleTimes.guardian)) {
       prefetchTasks.push(
         queryClient.prefetchQuery({
           queryKey: statsKey,
@@ -458,8 +401,8 @@ export const usePrefetchGuardian = () => {
             const response = await apiClient.getGuardianStats(guardianId);
             return normalizeGuardianStats(response);
           },
-          staleTime: STALE_TIMES.guardian,
-          gcTime: GC_TIMES.standard,
+          staleTime: staleTimes.guardian,
+          gcTime: gcTimes.standard,
         }),
       );
     }
@@ -474,10 +417,6 @@ export const usePrefetchGuardian = () => {
   return { prefetchGuardianData };
 };
 
-/**
- * Invalidate and refetch dashboard data
- * Use this after mutations to update cached data
- */
 export const useInvalidateDashboard = () => {
   const queryClient = useQueryClient();
 

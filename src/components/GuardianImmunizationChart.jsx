@@ -326,8 +326,7 @@ const EnhancedGuardianImmunizationChart = ({
     const today = new Date();
 
     if (dueDate < today) {
-      const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
-      if (daysOverdue === 0) return 'Due today';
+      const daysOverdue = Math.max(1, Math.floor((today - dueDate) / (1000 * 60 * 60 * 24)));
       if (daysOverdue === 1) return '1 day overdue';
       return `${daysOverdue} days overdue`;
     }

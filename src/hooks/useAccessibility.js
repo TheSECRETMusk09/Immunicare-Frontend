@@ -2,12 +2,10 @@ import { useEffect, useRef, useState, useCallback } from "react";
 
 let sharedAnnouncementRegion = null;
 let sharedAnnouncementTimeout = null;
+const focusableSelector =
+  'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
-/**
- * useFocusTrap Hook
- * Traps focus within a modal or dialog for keyboard navigation
- * WCAG 2.1 Level AA compliant
- */
+// Keep tab focus inside an active dialog.
 export const useFocusTrap = (isActive) => {
   const containerRef = useRef(null);
 
@@ -15,35 +13,31 @@ export const useFocusTrap = (isActive) => {
     if (!isActive || !containerRef.current) return;
 
     const container = containerRef.current;
-    const focusableElements = container.querySelectorAll(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    );
+    const focusableElements = container.querySelectorAll(focusableSelector);
     const firstElement = focusableElements[0];
     const lastElement = focusableElements[focusableElements.length - 1];
 
-    const handleTabKey = (e) => {
-      if (e.key !== "Tab") return;
+    const handleTabKey = (event) => {
+      if (event.key !== "Tab") return;
 
-      if (e.shiftKey) {
+      if (event.shiftKey) {
         if (document.activeElement === firstElement) {
           lastElement.focus();
-          e.preventDefault();
+          event.preventDefault();
         }
-      } else {
-        if (document.activeElement === lastElement) {
-          firstElement.focus();
-          e.preventDefault();
-        }
+      } else if (document.activeElement === lastElement) {
+        firstElement.focus();
+        event.preventDefault();
       }
     };
 
-    const handleEscapeKey = (e) => {
-      if (e.key === "Escape") {
+    const handleEscapeKey = (event) => {
+      if (event.key === "Escape") {
         container.dispatchEvent(new CustomEvent("close"));
       }
     };
 
-    // Focus first element
+    // Opening a modal without moving focus is a rough experience.
     firstElement?.focus();
 
     container.addEventListener("keydown", handleTabKey);
@@ -58,11 +52,7 @@ export const useFocusTrap = (isActive) => {
   return containerRef;
 };
 
-/**
- * useAnnounce Hook
- * Announces content to screen readers using ARIA live regions
- * WCAG 4.1.3 Status Messages
- */
+// Reuse one live region so announcements don't pile up in the DOM.
 export const useAnnounce = () => {
   const announce = useCallback((message, priority = "polite") => {
     if (typeof document === "undefined") {
@@ -98,11 +88,7 @@ export const useAnnounce = () => {
   return announce;
 };
 
-/**
- * useReducedMotion Hook
- * Detects if user prefers reduced motion
- * WCAG 2.2.2 Pause, Stop, Hide
- */
+// Watch the user's reduced motion preference.
 export const useReducedMotion = () => {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
@@ -110,7 +96,7 @@ export const useReducedMotion = () => {
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     setPrefersReducedMotion(mediaQuery.matches);
 
-    const handleChange = (e) => setPrefersReducedMotion(e.matches);
+    const handleChange = (event) => setPrefersReducedMotion(event.matches);
     mediaQuery.addEventListener("change", handleChange);
 
     return () => mediaQuery.removeEventListener("change", handleChange);
@@ -119,30 +105,27 @@ export const useReducedMotion = () => {
   return prefersReducedMotion;
 };
 
-/**
- * useKeyboardNavigation Hook
- * Enhanced keyboard navigation for lists and menus
- */
+// Simple arrow-key navigation for menus and listboxes.
 export const useKeyboardNavigation = (itemCount) => {
   const [focusedIndex, setFocusedIndex] = useState(-1);
 
   const handleKeyDown = useCallback(
-    (e) => {
-      switch (e.key) {
+    (event) => {
+      switch (event.key) {
         case "ArrowDown":
-          e.preventDefault();
+          event.preventDefault();
           setFocusedIndex((prev) => (prev + 1) % itemCount);
           break;
         case "ArrowUp":
-          e.preventDefault();
+          event.preventDefault();
           setFocusedIndex((prev) => (prev - 1 + itemCount) % itemCount);
           break;
         case "Home":
-          e.preventDefault();
+          event.preventDefault();
           setFocusedIndex(0);
           break;
         case "End":
-          e.preventDefault();
+          event.preventDefault();
           setFocusedIndex(itemCount - 1);
           break;
         default:
@@ -155,24 +138,21 @@ export const useKeyboardNavigation = (itemCount) => {
   return { focusedIndex, setFocusedIndex, handleKeyDown };
 };
 
-/**
- * useClickOutside Hook
- * Handles click outside detection with accessibility considerations
- */
+// Useful for popovers, drawers, and other dismissible UI.
 export const useClickOutside = (onClickOutside, isActive = true) => {
   const ref = useRef(null);
 
   useEffect(() => {
     if (!isActive) return;
 
-    const handleClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {
+    const handleClick = (event) => {
+      if (ref.current && !ref.current.contains(event.target)) {
         onClickOutside();
       }
     };
 
-    const handleEscape = (e) => {
-      if (e.key === "Escape") {
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
         onClickOutside();
       }
     };
@@ -189,11 +169,7 @@ export const useClickOutside = (onClickOutside, isActive = true) => {
   return ref;
 };
 
-/**
- * usePageTitle Hook
- * Manages document title for accessibility
- * WCAG 2.4.2 Page Titled
- */
+// Restore the previous title when the page unmounts.
 export const usePageTitle = (title) => {
   useEffect(() => {
     const previousTitle = document.title;
@@ -205,10 +181,7 @@ export const usePageTitle = (title) => {
   }, [title]);
 };
 
-/**
- * useSkipLink Hook
- * Manages skip to main content functionality
- */
+// Handy for skip links and keyboard shortcuts.
 export const useSkipLink = (mainContentId = "main-content") => {
   const skipToContent = useCallback(() => {
     const mainContent = document.getElementById(mainContentId);
@@ -222,10 +195,7 @@ export const useSkipLink = (mainContentId = "main-content") => {
   return skipToContent;
 };
 
-/**
- * useHighContrast Hook
- * Detects high contrast mode preference
- */
+// Watch for high-contrast mode where the browser supports it.
 export const useHighContrast = () => {
   const [isHighContrast, setIsHighContrast] = useState(false);
 
@@ -233,7 +203,7 @@ export const useHighContrast = () => {
     const mediaQuery = window.matchMedia("(prefers-contrast: high)");
     setIsHighContrast(mediaQuery.matches);
 
-    const handleChange = (e) => setIsHighContrast(e.matches);
+    const handleChange = (event) => setIsHighContrast(event.matches);
     mediaQuery.addEventListener("change", handleChange);
 
     return () => mediaQuery.removeEventListener("change", handleChange);
@@ -242,10 +212,7 @@ export const useHighContrast = () => {
   return isHighContrast;
 };
 
-/**
- * useAriaExpanded Hook
- * Manages aria-expanded state for togglable content
- */
+// Small helper for collapsible UI.
 export const useAriaExpanded = (initialState = false) => {
   const [isExpanded, setIsExpanded] = useState(initialState);
 

@@ -6,7 +6,7 @@ import { Button, Card, PageHeader } from "../../components/UI";
 import { normalizeArrayPayload } from "../../utils/apiUtils";
 
 export default function UserVaccinationSchedules() {
-  const { user, guardianId } = useAuth();
+  const {       guardianId } = useAuth();
   const navigate = useNavigate();
   const [children, setChildren] = useState([]);
   const [selectedChild, setSelectedChild] = useState(null);
@@ -151,7 +151,7 @@ export default function UserVaccinationSchedules() {
     const birthDate = new Date(dob);
     const scheduleDate = new Date(scheduledDate);
     const diffTime = Math.abs(scheduleDate - birthDate);
-    const diffMonths = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 30));
+    const diffMonths = Math.ceil(diffTime /( 1000 * 60 * 60 * 24 * 30));
     return diffMonths;
   };
 
@@ -161,25 +161,25 @@ export default function UserVaccinationSchedules() {
   };
 
   if (loading) {
-    return (
+    return(
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+      </div>)
+     ;
   }
 
   if (error) {
-    return (
+    return(
       <div className="text-center py-8">
         <div className="text-red-600">Error: {error}</div>
         <Button onClick={fetchChildren} className="mt-4">
           Retry
         </Button>
-      </div>
-    );
+      </div>)
+     ;
   }
 
-  return (
+  return(
     <div className="space-y-6">
       {/* Header */}
       <PageHeader
@@ -203,7 +203,7 @@ export default function UserVaccinationSchedules() {
         }
       />
 
-      {children.length === 0 ? (
+      {children.length === 0 ?(
         <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center">
           <div className="text-6xl mb-4">📅</div>
           <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">
@@ -216,8 +216,8 @@ export default function UserVaccinationSchedules() {
           <Button onClick={() => navigate("/guardian/children")}>
             Register Child
           </Button>
-        </div>
-      ) : (
+        </div>)
+        :(
         <>
           {/* Child Selector */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6">
@@ -225,7 +225,7 @@ export default function UserVaccinationSchedules() {
               Select Child
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {children.map((child) => (
+              {children.map((child) =>(
                 <button
                   key={child.id}
                   onClick={() => setSelectedChild(child)}
@@ -253,13 +253,13 @@ export default function UserVaccinationSchedules() {
                       </p>
                     </div>
                   </div>
-                </button>
-              ))}
+                </button>)
+               )}
             </div>
           </div>
 
           {/* Schedule Summary */}
-          {selectedChild && (
+          {selectedChild &&(
             <>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card className="p-4">
@@ -295,7 +295,7 @@ export default function UserVaccinationSchedules() {
               </div>
 
               {/* Schedule Content */}
-              {viewMode === "list" ? (
+              {viewMode === "list" ?(
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
                   <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                     <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
@@ -330,7 +330,7 @@ export default function UserVaccinationSchedules() {
                       <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         {schedules.map((schedule) => {
                           const status = getStatusBadge(schedule.status);
-                          return (
+                          return(
                             <tr
                               key={schedule.id}
                               className="hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -378,7 +378,7 @@ export default function UserVaccinationSchedules() {
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                 {schedule.status === "pending" ||
-                                schedule.status === "upcoming" ? (
+                                schedule.status === "upcoming" ?(
                                   <Button
                                     variant="secondary"
                                     size="sm"
@@ -387,25 +387,25 @@ export default function UserVaccinationSchedules() {
                                     }
                                   >
                                     📅 Schedule
-                                  </Button>
-                                ) : (
+                                  </Button>)
+                                  :(
                                   <Button
                                     variant="secondary"
                                     size="sm"
                                     disabled
                                   >
                                     ✅ Done
-                                  </Button>
-                                )}
+                                  </Button>)
+                                 }
                               </td>
-                            </tr>
-                          );
+                            </tr>)
+                           ;
                         })}
                       </tbody>
                     </table>
                   </div>
-                </div>
-              ) : (
+                </div>)
+                :(
                 // Calendar View Placeholder
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
@@ -422,8 +422,8 @@ export default function UserVaccinationSchedules() {
                       </p>
                     </div>
                   </div>
-                </div>
-              )}
+                </div>)
+               }
 
               {/* Quick Actions */}
               <div className="bg-white dark:bg-gray-800 rounded-xl p-6">
@@ -445,10 +445,10 @@ export default function UserVaccinationSchedules() {
                   </Button>
                 </div>
               </div>
-            </>
-          )}
-        </>
-      )}
-    </div>
-  );
+            </>)
+           }
+        </>)
+       }
+    </div>)
+   ;
 }

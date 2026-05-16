@@ -1,4 +1,5 @@
 import { toArrayPayload } from "./adminDataAdapters";
+import { normalizeRoleLabel } from "./roleLabels";
 
 export const HEALTH_WORKER_ROLE_NAMES = ["nurse", "midwife"];
 
@@ -38,9 +39,11 @@ const matchesClinicScope = (user, scopedClinicId) => {
 };
 
 const resolveRoleLabel = (user) =>
-  normalizeText(user?.display_name) ||
-  normalizeText(user?.role_display_name) ||
-  toTitleCase(user?.role_name || user?.role);
+  normalizeRoleLabel(
+    normalizeText(user?.display_name) ||
+      normalizeText(user?.role_display_name) ||
+      toTitleCase(user?.role_name || user?.role),
+  );
 
 const resolveUserLabel = (user) =>
   normalizeText(user?.username) ||

@@ -33,7 +33,7 @@ ChartJS.register(
 
 // Modern Chart Card component
 const ModernChartCard = ({ title, children, className = "" }) => {
-  return (
+  return(
     <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-lg transition-all duration-300 ${className}`}>
       <div className="p-6">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -41,12 +41,12 @@ const ModernChartCard = ({ title, children, className = "" }) => {
         </h3>
         {children}
       </div>
-    </div>
-  );
+    </div>)
+   ;
 };
 
 export const AnalyticsDashboard = () => {
-  const { stats, analytics, loading, error } = useDashboard();
+  const { stats,                     error } = useDashboard();
   const [timeRange, setTimeRange] = useState("month");
   const [chartType, setChartType] = useState("vaccinations");
   const [chartData, setChartData] = useState(null);
@@ -271,7 +271,7 @@ export const AnalyticsDashboard = () => {
   useEffect(() => {
     if (isConnected) {
       on("stats-update", (updatedStats) => {
-        setRealtimeStats((prev) => ({ ...prev, ...updatedStats }));
+        setRealtimeStats((prev) =>( { ...prev, ...updatedStats }));
       });
 
       on("chart-data-update", (data) => {
@@ -293,7 +293,7 @@ export const AnalyticsDashboard = () => {
           apiResponseTime:
             Math.max(0, displayStats.apiResponseTime + Math.floor(Math.random() * 10) - 5),
         };
-        setRealtimeStats((prev) => ({ ...(prev || defaultStats), ...updatedStats }));
+        setRealtimeStats((prev) =>( { ...(prev || defaultStats), ...updatedStats }));
       }, 5000);
 
       return () => clearInterval(interval);
@@ -303,7 +303,7 @@ export const AnalyticsDashboard = () => {
   if (error) return <Alert type="error">{error}</Alert>;
 
   // Common chart options for modern styling
-  const getCommonChartOptions = (title) => ({
+  const getCommonChartOptions = (title) =>( {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -382,7 +382,7 @@ export const AnalyticsDashboard = () => {
 
     switch (chartType) {
       case "vaccinations":
-        return (
+        return(
           <Bar
             data={data}
             options={{
@@ -396,10 +396,10 @@ export const AnalyticsDashboard = () => {
                 },
               },
             }}
-          />
-        );
+          />)
+         ;
       case "appointments":
-        return (
+        return(
           <Line
             data={data}
             options={{
@@ -412,17 +412,17 @@ export const AnalyticsDashboard = () => {
                 ...getCommonChartOptions().plugins,
               },
             }}
-          />
-        );
+          />)
+         ;
       case "inventory":
-        return (
+        return(
           <Bar
             data={data}
             options={{
               ...getCommonChartOptions("Vaccine Inventory"),
             }}
-          />
-        );
+          />)
+         ;
       default:
         return null;
     }
@@ -441,7 +441,7 @@ export const AnalyticsDashboard = () => {
     }
   };
 
-  return (
+  return(
     <div className="analytics-dashboard p-6">
       <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Analytics Dashboard</h1>
 
@@ -766,6 +766,6 @@ export const AnalyticsDashboard = () => {
           </Button>
         </div>
       </ModernChartCard>
-    </div>
-  );
+    </div>)
+   ;
 };

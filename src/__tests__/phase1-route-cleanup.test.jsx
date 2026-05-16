@@ -1,6 +1,6 @@
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen          } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
 import Sidebar from "../components/Sidebar";
@@ -14,49 +14,49 @@ import {
 const mockNavigate = jest.fn();
 let mockPathname = "/guardian/dashboard";
 
-jest.mock("react-router-dom", () => ({
+jest.mock("react-router-dom", () =>( {
   ...jest.requireActual("react-router-dom"),
   useNavigate: () => mockNavigate,
-  useLocation: () => ({ pathname: mockPathname }),
+  useLocation: () =>( { pathname: mockPathname }),
 }));
 
-jest.mock("../contexts/AuthContext", () => ({
-  useAuth: () => ({
+jest.mock("../contexts/AuthContext", () =>( {
+  useAuth: () =>( {
     user: { id: 1, firstName: "Guardian", username: "guardian.user" },
     guardianId: 1,
     logout: jest.fn(),
   }),
 }));
 
-jest.mock("../contexts/ThemeContext", () => ({
-  useTheme: () => ({
+jest.mock("../contexts/ThemeContext", () =>( {
+  useTheme: () =>( {
     darkMode: false,
     toggleDarkMode: jest.fn(),
   }),
 }));
 
-jest.mock("../contexts/NotificationContext", () => ({
-  useNotification: () => ({
+jest.mock("../contexts/NotificationContext", () =>( {
+  useNotification: () =>( {
     transferInSubmitted: jest.fn(),
     success: jest.fn(),
   }),
 }));
 
-jest.mock("../hooks/useCachedData", () => ({
-  usePrefetchGuardian: () => ({ prefetchGuardianData: jest.fn() }),
-  usePrefetchDashboard: () => ({ prefetchDashboardData: jest.fn() }),
-  useGuardianStats: () => ({ data: { childrenCount: 1 } }),
+jest.mock("../hooks/useCachedData", () =>( {
+  usePrefetchGuardian: () =>( { prefetchGuardianData: jest.fn() }),
+  usePrefetchDashboard: () =>( { prefetchDashboardData: jest.fn() }),
+  useGuardianStats: () =>( { data: { childrenCount: 1 } }),
 }));
 
-jest.mock("../hooks/useGuardianNotifications", () => () => ({
+jest.mock("../hooks/useGuardianNotifications", () => () =>( {
   unreadCount: 0,
 }));
 
-jest.mock("../services/notificationService", () => ({
+jest.mock("../services/notificationService", () =>( {
   sendTransferInSubmittedNotification: jest.fn(),
 }));
 
-jest.mock("../utils/api", () => ({
+jest.mock("../utils/api", () =>( {
   getGuardianStats: jest.fn().mockResolvedValue({ data: { childrenCount: 1 } }),
   getInfantsByGuardian: jest.fn().mockResolvedValue({
     data: [

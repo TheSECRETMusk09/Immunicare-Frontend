@@ -905,14 +905,14 @@ export const computeVaccinationComplianceSummary = ({
   const completed = timeline.filter((entry) => entry.status === "completed").length;
   const due = timeline.filter((entry) => entry.status === "due").length;
   const overdue = timeline.filter((entry) => entry.status === "overdue").length;
-  const pending = due + overdue;
   const upcoming = timeline.filter(
     (entry) => !["completed", "due", "overdue"].includes(entry.status),
   ).length;
-  const progressTotal = completed + pending;
+  const pending = upcoming;
+  const progressTotal = completed + due + pending + overdue;
 
   return {
-    dueCount: due + overdue,
+    dueCount: due,
     completed,
     pending,
     due,

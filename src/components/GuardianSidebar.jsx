@@ -20,6 +20,7 @@ import {
   Moon,
 } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
+import { normalizeRoleLabel } from "../utils/roleLabels";
 
 const PREFETCH_COOLDOWN_MS = 2 * 60 * 1000;
 
@@ -204,7 +205,6 @@ const GuardianSidebar = memo(
         hasSubItems: true,
         subItems: [
           { name: "All Records", icon: Syringe, path: "/guardian/vaccination-records" },
-          { name: "Immunization Chart", icon: FileSpreadsheet, path: "/guardian/immunization-chart" },
         ],
       },
 
@@ -517,10 +517,7 @@ const GuardianSidebar = memo(
                   <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 tracking-wide mt-0.5 mb-0.5 truncate">
                     {(() => {
                       const roleStr = user?.display_role || user?.role_name || user?.role || "Guardian";
-                      return roleStr
-                        .split('_')
-                        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-                        .join(' ');
+                      return normalizeRoleLabel(roleStr);
                     })()}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 truncate">

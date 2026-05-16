@@ -75,10 +75,10 @@ export default function StockAlerts() {
 
   const getSeverityBadge = (severity) => {
     const variants = {
-      critical: { color: "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400", icon: "🔴" },
-      high: { color: "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400", icon: "🟠" },
-      medium: { color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400", icon: "🟡" },
-      low: { color: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400", icon: "🔵" },
+      critical: { color: "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400", icon: "" },
+      high: { color: "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400", icon: "" },
+      medium: { color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400", icon: "" },
+      low: { color: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400", icon: "" },
     };
     const variant = variants[severity] || variants.low;
     return (

@@ -38,6 +38,7 @@ import {
   formatClinicDateLabel,
   formatClinicTime,
   formatTimeSlotLabel,
+  formatInfantDobShort,
 } from "../utils/dateUtils";
 import { normalizeArrayPayload } from "../utils/apiUtils";
 
@@ -234,6 +235,7 @@ export default function GuardianAppointmentBooking() {
   const prefilledDate = normalizeDatePrefill(
     searchParams.get("date") || location.state?.selectedDate || "",
   );
+  const todayDateStr = new Date().toISOString().split('T')[0];
 
   const [children, setChildren] = useState([]);
   const [selectedChild, setSelectedChild] = useState(null);
@@ -245,6 +247,7 @@ export default function GuardianAppointmentBooking() {
   const [timeSlotsLoading, setTimeSlotsLoading] = useState(false);
   const [timeSlots, setTimeSlots] = useState([]);
   const [timeSlotsFeedback, setTimeSlotsFeedback] = useState(null);
+  const [dateCapacity, setDateCapacity] = useState(null);
   const [blockedDates, setBlockedDates] = useState({});
 
   // Readiness state for automation
@@ -256,7 +259,7 @@ export default function GuardianAppointmentBooking() {
   const [formData, setFormData] = useState({
     infant_id: childId || "",
     vaccine_id: "",
-    scheduled_date: prefilledDate,
+    scheduled_date: prefilledDate && prefilledDate >= todayDateStr ? prefilledDate : todayDateStr,
     scheduled_time: "",
     type: "Vaccination",
     notes: "",
@@ -393,6 +396,15 @@ export default function GuardianAppointmentBooking() {
     fetchTimeSlots();
   }, [fetchTimeSlots]);
 
+  useEffect(() => {
+    setDateCapacity(null);
+    if (!formData.scheduled_date) return;
+    apiClient
+      .getAppointmentDailyCapacity({ date: formData.scheduled_date })
+      .then((result) => setDateCapacity(result || null))
+      .catch(() => setDateCapacity(null));
+  }, [formData.scheduled_date]);
+
   // Fetch child readiness when a child is selected
   const fetchChildReadiness = useCallback(async (infantId, scheduledDate = null) => {
     if (!infantId) return;
@@ -413,11 +425,13 @@ export default function GuardianAppointmentBooking() {
             ? String(nextRecommendedVaccine.vaccineId)
             : "";
           const nextVaccineId = prev.vaccine_id || recommendedVaccineId;
+          const today = new Date().toISOString().split('T')[0];
+          const clampToToday = (d) => (d && d >= today ? d : today);
           const nextScheduledDate =
             prev.scheduled_date ||
-            normalizeDatePrefill(readinessData?.nextAppointmentPrediction?.date) ||
-            normalizeDatePrefill(nextRecommendedVaccine?.earliestDate) ||
-            "";
+            clampToToday(normalizeDatePrefill(readinessData?.nextAppointmentPrediction?.date)) ||
+            clampToToday(normalizeDatePrefill(nextRecommendedVaccine?.earliestDate)) ||
+            today;
 
           return {
             ...prev,
@@ -796,7 +810,7 @@ export default function GuardianAppointmentBooking() {
                         Date of Birth
                       </p>
                       <p className="font-medium text-gray-900 dark:text-white">
-                        {new Date(selectedChild.dob).toLocaleDateString()}
+                        {formatInfantDobShort(selectedChild.dob)}
                       </p>
                     </div>
                     <div>
@@ -954,7 +968,7 @@ export default function GuardianAppointmentBooking() {
                               {child.first_name} {child.last_name}
                             </p>
                             <p className="text-sm text-gray-500 dark:text-gray-400 break-words">
-                              DOB: {new Date(child.dob).toLocaleDateString()}
+                              DOB: {formatInfantDobShort(child.dob)}
                               {child.control_number && (
                                 <span className="ml-2 text-emerald-600 dark:text-emerald-400">
                                   • Infant Control Number: {child.control_number}
@@ -1138,47 +1152,42 @@ export default function GuardianAppointmentBooking() {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Appointment Time (8AM - 4PM) <span className="text-red-500">*</span>
                       </label>
-                      <Select
-                        value={formData.scheduled_time}
-                        onChange={(e) => {
-                          clearBookingError();
-                          setFormData((prev) => ({
-                            ...prev,
-                            scheduled_time: e.target.value,
-                          }));
-                        }}
-                        onBlur={() => handleBlur("scheduled_time")}
-                        error={touched.scheduled_time ? errors.scheduled_time : undefined}
-                        disabled={
-                          !formData.scheduled_date ||
-                          !formData.vaccine_id ||
-                          timeSlotsLoading ||
-                          (timeSlotsFeedback && !timeSlotsFeedback.available)
-                        }
-                        className="w-full guardian-input"
-                      >
-                        <option value="">
-                          {!formData.vaccine_id
-                            ? "Due vaccine required first"
-                            : !formData.scheduled_date
-                              ? "Select date first"
-                              : timeSlotsLoading
-                                ? "Loading time slots..."
-                                : "Select time"}
-                        </option>
-                        {timeSlots.map((slot) => (
-                          <option key={slot} value={slot}>
-                            {formatTimeSlotLabel(slot)}
-                          </option>
-                        ))}
-                      </Select>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Available from 8:00 AM to 4:00 PM (12:00 PM - 1:00 PM lunch break), filtered by due vaccine stock and clinic availability.
-                      </p>
                       {!timeSlotsLoading && timeSlotsFeedback && !timeSlotsFeedback.available && (
                         <Alert variant="warning" className="mt-2">
                           {timeSlotsFeedback.message}
                         </Alert>
+                      )}
+                      {dateCapacity && (
+                        <div className="mt-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 px-3 py-2.5">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                              Daily Slot Availability
+                            </span>
+                            <span className={`text-[11px] font-bold ${
+                              dateCapacity.remaining === 0
+                                ? 'text-red-600 dark:text-red-400'
+                                : dateCapacity.remaining <= 50
+                                  ? 'text-amber-600 dark:text-amber-400'
+                                  : 'text-green-600 dark:text-green-400'
+                            }`}>
+                              {dateCapacity.remaining} available
+                            </span>
+                          </div>
+                          <div className="w-full h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                            <div
+                              className="h-1.5 rounded-full transition-all duration-500"
+                              style={{
+                                width: `${Math.min(100, (dateCapacity.current / dateCapacity.maximum) * 100)}%`,
+                                backgroundColor:
+                                  dateCapacity.remaining === 0
+                                    ? '#ef4444'
+                                    : dateCapacity.remaining <= 50
+                                      ? '#f59e0b'
+                                      : '#22c55e',
+                              }}
+                            />
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1252,7 +1261,7 @@ export default function GuardianAppointmentBooking() {
                         Date of Birth
                       </span>
                       <span className="font-medium text-gray-900 dark:text-white">
-                        {new Date(selectedChild.dob).toLocaleDateString()}
+                        {formatInfantDobShort(selectedChild.dob)}
                       </span>
                     </div>
                     <div className="flex flex-col gap-1 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between">

@@ -1,9 +1,9 @@
 import React, {
-  useState,
+  useState  ,
   useEffect,
   useCallback,
-  useMemo,
-  useRef,
+  useMemo    ,
+  useRef ,
 } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createPortal } from "react-dom";
@@ -33,118 +33,296 @@ import { APPROVED_VACCINE_NAMES } from "../constants/approvedVaccines";
 import { useAuth } from "../contexts/AuthContext";
 import PrintDateRangeControls from "./PrintDateRangeControls";
 import usePrintDateRange from "../hooks/usePrintDateRange";
+import VaccinationPeriodFilter from "./VaccinationPeriodFilter";
+import {
+  PERIOD_OPTIONS,
+  getVaccinationPeriodRange,
+  normalizeVaccinationPeriod,
+} from "../utils/vaccinationPeriods";
 import {
   filterItemsByPrintDateRange,
-  formatPrintDateRangeLabel,
   formatPrintDateValue,
   parseDateLikeValue,
   parseDateOnlyValue,
+  validatePrintDateRange,
 } from "../utils/printDateRange";
 import {
   downloadWordDocument,
-  downloadPdfFromHtml,
-  PRINT_PAGE_PRESETS,
+
+  PRINT_PAGE_PRESETS ,
 } from "../utils/printDocumentExport";
+import { normalizeRoleLabel } from "../utils/roleLabels";
 
 /**
  * Paper Configuration Inventory Management Component
  * Implements the layout from INVENTORY SHEET.docx with:
  * - Tab-based navigation only (no sub-navigations)
  * - Paper configuration layout for vaccinations
- * - Downloadable reports (CSV, PDF, Print)
- * - Improved stock alerts for used/unused vaccines and wasted vaccines
  */
 
-const INVENTORY_TAB_CONFIG = [
-  { key: "inventory_sheet", label: "Inventory Sheet" },
-  { key: "inventory_summary", label: "Inventory Summary" },
-  { key: "stock_movements", label: "Stock Movements" }
+const DOH_LGU_REPORT_ITEMS = [
+  {
+    rowNumber: 1,
+    label: "BCG",
+    aliases: ["bcg"],
+  },
+  {
+    rowNumber: 2,
+    label: "Hepatitis B",
+    aliases: ["hepa b", "hepatitis b", "hep b", "hepatitis b vaccine"],
+  },
+  {
+    rowNumber: 3,
+    label: "Pentavalent Vaccine (DPT-HepaB-Hib Vaccine)",
+    aliases: [
+      "penta valent",
+      "pentavalent",
+      "pentavalent vaccine",
+      "dpt hepab hib vaccine",
+      "dpt hepab hib",
+    ],
+  },
+  {
+    rowNumber: 4,
+    label: "Bivalent Oral Polio Vaccine (bOPV)",
+    aliases: [
+      "opv 20 doses",
+      "opv 20-doses",
+      "opv",
+      "bopv",
+      "bivalent oral polio vaccine",
+    ],
+  },
+  {
+    rowNumber: 5,
+    label: "Inactivated Polio Vaccine",
+    aliases: ["ipv multi dose", "ipv", "inactivated polio vaccine"],
+  },
+  {
+    rowNumber: 6,
+    label: "Pneumococcal Conjugate Vaccine (PCV 13/PCV 10)",
+    aliases: [
+      "pcv 13",
+      "pcv 10",
+      "pcv13",
+      "pcv10",
+      "pcv 13 / pcv 10",
+      "pcv",
+      "pcv 13/pcv 10",
+      "pneumococcal conjugate vaccine",
+    ],
+  },
+  {
+    rowNumber: 7,
+    label: "Measles Mumps and Rubella (MMR)",
+    aliases: ["mmr", "measles mumps rubella", "measles mumps and rubella"],
+  },
+  {
+    rowNumber: 8,
+    label: "Tetanus Diphtheria Toxoid",
+    aliases: [
+      "tetanus diphtheria toxoid",
+      "td vaccine",
+      "tetanus diphtheria",
+    ],
+  },
+  {
+    rowNumber: 9,
+    label: "Human Papillomavirus Vaccine",
+    aliases: ["human papillomavirus vaccine", "hpv vaccine", "hpv"],
+  },
+  {
+    rowNumber: 10,
+    label: "Influenza/Flu Vaccine",
+    aliases: ["influenza flu vaccine", "influenza vaccine", "flu vaccine"],
+  },
+  {
+    rowNumber: 11,
+    label: "Pneumococcal Polysaccharide Vaccine",
+    aliases: [
+      "pneumococcal polysaccharide vaccine",
+      "ppv vaccine",
+      "ppv23",
+      "ppv",
+    ],
+  },
+  {
+    rowNumber: 12,
+    label: "Hexaxim",
+    aliases: ["hexaxim"],
+  },
+  {
+    rowNumber: 13,
+    label: "Tetanus Toxoid",
+    aliases: ["tetanus toxoid", "tt vaccine", "tt"],
+  },
 ];
 
-const INVENTORY_TABLE_PAGE_SIZE = 20;
-const INVENTORY_ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
-
-const buildInventoryRowsPerPageOptions = (defaultSize) =>
-  Array.from(
-    new Set(
-      [defaultSize, ...INVENTORY_ROWS_PER_PAGE_OPTIONS].filter(
-        (value) => Number.isInteger(value) && value > 0,
-      ),
-    ),
-  ).sort((left, right) => left - right);
-
-const INVENTORY_DEFAULT_TAB_KEY = INVENTORY_TAB_CONFIG[0].key;
-const INVENTORY_TAB_STORAGE_KEY = "admin.inventory.activeTab";
-
-const INVENTORY_TAB_ALIASES = {
-  inventory_sheet: "inventory_sheet",
-  "inventory-sheet": "inventory_sheet",
-  stock_movements: "stock_movements",
-  "stock-movements": "stock_movements",
-  movements: "stock_movements",
-  transactions: "stock_movements",
-  suppliers: "inventory_sheet",
-  reports: "inventory_sheet",
-  inventory_summary: "inventory_summary",
-  "inventory-summary": "inventory_summary",
-  summary: "inventory_summary",
-  stock_alerts: "inventory_summary",
-  "stock-alerts": "inventory_summary",
-  alerts: "inventory_summary",
-  vaccine_monitoring: "inventory_summary",
-  "vaccine-monitoring": "inventory_summary",
-  monitoring: "inventory_summary",
-};
-
-const INVENTORY_TAB_PANEL_IDS = {
-  inventory_sheet: "inventory-panel-inventory-sheet",
-  inventory_summary: "inventory-panel-inventory-summary",
-  stock_movements: "inventory-panel-stock-movements",
-};
-
-const normalizeInventoryTabKey = (value) => {
-  if (value === undefined || value === null) {
-    return null;
-  }
-
-  const normalized = String(value).trim().toLowerCase().replace(/\s+/g, "_");
-  return INVENTORY_TAB_ALIASES[normalized] || null;
-};
-
-const getStoredInventoryTabKey = () => {
-  const sessionTab = normalizeInventoryTabKey(
-    safeSessionStorage.getItem(INVENTORY_TAB_STORAGE_KEY),
-  );
-  if (sessionTab) {
-    return sessionTab;
-  }
-
-  return normalizeInventoryTabKey(
-    safeLocalStorage.getItem(INVENTORY_TAB_STORAGE_KEY),
-  );
-};
-
-const persistInventoryTabKey = (tabKey) => {
-  const normalized = normalizeInventoryTabKey(tabKey);
-  if (!normalized) {
-    return;
-  }
-
-  safeSessionStorage.setItem(INVENTORY_TAB_STORAGE_KEY, normalized);
-  safeLocalStorage.setItem(INVENTORY_TAB_STORAGE_KEY, normalized);
-};
-
-const DEFAULT_PRINT_HEADER = {
-  healthCenter: "IMMUNICARE HEALTH CENTER",
-  barangay: "BARANGAY SAN NICOLAS",
-  city: "PASIG CITY",
-};
-
-const PRINT_REPORT_TYPES = {
+const INVENTORY_SHEET_FRAME_MAX_WIDTH = "10.4in";
+const INVENTORY_SHEET_SURFACE_MAX_WIDTH = "10.05in";
+const INVENTORY_SHEET_ROWS_PER_PAGE = 12;
+const INVENTORY_SHEET_COLUMN_WIDTH_PERCENTAGES = Object.freeze([
+  4, 20, 9, 9, 14, 7, 7, 8, 9, 7, 6,
+  ]);
+const DOH_LGU_REPORT_LEFT_SEAL_SRC = "/stock-form-doh-seal.png";
+const DOH_LGU_REPORT_RIGHT_SEAL_SRC = "/san-nicolas-logo.jpg";
+const PASIG_REPORT_SEAL_SRC = "/stock-form-pasig-seal.png";
+const DOH_REPORT_SEAL_SRC = DOH_LGU_REPORT_LEFT_SEAL_SRC;
+const INVENTORY_SHEET_LEFT_LOGO_SRC = DOH_REPORT_SEAL_SRC;
+const INVENTORY_SHEET_RIGHT_LOGO_SRC = "/san-nicolas-logo.jpg";
+const INVENTORY_SHEET_PDF_FRAME_WIDTH_MM = 312;
+const INVENTORY_SHEET_PDF_FRAME_PADDING_MM = 6.5;
+const DOH_LGU_REPORT_FILENAME_PREFIX = "doh-lgu-stock-inventory-report";
+const RIS_REPORT_FILENAME_PREFIX = "requisition-and-issue-slip";
+const RIS_PRIVATE_CLINIC_VALUE = "(leave blank)";
+const PRINT_REPORT_TYPES = Object.freeze({
   INVENTORY_SHEET: "inventory-sheet",
   DOH_LGU_STOCK_FORM: "doh-lgu-stock-form",
   REQUISITION_ISSUE_SLIP: "requisition-issue-slip",
+});
+const INVENTORY_REPORT_DELIVERY_TYPES = Object.freeze({
+  PRINT: "print",
+  PDF: "pdf",
+  WORD: "word",
+});
+const INVENTORY_PRINT_REPORT_OPTIONS = [
+  {
+    value: PRINT_REPORT_TYPES.INVENTORY_SHEET,
+    label: "Inventory Sheet",
+  },
+  {
+    value: PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM,
+    label: "DOH/LGU Stock Form",
+  },
+  {
+    value: PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP,
+    label: "RIS Form",
+  },
+];
+const PRINT_REPORT_COPY = Object.freeze({
+  inventorySheetTitle: "EPI VACCINE AND OTHER LOGISTICS INVENTORY FORM",
+  inventorySheetDepartment: "DEPARTMENT OF HEALTH (DOH)",
+  inventorySheetProgram: "Expanded Program on Immunization",
+  inventorySheetProcured: "Department of Health Procured",
+  inventorySheetHealthCenterLabel: "HEALTH CENTER:",
+  inventorySheetHealthCenterValue: "San Nicolas Health Center",
+  inventorySheetInventoryLine: "Inventory of Vaccines and Other Logistic",
+  inventorySheetCodeLabel: "Code",
+  dohLguTitle: "DOH and LGU Utilization / Stock Inventory Form",
+  dohLguSubtitle: "HEALTH FACILITY MONTHLY VACCINE STOCK INVENTORY REPORT",
+  risTitle: "REQUISITION AND ISSUE SLIP",
+  risSubtitle: "(VACCINES AND SUPPLIES)",
+  risMunicipality: "MUNICIPALITY OF PASIG",
+});
+const DEFAULT_PRINT_HEADER = Object.freeze({
+  healthCenter: "San Nicolas Health Center",
+  barangay: "San Nicolas",
+  city: "Pasig City",
+});
+
+const INVENTORY_REPORT_DELIVERY_OPTIONS = [
+  {
+    value: INVENTORY_REPORT_DELIVERY_TYPES.PRINT,
+    label: "Print Preview",
+  },
+  {
+    value: INVENTORY_REPORT_DELIVERY_TYPES.PDF,
+    label: "PDF Document",
+  },
+  {
+    value: INVENTORY_REPORT_DELIVERY_TYPES.WORD,
+    label: "Word Document",
+  },
+];
+
+const INVENTORY_REPORT_ORIENTATIONS = Object.freeze({
+  [PRINT_REPORT_TYPES.INVENTORY_SHEET]: "landscape",
+  [PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM]: "landscape",
+  [PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP]: "portrait",
+});
+
+const getInventoryReportOrientation = (reportType) =>
+  INVENTORY_REPORT_ORIENTATIONS[reportType] ||
+  INVENTORY_REPORT_ORIENTATIONS[PRINT_REPORT_TYPES.INVENTORY_SHEET];
+
+const getInventoryReportCssPageSettings = (
+  reportType = PRINT_REPORT_TYPES.INVENTORY_SHEET,
+) => {
+  const normalizedReportType = normalizeInventoryReportType(reportType);
+
+  if (normalizedReportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP) {
+    return {
+      pageCssSize: "legal portrait",
+      printMargin: "8mm",
+    };
+  }
+
+  if (
+    normalizedReportType === PRINT_REPORT_TYPES.INVENTORY_SHEET ||
+    normalizedReportType === PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM
+  ) {
+    return {
+      pageCssSize: "legal landscape",
+      printMargin: "8mm",
+    };
+  }
+
+  return {
+    pageCssSize: "A4 landscape",
+    printMargin: "15mm",
+  };
 };
+
+const getInventoryReportWordPagePreset = (
+  reportType = PRINT_REPORT_TYPES.INVENTORY_SHEET,
+) => {
+  const normalizedReportType = normalizeInventoryReportType(reportType);
+
+  if (normalizedReportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP) {
+    return {
+      ...PRINT_PAGE_PRESETS.legalPortrait,
+    };
+  }
+
+  if (
+    normalizedReportType === PRINT_REPORT_TYPES.INVENTORY_SHEET ||
+    normalizedReportType === PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM
+  ) {
+    return {
+      ...PRINT_PAGE_PRESETS.legalLandscape,
+    };
+  }
+
+  return {
+    ...PRINT_PAGE_PRESETS.a4Landscape,
+  };
+};
+
+export function getInventoryReportPdfConfig(reportType = "inventory-sheet") {
+  const normalizedReportType = normalizeInventoryReportType(reportType);
+
+  if (normalizedReportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP) {
+    return {
+      orientation: "portrait",
+      format: "legal",
+    };
+  }
+
+  if (
+    normalizedReportType === PRINT_REPORT_TYPES.INVENTORY_SHEET ||
+    normalizedReportType === PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM
+  ) {
+    return {
+      orientation: "landscape",
+      format: "legal",
+    };
+  }
+
+  return {
+    orientation: "landscape",
+    format: "a4",
+  };
+}
 
 const INVENTORY_VACCINE_MATCH_ALIASES = Object.freeze({
   BCG: ["bcg"],
@@ -157,7 +335,15 @@ const INVENTORY_VACCINE_MATCH_ALIASES = Object.freeze({
     "bopv",
     "bivalent oral polio vaccine",
   ],
-  "PCV 13/PCV 10": ["pcv 13", "pcv13", "pcv 10", "pcv10", "pcv 13/pcv 10", "pcv"],
+  "PCV 13/PCV 10": [
+    "pcv 13",
+    "pcv13",
+    "pcv 10",
+    "pcv10",
+    "pcv 13/pcv 10",
+    "pcv 13 / pcv 10",
+    "pcv",
+  ],
   MMR: ["mmr", "measles mumps rubella"],
   "IPV multi dose": ["ipv multi dose", "inactivated polio vaccine", "ipv"],
 });
@@ -200,120 +386,6 @@ const normalizeInventoryDisplayVaccineName = (value) => {
   return matchedEntry?.[0] || rawValue;
 };
 
-const PRINT_REPORT_COPY = {
-  inventorySheetTitle: "EPI VACCINE AND OTHER LOGISTICS INVENTORY FORM",
-  inventorySheetDepartment: "DEPARTMENT OF HEALTH (DOH)",
-  inventorySheetProgram: "Expanded Program on Immunization",
-  inventorySheetProcured: "Department of Health Procured",
-  inventorySheetHealthCenterLabel: "HEALTH CENTER:",
-  inventorySheetHealthCenterValue: "SAN NICOLAS HC",
-  inventorySheetInventoryLine: "Inventory of Vaccines and Other Logistic",
-  inventorySheetCodeLabel: "Code",
-  inventorySheetMonthLine: "For the Month: JANUARY",
-  dohLguTitle: "HEALTH FACILITY MONTHLY VACCINE STOCK INVENTORY REPORT",
-  dohLguSubtitle: "DOH and LGU Utilization / Stock Inventory Form",
-  risTitle: "REQUISITION AND ISSUE SLIP",
-  risSubtitle: "(VACCINES AND SUPPLIES)",
-  risMunicipality: "MUNICIPALITY OF PASIG",
-};
-
-const INVENTORY_PRINT_REPORT_OPTIONS = [
-  {
-    value: PRINT_REPORT_TYPES.INVENTORY_SHEET,
-    label: "Inventory Sheet",
-  },
-  {
-    value: PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM,
-    label: "DOH/LGU Stock Form",
-  },
-  {
-    value: PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP,
-    label: "RIS Form",
-  },
-];
-
-const INVENTORY_REPORT_DELIVERY_TYPES = Object.freeze({
-  PRINT: "print",
-  PDF: "pdf",
-  WORD: "word",
-});
-
-const INVENTORY_REPORT_DELIVERY_OPTIONS = [
-  {
-    value: INVENTORY_REPORT_DELIVERY_TYPES.PRINT,
-    label: "Print Preview",
-  },
-  {
-    value: INVENTORY_REPORT_DELIVERY_TYPES.PDF,
-    label: "PDF Document",
-  },
-  {
-    value: INVENTORY_REPORT_DELIVERY_TYPES.WORD,
-    label: "Word Document",
-  },
-];
-
-const getAvailableInventoryReportDeliveryOptions = (reportType) => {
-  const normalizedReportType = normalizeInventoryReportType(reportType);
-
-  if (
-    normalizedReportType === PRINT_REPORT_TYPES.INVENTORY_SHEET ||
-    normalizedReportType === PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM ||
-    normalizedReportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP
-  ) {
-    return INVENTORY_REPORT_DELIVERY_OPTIONS.filter(
-      (option) => option.value !== INVENTORY_REPORT_DELIVERY_TYPES.WORD,
-    );
-  }
-
-  return INVENTORY_REPORT_DELIVERY_OPTIONS;
-};
-
-const INVENTORY_REPORT_ORIENTATIONS = {
-  [PRINT_REPORT_TYPES.INVENTORY_SHEET]: "landscape",
-  [PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM]: "landscape",
-  [PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP]: "portrait",
-};
-
-// Keep RIS exports portrait-only within the Inventory module so other
-// document templates can continue using their existing page settings.
-const RIS_EXPORT_PAGE = Object.freeze({
-  orientation: "portrait",
-  wordPagePreset: PRINT_PAGE_PRESETS.legalPortrait,
-  pdfFormat: "legal",
-  printPageSize: "legal portrait",
-});
-
-const INVENTORY_PRINT_PAGE_SIZES = {
-  [PRINT_REPORT_TYPES.INVENTORY_SHEET]: "legal landscape",
-  [PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM]: "legal landscape",
-  [PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP]: RIS_EXPORT_PAGE.printPageSize,
-};
-
-const getInventoryReportOrientation = (reportType) =>
-  INVENTORY_REPORT_ORIENTATIONS[reportType] ||
-  INVENTORY_REPORT_ORIENTATIONS[PRINT_REPORT_TYPES.INVENTORY_SHEET];
-
-const getInventoryReportWordPagePreset = (reportType) =>
-  getInventoryReportOrientation(reportType) === "portrait"
-    ? PRINT_PAGE_PRESETS.legalPortrait
-    : PRINT_PAGE_PRESETS.legalLandscape;
-
-const getInventoryPrintPageSize = (reportType) =>
-  INVENTORY_PRINT_PAGE_SIZES[reportType] ||
-  INVENTORY_PRINT_PAGE_SIZES[PRINT_REPORT_TYPES.INVENTORY_SHEET];
-
-export const getInventoryReportPdfConfig = (reportType) => ({
-  orientation:
-    reportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP
-      ? RIS_EXPORT_PAGE.orientation
-      : getInventoryReportOrientation(reportType),
-  format:
-    reportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP
-      ? RIS_EXPORT_PAGE.pdfFormat
-      : "legal",
-});
-
 const normalizeInventoryMatchToken = (value) =>
   String(value || "")
     .trim()
@@ -323,13 +395,19 @@ const normalizeInventoryMatchToken = (value) =>
     .trim();
 
 const getInventoryMatchTokens = (value) => {
-  const normalizedValue = String(value || "").trim();
+  const normalizedValue = normalizeInventoryDisplayVaccineName(value);
   if (!normalizedValue) {
     return [];
   }
 
   const aliasValues = INVENTORY_VACCINE_MATCH_ALIASES[normalizedValue] || [];
-  return [...new Set([normalizedValue, ...aliasValues].map(normalizeInventoryMatchToken).filter(Boolean))];
+  return [
+    ...new Set(
+      [normalizedValue, ...aliasValues]
+        .map(normalizeInventoryMatchToken)
+        .filter(Boolean),
+    ),
+  ];
 };
 
 const inventoryNamesMatch = (leftValue, rightValue) => {
@@ -343,20 +421,16 @@ const inventoryNamesMatch = (leftValue, rightValue) => {
   return leftTokens.some((token) => rightTokens.includes(token));
 };
 
-const normalizeInventoryReportType = (value) =>
-  INVENTORY_PRINT_REPORT_OPTIONS.some((option) => option.value === value)
-    ? value
-    : PRINT_REPORT_TYPES.INVENTORY_SHEET;
-
 const normalizeStockAlertStatus = (value) => {
-  const normalized = String(value || "ACTIVE").trim().toLowerCase();
+  const normalizedValue = String(value || "ACTIVE").trim().toLowerCase();
   if (
-    normalized === "acknowledged" ||
-    normalized === "resolved" ||
-    normalized === "active"
+    normalizedValue === "acknowledged" ||
+    normalizedValue === "resolved" ||
+    normalizedValue === "active"
   ) {
-    return normalized;
+    return normalizedValue;
   }
+
   return "active";
 };
 
@@ -430,119 +504,103 @@ const getStockAlertPriorityVariant = (value) => {
 };
 
 const formatStockAlertTimestamp = (value) => {
-  const parsed = value ? new Date(value) : null;
-  if (!parsed || Number.isNaN(parsed.getTime())) {
+  const parsedValue = value ? new Date(value) : null;
+  if (!parsedValue || Number.isNaN(parsedValue.getTime())) {
     return "-";
   }
 
-  return parsed.toLocaleString();
+  return parsedValue.toLocaleString();
 };
 
-const DOH_LGU_REPORT_LEFT_SEAL_SRC = "/stock-form-doh-seal.png";
-const DOH_LGU_REPORT_RIGHT_SEAL_SRC = "/stock-form-pasig-seal.png";
-const DOH_LGU_REPORT_FILENAME_PREFIX = "doh-lgu-stock-inventory-report";
-const PASIG_REPORT_SEAL_SRC = DOH_LGU_REPORT_RIGHT_SEAL_SRC;
-const DOH_REPORT_SEAL_SRC = DOH_LGU_REPORT_LEFT_SEAL_SRC;
-const INVENTORY_SHEET_LEFT_LOGO_SRC = DOH_REPORT_SEAL_SRC;
-const INVENTORY_SHEET_RIGHT_LOGO_SRC = "/san-nicolas-logo.jpg";
-const INVENTORY_SHEET_ROWS_PER_PAGE = 18;
-const INVENTORY_SHEET_FRAME_MAX_WIDTH = "12in";
-const INVENTORY_SHEET_SURFACE_MAX_WIDTH = "11.86in";
-const INVENTORY_SHEET_PDF_FRAME_WIDTH_MM = 312;
-const INVENTORY_SHEET_PDF_FRAME_PADDING_MM = 6.5;
-const INVENTORY_SHEET_WORD_PAGE_CONFIG = Object.freeze({
-  ...PRINT_PAGE_PRESETS.legalLandscape,
-  margins: {
-    top: 720,
-    right: 720,
-    bottom: 720,
-    left: 720,
-    header: 360,
-    footer: 360,
-    gutter: 0,
-  },
-});
-const INVENTORY_SHEET_COLUMN_WIDTH_PERCENTAGES = Object.freeze([
-  4, 20, 9, 9, 14, 7, 7, 8, 9, 7, 6,
-]);
-const RIS_REPORT_FILENAME_PREFIX = "requisition-and-issue-slip";
-const RIS_PRIVATE_CLINIC_VALUE = "(leave blank)";
-const DOH_LGU_REPORT_ITEMS = [
-  { rowNumber: "1", label: "BCG", aliases: ["bcg"] },
-  {
-    rowNumber: "2",
-    label: "Hepatitis B",
-    aliases: ["hepatitis b", "hepa b"],
-  },
-  {
-    rowNumber: "3",
-    label: "Pentavalent Vaccine (DPT-HepaB-Hib Vaccine)",
-    aliases: [
-      "pentavalent vaccine",
-      "dpt hepab hib vaccine",
-      "penta valent",
-      "pentavalent",
-    ],
-  },
-  {
-    rowNumber: "4",
-    label: "Bivalent Oral Polio Vaccine (bOPV)",
-    aliases: ["bivalent oral polio vaccine", "bopv", "opv 20 doses", "opv"],
-  },
-  {
-    rowNumber: "5",
-    label: "Inactivated Polio Vaccine",
-    aliases: ["inactivated polio vaccine", "ipv multi dose", "ipv"],
-  },
-  {
-    rowNumber: "6",
-    label: "Pneumococcal Conjugate Vaccine (PCV 13/PCV 10)",
-    aliases: [
-      "pneumococcal conjugate vaccine",
-      "pcv 10",
-      "pcv10",
-      "pcv 13",
-      "pcv13",
-      "pcv 13/pcv 10",
-      "pcv",
-    ],
-  },
-  {
-    rowNumber: "7",
-    label: "Measles, Mumps and Rubella (MMR)",
-    aliases: ["measles mumps and rubella", "mmr"],
-  },
-  {
-    rowNumber: "9",
-    label: "Tetanus Diphtheria (TD) Toxoid Vaccine",
-    aliases: ["tetanus diphtheria td toxoid vaccine", "td toxoid", "td"],
-  },
-  {
-    rowNumber: "10",
-    label: "Human Papillomavirus Vaccine (HPV)",
-    aliases: ["human papillomavirus vaccine", "hpv"],
-  },
-  {
-    rowNumber: "11",
-    label: "Influenza / Flu Vaccine",
-    aliases: ["influenza", "flu vaccine"],
-  },
-  {
-    rowNumber: "12",
-    label: "Pneumococcal Polysaccharide Vaccine (PPV23)",
-    aliases: ["pneumococcal polysaccharide vaccine", "ppv23"],
-  },
-  {
-    rowNumber: "13",
-    label: "Hexaxim",
-    aliases: ["hexaxim", "hexavalent"],
-  },
-  {
-    rowNumber: "14",
-    label: "Tetanus Toxoid (TT)",
-    aliases: ["tetanus toxoid", "tt"],
-  },
+const normalizeInventoryReportType = (value) => {
+  const normalizedValue = String(value || "")
+    .trim()
+    .toLowerCase();
+
+  return Object.values(PRINT_REPORT_TYPES).includes(normalizedValue)
+    ? normalizedValue
+    : PRINT_REPORT_TYPES.INVENTORY_SHEET;
+};
+
+const getAvailableInventoryReportDeliveryOptions = (reportType) => {
+  const normalizedReportType = normalizeInventoryReportType(reportType);
+
+  if (
+    normalizedReportType === PRINT_REPORT_TYPES.INVENTORY_SHEET ||
+    normalizedReportType === PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM ||
+    normalizedReportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP
+  ) {
+    return INVENTORY_REPORT_DELIVERY_OPTIONS.filter(
+      (option) => option.value !== INVENTORY_REPORT_DELIVERY_TYPES.WORD &&
+        option.value !== INVENTORY_REPORT_DELIVERY_TYPES.PRINT,
+    );
+  }
+
+  return INVENTORY_REPORT_DELIVERY_OPTIONS.filter(
+    (option) => option.value !== INVENTORY_REPORT_DELIVERY_TYPES.PRINT,
+  );
+};
+
+const INVENTORY_TAB_STORAGE_KEY = "inventory.activeTab";
+const INVENTORY_TAB_CONFIG = [
+  { key: "inventory_sheet", label: "Inventory Sheet" },
+  { key: "inventory_summary", label: "Inventory Summary" },
+  { key: "stock_movements", label: "Stock Movements" },
 ];
+const INVENTORY_DEFAULT_TAB_KEY = INVENTORY_TAB_CONFIG[0].key;
+const INVENTORY_TAB_ALIASES = Object.freeze({
+  inventory_sheet: "inventory_sheet",
+  "inventory-sheet": "inventory_sheet",
+  suppliers: "inventory_sheet",
+  reports: "inventory_sheet",
+  inventory_summary: "inventory_summary",
+  "inventory-summary": "inventory_summary",
+  summary: "inventory_summary",
+  stock_alerts: "inventory_summary",
+  "stock-alerts": "inventory_summary",
+  alerts: "inventory_summary",
+  vaccine_monitoring: "inventory_summary",
+  "vaccine-monitoring": "inventory_summary",
+  monitoring: "inventory_summary",
+  stock_movements: "stock_movements",
+  "stock-movements": "stock_movements",
+  movements: "stock_movements",
+  transactions: "stock_movements",
+});
+const INVENTORY_TAB_PANEL_IDS = Object.freeze({
+  inventory_sheet: "inventory-panel-inventory-sheet",
+  inventory_summary: "inventory-panel-inventory-summary",
+  stock_movements: "inventory-panel-stock-movements",
+});
+
+const normalizeInventoryTabKey = (value) => {
+  if (value === undefined || value === null) {
+    return "";
+  }
+
+  const normalizedValue = String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+
+  return INVENTORY_TAB_ALIASES[normalizedValue] || "";
+};
+
+const getStoredInventoryTabKey = () =>
+  normalizeInventoryTabKey(
+    safeSessionStorage.getItem(INVENTORY_TAB_STORAGE_KEY) ||
+      safeLocalStorage.getItem(INVENTORY_TAB_STORAGE_KEY),
+  );
+
+const persistInventoryTabKey = (value) => {
+  const normalizedValue = normalizeInventoryTabKey(value);
+  if (!normalizedValue) {
+    return;
+  }
+
+  safeSessionStorage.setItem(INVENTORY_TAB_STORAGE_KEY, normalizedValue);
+  safeLocalStorage.setItem(INVENTORY_TAB_STORAGE_KEY, normalizedValue);
+};
 
 const RIS_PRIMARY_REPORT_ITEMS = [
   {
@@ -712,7 +770,8 @@ const formatInventoryActorRole = (value) => {
     return null;
   }
 
-  return normalized.replace(/\b\w/g, (char) => char.toUpperCase());
+  const titleCased = normalized.replace(/\b\w/g, (char) => char.toUpperCase());
+  return normalizeRoleLabel(titleCased);
 };
 
 const decodeInventoryHtmlEntities = (value, maxPasses = 3) => {
@@ -795,14 +854,14 @@ const INVENTORY_MOVEMENT_TYPE_META = Object.freeze({
 
 const getInventoryMovementTypeMeta = (type) => {
   const normalizedType = normalizeInventoryMovementType(type);
-  return (
+  return(
     INVENTORY_MOVEMENT_TYPE_META[normalizedType] || {
       label: normalizedType.replace(/_/g, " "),
       badgeVariant: "secondary",
       accentClass: "text-gray-700 dark:text-gray-300",
       quantityPrefix: "",
-    }
-  );
+    })
+   ;
 };
 
 const normalizeInventoryMovementRecord = (row = {}) => {
@@ -902,19 +961,47 @@ const getInventoryBatchSearchText = (batch) =>
     .join(" ")
     .toLowerCase();
 
-const createDefaultInventoryDisplayFilters = () => ({
+const createDefaultInventoryDisplayFilters = () =>( {
   startDate: "",
   endDate: "",
   vaccine: "all",
   status: "all",
 });
 
-const createDefaultStockMovementFilters = () => ({
-  startDate: "",
-  endDate: "",
+const createDefaultStockMovementFilters = () =>( {
+  period: "month",
   type: "all",
   vaccine: "all",
+  customStartDate: "",
+  customEndDate: "",
 });
+
+const INVENTORY_TABLE_PAGE_SIZE = 10;
+const INVENTORY_TABLE_PAGE_SIZE_OPTIONS = [5, 10, 25, 50, 100];
+const STOCK_MOVEMENT_PERIOD_OPTIONS = Object.freeze(PERIOD_OPTIONS);
+
+const buildStockMovementPeriodRange = (filters = {}) => {
+  const normalizedPeriod = normalizeVaccinationPeriod(filters.period || "month");
+
+  if (normalizedPeriod === "custom" &&( !filters.customStartDate || !filters.customEndDate)) {
+    return { startDate: "", endDate: "" };
+  }
+
+  return getVaccinationPeriodRange({
+    period: normalizedPeriod,
+    startDate: filters.customStartDate || "",
+    endDate: filters.customEndDate || "",
+    referenceDate: new Date(),
+  });
+};
+
+const buildInventoryRowsPerPageOptions = (
+  defaultPageSize = INVENTORY_TABLE_PAGE_SIZE,
+) =>
+  [...new Set([defaultPageSize, ...INVENTORY_TABLE_PAGE_SIZE_OPTIONS])]
+    .map((value) => Number(value) || INVENTORY_TABLE_PAGE_SIZE)
+    .filter((value) => value > 0)
+    .sort((left, right) => left - right);
 
 const INVENTORY_STATUS_FILTER_OPTIONS = [
   { value: "all", label: "All Statuses" },
@@ -1096,17 +1183,11 @@ function InventoryDisplayToolbarFilters({
   onFilterChange,
   onClearFilters,
   hasActiveFilters,
-  reportDate,
-  onReportDateChange,
-  selectedReportType,
-  onReportTypeChange,
-  showReportDateInput = false,
-  showReportTypeSelector = true,
   showDivider = true,
 }) {
-  return (
+  return(
     <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3 xl:justify-end">
-      {showDivider ? (
+      {showDivider ?(
         <>
           <div className="hidden h-10 w-px self-end bg-gray-200 dark:bg-gray-700 xl:block" />
           <div className="hidden self-end pb-2 2xl:block">
@@ -1114,8 +1195,8 @@ function InventoryDisplayToolbarFilters({
               Inventory Filters
             </p>
           </div>
-        </>
-      ) : null}
+        </>)
+        : null}
       <Input
         label="From Date"
         type="date"
@@ -1132,18 +1213,6 @@ function InventoryDisplayToolbarFilters({
         className="text-sm"
         containerClassName="w-full sm:w-[160px] xl:w-[144px]"
       />
-      {showReportDateInput && typeof onReportDateChange === "function" ? (
-        <Input
-          id="inventory-report-date-toolbar"
-          label="Report Date"
-          aria-label="Report Date"
-          type="date"
-          value={reportDate}
-          onChange={(event) => onReportDateChange(event.target.value)}
-          className="text-sm"
-          containerClassName="w-full sm:w-[170px] xl:w-[156px]"
-        />
-      ) : null}
       <Select
         label="Vaccine"
         value={filters.vaccine}
@@ -1160,16 +1229,6 @@ function InventoryDisplayToolbarFilters({
         className="text-sm"
         containerClassName="w-full sm:w-[188px] xl:w-[172px]"
       />
-      {showReportTypeSelector && typeof onReportTypeChange === "function" ? (
-        <Select
-          label="Report Format"
-          value={selectedReportType}
-          onChange={(event) => onReportTypeChange(event.target.value)}
-          options={INVENTORY_PRINT_REPORT_OPTIONS}
-          className="text-sm"
-          containerClassName="w-full sm:w-[220px] xl:w-[196px]"
-        />
-      ) : null}
       <div className="flex items-center gap-2 self-end">
         <Button
           variant="ghost"
@@ -1181,8 +1240,8 @@ function InventoryDisplayToolbarFilters({
           Clear Filters
         </Button>
       </div>
-    </div>
-  );
+    </div>)
+   ;
 }
 
 function StockMovementToolbarFilters({
@@ -1194,9 +1253,9 @@ function StockMovementToolbarFilters({
   hasActiveFilters,
   showDivider = true,
 }) {
-  return (
+  return(
     <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3 xl:justify-end">
-      {showDivider ? (
+      {showDivider ?(
         <>
           <div className="hidden h-10 w-px self-end bg-gray-200 dark:bg-gray-700 xl:block" />
           <div className="hidden self-end pb-2 2xl:block">
@@ -1204,23 +1263,20 @@ function StockMovementToolbarFilters({
               Stock Movement Filters
             </p>
           </div>
-        </>
-      ) : null}
-      <Input
-        label="From Date"
-        type="date"
-        value={filters.startDate}
-        onChange={(event) => onFilterChange("startDate", event.target.value)}
-        className="text-sm"
-        containerClassName="w-full sm:w-[160px] xl:w-[144px]"
-      />
-      <Input
-        label="To Date"
-        type="date"
-        value={filters.endDate}
-        onChange={(event) => onFilterChange("endDate", event.target.value)}
-        className="text-sm"
-        containerClassName="w-full sm:w-[160px] xl:w-[144px]"
+        </>)
+        : null}
+      <VaccinationPeriodFilter
+        period={filters.period}
+        onPeriodChange={(value) => onFilterChange("period", value)}
+        startDate={filters.customStartDate || ""}
+        endDate={filters.customEndDate || ""}
+        onStartDateChange={(value) => onFilterChange("customStartDate", value)}
+        onEndDateChange={(value) => onFilterChange("customEndDate", value)}
+        periodOptions={STOCK_MOVEMENT_PERIOD_OPTIONS}
+        className="w-full sm:w-[176px] xl:w-[160px]"
+        layout="stacked"
+        startDateLabel="From Date"
+        endDateLabel="To Date"
       />
       <Select
         label="Type"
@@ -1249,8 +1305,8 @@ function StockMovementToolbarFilters({
           Clear Filters
         </Button>
       </div>
-    </div>
-  );
+    </div>)
+   ;
 }
 
 function InventoryActiveTabToolbarFilters({
@@ -1260,23 +1316,18 @@ function InventoryActiveTabToolbarFilters({
   onInventoryFilterChange,
   onClearInventoryFilters,
   hasActiveInventoryFilters,
-  reportDate,
-  onReportDateChange,
   stockMovementFilters,
   stockMovementTypeOptions,
   stockMovementVaccineOptions,
   onStockMovementFilterChange,
   onClearStockMovementFilters,
   hasActiveStockMovementFilters,
-  selectedReportType,
-  onReportTypeChange,
   onSaveInventory,
-  onPrintReport,
   onGenerateReport,
   showDivider = true,
 }) {
   if (activeTab === "stock_movements") {
-    return (
+    return(
       <StockMovementToolbarFilters
         filters={stockMovementFilters}
         typeOptions={stockMovementTypeOptions}
@@ -1285,36 +1336,30 @@ function InventoryActiveTabToolbarFilters({
         onClearFilters={onClearStockMovementFilters}
         hasActiveFilters={hasActiveStockMovementFilters}
         showDivider={showDivider}
-      />
-    );
+      />)
+     ;
   }
 
-  const inventoryControls = (
+  const inventoryControls =(
     <InventoryDisplayToolbarFilters
       filters={inventoryFilters}
       vaccineOptions={inventoryVaccineOptions}
       onFilterChange={onInventoryFilterChange}
       onClearFilters={onClearInventoryFilters}
       hasActiveFilters={hasActiveInventoryFilters}
-      reportDate={reportDate}
-      onReportDateChange={onReportDateChange}
-      selectedReportType={selectedReportType}
-      onReportTypeChange={onReportTypeChange}
-      showReportDateInput={activeTab === "inventory_sheet"}
-      showReportTypeSelector={activeTab === "inventory_sheet"}
       showDivider={showDivider}
-    />
-  );
+    />)
+   ;
 
   if (activeTab !== "inventory_sheet") {
     return inventoryControls;
   }
 
-  return (
+  return(
     <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3 xl:justify-end">
       {inventoryControls}
       <div className="flex items-center gap-2 self-end">
-        {typeof onSaveInventory === "function" ? (
+        {typeof onSaveInventory === "function" ?(
           <Button
             variant="secondary"
             size="sm"
@@ -1322,18 +1367,8 @@ function InventoryActiveTabToolbarFilters({
             className="min-h-[40px] whitespace-nowrap"
           >
             Save Inventory
-          </Button>
-        ) : null}
-        {typeof onPrintReport === "function" ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => onPrintReport()}
-            className="min-h-[40px] whitespace-nowrap"
-          >
-            Print Report
-          </Button>
-        ) : null}
+          </Button>)
+          : null}
         <Button
           variant="primary"
           size="sm"
@@ -1343,8 +1378,8 @@ function InventoryActiveTabToolbarFilters({
           Generate Report
         </Button>
       </div>
-    </div>
-  );
+    </div>)
+   ;
 }
 
 function InventoryHeaderTabs({
@@ -1352,7 +1387,7 @@ function InventoryHeaderTabs({
   onTabChange,
   criticalAlertCount = 0,
 }) {
-  return (
+  return(
     <div className="flex space-x-2 overflow-x-auto rounded-xl border border-white/10 bg-white/20 p-1.5 backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800/50">
       <button
         onClick={() => onTabChange("inventory_sheet")}
@@ -1377,7 +1412,7 @@ function InventoryHeaderTabs({
         }`}
       >
         <span>Inventory Summary</span>
-        {criticalAlertCount > 0 ? (
+        {criticalAlertCount > 0 ?(
           <span
             className={`ml-2 inline-flex rounded-full px-2 py-0.5 text-xs ${
               activeTab === "inventory_summary"
@@ -1386,8 +1421,8 @@ function InventoryHeaderTabs({
             }`}
           >
             {criticalAlertCount}
-          </span>
-        ) : null}
+          </span>)
+          : null}
       </button>
       <button
         onClick={() => onTabChange("stock_movements")}
@@ -1401,8 +1436,8 @@ function InventoryHeaderTabs({
       >
         Stock Movements
       </button>
-    </div>
-  );
+    </div>)
+   ;
 }
 
 function InventoryPaginationFooter({
@@ -1431,7 +1466,7 @@ function InventoryPaginationFooter({
   const startIndex = (currentPage - 1) * itemsPerPage + 1;
   const endIndex = Math.min(currentPage * itemsPerPage, totalItems);
 
-  return (
+  return(
     <div
       data-testid={testId}
       className={`flex flex-shrink-0 flex-col gap-3 border-t border-gray-200 bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-800 lg:flex-row lg:items-center lg:justify-between ${className}`.trim()}
@@ -1454,11 +1489,11 @@ function InventoryPaginationFooter({
             className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
             aria-label="Rows per page"
           >
-            {rowsPerPageOptions.map((option) => (
+            {rowsPerPageOptions.map((option) =>(
               <option key={option} value={option}>
                 {option}
-              </option>
-            ))}
+              </option>)
+             )}
           </select>
         </div>
         <div className="flex items-center gap-2">
@@ -1510,8 +1545,8 @@ function InventoryPaginationFooter({
           </Button>
         </div>
       </div>
-    </div>
-  );
+    </div>)
+   ;
 }
 
 function StockMovementsPanel({
@@ -1567,17 +1602,17 @@ function StockMovementsPanel({
   }, [currentPage, pageInputValue, totalPages]);
 
   if (loading && movements.length === 0) {
-    return (
+    return(
       <div className="flex flex-col items-center justify-center py-16 print:hidden">
         <LoadingSpinner size="large" />
         <p className="mt-4 text-sm font-medium text-gray-600 dark:text-gray-400">
           Loading stock movement history...
         </p>
-      </div>
-    );
+      </div>)
+     ;
   }
 
-  return (
+  return(
     <div className="flex min-h-0 flex-1 flex-col gap-4 print:hidden">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card className="border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/70">
@@ -1614,7 +1649,7 @@ function StockMovementsPanel({
         </Card>
       </div>
 
-      {error && (
+      {error &&(
         <Alert variant="warning" title="Stock movement history unavailable">
           <div className="space-y-3">
             <p>{error}</p>
@@ -1622,8 +1657,8 @@ function StockMovementsPanel({
               Retry
             </Button>
           </div>
-        </Alert>
-      )}
+        </Alert>)
+       }
 
       <Card
         className="flex min-h-0 flex-1 flex-col overflow-hidden"
@@ -1681,7 +1716,7 @@ function StockMovementsPanel({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
-                {movements.length === 0 ? (
+                {movements.length === 0 ?(
                   <tr>
                     <td
                       colSpan="8"
@@ -1689,9 +1724,9 @@ function StockMovementsPanel({
                     >
                       No stock movement transactions match the selected filters.
                     </td>
-                  </tr>
-                ) : (
-                  paginatedMovements.map((movement) => {
+                  </tr>)
+                  :
+                                        (paginatedMovements.map((movement)=>{
                     const typeMeta = getInventoryMovementTypeMeta(
                       movement.transaction_type,
                     );
@@ -1710,7 +1745,7 @@ function StockMovementsPanel({
                       movement.performed_by_role,
                     );
 
-                    return (
+                    return(
                       <tr
                         key={movement.id}
                         className="align-top hover:bg-gray-50 dark:hover:bg-gray-800/80"
@@ -1740,11 +1775,11 @@ function StockMovementsPanel({
                         <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                           <div className="space-y-1">
                             <div>{movement.reference_number || "-"}</div>
-                            {movement.notes ? (
+                            {movement.notes ?(
                               <div className="text-xs text-gray-500 dark:text-gray-400">
                                 {movement.notes}
-                              </div>
-                            ) : null}
+                              </div>)
+                              : null}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
@@ -1752,17 +1787,17 @@ function StockMovementsPanel({
                             <div className="font-medium text-gray-900 dark:text-gray-100">
                               {performerPrimaryLabel}
                             </div>
-                            {performerRoleLabel ? (
+                            {performerRoleLabel ?(
                               <div className="text-xs text-gray-500 dark:text-gray-400">
                                 {performerRoleLabel}
-                              </div>
-                            ) : null}
+                              </div>)
+                              : null}
                           </div>
                         </td>
-                      </tr>
-                    );
-                  })
-                )}
+                      </tr>)
+                     ;
+                  }))
+                 }
               </tbody>
             </table>
           </div>
@@ -1797,8 +1832,8 @@ function StockMovementsPanel({
           }
         />
       </Card>
-    </div>
-  );
+    </div>)
+   ;
 }
 
 function InventoryPrintPortal({ children }) {
@@ -2088,7 +2123,7 @@ const aggregateInventoryRecordsByVaccine = (
       })[0];
 
       const movementTotals = matchingRows.reduce(
-        (accumulator, row) => ({
+        (accumulator, row) =>( {
           received: accumulator.received + normalizeInventoryNumber(row.received),
           transferred_in:
             accumulator.transferred_in + normalizeInventoryNumber(row.transferred_in),
@@ -2335,7 +2370,7 @@ const buildRisLineItem = ({ definition, matchedRows = [] }) => {
 };
 
 const buildRisReportRows = (inventoryRows = []) => {
-  const rowsWithIndex = inventoryRows.map((row, index) => ({
+  const rowsWithIndex = inventoryRows.map((row, index) =>( {
     ...row,
     __reportIndex: index,
   }));
@@ -2420,7 +2455,7 @@ const resolveRisControlNumber = ({
     }
   }
 
-  const controlDate = String(reportDate || new Date().toISOString().split("T")[0])
+  const controlDate = String(reportDate || getTodayInventoryDateInput())
     .replace(/[^0-9]/g, "")
     .slice(0, 8);
   const facilitySegment = String(clinicId || "")
@@ -2470,7 +2505,7 @@ const buildInventoryPrintRows = (inventoryRows = []) =>
 
 const buildInventoryPrintTotals = (rows = []) =>
   rows.reduce(
-    (acc, row) => ({
+    (acc, row) =>( {
       beginningBalance: acc.beginningBalance + row.beginningBalance,
       received: acc.received + row.received,
       transferredIn: acc.transferredIn + row.transferredIn,
@@ -2514,11 +2549,12 @@ const formatInventoryReportDate = (value) => {
 const isValidInventoryDateInput = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim());
 
 const getTodayInventoryDateInput = () => {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return (
+    getVaccinationPeriodRange({
+      period: "today",
+      referenceDate: new Date(),
+    }).startDate || new Date().toISOString().slice(0, 10)
+  );
 };
 
 const isExpiredInventoryDate = (value) => {
@@ -2640,11 +2676,11 @@ const buildFacilityAddress = (facilityInfo = {}) => {
     }
 
     const duplicateIndex = uniqueSegments.findIndex(({ normalized }) => {
-      return (
+      return(
         normalized === normalizedSegment ||
         normalized.includes(normalizedSegment) ||
-        normalizedSegment.includes(normalized)
-      );
+        normalizedSegment.includes(normalized))
+       ;
     });
 
     if (duplicateIndex === -1) {
@@ -2663,10 +2699,83 @@ const buildFacilityAddress = (facilityInfo = {}) => {
   return uniqueSegments.map(({ raw }) => raw).join(", ");
 };
 
-const uniqueJoin = (values, separator = ", ") =>
-  [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))].join(
-    separator,
+const isSameInventoryDate = (leftDate, rightDate) =>
+  leftDate instanceof Date &&
+  rightDate instanceof Date &&
+  leftDate.getFullYear() === rightDate.getFullYear() &&
+  leftDate.getMonth() === rightDate.getMonth() &&
+  leftDate.getDate() === rightDate.getDate();
+
+const isFullCalendarMonthPeriod = (startDate, endDate) => {
+  if (!(startDate instanceof Date) || !(endDate instanceof Date)) {
+    return false;
+  }
+
+  const lastDayOfMonth = new Date(
+    startDate.getFullYear(),
+    startDate.getMonth() + 1,
+    0,
+  ).getDate();
+
+  return (
+    startDate.getFullYear() === endDate.getFullYear() &&
+    startDate.getMonth() === endDate.getMonth() &&
+    startDate.getDate() === 1 &&
+    endDate.getDate() === lastDayOfMonth
   );
+};
+
+const formatInventoryPeriodBoundary = (value) =>
+  formatPrintDateValue(value, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).toUpperCase();
+
+const computePeriodLabel = ({
+  reportDate,
+  dateRangeStart,
+  dateRangeEnd,
+  isFiltering,
+}) => {
+  const fallbackPeriod = {
+    label: formatInventoryMonthYear(reportDate).toUpperCase(),
+    usesMonthPrefix: true,
+  };
+
+  if (!isFiltering) {
+    return fallbackPeriod;
+  }
+
+  const validation = validatePrintDateRange({
+    startDate: dateRangeStart,
+    endDate: dateRangeEnd,
+    requireBothDates: true,
+  });
+
+  if (!validation.isValid || !validation.start || !validation.end) {
+    return fallbackPeriod;
+  }
+
+  if (isFullCalendarMonthPeriod(validation.start, validation.end)) {
+    return {
+      label: formatInventoryMonthYear(validation.start).toUpperCase(),
+      usesMonthPrefix: true,
+    };
+  }
+
+  if (isSameInventoryDate(validation.start, validation.end)) {
+    return {
+      label: formatInventoryPeriodBoundary(validation.start),
+      usesMonthPrefix: false,
+    };
+  }
+
+  return {
+    label: `${formatInventoryPeriodBoundary(validation.start)} - ${formatInventoryPeriodBoundary(validation.end)}`,
+    usesMonthPrefix: false,
+  };
+};
 
 const resolveInventoryReportPeriodLabel = ({
   reportDate,
@@ -2674,31 +2783,176 @@ const resolveInventoryReportPeriodLabel = ({
   dateRangeEnd,
   isFiltering,
 }) => {
-  if (isFiltering && dateRangeStart && dateRangeEnd) {
-    return formatPrintDateRangeLabel({
-      startDate: dateRangeStart,
-      endDate: dateRangeEnd,
-      prefix: "Reporting Period",
-      fallbackLabel: "All available records",
-    }).replace(/^Reporting Period:\s*/, "");
-  }
-
-  return formatInventoryMonthYear(reportDate).toUpperCase();
+  return computePeriodLabel({
+    reportDate,
+    dateRangeStart,
+    dateRangeEnd,
+    isFiltering,
+  }).label;
 };
 
-const formatDohLguReportHeaderValue = (value) => String(value || "").trim().toUpperCase();
+const formatInventoryReportDateRangeLabel = ({
+  startDate = "",
+  endDate = "",
+  emptyLabel = "Select both From Date and To Date",
+} = {}) => {
+  const validation = validatePrintDateRange({
+    startDate,
+    endDate,
+    requireBothDates: true,
+  });
+
+  if (!validation.isValid || !validation.start || !validation.end) {
+    return emptyLabel;
+  }
+
+  return `${formatPrintDateValue(validation.start)} - ${formatPrintDateValue(validation.end)}`;
+};
+
+const buildInventoryReportDisplayFilters = (
+  displayFilters = {},
+  { startDate = "", endDate = "" } = {},
+) => ({
+  ...displayFilters,
+  startDate: String(startDate || "").trim(),
+  endDate: String(endDate || "").trim(),
+});
+
+const filterInventoryReportSourceForDisplay = (
+  inventoryReportSource = [],
+  displayFilters = {},
+) =>
+  inventoryReportSource.filter((item) => {
+    const matchesDateFilter = matchesInventoryReportPeriodRange(item, displayFilters);
+    const matchesVaccineFilter =
+      displayFilters.vaccine === "all" || item.name === displayFilters.vaccine;
+    const matchesStatusFilter = matchesInventoryStatusFilter(
+      item,
+      displayFilters.status,
+    );
+
+    return matchesDateFilter && matchesVaccineFilter && matchesStatusFilter;
+  });
+
+const buildInventorySheetRowsForDisplay = ({
+  inventoryReportSource = [],
+  vaccineItems = [],
+  fallbackClinicId = null,
+  displayFilters = {},
+}) =>
+  aggregateInventoryRecordsByVaccine(
+    inventoryReportSource,
+    vaccineItems,
+    fallbackClinicId,
+    {
+      mode: INVENTORY_RECORD_AGGREGATION_MODES.HISTORICAL_TOTALS,
+    },
+  ).filter((item) => {
+    const matchesDateFilter = matchesInventoryReportPeriodRange(item, displayFilters);
+    const matchesVaccineFilter =
+      displayFilters.vaccine === "all" || item.name === displayFilters.vaccine;
+    const matchesStatusFilter = matchesInventoryStatusFilter(item, displayFilters.status);
+
+    return matchesDateFilter && matchesVaccineFilter && matchesStatusFilter;
+  });
+
+const buildInventorySheetRowsWithLiveInventory = ({
+  inventoryReportSource = [],
+  liveInventoryRows = [],
+  vaccineItems = [],
+  fallbackClinicId = null,
+  displayFilters = {},
+}) =>
+  buildInventorySheetRowsForDisplay({
+    inventoryReportSource,
+    vaccineItems,
+    fallbackClinicId,
+    displayFilters,
+  })
+    .map((reportRow) => {
+      const liveRow = findMatchingInventoryRow(liveInventoryRows, reportRow);
+      const actionStockOnHand = liveRow?.stock_on_hand ?? reportRow.stock_on_hand;
+
+      return {
+        ...(liveRow || {}),
+        ...reportRow,
+        id: liveRow?.id ?? reportRow.id,
+        _apiId: liveRow?._apiId ?? reportRow._apiId,
+        _vaccineId: liveRow?._vaccineId ?? reportRow._vaccineId,
+        _facilityId: liveRow?._facilityId ?? reportRow._facilityId,
+        _actionStockOnHand: actionStockOnHand,
+      };
+    })
+    .filter((item) => {
+      const matchesDateFilter = matchesInventoryReportPeriodRange(
+        item,
+        displayFilters,
+      );
+      const matchesVaccineFilter =
+        displayFilters.vaccine === "all" || item.name === displayFilters.vaccine;
+      const matchesStatusFilter = matchesInventoryStatusFilter(
+        {
+          ...item,
+          stock_on_hand: item._actionStockOnHand ?? item.stock_on_hand,
+        },
+        displayFilters.status,
+      );
+
+      return matchesDateFilter && matchesVaccineFilter && matchesStatusFilter;
+    });
+
+const buildInventoryReportPayload = ({
+  inventoryReportSource = [],
+  liveInventoryRows = [],
+  vaccineItems = [],
+  fallbackClinicId = null,
+  displayFilters = {},
+  facilityInfo = {},
+  reportDate,
+}) => {
+  const filteredInventoryReportSource = filterInventoryReportSourceForDisplay(
+    inventoryReportSource,
+    displayFilters,
+  );
+  const inventorySheetRows = buildInventorySheetRowsWithLiveInventory({
+    inventoryReportSource: filteredInventoryReportSource,
+    liveInventoryRows,
+    vaccineItems,
+    fallbackClinicId,
+    displayFilters,
+  });
+  const printRows = buildInventoryPrintRows(inventorySheetRows);
+  const printTotals = buildInventoryPrintTotals(printRows);
+  const dohLguReportRows = buildDohLguReportRows(filteredInventoryReportSource);
+  const risReportRows = buildRisReportRows(filteredInventoryReportSource);
+  const risControlNumber = resolveRisControlNumber({
+    facilityInfo,
+    inventoryRows: filteredInventoryReportSource,
+    reportDate,
+    clinicId: fallbackClinicId,
+  });
+
+  return {
+    inventoryReportSource: filteredInventoryReportSource,
+    inventorySheetRows,
+    printRows,
+    printTotals,
+    dohLguReportRows,
+    risReportRows,
+    risControlNumber,
+  };
+};
 
 const resolveDohLguReportFacilityValue = (facilityInfo = {}) =>
-  formatDohLguReportHeaderValue(resolveInventorySheetFacilityName(facilityInfo));
+  String(resolveInventorySheetFacilityName(facilityInfo) || "").trim() ||
+  DEFAULT_PRINT_HEADER.healthCenter;
 
 const resolveDohLguReportAddressValue = (facilityInfo = {}) => {
   const fallbackAddress = [DEFAULT_PRINT_HEADER.barangay, DEFAULT_PRINT_HEADER.city]
     .filter(Boolean)
     .join(", ");
 
-  return formatDohLguReportHeaderValue(
-    buildFacilityAddress(facilityInfo) || fallbackAddress,
-  );
+  return String(buildFacilityAddress(facilityInfo) || fallbackAddress).trim();
 };
 
 const resolveDohLguReportLguValue = (facilityInfo = {}) => {
@@ -2706,7 +2960,7 @@ const resolveDohLguReportLguValue = (facilityInfo = {}) => {
   const defaultCityValue = String(DEFAULT_PRINT_HEADER.city || "").trim();
 
   if (!cityValue) {
-    return formatDohLguReportHeaderValue(defaultCityValue);
+    return defaultCityValue.toUpperCase();
   }
 
   const normalizedCityValue = cityValue.toUpperCase();
@@ -2719,10 +2973,10 @@ const resolveDohLguReportLguValue = (facilityInfo = {}) => {
     normalizedDefaultCityBase &&
     normalizedCityValue === normalizedDefaultCityBase
   ) {
-    return formatDohLguReportHeaderValue(defaultCityValue);
+    return defaultCityValue.toUpperCase();
   }
 
-  return formatDohLguReportHeaderValue(cityValue);
+  return cityValue.toUpperCase();
 };
 
 const resolveInventoryRowSourceBucket = (item = {}) => {
@@ -2766,15 +3020,15 @@ const matchesInventoryReportItem = (itemName, aliases = []) => {
       return false;
     }
 
-    return (
+    return(
       normalizedName === normalizedAlias ||
       normalizedName.startsWith(`${normalizedAlias} `) ||
       normalizedName.endsWith(` ${normalizedAlias}`) ||
       normalizedName.includes(` ${normalizedAlias} `) ||
       normalizedAlias.startsWith(`${normalizedName} `) ||
       normalizedAlias.endsWith(` ${normalizedName}`) ||
-      normalizedAlias.includes(` ${normalizedName} `)
-    );
+      normalizedAlias.includes(` ${normalizedName} `))
+     ;
   });
 };
 
@@ -2786,6 +3040,33 @@ const sumInventoryReportBucket = (rows, selector, bucket) =>
 
     return total + Number(selector(row) || 0);
   }, 0);
+
+const collectInventoryReportValues = (rows = [], selector) =>
+  rows
+    .map((row, index) => String(selector(row, index) || "").trim())
+    .filter(Boolean);
+
+const collectVaccineLotNumbers = (rows = []) =>
+  collectInventoryReportValues(
+    rows,
+    (row) => row.lot_batch_number || row.lot_number,
+  ).join(", ");
+
+const collectVaccineExpiryDates = (rows = []) =>
+  collectInventoryReportValues(
+    rows,
+    (row) => formatInventoryReportDate(row.expiry_date),
+  ).join(", ");
+
+const collectVaccineTransactionDates = (rows = []) =>
+  rows
+    .flatMap((row) => [
+      formatInventoryReportDate(row.received_date || row.transferred_in_date),
+      formatInventoryReportDate(row.transferred_out_date),
+    ])
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(", ");
 
 const buildDohLguReportRows = (inventoryRows = []) =>
   DOH_LGU_REPORT_ITEMS.map((definition) => {
@@ -2827,21 +3108,9 @@ const buildDohLguReportRows = (inventoryRows = []) =>
         (row) => row.transferred_out,
         "LGU",
       ),
-      lotNumber: uniqueJoin(
-        matchedRows.map((row) => row.lot_batch_number || row.lot_number),
-        "\n",
-      ),
-      expiryDate: uniqueJoin(
-        matchedRows.map((row) => formatInventoryReportDate(row.expiry_date)),
-        "\n",
-      ),
-      transactionDate: uniqueJoin(
-        matchedRows.flatMap((row) => [
-          formatInventoryReportDate(row.received_date || row.transferred_in_date),
-          formatInventoryReportDate(row.transferred_out_date),
-        ]),
-        "\n",
-      ),
+      lotNumber: collectVaccineLotNumbers(matchedRows),
+      expiryDate: collectVaccineExpiryDates(matchedRows),
+      transactionDate: collectVaccineTransactionDates(matchedRows),
       monthlyConsumptionDoh: sumInventoryReportBucket(
         matchedRows,
         (row) => row.issuance,
@@ -2927,7 +3196,7 @@ const DOH_LGU_REPORT_TOTAL_COLUMN_WEIGHT = DOH_LGU_PDF_COLUMN_WIDTH_WEIGHTS.redu
 
 const DOH_LGU_REPORT_COLUMN_WIDTH_PERCENTAGES = Object.freeze(
   DOH_LGU_PDF_COLUMN_WIDTH_WEIGHTS.map((weight) =>
-    Number(((weight / DOH_LGU_REPORT_TOTAL_COLUMN_WEIGHT) * 100).toFixed(2)),
+    Number( ((weight/ DOH_LGU_REPORT_TOTAL_COLUMN_WEIGHT) * 100).toFixed(2)),
   ),
 );
 
@@ -2947,7 +3216,7 @@ const getScaledPdfColumnStyles = ({
 
   return weights.reduce((result, weight, index) => {
     result[index] = {
-      cellWidth: Number(((availableWidth * weight) / totalWeight).toFixed(2)),
+      cellWidth: Number( ((availableWidth* weight) / totalWeight).toFixed(2)),
       ...(alignments[index] ? { halign: alignments[index] } : {}),
     };
     return result;
@@ -3011,7 +3280,7 @@ const exportDohLguInventoryPdf = async ({
     isFiltering,
   });
   const sanitizedReportDate =
-    String(reportDate || "").trim() || new Date().toISOString().split("T")[0];
+    String(reportDate || "").trim() || getTodayInventoryDateInput();
 
   const drawHeader = () => {
     const contentWidth = pageWidth - margin.left - margin.right;
@@ -3056,13 +3325,13 @@ const exportDohLguInventoryPdf = async ({
     });
 
     doc.setFontSize(8.3);
-    doc.text(PRINT_REPORT_COPY.dohLguTitle, centerX, 18.2, {
+    doc.text(PRINT_REPORT_COPY.dohLguSubtitle, centerX, 18.2, {
       align: "center",
     });
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.4);
-    doc.text(PRINT_REPORT_COPY.dohLguSubtitle, centerX, 21.8, {
+    doc.text(PRINT_REPORT_COPY.dohLguTitle, centerX, 21.8, {
       align: "center",
     });
 
@@ -3135,7 +3404,7 @@ const exportDohLguInventoryPdf = async ({
       textColor: [0, 0, 0],
       lineColor: [0, 0, 0],
       lineWidth: 0.18,
-      valign: "middle",
+      valign: "top",
       halign: "center",
       overflow: "linebreak",
     },
@@ -3245,7 +3514,7 @@ const exportRisPdf = async ({
     isFiltering,
   });
   const sanitizedReportDate =
-    String(reportDate || "").trim() || new Date().toISOString().split("T")[0];
+    String(reportDate || "").trim() || getTodayInventoryDateInput();
 
   const [pasigLogoResult, dohLogoResult] = await Promise.allSettled([
     loadPrintImageAsDataUrl(PASIG_REPORT_SEAL_SRC),
@@ -3428,6 +3697,11 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
     background: #ffffff;
     color: #111827;
     font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  }
+
+  @page {
+    size: __PRINT_PAGE_SIZE__;
+    margin: __PRINT_PAGE_MARGIN__;
   }
 
   body.inventory-export--landscape {
@@ -3751,16 +4025,22 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
     border: 1.1px solid #111827;
     padding: 0.11cm 0.08cm;
     vertical-align: middle;
-    word-break: break-word;
-    overflow-wrap: anywhere;
+    word-break: keep-all;
+    white-space: nowrap;
+    overflow-wrap: normal;
     background: #ffffff;
     background-clip: padding-box;
     box-shadow: none;
   }
 
+  .inventory-sheet-summary-print-table th,
+  .inventory-sheet-summary-print-table td {
+    padding: 0.045cm 0.05cm;
+  }
+
   #doh-lgu-print-table {
     border: 0.5pt solid #111827;
-    font-size: 7.95px;
+    font-size: 9pt;
     line-height: 1.16;
   }
 
@@ -3773,7 +4053,7 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
   }
 
   #doh-lgu-print-table thead th {
-    font-size: 7.85px;
+    font-size: 9pt;
     line-height: 1.12;
     letter-spacing: 0.007em;
   }
@@ -3786,7 +4066,7 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
   .inventory-sheet-summary-print-table th,
   #doh-lgu-print-table th,
   .ris-print-table th {
-    font-size: 8.2px;
+    font-size: 9pt;
     font-weight: 800;
     text-align: center;
   }
@@ -3794,8 +4074,14 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
   .inventory-sheet-summary-print-table td,
   #doh-lgu-print-table td,
   .ris-print-table td {
-    font-size: 8.7px;
+    font-size: 9pt;
     line-height: 1.2;
+  }
+
+  .inventory-sheet-summary-print-table th,
+  .inventory-sheet-summary-print-table td {
+    font-size: 7.7pt;
+    line-height: 1.12;
   }
 
   .inventory-sheet-summary-print-table .print-col-center,
@@ -3822,6 +4108,14 @@ const INVENTORY_EXPORT_DOCUMENT_STYLES = `
   .ris-print-table__numeric,
   .inventory-sheet-summary-print-total-row td {
     font-weight: 800;
+  }
+
+  #doh-lgu-print-table .print-col-left,
+  #doh-lgu-print-table .print-col-wrap {
+    vertical-align: top;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    white-space: normal;
   }
 
   .inventory-sheet-summary-print-table .print-col-beginning {
@@ -4177,6 +4471,8 @@ const buildInventoryExportDocument = ({
   title,
   bodyMarkup,
   orientation = "landscape",
+  pageCssSize = "A4 landscape",
+  printMargin = "15mm",
 }) => `<!DOCTYPE html>
 <html>
   <head>
@@ -4184,7 +4480,9 @@ const buildInventoryExportDocument = ({
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${title}</title>
     <style>
-      ${INVENTORY_EXPORT_DOCUMENT_STYLES}
+      ${INVENTORY_EXPORT_DOCUMENT_STYLES
+        .replace("__PRINT_PAGE_SIZE__", pageCssSize)
+        .replace("__PRINT_PAGE_MARGIN__", printMargin)}
     </style>
   </head>
   <body class="inventory-export inventory-export--${orientation}">
@@ -4192,30 +4490,217 @@ const buildInventoryExportDocument = ({
   </body>
 </html>`;
 
-const buildInventorySheetWordHtml = (props) =>
+const buildInventorySheetWordHtml = (
+  props,
+  reportType = PRINT_REPORT_TYPES.INVENTORY_SHEET,
+) =>
   buildInventoryExportDocument({
     title: PRINT_REPORT_COPY.inventorySheetTitle,
-    orientation: getInventoryReportOrientation(
-      PRINT_REPORT_TYPES.INVENTORY_SHEET,
-    ),
+    orientation: getInventoryReportOrientation(reportType),
+    ...getInventoryReportCssPageSettings(reportType),
     bodyMarkup: renderToStaticMarkup(<InventorySheetSummaryPrintReport {...props} />),
-  });
-
-const buildDohLguStockWordHtml = (props) =>
-  buildInventoryExportDocument({
-    title: PRINT_REPORT_COPY.dohLguTitle,
-    orientation: getInventoryReportOrientation(
-      PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM,
-    ),
-    bodyMarkup: renderToStaticMarkup(<DohLguStockInventoryPrintReport {...props} />),
   });
 
 const buildRisWordHtml = (props) =>
   buildInventoryExportDocument({
     title: PRINT_REPORT_COPY.risTitle,
-    orientation: RIS_EXPORT_PAGE.orientation,
+    orientation: getInventoryReportOrientation(
+      PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP,
+    ),
+    ...getInventoryReportCssPageSettings(
+      PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP,
+    ),
     bodyMarkup: renderToStaticMarkup(<RequisitionIssueSlipWordReport {...props} />),
   });
+
+const buildRisPrintHtml = (props) =>
+  buildInventoryExportDocument({
+    title: PRINT_REPORT_COPY.risTitle,
+    orientation: getInventoryReportOrientation(
+      PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP,
+    ),
+    ...getInventoryReportCssPageSettings(
+      PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP,
+    ),
+    bodyMarkup: renderToStaticMarkup(<RequisitionIssueSlipPrintReport {...props} />),
+  });
+
+const buildDohLguReportHtml = (props) =>
+  buildInventoryExportDocument({
+    title: PRINT_REPORT_COPY.dohLguTitle,
+    orientation: getInventoryReportOrientation(
+      PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM,
+    ),
+    ...getInventoryReportCssPageSettings(
+      PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM,
+    ),
+    bodyMarkup: renderToStaticMarkup(<DohLguStockInventoryPrintReport {...props} />),
+  });
+
+const buildPrintableInventoryReportHtml = ({
+  reportType,
+  reportDate,
+  reportRange = {},
+  reportPayload = {},
+  facilityInfo,
+  inventorySheetLeftLogoSrc,
+  inventorySheetRightLogoSrc,
+  risLeftSealSrc,
+  risRightSealSrc,
+  deliveryType = "print",
+}) => {
+  const normalizedReportType = normalizeInventoryReportType(reportType);
+  const sharedProps = {
+    facilityInfo,
+    reportDate,
+    dateRangeStart: reportRange.startDate || "",
+    dateRangeEnd: reportRange.endDate || "",
+    isFiltering: Boolean(reportRange.startDate && reportRange.endDate),
+    useActiveRangeLabel:
+      normalizedReportType === PRINT_REPORT_TYPES.INVENTORY_SHEET,
+  };
+
+  if (normalizedReportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP) {
+    const risProps = {
+      ...sharedProps,
+      reportRows: reportPayload.risReportRows || [],
+      controlNumber: reportPayload.risControlNumber,
+      ...(risLeftSealSrc ? { leftSealSrc: risLeftSealSrc } : {}),
+      ...(risRightSealSrc ? { rightSealSrc: risRightSealSrc } : {}),
+    };
+
+    return deliveryType === "word"
+      ? buildRisWordHtml(risProps)
+      : buildRisPrintHtml(risProps);
+  }
+
+  if (normalizedReportType === PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM) {
+    return buildDohLguReportHtml({
+      ...sharedProps,
+      reportRows: reportPayload.dohLguReportRows || [],
+    });
+  }
+
+  return buildInventorySheetWordHtml(
+    {
+      ...sharedProps,
+      printRows: reportPayload.printRows || [],
+      printTotals: reportPayload.printTotals || buildInventoryPrintTotals([]),
+      ...(inventorySheetLeftLogoSrc ? { leftLogoSrc: inventorySheetLeftLogoSrc } : {}),
+      ...(inventorySheetRightLogoSrc ? { rightLogoSrc: inventorySheetRightLogoSrc } : {}),
+    },
+    normalizedReportType,
+  );
+};
+
+function InventoryStaticHtmlReport({ html }) {
+  const parsedHtml = useMemo(() => {
+    if (!html || typeof DOMParser === "undefined") {
+      return {
+        bodyClassName: "",
+        styles: "",
+        bodyMarkup: "",
+      };
+    }
+
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+    return {
+      bodyClassName: parsed.body?.className || "",
+      styles: Array.from(parsed.querySelectorAll("style"))
+        .map((node) => node.textContent || "")
+        .join("\n"),
+      bodyMarkup: parsed.body?.innerHTML || "",
+    };
+  }, [html]);
+
+  if (!parsedHtml.bodyMarkup) {
+    return null;
+  }
+
+  return (
+    <div className={parsedHtml.bodyClassName}>
+      {parsedHtml.styles ? (
+        <style dangerouslySetInnerHTML={{ __html: parsedHtml.styles }} />
+      ) : null}
+      <div dangerouslySetInnerHTML={{ __html: parsedHtml.bodyMarkup }} />
+    </div>
+  );
+}
+
+const createInventoryPdfContainer = (html) => {
+  const parser = new DOMParser();
+  const parsed = parser.parseFromString(html, "text/html");
+  const container = document.createElement("div");
+
+  container.className = parsed.body?.className || "";
+  container.style.position = "fixed";
+  container.style.left = "-9999px";
+  container.style.top = "0";
+  container.style.width = "1123px";
+  container.style.background = "#ffffff";
+
+  const styleNodes = parsed.head?.querySelectorAll("style") || [];
+  styleNodes.forEach((node) => {
+    container.appendChild(node.cloneNode(true));
+  });
+
+  const bodyNodes = Array.from(parsed.body?.childNodes || []);
+  bodyNodes.forEach((node) => {
+    container.appendChild(node);
+  });
+
+  document.body.appendChild(container);
+
+  return {
+    element: container,
+    cleanup: () => {
+      if (container.parentNode) {
+        container.parentNode.removeChild(container);
+      }
+    },
+  };
+};
+
+const exportInventoryPdfFromHtml = async ({
+  html,
+  filename,
+  reportType = PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM,
+  fallbackExport,
+}) => {
+  const [{ default: jsPDF }] = await Promise.all([import("jspdf")]);
+  const pdfConfig = getInventoryReportPdfConfig(reportType);
+  const doc = new jsPDF({
+    orientation: pdfConfig.orientation,
+    unit: "pt",
+    format: pdfConfig.format,
+  });
+
+  if (typeof doc?.html !== "function") {
+    if (typeof fallbackExport === "function") {
+      await fallbackExport();
+      return;
+    }
+
+    throw new Error("HTML PDF export is not available in this environment.");
+  }
+
+  const { element, cleanup } = createInventoryPdfContainer(html);
+
+  try {
+    await doc.html(element, {
+      autoPaging: "text",
+      html2canvas: {
+        scale: 1,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      },
+      windowWidth: element.scrollWidth || undefined,
+    });
+    doc.save(filename);
+  } finally {
+    cleanup();
+  }
+};
 
 const loadImageDataUrl = async (src) => {
   try {
@@ -4241,13 +4726,26 @@ const resolveInventorySheetMonthLine = ({
   dateRangeStart,
   dateRangeEnd,
   isFiltering,
-}) =>
-  `FOR THE MONTH: ${resolveInventoryReportPeriodLabel({
+  useActiveRangeLabel = true,
+}) => {
+  if (!useActiveRangeLabel) {
+    return `FOR THE MONTH: ${resolveInventoryReportPeriodLabel({
+      reportDate,
+      dateRangeStart,
+      dateRangeEnd,
+      isFiltering,
+    })}`;
+  }
+
+  const periodLabel = computePeriodLabel({
     reportDate,
     dateRangeStart,
     dateRangeEnd,
     isFiltering,
-  })}`;
+  });
+
+  return `${periodLabel.usesMonthPrefix ? "FOR THE MONTH" : "FOR THE PERIOD"}: ${periodLabel.label}`;
+};
 
 const resolveInventorySheetFacilityName = (facilityInfo = {}) =>
   String(facilityInfo?.healthCenter || "").trim() ||
@@ -4277,15 +4775,17 @@ const buildInventorySheetHeaderContext = ({
   dateRangeStart,
   dateRangeEnd,
   isFiltering,
+  useActiveRangeLabel = true,
   leftLogoSrc = INVENTORY_SHEET_LEFT_LOGO_SRC,
   rightLogoSrc = INVENTORY_SHEET_RIGHT_LOGO_SRC,
-}) => ({
+}) =>( {
   facilityName: resolveInventorySheetFacilityName(facilityInfo),
   monthLine: resolveInventorySheetMonthLine({
     reportDate,
     dateRangeStart,
     dateRangeEnd,
     isFiltering,
+    useActiveRangeLabel,
   }),
   leftLogoSrc,
   rightLogoSrc,
@@ -4303,7 +4803,7 @@ const getInventorySheetPdfColumnStyles = (availableWidth) => {
   return INVENTORY_SHEET_COLUMN_WIDTH_PERCENTAGES.reduce(
     (result, percentage, index) => {
       result[index] = {
-        cellWidth: Number(((availableWidth * percentage) / 100).toFixed(2)),
+        cellWidth: Number( ((availableWidth* percentage) / 100).toFixed(2)),
         halign: index === 1 ? "left" : "center",
       };
       return result;
@@ -4407,7 +4907,7 @@ const drawInventorySheetPdfHeader = ({
   const frameWidth = Math.min(pageWidth - 20, INVENTORY_SHEET_PDF_FRAME_WIDTH_MM);
   const frameLeft = (pageWidth - frameWidth) / 2;
   const frameTop = margin.top - 1;
-  const frameHeight = pageHeight - (margin.top + margin.bottom) + 2;
+  const frameHeight = pageHeight -( margin.top + margin.bottom) + 2;
   const contentLeft = frameLeft + INVENTORY_SHEET_PDF_FRAME_PADDING_MM;
   const contentWidth = frameWidth - INVENTORY_SHEET_PDF_FRAME_PADDING_MM * 2;
   const contentRight = contentLeft + contentWidth;
@@ -4558,7 +5058,7 @@ const exportInventorySheetPdf = async ({
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = { top: 8, right: 8, bottom: 8, left: 8 };
   const sanitizedReportDate =
-    String(reportDate || "").trim() || new Date().toISOString().split("T")[0];
+    String(reportDate || "").trim() || getTodayInventoryDateInput();
   const headerContext = buildInventorySheetHeaderContext({
     facilityInfo,
     reportDate,
@@ -4667,20 +5167,20 @@ const InventorySheetSummaryPrintHeader = ({
   headerTestId = "inventory-sheet-print-header",
   monthLineTestId = "inventory-sheet-print-month-year",
 }) => {
-  return (
+  return(
     <header
       className="inventory-sheet-summary-print-header"
       data-testid={headerTestId}
     >
       <div className="inventory-sheet-summary-print-header__branding">
         <div className="inventory-sheet-summary-print-header__logo-wrap">
-          {leftLogoSrc ? (
+          {leftLogoSrc ?(
             <img
               src={leftLogoSrc}
               alt="Department of Health logo"
               className="inventory-sheet-summary-print-header__logo inventory-sheet-summary-print-header__logo--circle"
-            />
-          ) : null}
+            />)
+            : null}
         </div>
         <div
           className="inventory-sheet-summary-print-header__branding-copy"
@@ -4709,13 +5209,13 @@ const InventorySheetSummaryPrintHeader = ({
           </h2>
         </div>
         <div className="inventory-sheet-summary-print-header__logo-wrap">
-          {rightLogoSrc ? (
+          {rightLogoSrc ?(
             <img
               src={rightLogoSrc}
               alt="San Nicolas Health Center logo"
               className="inventory-sheet-summary-print-header__logo inventory-sheet-summary-print-header__logo--circle"
-            />
-          ) : null}
+            />)
+            : null}
         </div>
       </div>
       <div className="inventory-sheet-summary-print-header__detail-row">
@@ -4736,18 +5236,18 @@ const InventorySheetSummaryPrintHeader = ({
           {monthLine}
         </p>
       </div>
-    </header>
-  );
+    </header>)
+   ;
 };
 
 const InventorySheetSummaryPrintFooter = ({
   facilityName,
   monthLine,
-}) => (
+}) =>(
   <footer className="inventory-sheet-summary-print-footer">
     {facilityName} • {monthLine}
-  </footer>
-);
+  </footer>)
+ ;
 
 const renderInventoryReportCellLines = (value) => {
   const lines = String(value || "")
@@ -4759,12 +5259,12 @@ const renderInventoryReportCellLines = (value) => {
     return null;
   }
 
-  return lines.map((line, index) => (
+  return lines.map((line, index) =>(
     <React.Fragment key={`${line}-${index}`}>
       {line}
       {index < lines.length - 1 ? <br /> : null}
-    </React.Fragment>
-  ));
+    </React.Fragment>)
+   );
 };
 
 const InventorySheetSummaryPrintReport = ({
@@ -4775,6 +5275,7 @@ const InventorySheetSummaryPrintReport = ({
   dateRangeStart,
   dateRangeEnd,
   isFiltering,
+  useActiveRangeLabel = true,
   leftLogoSrc = INVENTORY_SHEET_LEFT_LOGO_SRC,
   rightLogoSrc = INVENTORY_SHEET_RIGHT_LOGO_SRC,
   reportClassName = "",
@@ -4791,17 +5292,18 @@ const InventorySheetSummaryPrintReport = ({
     dateRangeStart,
     dateRangeEnd,
     isFiltering,
+    useActiveRangeLabel,
     leftLogoSrc,
     rightLogoSrc,
   });
   const pageGroups = buildInventorySheetPages(printRows);
 
-  return (
+  return(
     <section
       className={`inventory-sheet-summary-print-report ${reportClassName}`.trim()}
       data-testid={reportTestId}
     >
-      {pageGroups.map((pageRows, pageIndex) => (
+      {pageGroups.map((pageRows, pageIndex) =>(
         <article
           key={`inventory-sheet-print-page-${pageIndex + 1}`}
           className="inventory-sheet-summary-print-report__page"
@@ -4820,12 +5322,12 @@ const InventorySheetSummaryPrintReport = ({
                 data-testid={tableTestId}
               >
                 <colgroup>
-                  {INVENTORY_SHEET_COLUMN_WIDTH_PERCENTAGES.map((width, index) => (
+                  {INVENTORY_SHEET_COLUMN_WIDTH_PERCENTAGES.map((width, index) =>(
                     <col
                       key={`inventory-sheet-col-${index}`}
                       style={{ width: `${width}%` }}
-                    />
-                  ))}
+                    />)
+                   )}
                 </colgroup>
                 <thead>
                   <tr>
@@ -4876,7 +5378,7 @@ const InventorySheetSummaryPrintReport = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {pageRows.map((item) => (
+                  {pageRows.map((item) =>(
                     <tr key={`inventory-sheet-print-${pageIndex + 1}-${item.id}`}>
                       <td className="print-col-base print-col-center">
                         {item.rowNumber}
@@ -4911,10 +5413,10 @@ const InventorySheetSummaryPrintReport = ({
                       <td className="print-col-base print-col-stock print-col-center">
                         {item.stockOnHand}
                       </td>
-                    </tr>
-                  ))}
+                    </tr>)
+                   )}
 
-                  {pageIndex === pageGroups.length - 1 && (
+                  {pageIndex === pageGroups.length - 1 &&(
                     <tr
                       className="inventory-sheet-summary-print-total-row"
                       data-testid={totalRowTestId}
@@ -4949,8 +5451,8 @@ const InventorySheetSummaryPrintReport = ({
                       <td className="print-col-base print-col-stock print-col-center">
                         {printTotals.stockOnHand}
                       </td>
-                    </tr>
-                  )}
+                    </tr>)
+                   }
                 </tbody>
               </table>
             </div>
@@ -4960,10 +5462,10 @@ const InventorySheetSummaryPrintReport = ({
               monthLine={headerContext.monthLine}
             />
           </div>
-        </article>
-      ))}
-    </section>
-  );
+        </article>)
+       )}
+    </section>)
+   ;
 };
 
 const DohLguStockInventoryPrintReport = ({
@@ -4986,7 +5488,7 @@ const DohLguStockInventoryPrintReport = ({
     isFiltering,
   });
 
-  return (
+  return(
     <section className="doh-lgu-stock-print-report" data-testid="inventory-print-report">
       <article
         className="doh-lgu-stock-print-report__page"
@@ -4998,33 +5500,33 @@ const DohLguStockInventoryPrintReport = ({
           </p>
           <div className="doh-lgu-stock-print-header__branding">
             <div>
-              {leftLogoSrc ? (
+              {leftLogoSrc ?(
                 <img
                   src={leftLogoSrc}
                   alt="Department of Health seal"
                   className="doh-lgu-stock-print-header__seal"
-                />
-              ) : null}
+                />)
+                : null}
             </div>
             <div className="doh-lgu-stock-print-header__branding-copy">
               <p className="doh-lgu-stock-print-header__line doh-lgu-stock-print-header__line--primary">
                 METRO MANILA CENTER FOR HEALTH DEVELOPMENT
               </p>
-              <h1 className="doh-lgu-stock-print-header__line doh-lgu-stock-print-header__line--title">
-                {PRINT_REPORT_COPY.dohLguTitle}
-              </h1>
               <p className="doh-lgu-stock-print-header__line doh-lgu-stock-print-header__line--subtitle">
                 {PRINT_REPORT_COPY.dohLguSubtitle}
               </p>
+              <h1 className="doh-lgu-stock-print-header__line doh-lgu-stock-print-header__line--title">
+                {PRINT_REPORT_COPY.dohLguTitle}
+              </h1>
             </div>
             <div>
-              {rightLogoSrc ? (
+              {rightLogoSrc ?(
                 <img
                   src={rightLogoSrc}
-                  alt="Municipality of Pasig seal"
+                  alt="San Nicolas Health Center logo"
                   className="doh-lgu-stock-print-header__seal"
-                />
-              ) : null}
+                />)
+                : null}
             </div>
           </div>
           <table className="doh-lgu-stock-print-header__meta-table">
@@ -5061,12 +5563,12 @@ const DohLguStockInventoryPrintReport = ({
 
         <table id="doh-lgu-print-table" data-testid="inventory-print-table">
           <colgroup>
-            {DOH_LGU_REPORT_COLUMN_WIDTH_PERCENTAGES.map((width, index) => (
+            {DOH_LGU_REPORT_COLUMN_WIDTH_PERCENTAGES.map((width, index) =>(
               <col
                 key={`doh-lgu-print-col-${index}`}
                 style={{ width: `${width}%` }}
-              />
-            ))}
+              />)
+             )}
           </colgroup>
           <thead>
             <tr>
@@ -5109,7 +5611,7 @@ const DohLguStockInventoryPrintReport = ({
             </tr>
           </thead>
           <tbody>
-            {reportRows.map((row) => (
+            {reportRows.map((row) =>(
               <tr key={row.key}>
                 <td className="print-col-center">{row.rowNumber}</td>
                 <td className="print-col-items print-col-item-name">
@@ -5136,10 +5638,10 @@ const DohLguStockInventoryPrintReport = ({
                 <td className="print-col-left">
                   {renderInventoryReportCellLines(row.lotNumber)}
                 </td>
-                <td className="print-col-center">
+                <td className="print-col-center print-col-wrap">
                   {renderInventoryReportCellLines(row.expiryDate)}
                 </td>
-                <td className="print-col-center">
+                <td className="print-col-center print-col-wrap">
                   {renderInventoryReportCellLines(row.transactionDate)}
                 </td>
                 <td className="print-col-center">
@@ -5168,13 +5670,13 @@ const DohLguStockInventoryPrintReport = ({
                 <td className="print-col-center">
                   {formatRisQuantityDisplay(row.endStocksLgu, { showZero: true })}
                 </td>
-              </tr>
-            ))}
+              </tr>)
+             )}
           </tbody>
         </table>
       </article>
-    </section>
-  );
+    </section>)
+   ;
 };
 
 const RequisitionIssueSlipDocumentReport = ({
@@ -5214,7 +5716,7 @@ const RequisitionIssueSlipDocumentReport = ({
     isFiltering,
   });
 
-  return (
+  return(
     <section className={rootClassName} data-testid={reportTestId}>
       <div className={pageClassName}>
         <div data-testid={headerTestId}>
@@ -5222,13 +5724,13 @@ const RequisitionIssueSlipDocumentReport = ({
             <tbody>
               <tr>
                 <td className="ris-word-header-table__seal-cell">
-                  {leftSealSrc ? (
+                  {leftSealSrc ?(
                     <img
                       src={leftSealSrc}
                       alt="Municipality of Pasig seal"
                       className="ris-word-header-table__seal"
-                    />
-                  ) : null}
+                    />)
+                    : null}
                 </td>
                 <td className="ris-word-header-table__title-cell">
                   <h1 className="ris-word-header-table__title">
@@ -5242,13 +5744,13 @@ const RequisitionIssueSlipDocumentReport = ({
                   </p>
                 </td>
                 <td className="ris-word-header-table__seal-cell">
-                  {rightSealSrc ? (
+                  {rightSealSrc ?(
                     <img
                       src={rightSealSrc}
                       alt="Department of Health seal"
                       className="ris-word-header-table__seal"
-                    />
-                  ) : null}
+                    />)
+                    : null}
                 </td>
               </tr>
             </tbody>
@@ -5327,11 +5829,11 @@ const RequisitionIssueSlipDocumentReport = ({
           </thead>
           <tbody>
             {reportRows.map((row) =>
-              row.type === "section" ? (
+              row.type === "section" ?(
                 <tr key={row.key} className="ris-print-table__section-row">
                   <td colSpan={6}>{row.description}</td>
-                </tr>
-              ) : (
+                </tr>)
+                :(
                 <tr key={row.key}>
                   <td className="ris-print-table__description">
                     {row.description}
@@ -5341,17 +5843,17 @@ const RequisitionIssueSlipDocumentReport = ({
                   <td className="ris-print-table__numeric">{row.requestQty}</td>
                   <td className="ris-print-table__numeric">{row.issuedQty}</td>
                   <td className="ris-print-table__numeric">{row.totalQty}</td>
-                </tr>
-              ),
+                </tr>)
+               ,
             )}
           </tbody>
         </table>
       </div>
-    </section>
-  );
+    </section>)
+   ;
 };
 
-const RequisitionIssueSlipWordReport = (props) => (
+const RequisitionIssueSlipWordReport = (props) =>(
   <RequisitionIssueSlipDocumentReport
     {...props}
     rootClassName="ris-word-report"
@@ -5360,10 +5862,10 @@ const RequisitionIssueSlipWordReport = (props) => (
     headerTestId="inventory-ris-word-header"
     periodTestId="inventory-ris-word-period"
     tableTestId="inventory-ris-word-table"
-  />
-);
+  />)
+ ;
 
-const RequisitionIssueSlipPrintReport = (props) => (
+const RequisitionIssueSlipPrintReport = (props) =>(
   <RequisitionIssueSlipDocumentReport
     {...props}
     rootClassName="ris-print-report"
@@ -5372,8 +5874,8 @@ const RequisitionIssueSlipPrintReport = (props) => (
     headerTestId="inventory-ris-print-header"
     periodTestId="inventory-ris-print-period"
     tableTestId="inventory-ris-print-table"
-  />
-);
+  />)
+ ;
 
 export default function InventoryManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -5487,21 +5989,78 @@ export default function InventoryManagement() {
   const [lotSearchTerm, setLotSearchTerm] = useState("");
   const [isPrintLayoutActive, setIsPrintLayoutActive] = useState(false);
   const [activePrintReportType, setActivePrintReportType] = useState(null);
+  const [activePrintReportHtml, setActivePrintReportHtml] = useState("");
   const [selectedExportReportType, setSelectedExportReportType] = useState(
     normalizeInventoryReportType(PRINT_REPORT_TYPES.INVENTORY_SHEET),
   );
   const [selectedReportDeliveryType, setSelectedReportDeliveryType] = useState(
-    INVENTORY_REPORT_DELIVERY_TYPES.PRINT,
+    INVENTORY_REPORT_DELIVERY_TYPES.PDF,
   );
   const [isGenerateReportModalOpen, setIsGenerateReportModalOpen] =
     useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const hasLoadedInventoryDataRef = useRef(false);
   const activePrintReportTypeRef = useRef(null);
   const printPageStyleRef = useRef(null);
 
   // Report date range
-  const [reportDate, setReportDate] = useState(
-    new Date().toISOString().split("T")[0],
+  const [reportDate, setReportDate] = useState(getTodayInventoryDateInput);
+  const [reportPeriod, setReportPeriod] = useState("month");
+  const [reportPeriodStartDate, setReportPeriodStartDate] = useState("");
+  const [reportPeriodEndDate, setReportPeriodEndDate] = useState("");
+  const reportPeriodRange = useMemo(
+    () =>
+      getVaccinationPeriodRange({
+        period: reportPeriod,
+        startDate: reportPeriodStartDate,
+        endDate: reportPeriodEndDate,
+        referenceDate: new Date(),
+      }),
+    [reportPeriod, reportPeriodStartDate, reportPeriodEndDate],
+  );
+  const reportPeriodRangeLabel = useMemo(
+    () =>
+      formatInventoryReportDateRangeLabel({
+        startDate: reportPeriodRange.startDate,
+        endDate: reportPeriodRange.endDate,
+      }),
+    [reportPeriodRange.endDate, reportPeriodRange.startDate],
+  );
+  const stockMovementPeriodRange = useMemo(
+    () => buildStockMovementPeriodRange(stockMovementFilters),
+    [stockMovementFilters],
+  );
+  const handleReportPeriodChange = useCallback(
+    (nextPeriod) => {
+      const normalizedPeriod = normalizeVaccinationPeriod(nextPeriod);
+      if (normalizedPeriod === "custom") {
+        const fallbackRange = getVaccinationPeriodRange({
+          period: reportPeriod,
+          startDate: reportPeriodStartDate,
+          endDate: reportPeriodEndDate,
+          referenceDate: new Date(),
+        });
+        setReportPeriodStartDate(fallbackRange.startDate || "");
+        setReportPeriodEndDate(fallbackRange.endDate || "");
+        setReportPeriod(normalizedPeriod);
+        return;
+      }
+
+      setReportPeriod(normalizedPeriod);
+    },
+    [reportPeriod, reportPeriodEndDate, reportPeriodStartDate],
+  );
+  const handleReportPeriodStartDateChange = useCallback(
+    (value) => {
+      setReportPeriodStartDate(value);
+    },
+    [],
+  );
+  const handleReportPeriodEndDateChange = useCallback(
+    (value) => {
+      setReportPeriodEndDate(value);
+    },
+    [],
   );
 
   const printDateRange = usePrintDateRange({
@@ -5535,6 +6094,21 @@ export default function InventoryManagement() {
   ]);
 
   useEffect(() => {
+    if (!isGenerateReportModalOpen) {
+      return;
+    }
+
+    const monthRange = getVaccinationPeriodRange({
+      period: "month",
+      referenceDate: new Date(),
+    });
+    setReportPeriod("month");
+    setReportPeriodStartDate(monthRange.startDate || "");
+    setReportPeriodEndDate(monthRange.endDate || "");
+    setReportDate(getTodayInventoryDateInput());
+  }, [isGenerateReportModalOpen]);
+
+  useEffect(() => {
     if (
       availableReportDeliveryOptions.some(
         (option) => option.value === selectedReportDeliveryType,
@@ -5545,7 +6119,7 @@ export default function InventoryManagement() {
 
     setSelectedReportDeliveryType(
       availableReportDeliveryOptions[0]?.value ||
-        INVENTORY_REPORT_DELIVERY_TYPES.PRINT,
+        INVENTORY_REPORT_DELIVERY_TYPES.PDF,
     );
   }, [availableReportDeliveryOptions, selectedReportDeliveryType]);
 
@@ -5578,13 +6152,13 @@ export default function InventoryManagement() {
       return null;
     }
 
-    return (
+    return(
       availableLots.find(
         (batch) =>
           resolveInventorySaveRowId(batch.batch_id || batch.inventory_id) ===
           selectedBatchId,
-      ) || null
-    );
+      ) || null)
+     ;
   }, [availableLots, formData.batch_id]);
 
   const filteredAvailableLots = useMemo(() => {
@@ -5641,8 +6215,8 @@ export default function InventoryManagement() {
 
   const isTransactionSubmitDisabled =
     isTransactionSubmitting ||
-    (requiresBatchSelection &&
-      (availableLotsLoading ||
+
+      (requiresBatchSelection&&(availableLotsLoading||
         !selectedBatchOption ||
         batchStockPreview?.unavailable ||
         batchStockPreview?.insufficientStock));
@@ -5665,7 +6239,7 @@ export default function InventoryManagement() {
     () =>
       APPROVED_VACCINE_NAMES
         .filter((name) => !name.toLowerCase().includes("diluent 5ml") && name !== "Diluent")
-        .map((name) => ({
+        .map((name) =>( {
           id: name.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
           name,
           unit: "vials",
@@ -5679,6 +6253,112 @@ export default function InventoryManagement() {
     setInventory(initialData);
     setInventoryReportSource(initialData);
   }, [vaccineItems]);
+
+  const normalizeInventoryApiRows = useCallback(
+    (inventoryData) => {
+      let apiInventory = [];
+      if (inventoryData && inventoryData.success !== undefined) {
+        apiInventory = inventoryData.data || inventoryData.inventory || [];
+      } else if (Array.isArray(inventoryData)) {
+        apiInventory = inventoryData;
+      } else if (inventoryData?.inventory) {
+        apiInventory = inventoryData.inventory;
+      }
+
+      return apiInventory.map((record) =>
+        normalizeInventoryRecord(record, {
+          _facilityId:
+            record.clinic_id || record.facility_id || fallbackClinicId,
+        }),
+      );
+    },
+    [fallbackClinicId],
+  );
+
+  const currentAppliedReportRange = useMemo(
+    () => ({
+      startDate: dateRangeStart,
+      endDate: dateRangeEnd,
+      isFiltering: Boolean(dateRangeStart && dateRangeEnd),
+    }),
+    [dateRangeEnd, dateRangeStart],
+  );
+
+  const generateModalReportRange = useMemo(
+    () => ({
+      startDate: reportPeriodRange.startDate || "",
+      endDate: reportPeriodRange.endDate || "",
+      isFiltering: Boolean(reportPeriodRange.startDate && reportPeriodRange.endDate),
+    }),
+    [reportPeriodRange.endDate, reportPeriodRange.startDate],
+  );
+
+  const buildReportPayloadForRange = useCallback(
+    ({ inventorySource, reportRange, reportDateValue }) =>
+      buildInventoryReportPayload({
+        inventoryReportSource: inventorySource,
+        liveInventoryRows: inventory,
+        vaccineItems,
+        fallbackClinicId,
+        displayFilters: buildInventoryReportDisplayFilters(
+          inventoryDisplayFilters,
+          reportRange,
+        ),
+        facilityInfo,
+        reportDate: reportDateValue,
+      }),
+    [
+      facilityInfo,
+      fallbackClinicId,
+      inventory,
+      inventoryDisplayFilters,
+      vaccineItems,
+    ],
+  );
+
+  const loadInventoryReportSourceForRange = useCallback(
+    async (reportRange = {}) => {
+      const inventoryQuery = {
+        clinic_id: fallbackClinicId,
+      };
+
+      if (reportRange.startDate) {
+        inventoryQuery.period_start = reportRange.startDate;
+      }
+
+      if (reportRange.endDate) {
+        inventoryQuery.period_end = reportRange.endDate;
+      }
+
+      const inventoryData = await apiClient.getVaccineInventory(inventoryQuery);
+      return normalizeInventoryApiRows(inventoryData);
+    },
+    [fallbackClinicId, normalizeInventoryApiRows],
+  );
+
+  const buildPrintableReportHtmlFromPayload = useCallback(
+    ({
+      reportType,
+      reportRange,
+      reportPayload,
+      reportDateValue,
+      deliveryType = "print",
+      embeddedAssets = {},
+    }) =>
+      buildPrintableInventoryReportHtml({
+        reportType,
+        reportDate: reportDateValue,
+        reportRange,
+        reportPayload,
+        facilityInfo,
+        inventorySheetLeftLogoSrc: embeddedAssets.inventorySheetLeftLogoSrc,
+        inventorySheetRightLogoSrc: embeddedAssets.inventorySheetRightLogoSrc,
+        risLeftSealSrc: embeddedAssets.risLeftSealSrc,
+        risRightSealSrc: embeddedAssets.risRightSealSrc,
+        deliveryType,
+      }),
+    [facilityInfo],
+  );
 
   const fetchPersistedStockAlerts = useCallback(async () => {
     if (
@@ -5734,16 +6414,22 @@ export default function InventoryManagement() {
     try {
       setStockMovementsLoading(true);
       setStockMovementsError(null);
+      const requestFilters = {
+        clinic_id: fallbackClinicId,
+        limit: 100000,
+      };
+
+      if (stockMovementPeriodRange.startDate) {
+        requestFilters.start_date = stockMovementPeriodRange.startDate;
+      }
+
+      if (stockMovementPeriodRange.endDate) {
+        requestFilters.end_date = stockMovementPeriodRange.endDate;
+      }
 
       const response = canUseSummaryEndpoint
-        ? await apiClient.getInventoryStockMovements({
-          clinic_id: fallbackClinicId,
-          limit: 100000,
-        })
-        : await apiClient.getVaccineInventoryTransactions(null, {
-          clinic_id: fallbackClinicId,
-          limit: 100000,
-        });
+        ? await apiClient.getInventoryStockMovements(requestFilters)
+        : await apiClient.getVaccineInventoryTransactions(null, requestFilters);
 
       let movementRows = [];
       let summarySource = null;
@@ -5774,8 +6460,8 @@ export default function InventoryManagement() {
         .map(normalizeInventoryMovementRecord)
         .map((movement) => {
           if (
-            (movement.performed_by_name || movement.performed_by_username) ||
-            (!currentUserDisplayName && !currentUserUsername)
+            (movement.performed_by_name || movement.performed_by_username) ||(
+             !currentUserDisplayName && !currentUserUsername)
           ) {
             return movement;
           }
@@ -5824,6 +6510,8 @@ export default function InventoryManagement() {
     currentUserRole,
     currentUserUsername,
     fallbackClinicId,
+    stockMovementPeriodRange.endDate,
+    stockMovementPeriodRange.startDate,
   ]);
 
   // Fetch data
@@ -5853,7 +6541,7 @@ export default function InventoryManagement() {
 
         const [inventoryData, vaccinesData] = await Promise.all([
           apiClient.getVaccineInventory(inventoryQuery),
-          apiClient.getVaccines().catch(() => ({ data: [] })),
+          apiClient.getVaccines().catch(() =>( { data: [] })),
         ]);
 
         let apiVaccines = [];
@@ -5865,22 +6553,7 @@ export default function InventoryManagement() {
           apiVaccines = vaccinesData.data;
         }
 
-        // Handle both wrapped and unwrapped response formats
-        let apiInventory = [];
-        if (inventoryData && inventoryData.success !== undefined) {
-          apiInventory = inventoryData.data || inventoryData.inventory || [];
-        } else if (Array.isArray(inventoryData)) {
-          apiInventory = inventoryData;
-        } else if (inventoryData?.inventory) {
-          apiInventory = inventoryData.inventory;
-        }
-
-        const normalizedApiInventory = apiInventory.map((record) =>
-          normalizeInventoryRecord(record, {
-            _facilityId:
-              record.clinic_id || record.facility_id || fallbackClinicId,
-          }),
-        );
+        const normalizedApiInventory = normalizeInventoryApiRows(inventoryData);
 
         const enrichedVaccineItems = vaccineItems.map((item) => {
           const matchedVaccine = apiVaccines.find(
@@ -5929,7 +6602,7 @@ export default function InventoryManagement() {
         }
 
         if (facilityData) {
-          setFacilityInfo((prev) => ({
+          setFacilityInfo((prev) =>( {
             ...prev,
             healthCenter: facilityData.name || prev.healthCenter,
             address: facilityData.address || prev.address,
@@ -5961,6 +6634,7 @@ export default function InventoryManagement() {
     inventoryDisplayFilters.startDate,
     initializeInventory,
     loadStockMovements,
+    normalizeInventoryApiRows,
     vaccineItems,
   ]);
 
@@ -5983,10 +6657,10 @@ export default function InventoryManagement() {
 
   useEffect(() => {
     if (!showModal || !selectedItem || !requiresBatchSelection) {
-      setAvailableLots((prev) => (prev.length > 0 ? [] : prev));
-      setAvailableLotsError((prev) => (prev ? null : prev));
-      setAvailableLotsLoading((prev) => (prev ? false : prev));
-      setLotSearchTerm((prev) => (prev ? "" : prev));
+      setAvailableLots((prev) =>( prev.length > 0 ? [] : prev));
+      setAvailableLotsError((prev) =>( prev ? null : prev));
+      setAvailableLotsLoading((prev) =>( prev ? false : prev));
+      setLotSearchTerm((prev) =>( prev ? "" : prev));
       return undefined;
     }
 
@@ -6096,21 +6770,25 @@ export default function InventoryManagement() {
     }
 
     if (!printPageStyleRef.current) {
-      const styleNode = document.createElement("style");
+      const existingNode = document.getElementById("inventory-print-page-style");
+      const styleNode = existingNode || document.createElement("style");
       styleNode.id = "inventory-print-page-style";
-      document.head.appendChild(styleNode);
+      if (!existingNode) {
+        document.head.appendChild(styleNode);
+      }
       printPageStyleRef.current = styleNode;
     }
 
-    const printPageSize = getInventoryPrintPageSize(reportType);
-    const printMargin =
-      reportType === PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM ? "10mm" : "0.35cm";
-    printPageStyleRef.current.textContent = `@media print { @page { size: ${printPageSize}; margin: ${printMargin}; } }`;
+    const { pageCssSize, printMargin } = getInventoryReportCssPageSettings(
+      reportType,
+    );
+    printPageStyleRef.current.textContent = `@media print { @page { size: ${pageCssSize}; margin: ${printMargin}; } }`;
   }, []);
 
   const clearPrintLayout = useCallback(() => {
     setIsPrintLayoutActive(false);
     setActivePrintReportType(null);
+    setActivePrintReportHtml("");
     activePrintReportTypeRef.current = null;
     document.body.classList.remove(
       "printing-inventory",
@@ -6224,7 +6902,7 @@ export default function InventoryManagement() {
 
     return [
       { value: "all", label: "All Vaccines" },
-      ...vaccineNames.map((name) => ({ value: name, label: name })),
+      ...vaccineNames.map((name) =>( { value: name, label: name })),
     ];
   }, [inventory]);
 
@@ -6246,7 +6924,7 @@ export default function InventoryManagement() {
 
     return [
       { value: "all", label: "All Types" },
-      ...uniqueTypes.map((type) => ({
+      ...uniqueTypes.map((type) =>( {
         value: type,
         label: getInventoryMovementTypeMeta(type).label,
       })),
@@ -6264,7 +6942,7 @@ export default function InventoryManagement() {
 
     return [
       { value: "all", label: "All Vaccines" },
-      ...vaccineNames.map((name) => ({ value: name, label: name })),
+      ...vaccineNames.map((name) =>( { value: name, label: name })),
     ];
   }, [stockMovements]);
 
@@ -6315,64 +6993,29 @@ export default function InventoryManagement() {
     });
   }, [filteredInventoryReportSource, inventoryDisplayFilters]);
 
-  const reportInventoryRows = useMemo(
-    () =>
-      aggregateInventoryRecordsByVaccine(
-        displayedInventoryReportSource,
-        vaccineItems,
-        fallbackClinicId,
-        {
-          mode: INVENTORY_RECORD_AGGREGATION_MODES.HISTORICAL_TOTALS,
-        },
-      ),
-    [displayedInventoryReportSource, fallbackClinicId, vaccineItems],
-  );
-
   const inventorySheetRows = useMemo(
     () =>
-      reportInventoryRows
-        .map((reportRow) => {
-          const liveRow = findMatchingInventoryRow(inventory, reportRow);
-          const actionStockOnHand =
-            liveRow?.stock_on_hand ?? reportRow.stock_on_hand;
-
-          return {
-            ...(liveRow || {}),
-            ...reportRow,
-            id: liveRow?.id ?? reportRow.id,
-            _apiId: liveRow?._apiId ?? reportRow._apiId,
-            _vaccineId: liveRow?._vaccineId ?? reportRow._vaccineId,
-            _facilityId: liveRow?._facilityId ?? reportRow._facilityId,
-            _actionStockOnHand: actionStockOnHand,
-          };
-        })
-        .filter((item) => {
-          const matchesDateFilter = matchesInventoryReportPeriodRange(
-            item,
-            inventoryDisplayFilters,
-          );
-          const matchesVaccineFilter =
-            inventoryDisplayFilters.vaccine === "all" ||
-            item.name === inventoryDisplayFilters.vaccine;
-          const matchesStatusFilter = matchesInventoryStatusFilter(
-            {
-              ...item,
-              stock_on_hand:
-                item._actionStockOnHand ?? item.stock_on_hand,
-            },
-            inventoryDisplayFilters.status,
-          );
-
-          return matchesDateFilter && matchesVaccineFilter && matchesStatusFilter;
-        }),
-    [inventory, inventoryDisplayFilters, reportInventoryRows],
+      buildInventorySheetRowsWithLiveInventory({
+        inventoryReportSource: displayedInventoryReportSource,
+        liveInventoryRows: inventory,
+        vaccineItems,
+        fallbackClinicId,
+        displayFilters: inventoryDisplayFilters,
+      }),
+    [
+      displayedInventoryReportSource,
+      fallbackClinicId,
+      inventory,
+      inventoryDisplayFilters,
+      vaccineItems,
+    ],
   );
 
   const displayedStockMovements = useMemo(() => {
     return filteredStockMovements.filter((movement) => {
       const matchesDateFilter = matchesOptionalDateRange(
         [movement.created_at, movement.transaction_date],
-        stockMovementFilters,
+        stockMovementPeriodRange,
       );
       const normalizedType = normalizeInventoryMovementType(
         movement.transaction_type,
@@ -6387,7 +7030,7 @@ export default function InventoryManagement() {
 
       return matchesDateFilter && matchesTypeFilter && matchesVaccineFilter;
     });
-  }, [filteredStockMovements, stockMovementFilters]);
+  }, [filteredStockMovements, stockMovementFilters, stockMovementPeriodRange]);
 
   const hasActiveInventoryDisplayFilters = useMemo(
     () =>
@@ -6399,9 +7042,11 @@ export default function InventoryManagement() {
 
   const hasActiveStockMovementFilters = useMemo(
     () =>
-      hasDisplayDateRangeValue(stockMovementFilters) ||
+      stockMovementFilters.period !== "month" ||
       stockMovementFilters.type !== "all" ||
-      stockMovementFilters.vaccine !== "all",
+      stockMovementFilters.vaccine !== "all" ||
+      Boolean(stockMovementFilters.customStartDate) ||
+      Boolean(stockMovementFilters.customEndDate),
     [stockMovementFilters],
   );
 
@@ -6416,9 +7061,25 @@ export default function InventoryManagement() {
   }, []);
 
   const updateStockMovementFilter = useCallback((field, value) => {
-    setStockMovementFilters((previous) =>
-      previous[field] === value ? previous : { ...previous, [field]: value },
-    );
+    const nextValue =
+      field === "period" ? normalizeVaccinationPeriod(value) : value;
+
+    setStockMovementFilters((previous) => {
+      if (previous[field] === nextValue) {
+        return previous;
+      }
+
+      if (field === "period" && nextValue !== "custom") {
+        return {
+          ...previous,
+          period: nextValue,
+          customStartDate: "",
+          customEndDate: "",
+        };
+      }
+
+      return { ...previous, [field]: nextValue };
+    });
   }, []);
 
   const clearStockMovementFilters = useCallback(() => {
@@ -6535,7 +7196,7 @@ export default function InventoryManagement() {
   // Calculate totals from the supplied inventory rows
   const calculateTotals = useCallback((rows = displayedInventory) => {
     return rows.reduce(
-      (acc, item) => ({
+      (acc, item) =>( {
         beginning_balance: acc.beginning_balance + item.beginning_balance,
         received: acc.received + item.received,
         transferred_in: acc.transferred_in + item.transferred_in,
@@ -6677,7 +7338,7 @@ export default function InventoryManagement() {
       }
     }
 
-    if ((modalType === "receive" || expiryDateInput) && (expiryDateCheck.error || !expiryDate)) {
+    if ((modalType === "receive" || expiryDateInput) &&( expiryDateCheck.error || !expiryDate)) {
       nextErrors.expiry_date =
         expiryDateCheck.error || "A valid expiry date is required.";
     } else if (expiryDate && transactionDate && expiryDate < transactionDate) {
@@ -6786,7 +7447,7 @@ export default function InventoryManagement() {
         return;
       }
 
-      console.log('🔍 Transaction Debug Info:');
+      console.log('Transaction Debug Info:');
       console.log('- modalType:', modalType);
       console.log('- dbInventoryId:', dbInventoryId);
       console.log('- matchedVaccineId:', matchedVaccineId);
@@ -6819,7 +7480,7 @@ export default function InventoryManagement() {
         payload.expiry_date = effectiveExpiryDate;
       }
 
-      console.log('📤 Sending transaction payload:', JSON.stringify(payload, null, 2));
+      console.log('Sending transaction payload:', JSON.stringify(payload, null, 2));
 
       const transactionResponse =
         await apiClient.createVaccineInventoryTransaction(payload);
@@ -6919,7 +7580,7 @@ export default function InventoryManagement() {
     } catch (err) {
       const backendFields = err?.response?.data?.fields || {};
       if (Object.keys(backendFields).length > 0) {
-        setTransactionErrors((prev) => ({
+        setTransactionErrors((prev) =>( {
           ...prev,
           ...backendFields,
         }));
@@ -6939,8 +7600,11 @@ export default function InventoryManagement() {
     }
   };
 
-  const printReport = (reportType = PRINT_REPORT_TYPES.INVENTORY_SHEET) => {
-    if (!printDateRange.ensureReadyForPrint()) {
+  const printReport = (
+    reportType = PRINT_REPORT_TYPES.INVENTORY_SHEET,
+    { html = "" } = {},
+  ) => {
+    if (!html) {
       return;
     }
 
@@ -6951,6 +7615,7 @@ export default function InventoryManagement() {
       handleTabChange(INVENTORY_DEFAULT_TAB_KEY);
     }
 
+    setActivePrintReportHtml(html);
     activatePrintLayout(normalizedReportType);
 
     // Small delay to ensure DOM updates
@@ -6970,7 +7635,7 @@ export default function InventoryManagement() {
       low: [],
       unused: [],
       wasted: [],
-      expiring: [], // Nearly expiring (within 30 days)
+      expiring: []  // Nearly expiring (within 30 days)
     };
 
     const now = new Date();
@@ -7010,7 +7675,7 @@ export default function InventoryManagement() {
             item.stock_on_hand > 0) {
           alerts.expiring.push({
             ...item,
-            days_until_expiry: Math.ceil((expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)),
+            days_until_expiry: Math.ceil((expiryDate.getTime() - now.getTime()) /( 24 * 60 * 60 * 1000)),
           });
         }
       }
@@ -7159,8 +7824,8 @@ export default function InventoryManagement() {
       setStockAlertFeedback({
         variant: "success",
         message:
-          response?.message ||
-          (pendingBulkStockAlertAction.action === "acknowledge"
+          response?.message ||(
+           pendingBulkStockAlertAction.action === "acknowledge"
             ? `Acknowledged ${pendingBulkStockAlertAction.count} stock alerts.`
             : `Resolved ${pendingBulkStockAlertAction.count} stock alerts.`),
       });
@@ -7183,7 +7848,7 @@ export default function InventoryManagement() {
       return null;
     }
 
-    return (
+    return(
       <Card className="flex min-h-0 flex-col overflow-hidden p-4 dark:bg-gray-800 dark:border-gray-700">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
@@ -7237,20 +7902,20 @@ export default function InventoryManagement() {
           </div>
         </div>
 
-        {stockAlertFeedback && (
+        {stockAlertFeedback &&(
           <Alert
             variant={stockAlertFeedback.variant}
             className="mt-4"
           >
             {stockAlertFeedback.message}
-          </Alert>
-        )}
+          </Alert>)
+         }
 
-        {stockAlertLoadError && (
+        {stockAlertLoadError &&(
           <Alert variant="error" className="mt-4">
             {stockAlertLoadError}
-          </Alert>
-        )}
+          </Alert>)
+         }
 
         <div
           className="auto-hide-scrollbar mt-4 min-h-0 max-h-[min(52vh,30rem)] overflow-auto"
@@ -7283,7 +7948,7 @@ export default function InventoryManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {paginatedPersistedStockAlerts.map((alert) => (
+              {paginatedPersistedStockAlerts.map((alert) =>(
                 <tr key={alert.id} className="dark:bg-gray-800/40">
                   <td className="px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
                     {alert.vaccine_name}
@@ -7320,22 +7985,22 @@ export default function InventoryManagement() {
                         alert.created_at,
                     )}
                   </td>
-                </tr>
-              ))}
+                </tr>)
+               )}
             </tbody>
           </table>
 
-          {!stockAlertsLoading && persistedStockAlerts.length === 0 && (
+          {!stockAlertsLoading && persistedStockAlerts.length === 0 &&(
             <div className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
               No persisted stock alerts are currently tracked for this facility.
-            </div>
-          )}
+            </div>)
+           }
 
-          {stockAlertsLoading && (
+          {stockAlertsLoading &&(
             <div className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
               Refreshing stock alert statuses...
-            </div>
-          )}
+            </div>)
+           }
         </div>
         <InventoryPaginationFooter
           testId="inventory-summary-workflow-pagination"
@@ -7373,8 +8038,8 @@ export default function InventoryManagement() {
             )
           }
         />
-      </Card>
-    );
+      </Card>)
+     ;
   };
 
   // Use the currently displayed inventory rows for report generation/export
@@ -7414,11 +8079,35 @@ export default function InventoryManagement() {
     ],
   );
 
-  const downloadSelectedPdf = async (reportTypeOverride) => {
-    if (!printDateRange.ensureReadyForPrint()) {
-      return;
-    }
+  const currentPageReportPayload = useMemo(
+    () => ({
+      inventoryReportSource: displayedInventoryReportSource,
+      inventorySheetRows,
+      printRows,
+      printTotals,
+      dohLguReportRows,
+      risReportRows,
+      risControlNumber,
+    }),
+    [
+      displayedInventoryReportSource,
+      inventorySheetRows,
+      printRows,
+      printTotals,
+      dohLguReportRows,
+      risControlNumber,
+      risReportRows,
+    ],
+  );
 
+  const downloadSelectedPdf = async (
+    reportTypeOverride,
+    {
+      reportRange = currentAppliedReportRange,
+      reportPayload = currentPageReportPayload,
+      reportDateValue = reportDate,
+    } = {},
+  ) => {
     const reportType = normalizeInventoryReportType(
       typeof reportTypeOverride === "string"
         ? reportTypeOverride
@@ -7426,15 +8115,22 @@ export default function InventoryManagement() {
     );
 
     try {
+      const isRangeFiltered = Boolean(
+        reportRange.startDate || reportRange.endDate,
+      );
+      const safeReportDate = reportDateValue || getTodayInventoryDateInput();
+
       if (reportType === PRINT_REPORT_TYPES.INVENTORY_SHEET) {
         await exportInventorySheetPdf({
           facilityInfo,
-          reportDate,
-          printRows,
-          printTotals,
-          dateRangeStart,
-          dateRangeEnd,
-          isFiltering,
+          reportDate: reportDateValue,
+          printRows: reportPayload.printRows || [],
+          printTotals:
+            reportPayload.printTotals ||
+            buildInventoryPrintTotals(reportPayload.printRows || []),
+          dateRangeStart: reportRange.startDate,
+          dateRangeEnd: reportRange.endDate,
+          isFiltering: isRangeFiltered,
         });
         return;
       }
@@ -7442,11 +8138,13 @@ export default function InventoryManagement() {
       if (reportType === PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM) {
         await exportDohLguInventoryPdf({
           facilityInfo,
-          reportDate,
-          reportRows: dohLguReportRows,
-          dateRangeStart,
-          dateRangeEnd,
-          isFiltering,
+          reportDate: reportDateValue,
+          reportRows:
+            reportPayload.dohLguReportRows ||
+            buildDohLguReportRows(reportPayload.inventoryReportSource || []),
+          dateRangeStart: reportRange.startDate,
+          dateRangeEnd: reportRange.endDate,
+          isFiltering: isRangeFiltered,
         });
         return;
       }
@@ -7454,17 +8152,80 @@ export default function InventoryManagement() {
       if (reportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP) {
         await exportRisPdf({
           facilityInfo,
-          reportDate,
-          reportRows: risReportRows,
-          controlNumber: risControlNumber,
-          dateRangeStart,
-          dateRangeEnd,
-          isFiltering,
+          reportDate: reportDateValue,
+          reportRows: reportPayload.risReportRows || [],
+          controlNumber: reportPayload.risControlNumber,
+          dateRangeStart: reportRange.startDate,
+          dateRangeEnd: reportRange.endDate,
+          isFiltering: isRangeFiltered,
         });
         return;
       }
 
-      throw new Error("Unsupported inventory PDF report format selected.");
+      const embeddedAssets =
+        reportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP
+          ? {
+              risLeftSealSrc:
+                (await loadImageDataUrl(PASIG_REPORT_SEAL_SRC)) ||
+                PASIG_REPORT_SEAL_SRC,
+              risRightSealSrc:
+                (await loadImageDataUrl(DOH_REPORT_SEAL_SRC)) || DOH_REPORT_SEAL_SRC,
+            }
+          : {
+              inventorySheetLeftLogoSrc:
+                (await loadImageDataUrl(INVENTORY_SHEET_LEFT_LOGO_SRC)) ||
+                INVENTORY_SHEET_LEFT_LOGO_SRC,
+              inventorySheetRightLogoSrc:
+                (await loadImageDataUrl(INVENTORY_SHEET_RIGHT_LOGO_SRC)) ||
+                INVENTORY_SHEET_RIGHT_LOGO_SRC,
+            };
+
+      const html = buildPrintableReportHtmlFromPayload({
+        reportType,
+        reportRange,
+        reportPayload,
+        reportDateValue,
+        deliveryType: "pdf",
+        embeddedAssets,
+      });
+      const filename =
+        reportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP
+          ? `${RIS_REPORT_FILENAME_PREFIX}-${safeReportDate}.pdf`
+          : `inventory-sheet-${safeReportDate}.pdf`;
+      const fallbackExport = async () => {
+        if (reportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP) {
+          await exportRisPdf({
+            facilityInfo,
+            reportDate: reportDateValue,
+            reportRows: reportPayload.risReportRows || [],
+            controlNumber: reportPayload.risControlNumber,
+            dateRangeStart: reportRange.startDate,
+            dateRangeEnd: reportRange.endDate,
+            isFiltering: isRangeFiltered,
+          });
+          return;
+        }
+
+        await exportInventorySheetPdf({
+          facilityInfo,
+          reportDate: reportDateValue,
+          printRows: reportPayload.printRows || [],
+          printTotals:
+            reportPayload.printTotals ||
+            buildInventoryPrintTotals(reportPayload.printRows || []),
+          dateRangeStart: reportRange.startDate,
+          dateRangeEnd: reportRange.endDate,
+          isFiltering: isRangeFiltered,
+        });
+      };
+
+      await exportInventoryPdfFromHtml({
+        html,
+        filename,
+        reportType,
+        fallbackExport,
+      });
+      return;
     } catch (pdfError) {
       setError(
         pdfError?.message || "Failed to generate the selected PDF report.",
@@ -7472,11 +8233,14 @@ export default function InventoryManagement() {
     }
   };
 
-  const downloadSelectedWord = useCallback(async (reportTypeOverride) => {
-    if (!printDateRange.ensureReadyForPrint()) {
-      return;
-    }
-
+  const downloadSelectedWord = useCallback(async (
+    reportTypeOverride,
+    {
+      reportRange = currentAppliedReportRange,
+      reportPayload = currentPageReportPayload,
+      reportDateValue = reportDate,
+    } = {},
+  ) => {
     const reportType = normalizeInventoryReportType(
       typeof reportTypeOverride === "string"
         ? reportTypeOverride
@@ -7484,110 +8248,68 @@ export default function InventoryManagement() {
     );
 
     try {
-      const commonProps = {
-        facilityInfo,
-        reportDate,
-        dateRangeStart,
-        dateRangeEnd,
-        isFiltering,
-      };
+      const embeddedAssets =
+        reportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP
+          ? {
+              risLeftSealSrc:
+                (await loadImageDataUrl(PASIG_REPORT_SEAL_SRC)) ||
+                PASIG_REPORT_SEAL_SRC,
+              risRightSealSrc:
+                (await loadImageDataUrl(DOH_REPORT_SEAL_SRC)) || DOH_REPORT_SEAL_SRC,
+            }
+          : {
+              inventorySheetLeftLogoSrc:
+                (await loadImageDataUrl(INVENTORY_SHEET_LEFT_LOGO_SRC)) ||
+                INVENTORY_SHEET_LEFT_LOGO_SRC,
+              inventorySheetRightLogoSrc:
+                (await loadImageDataUrl(INVENTORY_SHEET_RIGHT_LOGO_SRC)) ||
+                INVENTORY_SHEET_RIGHT_LOGO_SRC,
+            };
 
-      if (reportType === PRINT_REPORT_TYPES.INVENTORY_SHEET) {
-        const [embeddedLeftLogoSrc, embeddedRightLogoSrc] = await Promise.all([
-          loadImageDataUrl(INVENTORY_SHEET_LEFT_LOGO_SRC),
-          loadImageDataUrl(INVENTORY_SHEET_RIGHT_LOGO_SRC),
-        ]);
+      const html = buildPrintableReportHtmlFromPayload({
+        reportType,
+        reportRange,
+        reportPayload,
+        reportDateValue,
+        deliveryType: "word",
+        embeddedAssets,
+      });
+      const safeReportDate = reportDateValue || getTodayInventoryDateInput();
 
-        downloadWordDocument({
-          html: buildInventorySheetWordHtml({
-            ...commonProps,
-            printRows,
-            printTotals,
-            leftLogoSrc: embeddedLeftLogoSrc || INVENTORY_SHEET_LEFT_LOGO_SRC,
-            rightLogoSrc: embeddedRightLogoSrc || INVENTORY_SHEET_RIGHT_LOGO_SRC,
-          }),
-          filename: `inventory-sheet-${reportDate || "report"}.docx`,
-          title: PRINT_REPORT_COPY.inventorySheetTitle,
-          headerText: "",
-          footerText: "",
-          page: INVENTORY_SHEET_WORD_PAGE_CONFIG,
-        });
-        return;
-      }
-
-      if (reportType === PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM) {
-        const [embeddedLeftLogoSrc, embeddedRightLogoSrc] = await Promise.all([
-          loadImageDataUrl(DOH_LGU_REPORT_LEFT_SEAL_SRC),
-          loadImageDataUrl(DOH_LGU_REPORT_RIGHT_SEAL_SRC),
-        ]);
-
-        downloadWordDocument({
-          html: buildDohLguStockWordHtml({
-            ...commonProps,
-            reportRows: dohLguReportRows,
-            leftLogoSrc: embeddedLeftLogoSrc || DOH_LGU_REPORT_LEFT_SEAL_SRC,
-            rightLogoSrc: embeddedRightLogoSrc || DOH_LGU_REPORT_RIGHT_SEAL_SRC,
-          }),
-          filename: `${DOH_LGU_REPORT_FILENAME_PREFIX}-${reportDate || "report"}.docx`,
-          title: PRINT_REPORT_COPY.inventorySheetTitle,
-          headerText: "",
-          footerText: "",
-          page: INVENTORY_SHEET_WORD_PAGE_CONFIG,
-        });
-        return;
-      }
-
-      if (reportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP) {
-        const [embeddedLeftSealSrc, embeddedRightSealSrc] = await Promise.all([
-          loadImageDataUrl(PASIG_REPORT_SEAL_SRC),
-          loadImageDataUrl(DOH_REPORT_SEAL_SRC),
-        ]);
-
-        downloadWordDocument({
-          html: buildRisWordHtml({
-            ...commonProps,
-            reportRows: risReportRows,
-            controlNumber: risControlNumber,
-            leftSealSrc: embeddedLeftSealSrc || PASIG_REPORT_SEAL_SRC,
-            rightSealSrc: embeddedRightSealSrc || DOH_REPORT_SEAL_SRC,
-          }),
-          filename: `${RIS_REPORT_FILENAME_PREFIX}-${reportDate || "report"}.docx`,
-          title: PRINT_REPORT_COPY.risTitle,
-          headerText: "",
-          footerText: "Requisition and issue slip",
-          page: RIS_EXPORT_PAGE.wordPagePreset,
-        });
-        return;
-      }
-
-      throw new Error("Unsupported inventory Word report format selected.");
+      downloadWordDocument({
+        html,
+        filename:
+          reportType === PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM
+            ? `${DOH_LGU_REPORT_FILENAME_PREFIX}-${safeReportDate}.docx`
+            : reportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP
+              ? `${RIS_REPORT_FILENAME_PREFIX}-${safeReportDate}.docx`
+              : `inventory-sheet-${safeReportDate}.docx`,
+        title:
+          reportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP
+            ? PRINT_REPORT_COPY.risTitle
+            : reportType === PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM
+              ? PRINT_REPORT_COPY.dohLguTitle
+            : PRINT_REPORT_COPY.inventorySheetTitle,
+        headerText: "",
+        footerText:
+          reportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP
+            ? "Requisition and issue slip"
+            : "",
+        page: getInventoryReportWordPagePreset(reportType),
+      });
+      return;
     } catch (wordError) {
       setError(
         wordError?.message || "Failed to generate the selected Word document.",
       );
     }
   }, [
-    dateRangeEnd,
-    dateRangeStart,
-    dohLguReportRows,
-    facilityInfo,
-    isFiltering,
-    printDateRange,
-    printRows,
-    printTotals,
+    buildPrintableReportHtmlFromPayload,
+    currentAppliedReportRange,
+    currentPageReportPayload,
     reportDate,
-    risControlNumber,
-    risReportRows,
     selectedExportReportType,
   ]);
-
-  const handleSelectedReportPrint = (reportTypeOverride) => {
-    printReport(
-      normalizeInventoryReportType(
-        reportTypeOverride ?? selectedExportReportType,
-      ),
-    );
-  };
 
   const handleGenerateReportFromModal = async () => {
     const selectedReportType = normalizeInventoryReportType(
@@ -7595,70 +8317,95 @@ export default function InventoryManagement() {
     );
     const selectedDeliveryType = selectedReportDeliveryType;
 
-    if (!printDateRange.ensureReadyForPrint()) {
+    const rangeValidation = validatePrintDateRange({
+      startDate: generateModalReportRange.startDate,
+      endDate: generateModalReportRange.endDate,
+      requireBothDates: true,
+    });
+    if (!rangeValidation.isValid) {
+      setError(
+        reportPeriod === "custom"
+          ? "Select both From Date and To Date before generating the report."
+          : rangeValidation.error,
+      );
       return;
     }
 
-    setIsGenerateReportModalOpen(false);
+    try {
+      setIsGeneratingReport(true);
+      setError(null);
 
-    if (selectedDeliveryType === INVENTORY_REPORT_DELIVERY_TYPES.PDF) {
-      await downloadSelectedPdf(selectedReportType);
-      return;
+      const usesCurrentInventoryReportSource =
+        selectedReportType === PRINT_REPORT_TYPES.INVENTORY_SHEET ||
+        selectedReportType === PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM;
+      const reportInventorySource = usesCurrentInventoryReportSource
+        ? inventoryReportSource
+        : await loadInventoryReportSourceForRange(generateModalReportRange);
+      const payloadFilterRange = usesCurrentInventoryReportSource
+        ? generateModalReportRange
+        : { startDate: "", endDate: "", isFiltering: false };
+      const reportPayload = buildReportPayloadForRange({
+        inventorySource: reportInventorySource,
+        reportRange: payloadFilterRange,
+        reportDateValue: reportDate,
+      });
+
+      setIsGenerateReportModalOpen(false);
+
+      if (selectedDeliveryType === INVENTORY_REPORT_DELIVERY_TYPES.PDF) {
+        await downloadSelectedPdf(selectedReportType, {
+          reportRange: generateModalReportRange,
+          reportPayload,
+          reportDateValue: reportDate,
+        });
+        return;
+      }
+
+      if (selectedDeliveryType === INVENTORY_REPORT_DELIVERY_TYPES.WORD) {
+        await downloadSelectedWord(selectedReportType, {
+          reportRange: generateModalReportRange,
+          reportPayload,
+          reportDateValue: reportDate,
+        });
+        return;
+      }
+
+      const html = buildPrintableReportHtmlFromPayload({
+        reportType: selectedReportType,
+        reportRange: generateModalReportRange,
+        reportPayload,
+        reportDateValue: reportDate,
+        deliveryType: "print",
+      });
+
+      setTimeout(() => {
+        printReport(selectedReportType, { html });
+      }, 0);
+    } catch (reportGenerationError) {
+      setError(
+        reportGenerationError?.message ||
+          "Failed to prepare the selected inventory report.",
+      );
+    } finally {
+      setIsGeneratingReport(false);
     }
-
-    if (selectedDeliveryType === INVENTORY_REPORT_DELIVERY_TYPES.WORD) {
-      await downloadSelectedWord(selectedReportType);
-      return;
-    }
-
-    setTimeout(() => {
-      handleSelectedReportPrint(selectedReportType);
-    }, 0);
   };
 
   const activePrintReportMarkup =
-    isPrintLayoutActive &&
-    (activePrintReportType === PRINT_REPORT_TYPES.INVENTORY_SHEET ? (
-      <InventorySheetSummaryPrintReport
-        facilityInfo={facilityInfo}
-        reportDate={reportDate}
-        printRows={printRows}
-        printTotals={printTotals}
-        dateRangeStart={dateRangeStart}
-        dateRangeEnd={dateRangeEnd}
-        isFiltering={isFiltering}
-      />
-    ) : activePrintReportType === PRINT_REPORT_TYPES.DOH_LGU_STOCK_FORM ? (
-      <DohLguStockInventoryPrintReport
-        facilityInfo={facilityInfo}
-        reportDate={reportDate}
-        reportRows={dohLguReportRows}
-        dateRangeStart={dateRangeStart}
-        dateRangeEnd={dateRangeEnd}
-        isFiltering={isFiltering}
-      />
-    ) : activePrintReportType === PRINT_REPORT_TYPES.REQUISITION_ISSUE_SLIP ? (
-      <RequisitionIssueSlipPrintReport
-        facilityInfo={facilityInfo}
-        reportDate={reportDate}
-        reportRows={risReportRows}
-        controlNumber={risControlNumber}
-        dateRangeStart={dateRangeStart}
-        dateRangeEnd={dateRangeEnd}
-        isFiltering={isFiltering}
-      />
-    ) : null);
+    isPrintLayoutActive && activePrintReportHtml ? (
+      <InventoryStaticHtmlReport html={activePrintReportHtml} />
+    ) : null;
 
   if (loading) {
-    return (
+    return(
       <div className="flex items-center justify-center h-screen">
         <LoadingSpinner size="large" />
-      </div>
-    );
+      </div>)
+     ;
   }
 
   if (error) {
-    return (
+    return(
       <div className="p-6">
         <Alert variant="danger" onDismiss={() => setError(null)}>
           {error}
@@ -7666,18 +8413,17 @@ export default function InventoryManagement() {
         <Button onClick={fetchData} className="mt-4">
           Retry
         </Button>
-      </div>
-    );
+      </div>)
+     ;
   }
 
   const totals = calculateTotals(inventorySheetRows);
 
-  return (
+  return(
     <div
       className="inventory-management flex h-full min-h-0 flex-col gap-4 overflow-y-auto modern-scrollbar p-4"
       data-active-tab={resolvedActiveTab}
     >
-      {/* Header - Hidden on Print */}
       <div
         className="sticky top-0 z-20 space-y-4 bg-gray-50/95 pb-2 backdrop-blur dark:bg-gray-900/95 print:hidden"
         data-testid="inventory-sticky-shell"
@@ -7685,7 +8431,6 @@ export default function InventoryManagement() {
         <PageHeader
           title="Vaccine Inventory Management"
           subtitle="Paper-based inventory tracking system for vaccinations"
-          icon={<span className="text-2xl drop-shadow-md">💉</span>}
           className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 rounded-xl sm:rounded-2xl text-white shadow-lg w-full border-0"
           actions={
             <InventoryHeaderTabs
@@ -7696,7 +8441,6 @@ export default function InventoryManagement() {
           }
         />
 
-        {/* Tab Navigation */}
         <div className="mt-4 rounded-xl border border-gray-200 bg-white/90 p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/90">
           <div className="flex flex-wrap items-end gap-3">
             <div className="hidden" hidden aria-hidden="true">
@@ -7712,7 +8456,6 @@ export default function InventoryManagement() {
                 : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
             }`}
           >
-            <span>📋</span>
             <span>Inventory Sheet</span>
           </button>
                 <button
@@ -7726,13 +8469,12 @@ export default function InventoryManagement() {
                 : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
             }`}
           >
-            <span>📊</span>
             <span>Inventory Summary</span>
-            {stockAlerts.critical.length > 0 && (
+            {stockAlerts.critical.length > 0 &&(
               <span className="ml-2 px-2 py-0.5 text-xs bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 rounded-full">
                 {stockAlerts.critical.length}
-              </span>
-            )}
+              </span>)
+             }
           </button>
                 <button
             onClick={() => handleTabChange("stock_movements")}
@@ -7745,7 +8487,6 @@ export default function InventoryManagement() {
                 : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
             }`}
           >
-            <span>📦</span>
             <span>Stock Movements</span>
           </button>
         </div>
@@ -7757,33 +8498,20 @@ export default function InventoryManagement() {
               onInventoryFilterChange={updateInventoryDisplayFilter}
               onClearInventoryFilters={clearInventoryDisplayFilters}
               hasActiveInventoryFilters={hasActiveInventoryDisplayFilters}
-              reportDate={reportDate}
-              onReportDateChange={setReportDate}
               stockMovementFilters={stockMovementFilters}
               stockMovementTypeOptions={stockMovementTypeOptions}
               stockMovementVaccineOptions={stockMovementVaccineOptions}
               onStockMovementFilterChange={updateStockMovementFilter}
               onClearStockMovementFilters={clearStockMovementFilters}
               hasActiveStockMovementFilters={hasActiveStockMovementFilters}
-              selectedReportType={selectedExportReportType}
-              onReportTypeChange={(value) =>
-                setSelectedExportReportType(
-                  normalizeInventoryReportType(value),
-                )
-              }
               onSaveInventory={
                 resolvedActiveTab === "inventory_sheet"
                   ? handleSaveInventorySheet
                   : undefined
               }
-              onPrintReport={
-                resolvedActiveTab === "inventory_sheet"
-                  ? handleSelectedReportPrint
-                  : undefined
-              }
               onGenerateReport={() => {
                 setSelectedReportDeliveryType(
-                  INVENTORY_REPORT_DELIVERY_TYPES.PRINT,
+                  INVENTORY_REPORT_DELIVERY_TYPES.PDF,
                 );
                 setIsGenerateReportModalOpen(true);
               }}
@@ -7794,28 +8522,25 @@ export default function InventoryManagement() {
 
       </div>
 
-      {activePrintReportMarkup ? (
-        <InventoryPrintPortal>{activePrintReportMarkup}</InventoryPrintPortal>
-      ) : null}
+      {activePrintReportMarkup ?(
+        <InventoryPrintPortal>{activePrintReportMarkup}</InventoryPrintPortal>)
+        : null}
 
-      {/* Inventory Sheet Tab - This is the ONLY content that will print */}
-      {resolvedActiveTab === "inventory_sheet" && (
+      {resolvedActiveTab === "inventory_sheet" &&(
         <section
           id={INVENTORY_TAB_PANEL_IDS.inventory_sheet}
           data-testid="inventory-sheet-panel"
           className="inventory-sheet-print-area space-y-3 print:space-y-1"
         >
-          {printDateRange.hasAppliedDateRange ? (
+          {printDateRange.hasAppliedDateRange ?(
             <div className="print:hidden flex flex-wrap items-center justify-end gap-2">
               <div className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
                 {printDateRange.activeDateRangeLabel}
               </div>
-            </div>
-          ) : null}
+            </div>)
+            : null}
 
-           {/* Report Date and Date Range Filter - Hidden on Print, Visible on Screen */}
           <div className="hidden" hidden aria-hidden="true">
-            {/* Single Date Picker */}
             <div className="flex items-center gap-2">
               <label
                 htmlFor="inventory-report-date"
@@ -7839,7 +8564,6 @@ export default function InventoryManagement() {
               className="min-w-[320px] flex-1"
             />
 
-            {/* Export buttons */}
             <div className="flex items-center gap-2 ml-auto">
               <Button
                 variant="primary"
@@ -7847,7 +8571,7 @@ export default function InventoryManagement() {
                 onClick={handleSaveInventorySheet}
                 className="gap-2 mr-2"
               >
-                💾 Save Inventory
+Save Inventory
               </Button>
               <Button
                 variant="secondary"
@@ -7965,7 +8689,6 @@ export default function InventoryManagement() {
             </div>
           </div>
 
-          {/* Paper Configuration Inventory Table */}
           <Card className="overflow-hidden p-0 print:shadow-none print:border-none dark:bg-gray-800 dark:border-gray-700">
             <div className="overflow-x-auto overflow-y-visible print:overflow-visible">
               <table
@@ -8055,7 +8778,7 @@ export default function InventoryManagement() {
                   </tr>
                 </thead>
                 <tbody>
-                  {inventorySheetRows.length === 0 ? (
+                  {inventorySheetRows.length === 0 ?(
                     <tr className="bg-white dark:bg-gray-800">
                       <td
                         colSpan={13}
@@ -8063,9 +8786,9 @@ export default function InventoryManagement() {
                       >
                         No inventory rows match the selected filters.
                       </td>
-                    </tr>
-                  ) : (
-                    inventorySheetRows.map((item, index) => (
+                    </tr>)
+                    :
+                                          (inventorySheetRows.map((item,index)=>(
                     <tr
                       key={item.id}
                       className={
@@ -8154,10 +8877,9 @@ export default function InventoryManagement() {
                           </Button>
                         </div>
                       </td>
-                    </tr>
-                    ))
-                  )}
-                  {/* Totals Row */}
+                    </tr>)
+                     ))
+                   }
                   <tr className="bg-gray-300 dark:bg-gray-600 print:bg-gray-400 font-bold">
                     <td
                       colSpan={2}
@@ -8207,7 +8929,6 @@ export default function InventoryManagement() {
             </div>
           </Card>
 
-          {/* Print Footer - Visible only on Print */}
           <div className="hidden print:block mt-4">
             <div className="grid grid-cols-2 gap-6 mt-4">
               <div>
@@ -8226,17 +8947,15 @@ export default function InventoryManagement() {
               </div>
             </div>
           </div>
-        </section>
-      )}
+        </section>)
+       }
 
-      {/* Inventory Summary Tab - NOT printed */}
-      {resolvedActiveTab === "inventory_summary" && (
+      {resolvedActiveTab === "inventory_summary" &&(
         <section
           id={INVENTORY_TAB_PANEL_IDS.inventory_summary}
           data-testid="inventory-summary-panel"
           className="flex min-h-0 flex-1 flex-col gap-4"
         >
-          {/* Inventory Summary */}
           <Card className="shrink-0 p-4 dark:bg-gray-800 dark:border-gray-700">
             <h3 className="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-200">
               Inventory Summary
@@ -8297,13 +9016,11 @@ export default function InventoryManagement() {
             className="modern-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto pr-1"
             data-testid="inventory-summary-scroll-region"
           >
-            {/* Alert Summary Cards */}
             <div
               className="sticky top-0 z-20 bg-gray-50/95 pb-4 backdrop-blur dark:bg-gray-900/95"
               data-testid="inventory-summary-alert-cards-sticky"
             >
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                {/* Critical Stock Alert */}
               <Card className="p-3 border-l-4 border-red-500 dark:bg-gray-800 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <div>
@@ -8335,7 +9052,6 @@ export default function InventoryManagement() {
               </div>
               </Card>
 
-                {/* Low Stock Alert */}
               <Card className="p-3 border-l-4 border-yellow-500 dark:bg-gray-800 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <div>
@@ -8367,7 +9083,6 @@ export default function InventoryManagement() {
               </div>
               </Card>
 
-                {/* Unused Vaccines */}
               <Card className="p-3 border-l-4 border-gray-400 dark:bg-gray-800 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <div>
@@ -8396,7 +9111,6 @@ export default function InventoryManagement() {
               </div>
               </Card>
 
-                {/* Wasted Vaccines */}
               <Card className="p-3 border-l-4 border-orange-500 dark:bg-gray-800 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <div>
@@ -8432,12 +9146,11 @@ export default function InventoryManagement() {
 
             {renderAlertWorkflowCard()}
 
-            {/* Alerts Tables */}
             {(stockAlerts.critical.length > 0 ||
               stockAlerts.low.length > 0 ||
-              stockAlerts.wasted.length > 0) && (
+              stockAlerts.wasted.length > 0) &&(
               <Card className="overflow-hidden dark:bg-gray-800 dark:border-gray-700">
-              {stockAlerts.critical.length > 0 && (
+              {stockAlerts.critical.length > 0 &&(
                 <div className="mb-4">
                   <h3 className="text-sm font-semibold px-3 py-2 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-l-4 border-red-500">
                     Critical Stock
@@ -8461,7 +9174,7 @@ export default function InventoryManagement() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-red-100 dark:divide-red-900/30">
-                        {stockAlerts.critical.map((item) => (
+                        {stockAlerts.critical.map((item) =>(
                           <tr key={item.id} className="dark:bg-gray-800/50">
                             <td className="px-3 py-1 text-sm font-semibold text-gray-900 dark:text-gray-100">
                               {item.name}
@@ -8487,15 +9200,15 @@ export default function InventoryManagement() {
                                 Restock
                               </Button>
                             </td>
-                          </tr>
-                        ))}
+                          </tr>)
+                         )}
                       </tbody>
                     </table>
                   </div>
-                </div>
-              )}
+                </div>)
+               }
 
-              {stockAlerts.low.length > 0 && (
+              {stockAlerts.low.length > 0 &&(
                 <div className="mb-4">
                   <h3 className="text-sm font-semibold px-3 py-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-l-4 border-yellow-500">
                     Low Stock Warning
@@ -8519,7 +9232,7 @@ export default function InventoryManagement() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-yellow-100 dark:divide-yellow-900/30">
-                        {stockAlerts.low.map((item) => (
+                        {stockAlerts.low.map((item) =>(
                           <tr key={item.id} className="dark:bg-gray-800/50">
                             <td className="px-3 py-1 text-sm font-semibold text-gray-900 dark:text-gray-100">
                               {item.name}
@@ -8541,15 +9254,15 @@ export default function InventoryManagement() {
                                 Restock
                               </Button>
                             </td>
-                          </tr>
-                        ))}
+                          </tr>)
+                         )}
                       </tbody>
                     </table>
                   </div>
-                </div>
-              )}
+                </div>)
+               }
 
-              {stockAlerts.wasted.length > 0 && (
+              {stockAlerts.wasted.length > 0 &&(
                 <div>
                   <h3 className="text-sm font-semibold px-3 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-l-4 border-orange-500">
                     High Waste Items
@@ -8573,7 +9286,7 @@ export default function InventoryManagement() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-orange-100 dark:divide-orange-900/30">
-                        {stockAlerts.wasted.map((item) => (
+                        {stockAlerts.wasted.map((item) =>(
                           <tr key={item.id} className="dark:bg-gray-800/50">
                             <td className="px-3 py-1 text-sm font-semibold text-gray-900 dark:text-gray-100">
                               {item.name}
@@ -8589,20 +9302,19 @@ export default function InventoryManagement() {
                             <td className="px-3 py-1 text-gray-700 dark:text-gray-300">
                               Review
                             </td>
-                          </tr>
-                        ))}
+                          </tr>)
+                         )}
                       </tbody>
                     </table>
                   </div>
-                </div>
-              )}
-              </Card>
-            )}
+                </div>)
+               }
+              </Card>)
+             }
 
-            {/* No Alerts Message */}
             {stockAlerts.critical.length === 0 &&
               stockAlerts.low.length === 0 &&
-              stockAlerts.wasted.length === 0 && (
+              stockAlerts.wasted.length === 0 &&(
                 <Card className="p-6 text-center dark:bg-gray-800 dark:border-gray-700">
                 <div className="flex flex-col items-center">
                   <svg
@@ -8625,14 +9337,13 @@ export default function InventoryManagement() {
                     No stock alerts at this time.
                   </p>
                 </div>
-                </Card>
-              )}
+                </Card>)
+               }
           </div>
-        </section>
-      )}
+        </section>)
+       }
 
-      {/* Stock Movements Tab - NOT printed */}
-      {resolvedActiveTab === "stock_movements" && (
+      {resolvedActiveTab === "stock_movements" &&(
         <section
           id={INVENTORY_TAB_PANEL_IDS.stock_movements}
           data-testid="inventory-stock-movements-panel"
@@ -8645,12 +9356,16 @@ export default function InventoryManagement() {
             error={stockMovementsError}
             onRetry={loadStockMovements}
           />
-        </section>
-      )}
+        </section>)
+       }
 
       <Modal
         isOpen={isGenerateReportModalOpen}
-        onClose={() => setIsGenerateReportModalOpen(false)}
+        onClose={() => {
+          if (!isGeneratingReport) {
+            setIsGenerateReportModalOpen(false);
+          }
+        }}
         title="Generate Report"
         size="md"
         footer={
@@ -8659,6 +9374,7 @@ export default function InventoryManagement() {
               variant="cancel"
               type="button"
               onClick={() => setIsGenerateReportModalOpen(false)}
+              disabled={isGeneratingReport}
             >
               Cancel
             </Button>
@@ -8666,6 +9382,8 @@ export default function InventoryManagement() {
               variant="primary"
               type="button"
               onClick={handleGenerateReportFromModal}
+              loading={isGeneratingReport}
+              disabled={isGeneratingReport}
             >
               Generate Report
             </Button>
@@ -8694,86 +9412,54 @@ export default function InventoryManagement() {
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <Input
-              label="Report Date"
-              aria-label="Report Date"
-              type="date"
-              value={reportDate}
-              onChange={(event) => setReportDate(event.target.value)}
-            />
-            <Input
-              label="Start Date"
-              aria-label="Start Date"
-              type="date"
-              value={printDateRange.startDateInput}
-              onChange={(event) =>
-                printDateRange.setStartDateInput(event.target.value)
-              }
-              className={
-                printDateRange.validationError
-                  ? "border-danger-300 focus:border-danger-500 focus:ring-danger-500"
-                  : ""
-              }
-            />
-            <Input
-              label="End Date"
-              aria-label="End Date"
-              type="date"
-              value={printDateRange.endDateInput}
-              onChange={(event) =>
-                printDateRange.setEndDateInput(event.target.value)
-              }
-              className={
-                printDateRange.validationError
-                  ? "border-danger-300 focus:border-danger-500 focus:ring-danger-500"
-                  : ""
-              }
-            />
-          </div>
-
-          <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-800/70">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  type="button"
-                  onClick={printDateRange.applyDateRange}
-                  className="min-h-[40px] whitespace-nowrap"
-                >
-                  Apply Range
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  type="button"
-                  onClick={printDateRange.clearDateRange}
-                  className="min-h-[40px] whitespace-nowrap"
-                >
-                  Clear Range
-                </Button>
-              </div>
-
-              {printDateRange.hasAppliedDateRange ? (
-                <div className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
-                  {printDateRange.activeDateRangeLabel}
+          <div className="space-y-3">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-3">
+                <div className="max-w-sm">
+                  <VaccinationPeriodFilter
+                    period={reportPeriod}
+                    startDate={reportPeriodStartDate}
+                    endDate={reportPeriodEndDate}
+                    onPeriodChange={handleReportPeriodChange}
+                    onStartDateChange={handleReportPeriodStartDateChange}
+                    onEndDateChange={handleReportPeriodEndDateChange}
+                    startDateLabel="From Date"
+                    endDateLabel="To Date"
+                    layout="stacked"
+                  />
                 </div>
-              ) : (
+                <div className="max-w-[220px]">
+                  <Input
+                    label="Report Date"
+                    aria-label="Report Date"
+                    type="date"
+                    value={reportDate}
+                    onChange={(event) => setReportDate(event.target.value)}
+                  />
+                </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Leave both dates blank to include all available records.
+                  {selectedExportReportType === PRINT_REPORT_TYPES.INVENTORY_SHEET
+                    ? "Inventory Sheet header and footer labels follow the selected reporting period."
+                    : "Report Date only controls the printed header label."}
                 </p>
-              )}
+              </div>
+              <div className="flex flex-col justify-end">
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Date Range
+                </p>
+                <div className="flex min-h-[40px] items-center rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                  {reportPeriodRangeLabel}
+                </div>
+                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                  Based on the selected reporting period
+                </p>
+              </div>
             </div>
           </div>
 
-          {printDateRange.validationError ? (
-            <Alert variant="error">{printDateRange.validationError}</Alert>
-          ) : null}
-
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Reports use the current Inventory Sheet data and the active table
-            filters already applied on the page.
+            Reports use the selected period together with the active vaccine and
+            status filters already applied on the Inventory Sheet tab.
           </p>
         </div>
       </Modal>
@@ -8823,7 +9509,6 @@ export default function InventoryManagement() {
         </div>
       </Modal>
 
-      {/* Transaction Modal */}
       <Modal
         isOpen={showModal}
         onClose={closeTransactionModal}
@@ -8866,10 +9551,10 @@ export default function InventoryManagement() {
         }
       >
           <form id="inventoryTransactionForm" className="admin-form" onSubmit={handleTransaction}>
-            {selectedItem && (
+            {selectedItem &&(
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
               <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
-                <span>💉</span> Vaccine Information
+Vaccine Information
               </h4>
               <div className="bg-white dark:bg-gray-800 rounded-lg p-3 space-y-1">
                 <p className="font-semibold text-gray-900 dark:text-gray-100">
@@ -8882,23 +9567,22 @@ export default function InventoryManagement() {
                   </span>
                 </p>
               </div>
-            </div>
-          )}
+            </div>)
+           }
 
-          {transactionSubmitError && (
+          {transactionSubmitError &&(
             <Alert variant="error" className="mb-3">
               {transactionSubmitError}
-            </Alert>
-          )}
+            </Alert>)
+           }
 
-          {hasFieldErrors(transactionErrors) && (
+          {hasFieldErrors(transactionErrors) &&(
             <Alert variant="error" className="mb-3">
               Please resolve the highlighted transaction form errors before
               submitting.
-            </Alert>
-          )}
+            </Alert>)
+           }
 
-          {/* Transaction Details */}
           <div
             className={
               modalType === "receive"
@@ -8911,14 +9595,7 @@ export default function InventoryManagement() {
             <h4
               className={`text-sm font-semibold mb-3 flex items-center gap-2 ${modalType === "receive" ? "text-green-900 dark:text-green-100" : modalType === "issue" ? "text-blue-900 dark:text-blue-100" : "text-red-900 dark:text-red-100"}`}
             >
-              <span>
-                {modalType === "receive"
-                  ? "📥"
-                  : modalType === "issue"
-                    ? "📤"
-                    : "🗑️"}
-              </span>
-              Transaction Details
+Transaction Details
             </h4>
             <div className="admin-form-row-2">
               <div className="admin-field-group">
@@ -8929,7 +9606,7 @@ export default function InventoryManagement() {
                   value={formData.quantity || ""}
                   onChange={(e) => {
                     setFormData({ ...formData, quantity: e.target.value });
-                    setTransactionErrors((prev) => ({
+                    setTransactionErrors((prev) =>( {
                       ...prev,
                       quantity: undefined,
                     }));
@@ -8948,7 +9625,7 @@ export default function InventoryManagement() {
                   value={formData.date || ""}
                   onChange={(e) => {
                     setFormData({ ...formData, date: e.target.value });
-                    setTransactionErrors((prev) => ({
+                    setTransactionErrors((prev) =>( {
                       ...prev,
                       date: undefined,
                     }));
@@ -8959,7 +9636,7 @@ export default function InventoryManagement() {
                 />
               </div>
 
-              {modalType === "receive" && (
+              {modalType === "receive" &&(
                 <>
                   <div className="admin-field-group">
                     <Input
@@ -8968,7 +9645,7 @@ export default function InventoryManagement() {
                       value={formData.lot_number || ""}
                       onChange={(e) => {
                         setFormData({ ...formData, lot_number: e.target.value });
-                        setTransactionErrors((prev) => ({
+                        setTransactionErrors((prev) =>( {
                           ...prev,
                           lot_number: undefined,
                         }));
@@ -8984,7 +9661,7 @@ export default function InventoryManagement() {
                       value={formData.expiry_date || ""}
                       onChange={(e) => {
                         setFormData({ ...formData, expiry_date: e.target.value });
-                        setTransactionErrors((prev) => ({
+                        setTransactionErrors((prev) =>( {
                           ...prev,
                           expiry_date: undefined,
                         }));
@@ -8994,9 +9671,9 @@ export default function InventoryManagement() {
                       className="w-full"
                     />
                   </div>
-                </>
-              )}
-              {requiresBatchSelection && (
+                </>)
+               }
+              {requiresBatchSelection &&(
                 <div
                   className="admin-field-group"
                   style={{ gridColumn: "1 / -1" }}
@@ -9007,13 +9684,13 @@ export default function InventoryManagement() {
                     value={lotSearchTerm}
                     onChange={(e) => {
                       setLotSearchTerm(e.target.value);
-                      setFormData((prev) => ({
+                      setFormData((prev) =>( {
                         ...prev,
                         batch_id: "",
                         lot_number: "",
                         expiry_date: "",
                       }));
-                      setTransactionErrors((prev) => ({
+                      setTransactionErrors((prev) =>( {
                         ...prev,
                         batch_id: undefined,
                         quantity: undefined,
@@ -9026,11 +9703,11 @@ export default function InventoryManagement() {
                   />
 
                   <div className="mt-2 rounded-xl border border-white/10 bg-white/80 dark:bg-gray-800/80 dark:border-gray-700">
-                    {availableLotsLoading ? (
+                    {availableLotsLoading ?(
                       <div className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">
                         Loading available lot/batch records...
-                      </div>
-                    ) : filteredAvailableLots.length > 0 ? (
+                      </div>)
+                      : filteredAvailableLots.length > 0 ?(
                       <div className="max-h-56 overflow-y-auto modern-scrollbar">
                         {filteredAvailableLots.map((batch) => {
                           const isSelected =
@@ -9039,20 +9716,20 @@ export default function InventoryManagement() {
                             ) ===
                             resolveInventorySaveRowId(formData.batch_id);
 
-                          return (
+                          return(
                             <button
                               key={batch.batch_id || batch.inventory_id}
                               type="button"
                               onClick={() => {
                                 setLotSearchTerm(batch.lot_number || "");
-                                setFormData((prev) => ({
+                                setFormData((prev) =>( {
                                   ...prev,
                                   batch_id:
                                     batch.batch_id || batch.inventory_id || "",
                                   lot_number: batch.lot_number || "",
                                   expiry_date: batch.expiry_date || "",
                                 }));
-                                setTransactionErrors((prev) => ({
+                                setTransactionErrors((prev) =>( {
                                   ...prev,
                                   batch_id: undefined,
                                   quantity: undefined,
@@ -9075,20 +9752,20 @@ export default function InventoryManagement() {
                               </div>
                               <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-300">
                                 <span>Expiry: {formatInventoryBatchDate(batch.expiry_date)}</span>
-                                {batch.storage_location && (
-                                  <span>Storage: {batch.storage_location}</span>
-                                )}
+                                {batch.storage_location &&(
+                                  <span>Storage: {batch.storage_location}</span>)
+                                 }
                               </div>
-                            </button>
-                          );
+                            </button>)
+                           ;
                         })}
-                      </div>
-                    ) : (
+                      </div>)
+                      :(
                       <div className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">
                         {availableLotsError ||
                           "No selectable lot/batch records match the current search."}
-                      </div>
-                    )}
+                      </div>)
+                     }
                   </div>
 
                   <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -9096,7 +9773,7 @@ export default function InventoryManagement() {
                     can be selected.
                   </p>
 
-                  {selectedBatchOption && batchStockPreview && (
+                  {selectedBatchOption && batchStockPreview &&(
                     <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
                       <div className="rounded-lg border border-white/10 bg-white/70 px-3 py-2 dark:bg-gray-800/80 dark:border-gray-700">
                         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -9124,14 +9801,13 @@ export default function InventoryManagement() {
                           {Math.max(batchStockPreview.remaining, 0)}
                         </p>
                       </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                    </div>)
+                   }
+                </div>)
+               }
             </div>
           </div>
 
-          {/* Notes */}
           <div className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl p-4">
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
               {modalType === "waste" ? "Reason for Waste" : "Notes"}
@@ -9140,7 +9816,7 @@ export default function InventoryManagement() {
               value={formData.notes || ""}
               onChange={(e) => {
                 setFormData({ ...formData, notes: e.target.value });
-                setTransactionErrors((prev) => ({
+                setTransactionErrors((prev) =>( {
                   ...prev,
                   notes: undefined,
                 }));
@@ -9152,14 +9828,13 @@ export default function InventoryManagement() {
               }
               maxLength={500}
             />
-          {transactionErrors.notes && (
-              <span className="admin-field-error">{transactionErrors.notes}</span>
-            )}
+          {transactionErrors.notes &&(
+              <span className="admin-field-error">{transactionErrors.notes}</span>)
+             }
           </div>
         </form>
       </Modal>
 
-      {/* Print Styles - Only prints dedicated inventory report, hides app shell and controls */}
       <style>{`
         .inventory-sheet-summary-print-report,
         .doh-lgu-stock-print-report,
@@ -9176,6 +9851,32 @@ export default function InventoryManagement() {
         }
 
         @media print {
+          body.printing-inventory .inventory-sheet-summary-print-table,
+          body.printing-inventory #doh-lgu-print-table,
+          body.printing-inventory .ris-print-table {
+            table-layout: fixed !important;
+          }
+
+          body.printing-inventory #doh-lgu-print-table th,
+          body.printing-inventory #doh-lgu-print-table td,
+          body.printing-inventory .ris-print-table th,
+          body.printing-inventory .ris-print-table td {
+            font-size: 9pt !important;
+            word-break: keep-all !important;
+            white-space: nowrap !important;
+            overflow-wrap: normal !important;
+          }
+
+          body.printing-inventory .inventory-sheet-summary-print-table th,
+          body.printing-inventory .inventory-sheet-summary-print-table td {
+            font-size: 7.7pt !important;
+            line-height: 1.12 !important;
+            padding: 0.045cm 0.05cm !important;
+            word-break: keep-all !important;
+            white-space: nowrap !important;
+            overflow-wrap: normal !important;
+          }
+
           :root {
             --inventory-print-page-width: calc(14in - 0.7cm);
             --inventory-print-page-height: calc(8.5in - 0.7cm);
@@ -10180,6 +10881,90 @@ export default function InventoryManagement() {
           }
         }
       `}</style>
-    </div>
-  );
+      <style>{`
+        #inventory-print-root {
+          display: none;
+        }
+
+        @media print {
+          html,
+          body {
+            width: 100% !important;
+            height: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            background: #ffffff !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+
+          body.printing-inventory #root {
+            display: none !important;
+          }
+
+          body.printing-inventory #inventory-print-root {
+            display: block !important;
+            width: 100% !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            box-sizing: border-box !important;
+          }
+
+          body.printing-inventory .inventory-sheet-summary-print-report,
+          body.printing-inventory .doh-lgu-stock-print-report,
+          body.printing-inventory .ris-print-report {
+            display: block !important;
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            box-shadow: none !important;
+          }
+
+          body.printing-inventory .inventory-export,
+          body.printing-inventory .inventory-export * {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+
+          body.printing-inventory .inventory-sheet-summary-print-table,
+          body.printing-inventory #doh-lgu-print-table,
+          body.printing-inventory .ris-print-table {
+            width: 100% !important;
+            table-layout: fixed !important;
+          }
+
+          body.printing-inventory #doh-lgu-print-table th,
+          body.printing-inventory #doh-lgu-print-table td,
+          body.printing-inventory .ris-print-table th,
+          body.printing-inventory .ris-print-table td {
+            font-size: 9pt !important;
+            word-break: keep-all !important;
+            white-space: nowrap !important;
+            overflow-wrap: normal !important;
+          }
+
+          body.printing-inventory .inventory-sheet-summary-print-table th,
+          body.printing-inventory .inventory-sheet-summary-print-table td {
+            font-size: 7.7pt !important;
+            line-height: 1.12 !important;
+            padding: 0.045cm 0.05cm !important;
+            word-break: keep-all !important;
+            white-space: nowrap !important;
+            overflow-wrap: normal !important;
+          }
+
+          body.printing-inventory .inventory-sheet-summary-print-table tr,
+          body.printing-inventory #doh-lgu-print-table tr,
+          body.printing-inventory .ris-print-table tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+        }
+      `}</style>
+    </div>)
+   ;
 }

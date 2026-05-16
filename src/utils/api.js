@@ -16,21 +16,21 @@ const PUBLIC_AUTH_ROUTES = [
   "/reset-password",
 ];
 
-let refreshRequest = null;
-let refreshCooldownUntil = 0;
-let proactiveRefreshTerminalFailure = false;
-const inFlightGetRequests = new Map();
+let pendingRefresh = null;
+let cooldownEnd = 0;
+let refreshFailed = false;
+const activeGets = new Map();
 const DEFAULT_REFRESH_RATE_LIMIT_COOLDOWN_MS = 30 * 1000;
 const GUARDIAN_NOTIFICATIONS_PATH = "/guardian/notifications";
 
-const hasStoredAuthState = (storage) =>
+const hasAuthCache = (storage) =>
   Boolean(
     storage.getItem("token") ||
       storage.getItem("refreshToken") ||
       storage.getItem("user"),
   );
 
-const resolveRememberMePreference = (rememberMe) => {
+const resolveRememberMe = (rememberMe) => {
   if (typeof rememberMe === "boolean") {
     return rememberMe;
   }
@@ -39,18 +39,18 @@ const resolveRememberMePreference = (rememberMe) => {
     return true;
   }
 
-  if (hasStoredAuthState(safeLocalStorage)) {
+  if (hasAuthCache(safeLocalStorage)) {
     return true;
   }
 
-  if (hasStoredAuthState(safeSessionStorage)) {
+  if (hasAuthCache(safeSessionStorage)) {
     return false;
   }
 
   return true;
 };
 
-const getRememberMePreference = () => resolveRememberMePreference();
+const getRememberMePreference = () => resolveRememberMe();
 
 const getStoredAccessToken = () =>
   safeLocalStorage.getItem("token") || safeSessionStorage.getItem("token");
@@ -63,18 +63,18 @@ const getStoredUserJson = () =>
   safeLocalStorage.getItem("user") || safeSessionStorage.getItem("user");
 
 const getPreferredAuthStorage = () => {
-  if (hasStoredAuthState(safeLocalStorage)) {
+  if (hasAuthCache(safeLocalStorage)) {
     return safeLocalStorage;
   }
 
-  if (hasStoredAuthState(safeSessionStorage)) {
+  if (hasAuthCache(safeSessionStorage)) {
     return safeSessionStorage;
   }
 
   return getRememberMePreference() ? safeLocalStorage : safeSessionStorage;
 };
 
-const extractErrorMessage = (errorData) => {
+const getErrMsg = (errorData) => {
   if (!errorData) return null;
 
   if (typeof errorData === "string") {
@@ -133,20 +133,20 @@ const parseRetryAfterSeconds = (value) => {
   return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : null;
 };
 
-const isRefreshRateLimited = () => refreshCooldownUntil > Date.now();
+const isRefreshRateLimited = () => cooldownEnd > Date.now();
 
 const clearRefreshCooldown = () => {
-  refreshCooldownUntil = 0;
+  cooldownEnd = 0;
 };
 
 const clearProactiveRefreshTerminalFailure = () => {
-  proactiveRefreshTerminalFailure = false;
+  refreshFailed = false;
 };
 
-const hasProactiveRefreshTerminalFailure = () => proactiveRefreshTerminalFailure === true;
+const hasProactiveRefreshTerminalFailure = () => refreshFailed === true;
 
 const markProactiveRefreshTerminalFailure = () => {
-  proactiveRefreshTerminalFailure = true;
+  refreshFailed = true;
 };
 
 const setRefreshCooldownFromError = (error) => {
@@ -165,13 +165,13 @@ const setRefreshCooldownFromError = (error) => {
     ? retryAfterSeconds * 1000
     : DEFAULT_REFRESH_RATE_LIMIT_COOLDOWN_MS;
 
-  refreshCooldownUntil = Date.now() + cooldownMs;
+  cooldownEnd = Date.now() + cooldownMs;
 };
 
 const createRefreshRateLimitedError = () => {
   const retryAfterSeconds = Math.max(
     1,
-    Math.ceil((refreshCooldownUntil - Date.now()) / 1000),
+    Math.ceil((cooldownEnd - Date.now()) / 1000),
   );
   const rateLimitedError = new Error("Token refresh temporarily rate limited");
   rateLimitedError.status = 429;
@@ -228,7 +228,7 @@ const shouldSuppressExpectedAuthErrorLog = (error, config = {}) => {
 const clearAuthStorage = () => {
   clearRefreshCooldown();
   clearProactiveRefreshTerminalFailure();
-  refreshRequest = null;
+  pendingRefresh = null;
   safeLocalStorage.removeItem("token");
   safeSessionStorage.removeItem("token");
   safeLocalStorage.removeItem("refreshToken");
@@ -258,7 +258,7 @@ const persistAuthSession = ({
   clearRefreshCooldown();
   clearProactiveRefreshTerminalFailure();
 
-  const persistDurably = resolveRememberMePreference(rememberMe);
+  const persistDurably = resolveRememberMe(rememberMe);
   const targetStorage = persistDurably ? safeLocalStorage : safeSessionStorage;
   const secondaryStorage = persistDurably ? safeSessionStorage : safeLocalStorage;
 
@@ -316,9 +316,9 @@ const getOrCreateRefreshRequest = () => {
     return Promise.reject(createRefreshRateLimitedError());
   }
 
-  if (!refreshRequest) {
+  if (!pendingRefresh) {
     const storedRefreshToken = getStoredRefreshToken();
-    refreshRequest = axios
+    pendingRefresh = axios
       .post(
         `${API_BASE_URL}/auth/refresh`,
         storedRefreshToken ? { refreshToken: storedRefreshToken } : {},
@@ -336,20 +336,19 @@ const getOrCreateRefreshRequest = () => {
         throw error;
       })
       .finally(() => {
-        refreshRequest = null;
+        pendingRefresh = null;
       });
   }
-  return refreshRequest;
+  return pendingRefresh;
 };
 
-// Create axios instance with increased timeout
 const axiosClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
-  withCredentials: true, // Enable sending cookies in cross-origin requests
-  timeout: 22000, // 22s: just after backend 20s gateway timeout, before frontend 25s withTimeout
+  withCredentials: true,
+  timeout: 22000,
 });
 
 const SAFE_RETRY_METHODS = new Set(["get", "head", "options"]);
@@ -402,8 +401,6 @@ const buildInFlightRequestKey = (config = {}, baseURL = "") => {
   const method = String(config.method || "get").toLowerCase();
 
   if (
-    // Requests with their own AbortSignal must not share an in-flight promise.
-    // Otherwise a canceled fetch can poison the next retry during reload or tab switches.
     config.signal ||
     !DEDUPED_REQUEST_METHODS.has(method) ||
     config.disableRequestDeduplication === true
@@ -421,11 +418,10 @@ const buildInFlightRequestKey = (config = {}, baseURL = "") => {
   });
 };
 
-// Configure retry logic - don't retry on 401 Unauthorized
 axiosRetry(axiosClient, {
   retries: 2,
   retryDelay: (retryCount) => {
-    return retryCount * 1000; // exponential backoff
+    return retryCount * 1000;
   },
   retryCondition: (error) => {
     if (isRequestCanceled(error)) {
@@ -452,7 +448,6 @@ axiosRetry(axiosClient, {
   },
 });
 
-// Check if the JWT token is within 2 minutes of expiration
 const isTokenExpiringSoon = (token) => {
   if (!token) return false;
   try {
@@ -470,27 +465,22 @@ const isTokenExpiringSoon = (token) => {
     const expTime = payload.exp * 1000;
     const iatTime = payload.iat ? payload.iat * 1000 : 0;
 
-    // Phase 3: Proactive Token Refresh at 75% lifetime
     if (iatTime && expTime) {
       const totalLifetime = expTime - iatTime;
       const timePassed = Date.now() - iatTime;
       return timePassed > (totalLifetime * 0.75) && (expTime - Date.now()) > 0;
     }
 
-    // Fallback: Refresh if less than 15 minutes (900000 ms) remaining
     return (expTime - Date.now()) > 0 && (expTime - Date.now()) < 900000;
   } catch (e) {
     return false;
   }
 };
 
-// Request interceptor to add auth token
 axiosClient.interceptors.request.use(
   async (config) => {
-    // Check both localStorage and sessionStorage for token using safe storage
     let token = getStoredAccessToken();
 
-    // Proactive token refresh before request if nearing expiration
     if (
       token &&
       isTokenExpiringSoon(token) &&
@@ -525,8 +515,6 @@ axiosClient.interceptors.request.use(
         ) {
           console.warn("Proactive token refresh failed:", refreshError?.message);
         }
-        // Ignore error here, let the request proceed.
-        // Response interceptor will catch actual 401s if it truly failed.
       }
     }
 
@@ -540,7 +528,6 @@ axiosClient.interceptors.request.use(
   },
 );
 
-// Response interceptor for token refresh on 401
 axiosClient.interceptors.response.use(
   (response) => {
     return response;
@@ -562,7 +549,6 @@ axiosClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Handle network errors and timeouts
     if (!error.response) {
       if (error.code === "ECONNABORTED" || error.message.includes("timeout")) {
         console.warn("Request timeout:", error.config?.url);
@@ -575,14 +561,12 @@ axiosClient.interceptors.response.use(
         );
       }
 
-      // Network error without response - server might be down
       console.error("Network error:", error.message);
       throw new Error(
         "Unable to connect to server. Please check your connection and try again.",
       );
     }
 
-    // Handle 401 Unauthorized - try to refresh token
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
@@ -594,7 +578,6 @@ axiosClient.interceptors.response.use(
       try {
         const refreshResponse = await getOrCreateRefreshRequest();
 
-        // If refresh successful, update token and retry original request
         const newToken =
           refreshResponse.data.token || refreshResponse.data.accessToken;
         const newRefreshToken = refreshResponse.data.refreshToken;
@@ -611,10 +594,8 @@ axiosClient.interceptors.response.use(
             persistStoredUser(refreshResponse.data.user);
           }
 
-          // Update the original request with new token
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
 
-          // Retry the original request
           return axiosClient(originalRequest);
         }
 
@@ -647,12 +628,11 @@ axiosClient.interceptors.response.use(
       }
     }
 
-    // Handle other errors
     let errorMessage = `HTTP error! status: ${error.response?.status || "unknown"}`;
 
     if (error.response?.data) {
       const errorData = error.response.data;
-      const extractedMessage = extractErrorMessage(errorData);
+      const extractedMessage = getErrMsg(errorData);
       if (extractedMessage) {
         errorMessage = extractedMessage;
       }
@@ -714,8 +694,8 @@ class ApiClient {
       this.client.defaults.baseURL,
     );
 
-    if (inFlightRequestKey && inFlightGetRequests.has(inFlightRequestKey)) {
-      return inFlightGetRequests.get(inFlightRequestKey);
+    if (inFlightRequestKey && activeGets.has(inFlightRequestKey)) {
+      return activeGets.get(inFlightRequestKey);
     }
 
     const responsePromise = this.client
@@ -732,18 +712,17 @@ class ApiClient {
       })
       .finally(() => {
         if (inFlightRequestKey) {
-          inFlightGetRequests.delete(inFlightRequestKey);
+          activeGets.delete(inFlightRequestKey);
         }
       });
 
     if (inFlightRequestKey) {
-      inFlightGetRequests.set(inFlightRequestKey, responsePromise);
+      activeGets.set(inFlightRequestKey, responsePromise);
     }
 
     return responsePromise;
   }
 
-  // Generic HTTP helpers for backward compatibility across service modules
   async get(endpoint, config = {}) {
     return this.request(endpoint, {
       method: "GET",
@@ -774,7 +753,6 @@ class ApiClient {
     });
   }
 
-  // Custom request method for non-standard endpoints
   async customRequest(url, options = {}) {
       try {
         const response = await this.client.request({
@@ -805,7 +783,6 @@ class ApiClient {
     return response?.data || response;
   }
 
-  // Auth endpoints
   async login(credentials) {
     try {
       console.log(
@@ -864,7 +841,6 @@ class ApiClient {
     });
   }
 
-  // New dual-option forgot password methods
   async forgotPasswordOtp(identifierOrPayload, method = "email") {
     const data =
       identifierOrPayload && typeof identifierOrPayload === "object"
@@ -947,7 +923,6 @@ class ApiClient {
     return queryParams.toString() ? `?${queryParams.toString()}` : "";
   }
 
-  // Dashboard endpoints
   async getDashboardStats(params = {}) {
     const suffix = this.buildQuerySuffix(params);
     return this.request(`/dashboard/stats${suffix}`);
@@ -1030,7 +1005,6 @@ class ApiClient {
     return this.request(`/analytics/appointments${suffix}`);
   }
 
-  // Comprehensive analytics dashboard data
   async getAnalyticsDashboard(params = {}, config = {}) {
     const suffix = this.buildQuerySuffix(params);
     return this.request(`/analytics/dashboard${suffix}`, {
@@ -1061,7 +1035,6 @@ class ApiClient {
     return this.request(`/analytics/demographics${suffix}`);
   }
 
-  // User Management endpoints
   async getAllUsers() {
     return this.request("/users/all-users");
   }
@@ -1167,17 +1140,13 @@ class ApiClient {
     return this.request("/users/clinics");
   }
 
-  // Get facility info for the current user
   async getFacilityInfo() {
     try {
-      // Try to get facility info from settings
       const response = await this.request("/settings/facility");
       return response;
     } catch (error) {
-      // Fallback: try to get clinic info
       try {
         const clinics = await this.request("/users/clinics");
-        // Handle wrapped response format
         const clinicData = clinics?.data || clinics;
         if (Array.isArray(clinicData) && clinicData.length > 0) {
           return clinicData[0];
@@ -1190,7 +1159,6 @@ class ApiClient {
     }
   }
 
-  // Settings endpoints
   async getSettings() {
     return this.request("/settings");
   }
@@ -1219,7 +1187,6 @@ class ApiClient {
     });
   }
 
-  // Infants Management endpoints
   async getInfants(params = {}, config = {}) {
     const suffix = this.buildQuerySuffix(params);
     return this.request(`/infants${suffix}`, {
@@ -1253,7 +1220,6 @@ class ApiClient {
     });
   }
 
-  // Transfer-in case management
   async createTransferInCase(caseData) {
     return this.request("/transfer-in-cases", {
       method: "POST",
@@ -1319,7 +1285,6 @@ class ApiClient {
     return this.request(`/infants/guardian/${guardianId}`);
   }
 
-  // Infant Age Management endpoints
   async getInfantAges(limit = 100, offset = 0) {
     return this.request(`/infant-ages${this.buildQuerySuffix({ limit, offset })}`);
   }
@@ -1351,7 +1316,6 @@ class ApiClient {
     });
   }
 
-  // Vaccinations Management endpoints
   async getAllVaccinations() {
     return this.request("/vaccinations/records");
   }
@@ -1392,7 +1356,6 @@ class ApiClient {
     return this.request(`/vaccinations/records/infant/${infantId}`);
   }
 
-  // Alias for getVaccinationRecordsByInfant
   async getVaccinationsByInfant(infantId) {
     return this.getVaccinationRecordsByInfant(infantId);
   }
@@ -1473,7 +1436,6 @@ class ApiClient {
     return this.request(`/vaccinations/schedules/infant/${infantId}`);
   }
 
-  // Dynamic Immunization Schedule endpoints
   async getDynamicSchedule(infantId) {
     return this.request(`/vaccinations/schedule/${infantId}`);
   }
@@ -1498,7 +1460,6 @@ class ApiClient {
     return this.request(`/vaccinations/extended/${infantId}`);
   }
 
-  // Vaccination readiness - automated vaccine readiness calculation
   async getVaccinationReadiness(infantId, options = {}) {
     const params = new URLSearchParams();
     Object.entries(options || {}).forEach(([key, value]) => {
@@ -1510,22 +1471,18 @@ class ApiClient {
     return this.request(`/vaccination-readiness/${infantId}${suffix}`);
   }
 
-  // Vaccine Eligibility - Get eligible vaccines for an infant
   async getEligibleVaccines(infantId, options = {}) {
     return this.request(`/vaccinations/eligible/${infantId}`, { method: 'GET', ...options });
   }
 
-  // Vaccine Eligibility - Get next dose info for a specific vaccine
   async getNextDoseInfo(infantId, vaccineId) {
     return this.request(`/vaccinations/next-dose/${infantId}/${vaccineId}`);
   }
 
-  // Vaccine Eligibility - Get vaccine readiness for a specific vaccine
   async getVaccineReadiness(infantId, vaccineId) {
     return this.request(`/vaccinations/readiness/${infantId}/${vaccineId}`);
   }
 
-  // Vaccine Eligibility - Check contraindications
   async checkVaccineContraindications(infantId, vaccineId) {
     return this.request(`/vaccinations/contraindications/${infantId}/${vaccineId}`);
   }
@@ -1548,7 +1505,6 @@ class ApiClient {
     });
   }
 
-  // Infant Vaccine Readiness endpoints
   async getInfantVaccineReadiness(infantId) {
     return this.request(`/vaccination-readiness/infant/${infantId}`);
   }
@@ -1571,7 +1527,6 @@ class ApiClient {
     return this.request(`/vaccination-readiness/schedule/${infantId}`);
   }
 
-  // Vaccination with automatic inventory deduction
   async recordVaccinationWithInventory(recordData) {
     return this.request("/vaccinations/record-with-inventory", {
       method: "POST",
@@ -1633,7 +1588,6 @@ class ApiClient {
     return this.request(`/vaccinations/transactions${suffix}`);
   }
 
-  // Inventory Management endpoints
   async getInventoryItems() {
     return this.request("/inventory/items");
   }
@@ -1725,7 +1679,6 @@ class ApiClient {
     return this.request("/inventory/stats");
   }
 
-  // Vaccine supply endpoints
   async getVaccineSupplyCityDashboard() {
     return this.request("/vaccine-supply/dashboard/city");
   }
@@ -1755,7 +1708,6 @@ class ApiClient {
     });
   }
 
-  // Vaccine Inventory Management endpoints (based on ITEMS_vaccines.docx structure)
   async getVaccineInventory(options = "/inventory/vaccine-inventory") {
     if (typeof options === "string") {
       return this.request(options);
@@ -1838,8 +1790,6 @@ class ApiClient {
   }
 
   async getVaccineInventoryTransactions(vaccineInventoryId = null, filters = {}) {
-    // Backward compatible: support both legacy path parameter usage and
-    // canonical collection endpoint with optional query filters.
     if (vaccineInventoryId !== null && vaccineInventoryId !== undefined) {
       return this.request(
         `/inventory/vaccine-inventory-transactions/${vaccineInventoryId}`,
@@ -1918,7 +1868,6 @@ class ApiClient {
     return this.request(`/inventory/vaccine-inventory/stats?${params}`);
   }
 
-  // Appointments Management endpoints
   async getAppointments(filters = {}) {
     const params = new URLSearchParams(filters);
     return this.request(`/appointments?${params}`);
@@ -1934,6 +1883,13 @@ class ApiClient {
       method: "GET",
       ...options,
     });
+  }
+
+  async getAppointmentDailyCapacity({ date, clinic_id } = {}, options = {}) {
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+    if (clinic_id) params.append('clinic_id', clinic_id);
+    return this.request(`/appointments/availability/daily-capacity?${params}`, { method: 'GET', ...options });
   }
 
   async getAppointmentTimeSlots({ scheduled_date, vaccine_id, clinic_id, exclude_appointment_id } = {}, options = {}) {
@@ -2011,7 +1967,6 @@ class ApiClient {
     return this.request(`/appointments?infant_id=${infantId}`);
   }
 
-  // Blocked Dates Management endpoints (Admin)
   async getBlockedDates({ month, clinic_id } = {}, options = {}) {
     const params = new URLSearchParams();
     if (month) params.append('month', month);
@@ -2046,7 +2001,6 @@ class ApiClient {
     return this.request(`/appointments/blocked-dates/check?${params}`);
   }
 
-  // Announcements Management endpoints
   async getAnnouncements(filters = {}) {
     const params = new URLSearchParams();
     Object.entries(filters || {}).forEach(([key, value]) => {
@@ -2160,7 +2114,6 @@ class ApiClient {
     return this.request("/announcements/stats/overview");
   }
 
-  // Paper Templates Management endpoints
   async getPaperTemplates(filters = {}) {
     const params = new URLSearchParams(filters);
     return this.request(`/paper-templates?${params}`);
@@ -2194,7 +2147,6 @@ class ApiClient {
     return this.request(`/paper-templates/${id}/fields`);
   }
 
-  // Document Downloads endpoints
   async getDownloadHistory(filters = {}) {
     const params = new URLSearchParams(filters);
     return this.request(`/documents/history?${params}`);
@@ -2224,7 +2176,6 @@ class ApiClient {
     return this.request(`/documents/analytics?${params}`);
   }
 
-  // Monitoring endpoints
   async getMonitoringData(filters = {}) {
     const params = new URLSearchParams(filters);
     return this.request(`/monitoring/monitoring?${params}`);
@@ -2250,7 +2201,6 @@ class ApiClient {
     return this.request(`/monitoring/template-performance?${params}`);
   }
 
-  // Audit Log endpoints
   async getAuditLogs(filters = {}) {
     const params = new URLSearchParams(filters);
     return this.request(`/monitoring/audit-logs?${params}`);
@@ -2264,7 +2214,6 @@ class ApiClient {
     });
   }
 
-  // Growth Monitoring endpoints
   async getGrowthRecords(filters = {}) {
     const params = new URLSearchParams(filters);
     return this.request(`/growth/records?${params}`);
@@ -2319,7 +2268,6 @@ class ApiClient {
     });
   }
 
-  // User Profile endpoints
   async getUserProfile(userId) {
     return this.request(`/users/profile/${userId}`);
   }
@@ -2331,7 +2279,6 @@ class ApiClient {
     });
   }
 
-  // Guardian Profile endpoints
   async getGuardianProfile(guardianId) {
     return this.request(`/users/guardian/profile/${guardianId}`);
   }
@@ -2343,7 +2290,6 @@ class ApiClient {
     });
   }
 
-  // Messages endpoints
   async getMessagesByUser(userId) {
     return this.request(`/messages/user/${userId}`);
   }
@@ -2354,7 +2300,6 @@ class ApiClient {
     });
   }
 
-  // User Profile endpoints
   async changePassword(currentPassword, newPassword) {
     return this.request(`/auth/change-password`, {
       method: "POST",
@@ -2362,7 +2307,6 @@ class ApiClient {
     });
   }
 
-  // User Password Management endpoints (Admin Only)
   async resetGuardianPassword(guardianId, password, options = {}) {
     return this.request(`/users/guardians/${guardianId}/password`, {
       method: "PUT",
@@ -2404,7 +2348,6 @@ class ApiClient {
     });
   }
 
-  // Guardian-specific notifications endpoints
   async getGuardianNotifications(filters = {}) {
     const params = new URLSearchParams();
     Object.entries(filters || {}).forEach(([key, value]) => {
@@ -2449,7 +2392,6 @@ class ApiClient {
     });
   }
 
-  // Notifications endpoints
   async createNotification(notificationData) {
     return this.request("/notifications", {
       method: "POST",
@@ -2497,12 +2439,10 @@ class ApiClient {
     return this.request(`/notifications/unread-count`);
   }
 
-  // Health Records endpoints (alias for growth records)
   async getHealthRecordsByInfant(infantId) {
     return this.getGrowthRecordsByInfant(infantId);
   }
 
-  // Admin Management endpoints
   async getAdminUsers() {
     return this.request("/admin/admins");
   }
@@ -2540,7 +2480,6 @@ class ApiClient {
     return this.request("/admin/stats");
   }
 
-  // Export endpoints
   async exportVaccinationRecords(format = "csv", filters = {}) {
     const params = new URLSearchParams({ format, ...filters });
     return this.request(`/analytics/export?type=vaccinations&${params}`, {

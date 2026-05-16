@@ -1,3 +1,5 @@
+import { toClinicDateKey } from "./dateUtils";
+
 const toLowerValue = (value) =>
   typeof value === "string" ? value.toLowerCase() : "";
 
@@ -49,6 +51,275 @@ const pickFirstNonEmptyValue = (...values) => {
   }
 
   return null;
+};
+
+const INTERNAL_URL_BASE = "https://immunicare.local";
+
+const buildFullName = (firstName, lastName) => {
+  const normalizedFirstName = String(firstName || "").trim();
+  const normalizedLastName = String(lastName || "").trim();
+  return [normalizedFirstName, normalizedLastName].filter(Boolean).join(" ").trim();
+};
+
+const normalizeAppointmentDateKeyCandidate = (value) => {
+  if (value === null || value === undefined || value === "") {
+    return "";
+  }
+
+  if (value instanceof Date) {
+    return toClinicDateKey(value);
+  }
+
+  const text = String(value).trim();
+  if (!text) {
+    return "";
+  }
+
+  const isoMatch = text.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (isoMatch) {
+    return isoMatch[1];
+  }
+
+  const slashMatch = text.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (slashMatch) {
+    const [, month, day, year] = slashMatch;
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+
+  return toClinicDateKey(text);
+};
+
+const parseInternalUrl = (value) => {
+  try {
+    return new URL(value || "/", INTERNAL_URL_BASE);
+  } catch (_error) {
+    return null;
+  }
+};
+
+const formatInternalUrl = (url) => {
+  if (!url) {
+    return "";
+  }
+
+  return `${url.pathname}${url.search}${url.hash}`;
+};
+
+const parseClinicDateKeyAsUtc = (dateKey) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey || "").trim())) {
+    return null;
+  }
+
+  const parsed = new Date(`${dateKey}T00:00:00.000Z`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const getClinicWeekStartKey = (dateKey) => {
+  const parsed = parseClinicDateKeyAsUtc(dateKey);
+  if (!parsed) {
+    return "";
+  }
+
+  const dayOfWeek = parsed.getUTCDay();
+  const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  parsed.setUTCDate(parsed.getUTCDate() - diffToMonday);
+  return toClinicDateKey(parsed);
+};
+
+const resolveAppointmentSearchText = (raw = {}) => {
+  const { metadata, payload, templateData } = getMetadataPayload(raw);
+  const structuredFullName = pickFirstNonEmptyValue(
+    raw?.infant_name,
+    raw?.infantName,
+    raw?.child_name,
+    raw?.childName,
+    raw?.patient_name,
+    raw?.patientName,
+    payload?.infantName,
+    payload?.infant_name,
+    payload?.childName,
+    payload?.child_name,
+    payload?.patientName,
+    payload?.patient_name,
+    templateData?.infantName,
+    templateData?.infant_name,
+    templateData?.childName,
+    templateData?.child_name,
+    metadata?.infantName,
+    metadata?.infant_name,
+    metadata?.childName,
+    metadata?.child_name,
+    metadata?.patientName,
+    metadata?.patient_name,
+  );
+
+  if (structuredFullName) {
+    return String(structuredFullName).trim();
+  }
+
+  const combinedStructuredName = buildFullName(
+    pickFirstNonEmptyValue(
+      raw?.infant_first_name,
+      raw?.infantFirstName,
+      raw?.child_first_name,
+      raw?.childFirstName,
+      payload?.infant_first_name,
+      payload?.infantFirstName,
+      payload?.child_first_name,
+      payload?.childFirstName,
+      metadata?.infant_first_name,
+      metadata?.infantFirstName,
+      metadata?.child_first_name,
+      metadata?.childFirstName,
+    ),
+    pickFirstNonEmptyValue(
+      raw?.infant_last_name,
+      raw?.infantLastName,
+      raw?.child_last_name,
+      raw?.childLastName,
+      payload?.infant_last_name,
+      payload?.infantLastName,
+      payload?.child_last_name,
+      payload?.childLastName,
+      metadata?.infant_last_name,
+      metadata?.infantLastName,
+      metadata?.child_last_name,
+      metadata?.childLastName,
+    ),
+  );
+
+  if (combinedStructuredName) {
+    return combinedStructuredName;
+  }
+
+  const searchableText = [
+    raw?.message,
+    raw?.content,
+    raw?.description,
+    raw?.body,
+    metadata?.message,
+    payload?.message,
+    templateData?.message,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const patterns = [
+    /appointment for\s+(.+?)\s+on\s+/i,
+    /available for\s+(.+?)(?::|\s+on\s+)/i,
+    /for\s+(.+?)\.\s*new schedule:/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = searchableText.match(pattern);
+    if (match?.[1]) {
+      return match[1].trim();
+    }
+  }
+
+  return "";
+};
+
+const resolveAppointmentDateKey = (raw = {}) => {
+  const { metadata, payload, templateData } = getMetadataPayload(raw);
+  const structuredValue = pickFirstNonEmptyValue(
+    raw?.scheduled_date,
+    raw?.scheduledDate,
+    raw?.new_scheduled_date,
+    raw?.newScheduledDate,
+    raw?.suggested_date,
+    raw?.suggestedDate,
+    payload?.scheduled_date,
+    payload?.scheduledDate,
+    payload?.new_scheduled_date,
+    payload?.newScheduledDate,
+    payload?.suggested_date,
+    payload?.suggestedDate,
+    templateData?.scheduled_date,
+    templateData?.scheduledDate,
+    templateData?.suggested_date,
+    templateData?.suggestedDate,
+    metadata?.scheduled_date,
+    metadata?.scheduledDate,
+    metadata?.new_scheduled_date,
+    metadata?.newScheduledDate,
+    metadata?.suggested_date,
+    metadata?.suggestedDate,
+  );
+
+  const structuredDateKey = normalizeAppointmentDateKeyCandidate(structuredValue);
+  if (structuredDateKey) {
+    return structuredDateKey;
+  }
+
+  const searchableText = [
+    raw?.message,
+    raw?.content,
+    raw?.description,
+    raw?.body,
+    metadata?.message,
+    payload?.message,
+    templateData?.message,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const isoMatch = searchableText.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  if (isoMatch?.[1]) {
+    return isoMatch[1];
+  }
+
+  const slashMatch = searchableText.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
+  if (slashMatch) {
+    const [, month, day, year] = slashMatch;
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+
+  return "";
+};
+
+const resolveAdminAppointmentPeriod = (dateKey) => {
+  const candidateDateKey = normalizeAppointmentDateKeyCandidate(dateKey);
+  const todayKey = toClinicDateKey(new Date());
+
+  if (!candidateDateKey || !todayKey) {
+    return "month";
+  }
+
+  // Prefer the broader "month" window when the appointment falls inside the
+  // current calendar month. This guarantees the appointment is visible from
+  // the admin notification redirect even if the appointment happens to be
+  // today, tomorrow, or later this month. The narrower "today" filter would
+  // otherwise hide future-month appointments scheduled in the same week.
+  if (candidateDateKey.slice(0, 7) === todayKey.slice(0, 7)) {
+    return "month";
+  }
+
+  if (getClinicWeekStartKey(candidateDateKey) === getClinicWeekStartKey(todayKey)) {
+    return "week";
+  }
+
+  return "month";
+};
+
+const buildAdminAppointmentsActionUrl = (raw = {}, explicitUrl = null) => {
+  const explicit = explicitUrl ? parseInternalUrl(explicitUrl) : null;
+  const url = explicit || parseInternalUrl("/appointments");
+
+  if (!url || url.pathname !== "/appointments") {
+    return explicitUrl || "";
+  }
+
+  const searchText = resolveAppointmentSearchText(raw);
+  const appointmentDateKey = resolveAppointmentDateKey(raw);
+
+  if (!url.searchParams.get("search") && searchText) {
+    url.searchParams.set("search", searchText);
+  }
+
+  url.searchParams.set("period", resolveAdminAppointmentPeriod(appointmentDateKey));
+
+  return formatInternalUrl(url);
 };
 
 export const CATEGORY_META = Object.freeze({
@@ -704,18 +975,25 @@ const getInfantId = (raw = {}) => {
 };
 
 export const resolveNotificationActionUrl = (raw, options = {}) => {
-  const explicitUrl = resolveExplicitNotificationUrl(raw);
-  if (explicitUrl) {
-    return explicitUrl;
-  }
-
   const category = resolveNotificationCategory(raw, options);
+  const explicitUrl = resolveExplicitNotificationUrl(raw);
   const notificationType = normalizeCandidateValue(
     pickFirstNonEmptyValue(raw?.notification_type, raw?.event_type, raw?.type),
   );
   const relatedEntityType = getRelatedEntityType(raw);
   const relatedEntityId = getRelatedEntityId(raw);
   const infantId = getInfantId(raw);
+
+  if (!options.isGuardian && (category === "appointment" || category === "missed_schedule")) {
+    const appointmentActionUrl = buildAdminAppointmentsActionUrl(raw, explicitUrl);
+    if (appointmentActionUrl) {
+      return appointmentActionUrl;
+    }
+  }
+
+  if (explicitUrl) {
+    return explicitUrl;
+  }
 
   if (options.isGuardian) {
     if (notificationType === "new_message") {

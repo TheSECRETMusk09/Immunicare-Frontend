@@ -1,11 +1,5 @@
-/**
- * Immunicare Login Theme Configuration
- * Distinct visual branding for Admin and Guardian user roles
- * WCAG 2.1 AA compliant color schemes
- */
-
-// WCAG 2.1 AA compliant color combinations
-// All color pairs meet minimum contrast ratio of 4.5:1 for normal text
+// Login theme tokens for admin and guardian roles.
+// Color pairs tuned for contrast.
 
 export const adminTheme = {
   name: "admin",
@@ -18,7 +12,7 @@ export const adminTheme = {
       300: "#93c5fd",
       400: "#60a5fa",
       500: "#3b82f6",
-      600: "#2563eb", // Main primary - WCAG AA compliant on white
+      600: "#2563eb", // Main primary, readable on white
       700: "#1d4ed8",
       800: "#1e40af",
       900: "#1e3a8a",
@@ -45,9 +39,9 @@ export const adminTheme = {
       dark: "#0f766e",
     },
     // Semantic colors
-    success: "#059669", // WCAG AA on white
-    warning: "#d97706", // WCAG AA on white
-    error: "#dc2626", // WCAG AA on white
+    success: "#059669", // Readable on white
+    warning: "#d97706", // Readable on white
+    error: "#dc2626", // Readable on white
     info: "#2563eb",
   },
   // Background gradients
@@ -71,7 +65,7 @@ export const adminTheme = {
   },
   // Spacing and sizing
   spacing: {
-    touchTarget: "44px", // WCAG 2.5.5 minimum target size
+    touchTarget: "44px", // Min tap target
     inputHeight: "48px", // Comfortable touch target
     buttonHeight: "48px",
     maxWidth: "420px",
@@ -93,7 +87,7 @@ export const adminTheme = {
     focus: "0 0 0 3px rgba(37, 99, 235, 0.4)",
     error: "0 0 0 3px rgba(220, 38, 38, 0.3)",
   },
-  // Focus indicators - WCAG 2.4.7
+  // Focus indicators
   focus: {
     outline: "3px solid #2563eb",
     outlineOffset: "2px",
@@ -122,7 +116,7 @@ export const guardianTheme = {
       300: "#fdba74",
       400: "#fb923c",
       500: "#f97316",
-      600: "#ea580c", // Main primary - WCAG AA compliant on white
+      600: "#ea580c", // Main primary, readable on white
       700: "#c2410c",
       800: "#9a3412",
       900: "#7c2d12",

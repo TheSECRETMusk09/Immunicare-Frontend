@@ -37,7 +37,6 @@ const ComplianceMonitor = ({
           title="High Compliance (≥80%)"
           count={stats.high}
           total={totalInfants}
-          icon="😊"
           color="green"
           description="Children who are up-to-date with vaccinations"
         />
@@ -45,7 +44,6 @@ const ComplianceMonitor = ({
           title="Moderate Compliance (50-79%)"
           count={stats.moderate}
           total={totalInfants}
-          icon="😐"
           color="yellow"
           description="Children who need attention"
         />
@@ -53,7 +51,6 @@ const ComplianceMonitor = ({
           title="Low Compliance (<50%)"
           count={stats.low}
           total={totalInfants}
-          icon="😟"
           color="red"
           description="Children at risk - immediate action needed"
         />

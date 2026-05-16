@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import apiClient from "../utils/api";
 
-const unwrapData = (payload) => payload?.data ?? payload ?? [];
+const unwrap = (payload) => payload?.data ?? payload ?? [];
 
-const splitFullName = (value = "") => {
+const splitName = (value = "") => {
   const parts = String(value || "")
     .trim()
     .split(/\s+/)
@@ -32,7 +32,7 @@ const splitFullName = (value = "") => {
   };
 };
 
-const normalizePatientRecord = (record) => {
+const normPatient = (record) => {
   const completedVaccinations = Number(record?.completed_vaccinations || 0);
   const pendingVaccinations = Number(record?.pending_vaccinations || 0);
   const synthesizedHistory = [
@@ -73,8 +73,8 @@ const normalizePatientRecord = (record) => {
   };
 };
 
-const mapPatientPayloadToInfant = (patientData = {}) => {
-  const { first_name, middle_name, last_name } = splitFullName(patientData.name);
+const mapToInfant = (patientData = {}) => {
+  const { first_name, middle_name, last_name } = splitName(patientData.name);
 
   return {
     first_name,
@@ -98,7 +98,7 @@ export const usePatientManagement = () => {
     try {
       setLoading(true);
       const response = await apiClient.getInfants();
-      const normalizedPatients = unwrapData(response).map(normalizePatientRecord);
+      const normalizedPatients = unwrap(response).map(normPatient);
       setPatients(normalizedPatients);
       return normalizedPatients;
     } catch (err) {
@@ -113,7 +113,7 @@ export const usePatientManagement = () => {
     async (patientData) => {
       try {
         setError(null);
-        await apiClient.createInfant(mapPatientPayloadToInfant(patientData));
+        await apiClient.createInfant(mapToInfant(patientData));
         await fetchPatients();
       } catch (err) {
         setError(err.message || "Failed to add patient");
@@ -127,7 +127,7 @@ export const usePatientManagement = () => {
     async (id, patientData) => {
       try {
         setError(null);
-        await apiClient.updateInfant(id, mapPatientPayloadToInfant(patientData));
+        await apiClient.updateInfant(id, mapToInfant(patientData));
         await fetchPatients();
       } catch (err) {
         setError(err.message || "Failed to update patient");
@@ -159,7 +159,7 @@ export const usePatientManagement = () => {
     try {
       setError(null);
       const response = await apiClient.searchInfants(query);
-      const normalizedPatients = unwrapData(response).map(normalizePatientRecord);
+      const normalizedPatients = unwrap(response).map(normPatient);
       setPatients(normalizedPatients);
       return normalizedPatients;
     } catch (err) {
@@ -172,8 +172,8 @@ export const usePatientManagement = () => {
     try {
       setError(null);
       const response = await apiClient.getInfant(id);
-      const patient = unwrapData(response);
-      return patient ? normalizePatientRecord(patient) : null;
+      const patient = unwrap(response);
+      return patient ? normPatient(patient) : null;
     } catch (err) {
       setError(err.message || "Failed to fetch patient details");
       return null;
@@ -184,7 +184,7 @@ export const usePatientManagement = () => {
     try {
       setError(null);
       const response = await apiClient.getVaccinationRecordsByInfant(patientId);
-      return unwrapData(response);
+      return unwrap(response);
     } catch (err) {
       setError(err.message || "Failed to fetch vaccination history");
       return [];

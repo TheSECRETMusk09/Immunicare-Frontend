@@ -11,13 +11,14 @@ import InjectVaccineModal from "../components/InjectVaccineModal";
 import VaccineReadinessManager from "../components/VaccineReadinessManager";
 import useInfantManagementSocket from "../hooks/useInfantManagementSocket";
 import { useAuth } from "../contexts/AuthContext";
-import { normalizeInfantsResponse } from "../utils/adminDataAdapters";
+import { normalizeInfant, normalizeInfantsResponse } from "../utils/adminDataAdapters";
 import {
   buildInfantRecordPrefillContext,
   getInfantDisplayLabel,
   getInfantFullName,
 } from "../utils/infantIdentity";
 import { getVaccinationPeriodRange } from "../utils/vaccinationPeriods";
+import { formatInfantDobShort } from "../utils/dateUtils";
 import {
   Button,
   PageHeader,
@@ -125,8 +126,8 @@ const normalizePaginationState = (pagination, currentPage, itemsPerPage, itemCou
   const normalizedLimit = Number(pagination?.limit || itemsPerPage || 20) || 20;
   const normalizedTotal = Number(pagination?.total ?? itemCount ?? 0) || 0;
   const normalizedTotalPages =
-    Number(pagination?.totalPages) ||
-    (normalizedLimit > 0 ? Math.ceil(normalizedTotal / normalizedLimit) : 0);
+    Number(pagination?.totalPages) ||(
+     normalizedLimit > 0 ? Math.ceil(normalizedTotal / normalizedLimit) : 0);
 
   return {
     page: normalizedPage,
@@ -146,6 +147,7 @@ const normalizePaginationState = (pagination, currentPage, itemsPerPage, itemCou
 
 const DEFAULT_ITEMS_PER_PAGE = 20;
 const ITEMS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
+const INFANT_DETAIL_VIEWS = new Set(["personal", "schedule", "records", "chart"]);
 const DEFAULT_SORT_STATE = {
   key: null,
   direction: null,
@@ -170,7 +172,7 @@ const VACCINATION_PROGRESS_PRESETS = [
   { value: "5-plus", label: "5+ doses", min: "5", max: "" },
 ];
 
-const createColumnFilterState = (filters = DEFAULT_COLUMN_FILTERS) => ({
+const createColumnFilterState = (filters = DEFAULT_COLUMN_FILTERS) =>( {
   dob: {
     start: String(filters?.dob?.start || ""),
     end: String(filters?.dob?.end || ""),
@@ -220,7 +222,24 @@ const normalizeDateOnlyValue = (value) => {
   return parsedDate.toISOString().slice(0, 10);
 };
 
-const getInfantNameValue = (row = {}) => getInfantFullName(row) || "";
+
+
+const normalizeInfantDetailView = (value) => {
+  const normalizedValue = String(value || "").trim().toLowerCase();
+  return INFANT_DETAIL_VIEWS.has(normalizedValue) ? normalizedValue : "";
+};
+
+const parseInfantManagementRoute = (search = "") => {
+  const searchParams = new URLSearchParams(search);
+  const rawView = String(searchParams.get("view") || "").trim().toLowerCase();
+
+  return {
+    detailView: normalizeInfantDetailView(rawView),
+    infantId:
+      Number(searchParams.get("infantId") || searchParams.get("infant_id") || 0) || null,
+    isTransferIn: rawView === "transfer-in",
+  };
+};
 
 const getSexLabel = (value) => {
   const normalizedValue = String(value || "").trim().toLowerCase();
@@ -329,10 +348,10 @@ const isColumnFilterActive = (columnKey, filters = DEFAULT_COLUMN_FILTERS) => {
     case "sex":
       return Array.isArray(filters?.sex) && filters.sex.length > 0;
     case "workflow_status":
-      return (
+      return(
         Array.isArray(filters?.workflow_status) &&
-        filters.workflow_status.length > 0
-      );
+        filters.workflow_status.length > 0)
+       ;
     case "vaccination_progress":
       return Boolean(
         filters?.vaccination_progress?.min !== "" ||
@@ -452,7 +471,7 @@ const sortInfantRows = (rows = [], sortState = DEFAULT_SORT_STATE) => {
   }
 
   return [...rows]
-    .map((row, index) => ({ row, index }))
+    .map((row, index) =>( { row, index }))
     .sort((leftEntry, rightEntry) => {
       const comparison = compareInfantRowsByColumn(
         leftEntry.row,
@@ -551,7 +570,7 @@ export default function InfantManagement() {
   const [recordVaccinationPrefill, setRecordVaccinationPrefill] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-  const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
+  const hasLoadedInitialDataRef = useRef(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
   const [period, setPeriod] = useState("all");
@@ -569,6 +588,11 @@ export default function InfantManagement() {
     () => getInfantServerSortQuery(sortState),
     [sortState],
   );
+  const workflowStatusFilter = Array.isArray(columnFilters?.workflow_status)
+    ? columnFilters.workflow_status
+    : [];
+  const workflowStatusFilterKey = workflowStatusFilter.join(",");
+  const previousWorkflowFilterKeyRef = React.useRef(workflowStatusFilterKey);
   const [infantPagination, setInfantPagination] = useState({
     page: 1,
     limit: itemsPerPage,
@@ -588,6 +612,39 @@ export default function InfantManagement() {
   const fetchRequestIdRef = useRef(0);
   const transferInCasesRef = useRef(null);
 
+  const syncInfantRouteState = useCallback(
+    (nextView, infant = null, options = {}) => {
+      const searchParams = new URLSearchParams(location.search);
+      const detailView = normalizeInfantDetailView(nextView);
+      const infantId = Number(infant?.id || 0) || null;
+
+      if (detailView && infantId) {
+        searchParams.set("view", detailView);
+        searchParams.set("infantId", String(infantId));
+      } else if (nextView === "transfer-in") {
+        searchParams.set("view", "transfer-in");
+        searchParams.delete("infantId");
+      } else {
+        searchParams.delete("view");
+        searchParams.delete("infantId");
+      }
+
+      navigate(
+        {
+          pathname: location.pathname,
+          search: searchParams.toString() ? `?${searchParams.toString()}` : "",
+        },
+        {
+          replace: Boolean(options.replace),
+          state: Object.prototype.hasOwnProperty.call(options, "state")
+            ? options.state
+            : location.state,
+        },
+      );
+    },
+    [location.pathname, location.search, location.state, navigate],
+  );
+
   const openRecordVaccinationsModal = useCallback((targetInfant = null) => {
     setRecordVaccinationPrefill(
       targetInfant ? buildInfantRecordPrefillContext(targetInfant) : null,
@@ -603,6 +660,13 @@ export default function InfantManagement() {
   useEffect(() => {
     setCurrentPage(1);
   }, [debouncedSearchQuery, period, periodStartDate, periodEndDate]);
+
+  useEffect(() => {
+    if (previousWorkflowFilterKeyRef.current !== workflowStatusFilterKey) {
+      previousWorkflowFilterKeyRef.current = workflowStatusFilterKey;
+      setCurrentPage(1);
+    }
+  }, [workflowStatusFilterKey]);
 
   useEffect(() => {
     setPageInputValue(String(currentPage || 1));
@@ -636,17 +700,88 @@ export default function InfantManagement() {
   }, []);
 
   useEffect(() => {
-    if (selectedInfant || (activeView !== "list" && activeView !== "transfer-in")) {
+    const routeState = parseInfantManagementRoute(location.search);
+    if (
+      routeState.detailView ||
+      selectedInfant ||(
+       activeView !== "list" && activeView !== "transfer-in")
+    ) {
       return;
     }
 
-    const requestedView = new URLSearchParams(location.search).get("view");
-    const nextPrimaryView = requestedView === "transfer-in" ? "transfer-in" : "list";
+    const nextPrimaryView = routeState.isTransferIn ? "transfer-in" : "list";
 
     if (activeView !== nextPrimaryView) {
       setActiveView(nextPrimaryView);
     }
   }, [activeView, location.search, selectedInfant]);
+
+  useEffect(() => {
+    const routeState = parseInfantManagementRoute(location.search);
+    if (!routeState.detailView || !routeState.infantId) {
+      return;
+    }
+
+    let ignore = false;
+
+    const applyRouteSelection = (infantRecord) => {
+      if (!infantRecord || ignore) {
+        return;
+      }
+
+      setSelectedInfant(infantRecord);
+      setActiveView(routeState.detailView);
+    };
+
+    const listMatch = infants.find((entry) => entry.id === routeState.infantId);
+    if (listMatch) {
+      applyRouteSelection(listMatch);
+      return () => {
+        ignore = true;
+      };
+    }
+
+    if (selectedInfant?.id === routeState.infantId) {
+      if (activeView !== routeState.detailView) {
+        setActiveView(routeState.detailView);
+      }
+
+      return () => {
+        ignore = true;
+      };
+    }
+
+           (async()=>{
+      try {
+        const response = await infantService.getById(routeState.infantId);
+        const infantPayload = response?.success ? response.data : null;
+        const restoredInfant = infantPayload ? normalizeInfant(infantPayload) : null;
+
+        if (restoredInfant?.id) {
+          applyRouteSelection(restoredInfant);
+          return;
+        }
+      } catch (routeError) {
+        console.error("[InfantManagement] Unable to restore infant view from URL:", routeError);
+      }
+
+      if (!ignore) {
+        setSelectedInfant(null);
+        setActiveView("list");
+        syncInfantRouteState("list", null, { replace: true });
+      }
+    }       )();
+
+    return () => {
+      ignore = true;
+    };
+  }, [
+    activeView,
+    infants,
+    location.search,
+    selectedInfant?.id,
+    syncInfantRouteState,
+  ]);
 
   useEffect(() => {
     const navigationState = location.state;
@@ -688,7 +823,7 @@ export default function InfantManagement() {
     const requestId = ++fetchRequestIdRef.current;
 
     try {
-      if (isRefresh || hasLoadedInitialData) {
+      if (isRefresh || hasLoadedInitialDataRef.current) {
         setRefreshing(true);
       } else {
         setLoading(true);
@@ -703,6 +838,9 @@ export default function InfantManagement() {
         ...(debouncedSearchQuery ? { search: debouncedSearchQuery } : {}),
         ...(!debouncedSearchQuery && activePeriodRange.from ? { start_date: activePeriodRange.from } : {}),
         ...(!debouncedSearchQuery && activePeriodRange.to ? { end_date: activePeriodRange.to } : {}),
+        ...(workflowStatusFilterKey
+          ? { workflow_status: workflowStatusFilterKey }
+          : {}),
         ...serverSortQuery,
       });
       const infantsData = normalizeInfantsResponse(result?.data ?? result);
@@ -715,7 +853,7 @@ export default function InfantManagement() {
       const nextSummary = result?.summary || {
         total: nextPagination.total,
         needsReview: infantsData.filter(
-          (infant) => infant.workflow_status === "needs_review",
+          (infant) => getInfantWorkflowStatusValue(infant) === "needs_review",
         ).length,
         withImportedHistory: infantsData.filter(
           (infant) => infant.latest_transfer_case_id != null,
@@ -770,7 +908,7 @@ export default function InfantManagement() {
 
       setLoading(false);
       setRefreshing(false);
-      setHasLoadedInitialData(true);
+      hasLoadedInitialDataRef.current = true;
     }
   }, [
     currentPage,
@@ -778,11 +916,11 @@ export default function InfantManagement() {
     periodStartDate,
     periodEndDate,
     debouncedSearchQuery,
-    hasLoadedInitialData,
     isAdmin,
     itemsPerPage,
     serverSortQuery,
     selectedInfant?.id,
+    workflowStatusFilterKey,
   ]);
 
   useInfantManagementSocket({
@@ -818,6 +956,7 @@ export default function InfantManagement() {
   const handleViewBooklet = (infant, viewType) => {
     setSelectedInfant(infant);
     setActiveView(viewType);
+    syncInfantRouteState(viewType, infant);
   };
 
   const handleBackToList = () => {
@@ -825,6 +964,16 @@ export default function InfantManagement() {
     void fetchInfants();
     setSelectedInfant(null);
     setActiveView("list");
+    syncInfantRouteState("list", null);
+  };
+
+  const handleSelectInfantDetailView = (viewType) => {
+    if (!selectedInfant) {
+      return;
+    }
+
+    setActiveView(viewType);
+    syncInfantRouteState(viewType, selectedInfant, { replace: true });
   };
 
   const handlePersonalUpdate = () => {
@@ -993,7 +1142,7 @@ export default function InfantManagement() {
     "whitespace-nowrap rounded-md px-2.5 shadow-none";
   const actionsColumnWidth = "10.5rem";
   const actionsColumnMinWidth = "10.5rem";
-  const buildColumnStyle = (width, minWidth = width) => ({
+  const buildColumnStyle = (width, minWidth = width) =>( {
     width,
     minWidth,
   });
@@ -1013,14 +1162,14 @@ export default function InfantManagement() {
       sortable: true,
       headerClassName: "whitespace-nowrap",
       cellClassName: "overflow-hidden whitespace-nowrap text-ellipsis",
-      render: (val, row) => (
+      render: (val, row) =>(
         <div
           className="truncate font-semibold leading-5 text-gray-900 dark:text-gray-100"
           title={`${row.first_name} ${row.last_name}`.trim()}
         >
           {row.first_name} {row.last_name}
-        </div>
-      ),
+        </div>)
+       ,
     },
     {
       key: "control_number",
@@ -1029,14 +1178,14 @@ export default function InfantManagement() {
       minWidth: "12.5rem",
       headerClassName: "whitespace-nowrap",
       cellClassName: "overflow-hidden whitespace-nowrap text-ellipsis",
-      render: (val, row) => (
+      render: (val, row) =>(
         <span
           className="inline-flex max-w-full truncate overflow-hidden rounded-md bg-gray-100 px-2 py-1 font-mono text-[11px] text-gray-600 dark:bg-gray-700 dark:text-gray-300"
           title={formatControlNumberDisplay(val, row.dob)}
         >
           {formatControlNumberDisplay(val, row.dob)}
-        </span>
-      ),
+        </span>)
+       ,
     },
     {
       key: "dob",
@@ -1048,6 +1197,7 @@ export default function InfantManagement() {
       headerClassName: "whitespace-nowrap",
       cellClassName: "whitespace-nowrap",
       type: "date",
+      render: (val) => formatInfantDobShort(val),
     },
     {
       key: "sex",
@@ -1063,11 +1213,11 @@ export default function InfantManagement() {
           val === "male" || val === "M" || val?.toLowerCase() === "male";
         const isFemale =
           val === "female" || val === "F" || val?.toLowerCase() === "female";
-        return (
+        return(
           <Badge variant={isMale ? "info" : "primary"}>
             {isMale ? "Male" : isFemale ? "Female" : "Other"}
-          </Badge>
-        );
+          </Badge>)
+         ;
       },
     },
     {
@@ -1085,22 +1235,22 @@ export default function InfantManagement() {
         if (parents.length === 0 && row.guardian_name) {
           parents.push(row.guardian_name);
         }
-        return (
+        return(
           <div
             className="space-y-0.5 overflow-hidden text-[13px] leading-5"
             title={parents.join("\n")}
           >
-            {parents.length > 0 ? (
-              parents.map((p, i) => (
+            {parents.length > 0 ?
+                         (parents.map((p,i)=>(
                 <div key={i} className="truncate text-gray-700 dark:text-gray-300">
                   {p}
-                </div>
-              ))
-            ) : (
-              <span className="text-gray-400">Not specified</span>
-            )}
-          </div>
-        );
+                </div>)
+               ))
+              :(
+              <span className="text-gray-400">Not specified</span>)
+             }
+          </div>)
+         ;
       },
     },
     {
@@ -1113,14 +1263,14 @@ export default function InfantManagement() {
       render: (val, row) => {
         const contactValue =
           row.cellphone_number || row.guardian_phone || "Not specified";
-        return (
+        return(
           <div
             className="truncate text-[13px] leading-5 text-gray-700 dark:text-gray-300"
             title={contactValue}
           >
             {contactValue}
-          </div>
-        );
+          </div>)
+         ;
       },
     },
     {
@@ -1138,10 +1288,10 @@ export default function InfantManagement() {
         const workflowMeta =
           WORKFLOW_STATUS_META[workflowStatus] || WORKFLOW_STATUS_META.up_to_date;
 
-        return (
+        return(
           <div className="space-y-1">
             <Badge variant={workflowMeta.variant}>{workflowMeta.label}</Badge>
-            {row.latest_transfer_case_status && (
+            {row.latest_transfer_case_status &&(
               <div>
                 <Badge
                   variant={
@@ -1152,10 +1302,10 @@ export default function InfantManagement() {
                   {TRANSFER_STATUS_META[row.latest_transfer_case_status]?.label ||
                     row.latest_transfer_case_status}
                 </Badge>
-              </div>
-            )}
-          </div>
-        );
+              </div>)
+             }
+          </div>)
+         ;
       },
     },
     {
@@ -1167,13 +1317,13 @@ export default function InfantManagement() {
       filterPanelAlignment: "right",
       headerClassName: "whitespace-nowrap",
       cellClassName: "whitespace-nowrap",
-      render: (val, row) => (
+      render: (val, row) =>(
         <div className="space-y-0.5 text-[13px] leading-5 text-gray-700 dark:text-gray-300">
           <div>Completed: {Number(row.completed_vaccinations || 0)}</div>
           <div>Pending: {Number(row.pending_vaccinations || 0)}</div>
           <div>Imported: {Number(row.imported_vaccinations || 0)}</div>
-        </div>
-      ),
+        </div>)
+       ,
     },
     {
       key: "latest_transfer_source_facility",
@@ -1182,18 +1332,18 @@ export default function InfantManagement() {
       minWidth: "8.5rem",
       headerClassName: "whitespace-nowrap",
       cellClassName: "overflow-hidden whitespace-nowrap text-ellipsis",
-      render: (val) => (
+      render: (val) =>(
         <div
           className="truncate text-[13px] leading-5 text-gray-700 dark:text-gray-300"
           title={val || "—"}
         >
           {val || "—"}
-        </div>
-      ),
+        </div>)
+       ,
     },
   ];
 
-  const tableActions = (row) => (
+  const tableActions = (row) =>(
     <div className="ml-auto flex max-w-[10.5rem] flex-row flex-wrap items-center justify-end gap-1.5">
       <Button
         variant="primary"
@@ -1244,8 +1394,8 @@ export default function InfantManagement() {
       >
         Ready
       </Button>
-    </div>
-  );
+    </div>)
+   ;
 
   const compactFieldClassName =
     "w-full rounded-md border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
@@ -1273,7 +1423,7 @@ export default function InfantManagement() {
     const panelAlignmentClassName =
       column.filterPanelAlignment === "right" ? "right-0" : "left-0";
 
-    return (
+    return(
       <div
         className={`absolute ${panelAlignmentClassName} top-full z-[1000] mt-2 w-72 rounded-xl border border-gray-200 bg-white p-3 text-left normal-case tracking-normal shadow-xl dark:border-gray-700 dark:bg-gray-800`}
         onClick={(event) => event.stopPropagation()}
@@ -1289,7 +1439,7 @@ export default function InfantManagement() {
           </p>
         </div>
 
-        {column.key === "name" && (
+        {column.key === "name" &&(
           <div className="space-y-3">
             <input
               type="text"
@@ -1306,10 +1456,10 @@ export default function InfantManagement() {
               aria-label="Filter infant name"
               autoFocus
             />
-          </div>
-        )}
+          </div>)
+         }
 
-        {column.key === "dob" && (
+        {column.key === "dob" &&(
           <div className="space-y-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">
@@ -1319,7 +1469,7 @@ export default function InfantManagement() {
                 type="date"
                 value={filterDraft?.start || ""}
                 onChange={(event) =>
-                  handleColumnFilterDraftChange((previousDraft) => ({
+                  handleColumnFilterDraftChange((previousDraft) =>( {
                     ...(previousDraft || {}),
                     start: event.target.value,
                   }))
@@ -1336,7 +1486,7 @@ export default function InfantManagement() {
                 type="date"
                 value={filterDraft?.end || ""}
                 onChange={(event) =>
-                  handleColumnFilterDraftChange((previousDraft) => ({
+                  handleColumnFilterDraftChange((previousDraft) =>( {
                     ...(previousDraft || {}),
                     end: event.target.value,
                   }))
@@ -1345,15 +1495,15 @@ export default function InfantManagement() {
                 aria-label="Date of birth end"
               />
             </div>
-          </div>
-        )}
+          </div>)
+         }
 
-        {column.key === "sex" && (
+        {column.key === "sex" &&(
           <div className="space-y-2">
             {[
               { value: "male", label: "Male" },
               { value: "female", label: "Female" },
-            ].map((option) => (
+            ].map((option) =>(
               <label
                 key={option.value}
                 className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700/60"
@@ -1365,14 +1515,14 @@ export default function InfantManagement() {
                   className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
                 <span>{option.label}</span>
-              </label>
-            ))}
-          </div>
-        )}
+              </label>)
+             )}
+          </div>)
+         }
 
-        {column.key === "workflow_status" && (
+        {column.key === "workflow_status" &&(
           <div className="space-y-2">
-            {Object.entries(WORKFLOW_STATUS_META).map(([workflowKey, workflowMeta]) => (
+            {Object.entries(WORKFLOW_STATUS_META).map(([workflowKey, workflowMeta]) =>(
               <label
                 key={workflowKey}
                 className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700/60"
@@ -1386,12 +1536,12 @@ export default function InfantManagement() {
                   className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
                 <span>{workflowMeta.label}</span>
-              </label>
-            ))}
-          </div>
-        )}
+              </label>)
+             )}
+          </div>)
+         }
 
-        {column.key === "vaccination_progress" && (
+        {column.key === "vaccination_progress" &&(
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -1403,7 +1553,7 @@ export default function InfantManagement() {
                   min="0"
                   value={filterDraft?.min ?? ""}
                   onChange={(event) =>
-                    handleColumnFilterDraftChange((previousDraft) => ({
+                    handleColumnFilterDraftChange((previousDraft) =>( {
                       ...(previousDraft || {}),
                       min: event.target.value,
                       preset: "",
@@ -1423,7 +1573,7 @@ export default function InfantManagement() {
                   min="0"
                   value={filterDraft?.max ?? ""}
                   onChange={(event) =>
-                    handleColumnFilterDraftChange((previousDraft) => ({
+                    handleColumnFilterDraftChange((previousDraft) =>( {
                       ...(previousDraft || {}),
                       max: event.target.value,
                       preset: "",
@@ -1442,7 +1592,7 @@ export default function InfantManagement() {
               <div className="flex flex-wrap gap-2">
                 {VACCINATION_PROGRESS_PRESETS.map((preset) => {
                   const isActive = String(filterDraft?.preset || "") === preset.value;
-                  return (
+                  return(
                     <button
                       key={preset.value || "any"}
                       type="button"
@@ -1460,13 +1610,13 @@ export default function InfantManagement() {
                       }`}
                     >
                       {preset.label}
-                    </button>
-                  );
+                    </button>)
+                   ;
                 })}
               </div>
             </div>
-          </div>
-        )}
+          </div>)
+         }
 
         <div className="mt-4 flex items-center justify-end gap-2">
           <Button
@@ -1486,15 +1636,15 @@ export default function InfantManagement() {
             Filter
           </Button>
         </div>
-      </div>
-    );
+      </div>)
+     ;
   };
 
   const renderHeaderCellContent = (column) => {
     const activeSortForColumn = sortState.key === column.key ? sortState.direction : null;
     const activeFilterForColumn = isColumnFilterActive(column.key, columnFilters);
 
-    return (
+    return(
       <div
         className={`relative flex min-h-[1.5rem] items-center justify-between gap-2 ${
           activeFilterPanel === column.key ? "z-[1000]" : "z-10"
@@ -1503,7 +1653,7 @@ export default function InfantManagement() {
       >
         <span className="flex-1 leading-4">{column.label}</span>
         <div className="flex items-center gap-1">
-          {column.sortable && (
+          {column.sortable &&(
             <button
               type="button"
               onClick={() => handleSortToggle(column.key)}
@@ -1515,16 +1665,16 @@ export default function InfantManagement() {
               aria-label={`Sort ${column.label}`}
               title={`Sort ${column.label}`}
             >
-              {activeSortForColumn === "asc" ? (
-                <ArrowUp className="h-3.5 w-3.5" />
-              ) : activeSortForColumn === "desc" ? (
-                <ArrowDown className="h-3.5 w-3.5" />
-              ) : (
-                <ArrowUpDown className="h-3.5 w-3.5" />
-              )}
-            </button>
-          )}
-          {column.filterable && (
+              {activeSortForColumn === "asc" ?(
+                <ArrowUp className="h-3.5 w-3.5" />)
+                : activeSortForColumn === "desc" ?(
+                <ArrowDown className="h-3.5 w-3.5" />)
+                :(
+                <ArrowUpDown className="h-3.5 w-3.5" />)
+               }
+            </button>)
+           }
+          {column.filterable &&(
             <button
               type="button"
               onClick={() => openColumnFilterPanel(column.key)}
@@ -1537,27 +1687,27 @@ export default function InfantManagement() {
               title={`Filter ${column.label}`}
             >
               <Filter className="h-3.5 w-3.5" />
-            </button>
-          )}
+            </button>)
+           }
         </div>
         {renderColumnFilterPanel(column)}
-      </div>
-    );
+      </div>)
+     ;
   };
 
   if (loading) {
-    return (
+    return(
       <div className="flex flex-col items-center justify-center py-24">
         <LoadingSpinner size="lg" />
         <span className="mt-4 text-gray-600 dark:text-gray-400 font-medium">
           Loading infants...
         </span>
-      </div>
-    );
+      </div>)
+     ;
   }
 
   if (error) {
-    return (
+    return(
       <PageContainer>
         <Alert variant="error" title="Error loading infants">
           {error}
@@ -1567,12 +1717,12 @@ export default function InfantManagement() {
             </Button>
           </div>
         </Alert>
-      </PageContainer>
-    );
+      </PageContainer>)
+     ;
   }
 
 if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
-    return (
+    return(
       <div className="space-y-8 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
@@ -1603,7 +1753,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                     ?.label ||
                     "Workflow Active"}
                 </Badge>
-                {selectedInfant.latest_transfer_case_status && (
+                {selectedInfant.latest_transfer_case_status &&(
                   <Badge
                     variant={
                       TRANSFER_STATUS_META[selectedInfant.latest_transfer_case_status]
@@ -1612,8 +1762,8 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                   >
                     {TRANSFER_STATUS_META[selectedInfant.latest_transfer_case_status]
                       ?.label || selectedInfant.latest_transfer_case_status}
-                  </Badge>
-                )}
+                  </Badge>)
+                 }
               </div>
             </div>
           </div>
@@ -1628,7 +1778,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
 
           <div className="flex flex-wrap gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
             <button
-              onClick={() => setActiveView("personal")}
+              onClick={() => handleSelectInfantDetailView("personal")}
               className={`px-4 py-2 rounded-lg text-sm font-bold ${
                 activeView === "personal"
                   ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
@@ -1638,7 +1788,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
               Personal Record
             </button>
             <button
-              onClick={() => setActiveView("schedule")}
+              onClick={() => handleSelectInfantDetailView("schedule")}
               className={`px-4 py-2 rounded-lg text-sm font-bold ${
                 activeView === "schedule"
                   ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
@@ -1648,7 +1798,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
               Vaccine Schedule
             </button>
             <button
-              onClick={() => setActiveView("records")}
+              onClick={() => handleSelectInfantDetailView("records")}
               className={`px-4 py-2 rounded-lg text-sm font-bold ${
                 activeView === "records"
                   ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
@@ -1658,7 +1808,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
               Immunization Records
             </button>
             <button
-              onClick={() => setActiveView("chart")}
+              onClick={() => handleSelectInfantDetailView("chart")}
               className={`px-4 py-2 rounded-lg text-sm font-bold ${
                 activeView === "chart"
                   ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
@@ -1670,7 +1820,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
           </div>
         </div>
 
-        {activeView === "chart" ? (
+        {activeView === "chart" ?(
           <div className="animate-fade-in">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
@@ -1699,8 +1849,8 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
               </div>
             </div>
             <ImmunizationChart infantId={selectedInfant.id} />
-          </div>
-        ) : (
+          </div>)
+          :(
           <PageContainer
             title={
               activeView === "personal"
@@ -1711,21 +1861,21 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
             }
           >
             <div className="animate-fade-in">
-              {activeView === "schedule" && (
-                <VaccineScheduleBooklet infantId={selectedInfant.id} />
-              )}
-              {activeView === "records" && (
-                <ImmunizationRecordBooklet infantId={selectedInfant.id} />
-              )}
-              {activeView === "personal" && (
+              {activeView === "schedule" &&(
+                <VaccineScheduleBooklet infantId={selectedInfant.id} />)
+               }
+              {activeView === "records" &&(
+                <ImmunizationRecordBooklet infantId={selectedInfant.id} />)
+               }
+              {activeView === "personal" &&(
                 <InfantPersonalRecord
                   infantId={selectedInfant.id}
                   onUpdate={handlePersonalUpdate}
-                />
-              )}
+                />)
+               }
             </div>
-          </PageContainer>
-        )}
+          </PageContainer>)
+         }
 
         {/* Inject Vaccine Button */}
         <div className="fixed bottom-6 right-6">
@@ -1738,11 +1888,11 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
             <Syringe className="w-5 h-5" /> Record Vaccinations
           </Button>
         </div>
-      </div>
-    );
+      </div>)
+     ;
   }
 
-  return (
+  return(
     <div className="flex flex-col h-screen overflow-hidden">
       {/* Sticky Header Section - Stays fixed at top while scrolling */}
       <div className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6">
@@ -1753,7 +1903,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
             icon={activeView === "transfer-in" ? <BookOpen className="w-6 h-6" /> : <Baby className="w-6 h-6" />}
             actions={
               <div className="flex flex-wrap gap-2">
-                {activeView === "transfer-in" ? (
+                {activeView === "transfer-in" ?(
                   <>
                     <Button
                       onClick={() => {
@@ -1779,8 +1929,8 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                       <RefreshCw className={`w-4 h-4 ${transferCasesRefreshing ? "animate-spin" : ""}`} />
                       {transferCasesRefreshing ? "Refreshing..." : "Refresh"}
                     </Button>
-                  </>
-                ) : (
+                  </>)
+                  :(
                   <>
                     <Button
                       onClick={() => {
@@ -1808,8 +1958,8 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                     >
                       <Plus className="w-4 h-4" /> Add New Infant
                     </Button>
-                  </>
-                )}
+                  </>)
+                 }
               </div>
             }
           />
@@ -1817,15 +1967,15 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
       </div>
 
       <div className="flex-1 flex flex-col p-4 sm:px-6 sm:pb-6 pt-3 overflow-hidden">
-        {activeView === "transfer-in" ? (
+        {activeView === "transfer-in" ?(
           <div className="flex-1 min-h-0 overflow-hidden animate-fade-in -mx-4 sm:-mx-6 -mb-6 px-4 sm:px-6 pb-6">
             <TransferInCases
               ref={transferInCasesRef}
               showHeader={false}
               onRefreshStateChange={setTransferCasesRefreshing}
             />
-          </div>
-        ) : (
+          </div>)
+          :(
           <div className={`${contentShellClassName} flex-1 min-h-0`}>
             <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3.5">
@@ -1856,8 +2006,18 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                   placeholder="Search by name, control no, or contact..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-10 pr-9"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                  <X className="w-4 h-4" aria-hidden="true" />
+                </button>
+              )}
             </div>
             <div className="w-full sm:w-auto">
               <select
@@ -1873,7 +2033,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                 <option value="custom">Custom Range</option>
               </select>
             </div>
-            {period === "custom" && (
+            {period === "custom" &&(
               <>
                 <div className="w-full sm:w-auto sm:max-w-[180px]">
                   <Input
@@ -1891,13 +2051,13 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                     title="Registration date to"
                   />
                 </div>
-              </>
-            )}
+              </>)
+             }
             </div>
             <div className="flex items-center justify-between gap-3 sm:justify-start">
-              {refreshing && (
-                <span className="text-xs text-gray-500 dark:text-gray-400">Refreshing...</span>
-              )}
+              {refreshing &&(
+                <span className="text-xs text-gray-500 dark:text-gray-400">Refreshing...</span>)
+               }
               <Button
                 variant="secondary"
                 size="sm"
@@ -1920,9 +2080,9 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
               Registered Infants - Click to View Digital Booklets
             </h3>
           </div>
-          {activeFilterChips.length > 0 && (
+          {activeFilterChips.length > 0 &&(
             <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-5 py-3 dark:border-gray-700 dark:bg-gray-800">
-              {activeFilterChips.map((chip) => (
+              {activeFilterChips.map((chip) =>(
                 <span
                   key={chip.key}
                   className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-200"
@@ -1937,24 +2097,24 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                   >
                     <X className="h-3 w-3" />
                   </button>
-                </span>
-              ))}
-            </div>
-          )}
+                </span>)
+               )}
+            </div>)
+           }
           <div className="flex-1 overflow-auto auto-hide-scrollbar">
             <table className="relative min-w-[1320px] w-full table-fixed divide-y divide-gray-200 dark:divide-gray-700">
               <colgroup>
-                {columns.map((col) => (
+                {columns.map((col) =>(
                   <col
                     key={col.key}
                     style={buildColumnStyle(col.width, col.minWidth)}
-                  />
-                ))}
+                  />)
+                 )}
                 <col style={buildColumnStyle(actionsColumnWidth, actionsColumnMinWidth)} />
               </colgroup>
               <thead className="sticky top-0 z-10 overflow-visible bg-gray-50 shadow-sm dark:bg-gray-700">
                 <tr>
-                  {columns.map((col) => (
+                  {columns.map((col) =>(
                     <th
                       key={col.key}
                       scope="col"
@@ -1964,8 +2124,8 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                       } focus-within:z-[1200] ${col.headerClassName || ""}`}
                     >
                       {renderHeaderCellContent(col)}
-                    </th>
-                  ))}
+                    </th>)
+                   )}
                   <th
                     scope="col"
                     style={buildColumnStyle(actionsColumnWidth, actionsColumnMinWidth)}
@@ -1976,7 +2136,7 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredInfants.length === 0 ? (
+                {filteredInfants.length === 0 ?(
                   <tr>
                     <td colSpan={columns.length + 1} className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
                       <div className="flex flex-col items-center justify-center">
@@ -1988,11 +2148,11 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                         </p>
                       </div>
                     </td>
-                  </tr>
-                ) : (
-                  paginatedInfants.map((row) => (
+                  </tr>)
+                  :
+                                      (paginatedInfants.map((row)=>(
                     <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                      {columns.map((col, colIndex) => (
+                      {columns.map((col, colIndex) =>(
                         <td
                           key={col.key || colIndex}
                           style={buildColumnStyle(col.width, col.minWidth)}
@@ -2003,22 +2163,22 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                             : col.type === "date" && row[col.key]
                               ? new Date(row[col.key]).toLocaleDateString()
                               : row[col.key]}
-                        </td>
-                      ))}
+                        </td>)
+                       )}
                       <td
                         style={buildColumnStyle(actionsColumnWidth, actionsColumnMinWidth)}
                         className="overflow-hidden px-3 py-3 align-middle text-right text-sm font-medium"
                       >
                         {tableActions(row)}
                       </td>
-                    </tr>
-                  ))
-                )}
+                    </tr>)
+                   ))
+                 }
               </tbody>
             </table>
           </div>
 
-          {totalInfants > 0 && (
+          {totalInfants > 0 &&(
             <div className="flex flex-shrink-0 flex-col gap-3 border-t border-gray-200 bg-white px-5 py-3 dark:border-gray-700 dark:bg-gray-800 lg:flex-row lg:items-center lg:justify-between">
               <div className="text-sm text-gray-500">
                 {tableSummaryText}
@@ -2042,11 +2202,11 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                     className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                     aria-label="Rows per page"
                   >
-                    {ITEMS_PER_PAGE_OPTIONS.map((option) => (
+                    {ITEMS_PER_PAGE_OPTIONS.map((option) =>(
                       <option key={option} value={option}>
                         {option}
-                      </option>
-                    ))}
+                      </option>)
+                     )}
                   </select>
                 </div>
                 <div className="flex items-center gap-2">
@@ -2103,11 +2263,11 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                   </Button>
                 </div>
               </div>
-            </div>
-          )}
+            </div>)
+           }
         </div>
-          </div>
-        )}
+          </div>)
+         }
       </div>
 
       {/* Add Infant Modal */}
@@ -2145,6 +2305,6 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
           }
         }}
       />
-    </div>
-  );
+    </div>)
+   ;
 }

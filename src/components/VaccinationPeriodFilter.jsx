@@ -9,43 +9,73 @@ const VaccinationPeriodFilter = ({
   onPeriodChange,
   onStartDateChange,
   onEndDateChange,
+  periodOptions = PERIOD_OPTIONS,
   className = "",
+  periodLabel = "Period",
+  startDateLabel = "Start Date",
+  endDateLabel = "End Date",
+  layout = "inline",
 }) => {
+  const isStackedLayout = layout === "stacked";
+  const supportsCustomPeriod = periodOptions.some((option) => option.value === "custom");
+
   return (
-    <div className={`flex flex-wrap items-end gap-3 ${className}`.trim()}>
-      <div className="w-full sm:w-44 flex-shrink-0">
+    <div
+      className={`${
+        isStackedLayout
+          ? "space-y-3"
+          : "flex flex-wrap items-end gap-3"
+      } ${className}`.trim()}
+    >
+      <div
+        className={
+          isStackedLayout
+            ? "w-full"
+            : "w-full sm:w-44 flex-shrink-0"
+        }
+      >
         <Select
-          label="Period"
+          label={periodLabel}
           surface="light"
           value={period}
           onChange={(event) => onPeriodChange?.(event.target.value)}
-          options={PERIOD_OPTIONS}
+          options={periodOptions}
           containerClassName="mb-0"
         />
       </div>
 
-      {period === "custom" && (
-        <>
+      {supportsCustomPeriod && period === "custom" && (
+        <div
+          className={
+            isStackedLayout
+              ? "grid gap-3 sm:grid-cols-2"
+              : "contents"
+          }
+        >
           <div className="w-full sm:w-44 flex-shrink-0">
             <Input
-              label="Start Date"
+              label={startDateLabel}
               surface="light"
               type="date"
               value={startDate}
               onChange={(event) => onStartDateChange?.(event.target.value)}
             />
           </div>
-          <div className="hidden sm:block pb-2 text-gray-500 dark:text-gray-400">-</div>
+          {!isStackedLayout ? (
+            <div className="hidden sm:block pb-2 text-gray-500 dark:text-gray-400">
+              -
+            </div>
+          ) : null}
           <div className="w-full sm:w-44 flex-shrink-0">
             <Input
-              label="End Date"
+              label={endDateLabel}
               surface="light"
               type="date"
               value={endDate}
               onChange={(event) => onEndDateChange?.(event.target.value)}
             />
           </div>
-        </>
+        </div>
       )}
     </div>
   );

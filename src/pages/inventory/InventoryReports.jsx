@@ -1,12 +1,12 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import apiClient from "../utils/api";
+import { useNavigate } from "react-router-dom";import
+                      "../utils/api";
 import {
   Card,
   Button,
   PageHeader,
   Alert,
-  LoadingSpinner,
+
 } from "../../components/UI";
 import {
   FileText,
@@ -110,7 +110,7 @@ const InventoryReports = () => {
     },
   ];
 
-  return (
+  return(
     <div className="p-6 space-y-8">
       <PageHeader
         title="Inventory Reports"
@@ -118,29 +118,29 @@ const InventoryReports = () => {
         icon={<BarChart3 className="w-6 h-6" />}
       />
 
-      {error && (
+      {error &&(
         <Alert
           variant="error"
           title="Error generating report"
           onClose={() => setError(null)}
         >
           {error}
-        </Alert>
-      )}
+        </Alert>)
+       }
 
-      {success && (
+      {success &&(
         <Alert
           variant="success"
           title="Success"
           onClose={() => setSuccess(null)}
         >
           {success}
-        </Alert>
-      )}
+        </Alert>)
+       }
 
       {/* Report Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {reportTypes.map((report) => (
+        {reportTypes.map((report) =>(
           <Card
             key={report.id}
             className={`p-6 border-t-4 border-t-${report.color}-500 hover:shadow-lg transition-shadow`}
@@ -165,7 +165,7 @@ const InventoryReports = () => {
 
             {/* Mock Stats */}
             <div className="grid grid-cols-2 gap-4 mb-6">
-              {report.id === "stockSummary" && (
+              {report.id === "stockSummary" &&(
                 <>
                   <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg text-center">
                     <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -195,9 +195,9 @@ const InventoryReports = () => {
                       Expiring Soon
                     </p>
                   </div>
-                </>
-              )}
-              {report.id === "usageReport" && (
+                </>)
+               }
+              {report.id === "usageReport" &&(
                 <>
                   <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg text-center">
                     <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -221,9 +221,9 @@ const InventoryReports = () => {
                       Top Vaccines
                     </p>
                   </div>
-                </>
-              )}
-              {report.id === "expiryReport" && (
+                </>)
+               }
+              {report.id === "expiryReport" &&(
                 <>
                   <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg text-center">
                     <p className="text-2xl font-bold text-yellow-600">8</p>
@@ -245,8 +245,8 @@ const InventoryReports = () => {
                       Risk Level
                     </p>
                   </div>
-                </>
-              )}
+                </>)
+               }
             </div>
 
             <div className="flex gap-2">
@@ -256,15 +256,15 @@ const InventoryReports = () => {
                 disabled={generating === report.id}
                 className="flex-1 flex items-center justify-center gap-2"
               >
-                {generating === report.id ? (
+                {generating === report.id ?(
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" /> Generating...
-                  </>
-                ) : (
+                  </>)
+                  :(
                   <>
                     <FileText className="w-4 h-4" /> Generate
-                  </>
-                )}
+                  </>)
+                 }
               </Button>
               <Button
                 variant="secondary"
@@ -274,8 +274,8 @@ const InventoryReports = () => {
                 <Printer className="w-4 h-4" />
               </Button>
             </div>
-          </Card>
-        ))}
+          </Card>)
+         )}
       </div>
 
       {/* Recent Reports Section */}
@@ -321,7 +321,7 @@ const InventoryReports = () => {
                   date: "2025-12-15",
                   status: "Completed",
                 },
-              ].map((report, index) => (
+              ].map((report, index) =>(
                 <tr
                   key={index}
                   className="hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -356,8 +356,8 @@ const InventoryReports = () => {
                       <Download className="w-4 h-4" /> Download
                     </Button>
                   </td>
-                </tr>
-              ))}
+                </tr>)
+               )}
             </tbody>
           </table>
         </div>
@@ -372,8 +372,8 @@ const InventoryReports = () => {
           ← Back to Inventory Management
         </Button>
       </div>
-    </div>
-  );
+    </div>)
+   ;
 };
 
 export default InventoryReports;

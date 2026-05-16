@@ -1,13 +1,4 @@
-/**
- * Forgot Password Page
- * Password reset request page for users who forgot their password
- *
- * Features:
- * - Email input to request password reset
- * - Option to receive OTP via Email or SMS
- * - Connected to /api/auth/forgot-password/otp endpoint
- * - WCAG 2.1 AA compliant
- */
+// Password reset flow with email/SMS OTP.
 
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";

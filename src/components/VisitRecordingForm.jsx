@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Button, Input } from "./UI";
+import { normalizeRoleLabel } from "../utils/roleLabels";
 
 const VISIT_TIME_MIN = "07:00";
 const VISIT_TIME_MAX = "16:00";
@@ -36,7 +37,9 @@ const normalizeWorkerOption = (worker) => {
     return null;
   }
 
-  const roleLabel = String(worker?.roleLabel || worker?.role_name || worker?.role || "").trim();
+  const roleLabel = normalizeRoleLabel(
+    String(worker?.roleLabel || worker?.role_name || worker?.role || "").trim(),
+  );
 
   return {
     id: Number.isFinite(id) && id > 0 ? id : null,

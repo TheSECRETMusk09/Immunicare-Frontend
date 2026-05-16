@@ -23,9 +23,9 @@ const InfantCard = ({
   ).length;
 
   const getStatusEmoji = (rate) => {
-    if (rate >= 80) return "😊";
-    if (rate >= 50) return "😐";
-    return "😟";
+    if (rate >= 80) return "";
+    if (rate >= 50) return "";
+    return "";
   };
 
   const getStatusColor = (rate) => {
@@ -40,7 +40,6 @@ const InfantCard = ({
       <div className="flex justify-between items-start mb-4">
         <div>
           <h4 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2 text-lg">
-            <span className="text-2xl">{infant.sex === "M" ? "👦" : "👧"}</span>
             {infant.first_name} {infant.last_name}
           </h4>
           <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -111,7 +110,6 @@ const InfantCard = ({
                 key={index}
                 className="flex items-center gap-2 text-xs p-2 bg-gray-50 dark:bg-gray-700 rounded"
               >
-                <span className="text-green-600">💉</span>
                 <span className="font-medium text-gray-900 dark:text-gray-100">
                   {vaccine.vaccine_name}
                 </span>
@@ -153,11 +151,17 @@ const getComplianceRate = (
   vaccinationSchedules
 ) => {
   const infantRecords = vaccinationRecords.filter(
-    (r) => r.infant_id === infantId && r.admin_date
+    (r) => r.infant_id === infantId
   );
-  const completed = infantRecords.length;
-  const totalExpected = vaccinationSchedules.length * 2; // Average 2 doses per vaccine
-  return totalExpected > 0 ? Math.round((completed / totalExpected) * 100) : 0;
+  const completed = infantRecords.filter((r) => r.admin_date).length;
+  const overdue = infantRecords.filter(
+    (r) => !r.admin_date && String(r.status || "").toLowerCase() === "overdue"
+  ).length;
+  const due = infantRecords.filter(
+    (r) => !r.admin_date && ["due", "due_soon"].includes(String(r.status || "").toLowerCase())
+  ).length;
+  const progressTotal = completed + overdue + due;
+  return progressTotal > 0 ? Math.round((completed / progressTotal) * 100) : 0;
 };
 
 const getNextVaccines = (

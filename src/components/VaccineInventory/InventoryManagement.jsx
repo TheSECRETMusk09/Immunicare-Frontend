@@ -8,9 +8,9 @@ import {
   Plus,
   Edit,
   Trash2,
-  RefreshCw,
-  Download,
-  Upload,
+
+  Download ,
+
 } from "lucide-react";
 import { useInventory } from "../../hooks/useInventory";
 
@@ -19,18 +19,18 @@ export const InventoryManagement = () => {
     inventory,
     lowStockAlerts,
     expiryAlerts,
-    loading,
-    error,
+
+
     addStock,
     updateStock,
     deleteStock,
-    transferStock,
+
     getInventoryReport,
   } = useInventory();
 
   const [selectedVaccine, setSelectedVaccine] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [         , setIsEditing] = useState(false);
   const [modalType, setModalType] = useState("add"); // 'add', 'edit', 'transfer'
   const [formData, setFormData] = useState({
     vaccineName: "",
@@ -105,7 +105,7 @@ export const InventoryManagement = () => {
 
   const getStockStatus = (vaccine) => {
     const daysUntilExpiry = Math.ceil(
-      (new Date(vaccine.expiryDate) - new Date()) / (1000 * 60 * 60 * 24),
+      (new Date(vaccine.expiryDate) - new Date()) /( 1000 * 60 * 60 * 24),
     );
 
     if (vaccine.quantity <= vaccine.minLevel) return "danger";
@@ -117,7 +117,7 @@ export const InventoryManagement = () => {
 
   const getDaysUntilExpiry = (expiryDate) => {
     const days = Math.ceil(
-      (new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24),
+      (new Date(expiryDate) - new Date()) /( 1000 * 60 * 60 * 24),
     );
     if (days < 0) return "Expired";
     if (days === 0) return "Expires Today";
@@ -125,7 +125,7 @@ export const InventoryManagement = () => {
     return `${days} days`;
   };
 
-  const InventoryOverview = () => (
+  const InventoryOverview = () =>(
     <div className="space-y-6">
       {/* Alert Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -204,7 +204,7 @@ export const InventoryManagement = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {inventory.map((vaccine) => (
+              {inventory.map((vaccine) =>(
                 <tr key={vaccine.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -272,19 +272,19 @@ export const InventoryManagement = () => {
                       Delete
                     </Button>
                   </td>
-                </tr>
-              ))}
+                </tr>)
+               )}
             </tbody>
           </table>
         </div>
       </Card>
-    </div>
-  );
+    </div>)
+   ;
 
-  const LowStockAlerts = () => (
+  const LowStockAlerts = () =>(
     <Card title="Low Stock Alerts">
       <div className="space-y-4">
-        {lowStockAlerts.map((alert, index) => (
+        {lowStockAlerts.map((alert, index) =>(
           <div
             key={index}
             className="flex items-center justify-between p-4 border border-red-200 rounded-lg bg-red-50"
@@ -308,21 +308,21 @@ export const InventoryManagement = () => {
                 View Details
               </Button>
             </div>
-          </div>
-        ))}
-        {lowStockAlerts.length === 0 && (
+          </div>)
+         )}
+        {lowStockAlerts.length === 0 &&(
           <div className="text-center py-8 text-gray-500">
             No low stock alerts at this time
-          </div>
-        )}
+          </div>)
+         }
       </div>
-    </Card>
-  );
+    </Card>)
+   ;
 
-  const ExpiryAlerts = () => (
+  const ExpiryAlerts = () =>(
     <Card title="Expiry Alerts">
       <div className="space-y-4">
-        {expiryAlerts.map((alert, index) => (
+        {expiryAlerts.map((alert, index) =>(
           <div
             key={index}
             className="flex items-center justify-between p-4 border border-yellow-200 rounded-lg bg-yellow-50"
@@ -346,18 +346,18 @@ export const InventoryManagement = () => {
                 Transfer
               </Button>
             </div>
-          </div>
-        ))}
-        {expiryAlerts.length === 0 && (
+          </div>)
+         )}
+        {expiryAlerts.length === 0 &&(
           <div className="text-center py-8 text-gray-500">
             No expiry alerts at this time
-          </div>
-        )}
+          </div>)
+         }
       </div>
-    </Card>
-  );
+    </Card>)
+   ;
 
-  const StockTransactions = () => (
+  const StockTransactions = () =>(
     <Card title="Recent Stock Transactions">
       <div className="space-y-4">
         {/* This would be populated with actual transaction data */}
@@ -365,10 +365,10 @@ export const InventoryManagement = () => {
           Stock transaction history will be displayed here
         </div>
       </div>
-    </Card>
-  );
+    </Card>)
+   ;
 
-  return (
+  return(
     <div className="inventory-management space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
@@ -445,7 +445,7 @@ export const InventoryManagement = () => {
       {activeTab === "transactions" && <StockTransactions />}
 
       {/* Stock Management Modal */}
-      {showModal && (
+      {showModal &&(
         <Modal
           title={
             modalType === "add"
@@ -457,7 +457,7 @@ export const InventoryManagement = () => {
           onClose={() => setShowModal(false)}
           size="md"
         >
-          {modalType !== "transfer" ? (
+          {modalType !== "transfer" ?(
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Select
@@ -546,8 +546,8 @@ export const InventoryManagement = () => {
                   placeholder="2-8°C"
                 />
               </div>
-            </div>
-          ) : (
+            </div>)
+            :(
             <div className="space-y-4">
               <div className="p-4 bg-gray-50 rounded-lg">
                 <h4 className="font-semibold mb-2">Transfer Details</h4>
@@ -588,8 +588,8 @@ export const InventoryManagement = () => {
                 }
                 placeholder="e.g., Redistribution, Emergency supply"
               />
-            </div>
-          )}
+            </div>)
+           }
 
           <div className="form-actions-standardized">
             <Button
@@ -616,8 +616,8 @@ export const InventoryManagement = () => {
                   : "Transfer Stock"}
             </Button>
           </div>
-        </Modal>
-      )}
-    </div>
-  );
+        </Modal>)
+       }
+    </div>)
+   ;
 };

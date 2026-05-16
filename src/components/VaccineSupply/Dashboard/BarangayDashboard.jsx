@@ -180,7 +180,7 @@ const BarangayDashboard = () => {
       <div className="quick-links-grid mt-4">
         <Card className="quick-link-card">
           <Card.Body>
-            <h4>📦 Inventory</h4>
+            <h4>Inventory</h4>
             <p>Manage your vaccine stock</p>
             <Button
               variant="secondary"
@@ -194,7 +194,7 @@ const BarangayDashboard = () => {
 
         <Card className="quick-link-card">
           <Card.Body>
-            <h4>🌡️ Temperature</h4>
+            <h4>Temperature</h4>
             <p>Log and monitor temperatures</p>
             <Button
               variant="secondary"
@@ -208,7 +208,7 @@ const BarangayDashboard = () => {
 
         <Card className="quick-link-card">
           <Card.Body>
-            <h4>📋 Reports</h4>
+            <h4>Reports</h4>
             <p>Submit periodic reports</p>
             <Button
               variant="secondary"
@@ -222,7 +222,7 @@ const BarangayDashboard = () => {
 
         <Card className="quick-link-card">
           <Card.Body>
-            <h4>🚚 Allocations</h4>
+            <h4>Allocations</h4>
             <p>Track incoming vaccines</p>
             <Button
               variant="secondary"
@@ -243,19 +243,19 @@ const BarangayDashboard = () => {
         <Card.Body>
           <div className="activity-summary">
             <div className="activity-item">
-              <span className="activity-icon">📝</span>
+              <span className="activity-icon"></span>
               <span className="activity-text">
                 Recent Reports: {recentReports}
               </span>
             </div>
             <div className="activity-item">
-              <span className="activity-icon">📦</span>
+              <span className="activity-icon"></span>
               <span className="activity-text">
                 Pending Allocations: {pendingAllocations}
               </span>
             </div>
             <div className="activity-item">
-              <span className="activity-icon">📋</span>
+              <span className="activity-icon"></span>
               <span className="activity-text">
                 Pending Requests: {pendingRequests}
               </span>

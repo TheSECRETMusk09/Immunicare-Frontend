@@ -16,13 +16,13 @@
  */
 
 import React from "react";
-import { BrowserRouter, MemoryRouter } from "react-router-dom";
+import {                MemoryRouter } from "react-router-dom";
 import {
   render,
   screen,
   fireEvent,
   waitFor,
-  act,
+
   cleanup,
 } from "@testing-library/react";
 import "@testing-library/jest-dom";
@@ -103,16 +103,16 @@ const mockGuardianApi = {
 };
 
 // Mock components
-jest.mock("../pages/GuardianDashboard", () => ({
+jest.mock("../pages/GuardianDashboard", () =>( {
   __esModule: true,
-  default: () => (
+  default: () =>(
     <div data-testid="guardian-dashboard">
       <h1>Guardian Dashboard</h1>
-    </div>
-  ),
+    </div>)
+   ,
 }));
 
-jest.mock("../contexts/AuthContext", () => ({
+jest.mock("../contexts/AuthContext", () =>( {
   useAuth: () => mockGuardianContext,
 }));
 
@@ -274,9 +274,9 @@ describe("Guardian Dashboard - Child Card Buttons", () => {
 
       render(
         <ul>
-          {vaccinations.map((v, i) => (
-            <li key={i}>{v.vaccine} - {v.date}</li>
-          ))}
+          {vaccinations.map((v, i) =>(
+            <li key={i}>{v.vaccine} - {v.date}</li>)
+           )}
         </ul>
       );
 
@@ -383,9 +383,9 @@ describe("Guardian Dashboard - Appointment Buttons", () => {
 
       render(
         <select>
-          {children.map(c => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
+          {children.map(     (c
+
+          )               =>(<option key={c.id}value={c.id}>{c.name}</option>))}
         </select>
       );
 

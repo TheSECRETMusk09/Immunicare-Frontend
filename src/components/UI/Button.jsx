@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Children, cloneElement, isValidElement } from "react";
 import ActionSpinner from "./ActionSpinner";
 
 /**
@@ -20,6 +20,7 @@ const Button = ({
   size = "md",
   actionRole,
   leftIcon,
+  asChild = false,
   disabled = false,
   loading = false,
   onClick,
@@ -75,6 +76,40 @@ const Button = ({
         : "";
 
   const classes = `${baseClasses} ${variants[variant]} ${sizes[size]} ${formActionPadding} ${actionRoleClass} ${className}`;
+  const content = (
+    <>
+      {!loading && leftIcon ? leftIcon : null}
+      {loading && <ActionSpinner size="md" className="-ml-0.5 mr-2" />}
+      {asChild && isValidElement(children) ? children.props.children : children}
+    </>
+  );
+
+  if (asChild && isValidElement(children)) {
+    const child = Children.only(children);
+    const handleChildClick = (event) => {
+      if (disabled || loading) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
+      child.props.onClick?.(event);
+      onClick?.(event);
+    };
+
+    return cloneElement(child, {
+      ...props,
+      className: `${classes} ${child.props.className || ""}`.trim(),
+      onClick: handleChildClick,
+      "aria-busy": loading || undefined,
+      "aria-disabled": disabled || loading || undefined,
+      tabIndex:
+        disabled || loading
+          ? -1
+          : child.props.tabIndex,
+      children: content,
+    });
+  }
 
   return (
     <button
@@ -86,11 +121,7 @@ const Button = ({
       aria-disabled={disabled || loading}
       {...props}
     >
-      {!loading && leftIcon ? leftIcon : null}
-      {loading && (
-        <ActionSpinner size="md" className="-ml-0.5 mr-2" />
-      )}
-      {children}
+      {content}
     </button>
   );
 };

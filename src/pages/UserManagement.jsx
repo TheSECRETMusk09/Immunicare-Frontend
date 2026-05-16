@@ -39,11 +39,12 @@ import {
   Power,
   PowerOff,
   Search,
-  ArrowUpDown,
+  X,
 } from "lucide-react";
 import useUserManagementSocket from "../hooks/useUserManagementSocket";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { useDebounce } from "../hooks/usePerformance";
+import { normalizeRoleLabel } from "../utils/roleLabels";
 
 const toComparableTimestamp = (value) => {
   if (!value) {
@@ -67,6 +68,8 @@ const normalizeGuardianUsernameForDisplay = (value = "") =>
   String(value || "")
     .trim()
     .toLowerCase();
+
+const normalizeRoleName = (value) => String(value || "").trim().toLowerCase();
 
 const calculatePasswordStrength = (password) => {
   const checks = [
@@ -130,6 +133,29 @@ const PASSWORD_REQUIREMENT_DEFINITIONS = [
   },
 ];
 
+const ADD_USER_ROLE_DEFINITIONS = [
+  {
+    label: "System Administrator",
+    names: ["system_admin", "system administrator"],
+  },
+  {
+    label: "Physician",
+    names: ["physician"],
+  },
+  {
+    label: "Healthcare Worker",
+    names: ["health_worker", "healthcare worker"],
+  },
+  {
+    label: "Nurse",
+    names: ["nurse"],
+  },
+  {
+    label: "Midwife",
+    names: ["midwife"],
+  },
+];
+
 const resolveUserManagementTab = (value) => {
   const normalized = String(value || "").trim().toLowerCase();
   return USER_MANAGEMENT_TABS.has(normalized) ? normalized : "admins";
@@ -153,16 +179,6 @@ const USER_FORM_INITIAL_STATE = {
   clinic_id: "",
   contact: "",
   password: "",
-};
-
-const ADMIN_FORM_INITIAL_STATE = {
-  username: "",
-  email: "",
-  contact: "",
-  role_id: "",
-  clinic_id: "",
-  password: "",
-  confirmPassword: "",
 };
 
 const GUARDIAN_PHONE_REGEX = /^(\+63|0)\d{10}$/;
@@ -216,7 +232,6 @@ export default function UserManagement() {
   );
   const [showModal, setShowModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [showAddAdminModal, setShowAddAdminModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [selectedUserForPassword, setSelectedUserForPassword] = useState(null);
   const [passwordFormData, setPasswordFormData] = useState({
@@ -225,16 +240,9 @@ export default function UserManagement() {
   });
   const [passwordResetErrors, setPasswordResetErrors] = useState({});
   const [passwordResetFormError, setPasswordResetFormError] = useState("");
-  const [adminFormData, setAdminFormData] = useState({
-    ...ADMIN_FORM_INITIAL_STATE,
-  });
   const [formData, setFormData] = useState({
     ...USER_FORM_INITIAL_STATE,
   });
-
-  // Sorting state
-  const [sortField, setSortField] = useState("created_at");
-  const [sortDirection, setSortDirection] = useState("desc");
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -244,7 +252,6 @@ export default function UserManagement() {
   const [endDate, setEndDate] = useState("");
 
   // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
   const [systemCurrentPage, setSystemCurrentPage] = useState(1);
   const [guardianCurrentPage, setGuardianCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -301,8 +308,6 @@ export default function UserManagement() {
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [formTouched, setFormTouched] = useState({});
-  const [adminFormErrors, setAdminFormErrors] = useState({});
-  const [adminFormTouched, setAdminFormTouched] = useState({});
 
   const currentClinicId = useMemo(
     () => resolveClinicId(user?.clinic_id, user?.facility_id, clinics?.[0]?.id),
@@ -348,16 +353,6 @@ export default function UserManagement() {
     ],
   );
 
-  const resolvedAdminFormClinicId = useMemo(
-    () => resolveClinicId(adminFormData.clinic_id, currentClinicId),
-    [adminFormData.clinic_id, currentClinicId],
-  );
-
-  const resolvedAdminFormClinicName = useMemo(
-    () => resolveClinicName(resolvedAdminFormClinicId, user?.clinic_name),
-    [resolveClinicName, resolvedAdminFormClinicId, user?.clinic_name],
-  );
-
   const passwordRequirementItems = useMemo(
     () =>
       PASSWORD_REQUIREMENT_DEFINITIONS.map((requirement) => ({
@@ -373,13 +368,6 @@ export default function UserManagement() {
     setFormData({ ...USER_FORM_INITIAL_STATE });
     setFormErrors({});
     setFormTouched({});
-  }, []);
-
-  const closeAdminModal = useCallback(() => {
-    setShowAddAdminModal(false);
-    setAdminFormData({ ...ADMIN_FORM_INITIAL_STATE });
-    setAdminFormErrors({});
-    setAdminFormTouched({});
   }, []);
 
   // Guardian relationship options
@@ -403,18 +391,40 @@ export default function UserManagement() {
     { value: "other", label: "Other" },
   ];
 
-  const ADMIN_ROLE_NAMES = useMemo(
-    () => new Set(["super_admin", "system_admin", "admin", "administrator"]),
+  const ADMIN_TAB_ROLE_NAMES = useMemo(
+    () => new Set(["system_admin", "system administrator", "admin", "administrator"]),
+    [],
+  );
+
+  const REMOVED_ROLES = useMemo(
+    () => new Set(["guardian", "health_worker", "inventory_manager", "clinic_manager", "dentist", "nutritionist"]),
     [],
   );
 
   const staffRoles = useMemo(
     () =>
       (Array.isArray(roles) ? roles : []).filter(
-        (role) => String(role?.name || "").trim().toLowerCase() !== "guardian",
+        (role) => !REMOVED_ROLES.has(normalizeRoleName(role?.name)),
       ),
-    [roles],
+    [roles, REMOVED_ROLES],
   );
+
+  const systemAdminRoleOption = useMemo(() => {
+    const systemAdministratorRole = (Array.isArray(roles) ? roles : []).find(
+      (role) =>
+        normalizeRoleName(role?.name) === "system_admin" ||
+        normalizeRoleName(role?.name) === "system administrator",
+    );
+
+    if (!systemAdministratorRole) {
+      return null;
+    }
+
+    return {
+      value: String(systemAdministratorRole.id),
+      label: "System Administrator",
+    };
+  }, [roles]);
 
   const staffRoleNameById = useMemo(() => {
     const roleMap = new Map();
@@ -429,11 +439,6 @@ export default function UserManagement() {
     [roleFilter, staffRoleNameById],
   );
 
-  const adminRoleCsv = useMemo(
-    () => Array.from(ADMIN_ROLE_NAMES).join(","),
-    [ADMIN_ROLE_NAMES],
-  );
-
   const guardianQueryParams = useMemo(
     () => ({
       page: guardianCurrentPage,
@@ -446,11 +451,9 @@ export default function UserManagement() {
   );
 
   const systemUserQueryParams = useMemo(() => {
-    const isAdminTab = activeTab === "admins";
     const isSystemTab = activeTab === "system";
-    const queryPage = isAdminTab ? currentPage : systemCurrentPage;
     const params = {
-      page: queryPage,
+      page: systemCurrentPage,
       limit: itemsPerPage,
       include_guardians: false,
       search: debouncedSearchQuery || undefined,
@@ -459,25 +462,17 @@ export default function UserManagement() {
       is_active: statusFilter ? String(statusFilter === "active") : undefined,
     };
 
-    if (isAdminTab) {
-      params.roles = selectedRoleName || adminRoleCsv;
-      params.sort_field = sortField;
-      params.sort_direction = sortDirection;
-    } else if (isSystemTab && selectedRoleName) {
+    if (isSystemTab && selectedRoleName) {
       params.roles = selectedRoleName;
     }
 
     return params;
   }, [
     activeTab,
-    adminRoleCsv,
-    currentPage,
     debouncedSearchQuery,
     endDate,
     itemsPerPage,
     selectedRoleName,
-    sortDirection,
-    sortField,
     startDate,
     statusFilter,
     systemCurrentPage,
@@ -564,35 +559,84 @@ export default function UserManagement() {
     });
   }, [systemUsers]);
 
-  const roleFilterOptions = useMemo(() => {
-    const sourceRoles =
-      activeTab === "admins"
-        ? staffRoles.filter((role) =>
-            ADMIN_ROLE_NAMES.has(String(role?.name || "").trim().toLowerCase()),
-          )
-        : staffRoles;
-
-    return sourceRoles.map((role) => ({
-      value: String(role.id),
-      label: role.display_name || role.name,
-    }));
-  }, [ADMIN_ROLE_NAMES, activeTab, staffRoles]);
-
-  const addStaffRoleOptions = useMemo(
+  const adminRoleFilterOptions = useMemo(
     () =>
       staffRoles
-        .filter((role) => !["guardian", "super_admin", "admin"].includes(String(role?.name || "").trim().toLowerCase()))
+        .filter((role) => ADMIN_TAB_ROLE_NAMES.has(normalizeRoleName(role?.name)))
         .map((role) => ({
           value: String(role.id),
-          label: role.display_name || role.name,
+          label: normalizeRoleLabel(role.display_name || role.name),
         })),
-    [staffRoles],
+    [ADMIN_TAB_ROLE_NAMES, staffRoles],
   );
 
-  const admins = normalizedSystemUsers;
+  const roleFilterOptions = useMemo(() => {
+    if (activeTab === "admins") {
+      return adminRoleFilterOptions;
+    }
+
+    return staffRoles.map((role) => ({
+      value: String(role.id),
+      label: normalizeRoleLabel(role.display_name || role.name),
+    }));
+  }, [activeTab, adminRoleFilterOptions, staffRoles]);
+
+  const addUserRoleOptions = useMemo(
+    () =>
+      ADD_USER_ROLE_DEFINITIONS.map((roleDefinition) => {
+        const matchingRole = (Array.isArray(roles) ? roles : []).find((role) =>
+          roleDefinition.names.includes(normalizeRoleName(role?.name)),
+        );
+
+        if (!matchingRole) {
+          return null;
+        }
+
+        return {
+          value: String(matchingRole.id),
+          label: roleDefinition.label,
+        };
+      }).filter(Boolean),
+    [roles],
+  );
+
+  // FILTERED VIEW
+  const filteredAdminUsers = useMemo(() => {
+    const adminUsers = normalizedSystemUsers.filter((entry) =>
+      ADMIN_TAB_ROLE_NAMES.has(
+        normalizeRoleName(entry.normalized_role_name || entry.role_name),
+      ),
+    );
+
+    if (!selectedRoleName) {
+      return adminUsers;
+    }
+
+    return adminUsers.filter(
+      (entry) => normalizeRoleName(entry.role_name) === selectedRoleName,
+    );
+  }, [ADMIN_TAB_ROLE_NAMES, normalizedSystemUsers, selectedRoleName]);
+
   const filteredSystemUsers = normalizedSystemUsers;
-  const paginatedAdmins = normalizedSystemUsers;
-  const paginatedSystemUsers = normalizedSystemUsers;
+  const visibleSystemUsers =
+    activeTab === "admins" ? filteredAdminUsers : filteredSystemUsers; // FILTERED VIEW
+  const paginatedSystemUsers = visibleSystemUsers;
+  const adminTabCount = filteredAdminUsers.length; // FILTERED VIEW
+  const isSystemUserTab = activeTab === "admins" || activeTab === "system";
+  const activeSystemUserType = activeTab === "admins" ? "admin" : "system"; // FILTERED VIEW
+  const systemUserDisplayCount =
+    activeTab === "admins" ? adminTabCount : systemUserTotalCount; // FILTERED VIEW
+  const systemUserDisplayStart =
+    activeTab === "admins"
+      ? adminTabCount > 0
+        ? 1
+        : 0
+      : (systemCurrentPage - 1) * itemsPerPage + 1;
+  const systemUserDisplayEnd =
+    activeTab === "admins"
+      ? adminTabCount
+      : Math.min(systemCurrentPage * itemsPerPage, systemUserTotalCount);
+  const systemUserDisplayLabel = activeTab === "admins" ? "admins" : "users";
 
   const filteredGuardians = useMemo(() => {
     if (!Array.isArray(guardians)) {
@@ -635,7 +679,6 @@ export default function UserManagement() {
 
   const paginatedGuardians = filteredGuardians;
   const totalGuardianPages = guardianPagination?.totalPages || 0;
-  const totalAdminPages = systemUserPagination?.totalPages || 0;
   const totalSystemPages = systemUserPagination?.totalPages || 0;
 
   const activeListLoading =
@@ -644,20 +687,6 @@ export default function UserManagement() {
     activeTab === "guardians" ? guardiansIsFetching : systemUsersIsFetching;
   const activeListError =
     activeTab === "guardians" ? guardiansError : systemUsersError;
-
-  // Handle sorting
-  const handleSort = useCallback(
-    (field) => {
-      if (sortField === field) {
-        setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-      } else {
-        setSortField(field);
-        setSortDirection("asc");
-      }
-      setCurrentPage(1);
-    },
-    [sortField, sortDirection],
-  );
 
   // Handle toggle user active - with self-protection
   const handleToggleUserActive = async (user) => {
@@ -702,7 +731,6 @@ export default function UserManagement() {
     setStatusFilter("");
     setStartDate("");
     setEndDate("");
-    setCurrentPage(1);
     setSystemCurrentPage(1);
     setGuardianCurrentPage(1);
     setSearchParams((prev) => {
@@ -713,6 +741,8 @@ export default function UserManagement() {
   }, [setSearchParams]);
 
   const handleAddUser = useCallback((userType) => {
+    const isAdminView = userType === "admins";
+
     setEditingUser(null);
     setFormData({
       ...USER_FORM_INITIAL_STATE,
@@ -720,11 +750,12 @@ export default function UserManagement() {
         userType === "guardians" || !currentClinicId
           ? ""
           : String(currentClinicId),
+      role_id: isAdminView ? systemAdminRoleOption?.value || "" : "", // MERGED MODAL
     });
     setFormErrors({});
     setFormTouched({});
     setShowModal(true);
-  }, [currentClinicId]);
+  }, [currentClinicId, systemAdminRoleOption]);
 
   const handleEditUser = useCallback((user, userType) => {
     setEditingUser(user);
@@ -783,6 +814,21 @@ export default function UserManagement() {
     setFormTouched({});
     setShowModal(true);
   }, []);
+
+  useEffect(() => {
+    if (!showModal || editingUser || activeTab !== "admins") {
+      return;
+    }
+
+    if (formData.role_id || !systemAdminRoleOption?.value) {
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      role_id: systemAdminRoleOption.value,
+    })); // MERGED MODAL
+  }, [activeTab, editingUser, formData.role_id, showModal, systemAdminRoleOption]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -966,11 +1012,7 @@ export default function UserManagement() {
             throw new Error(createResult.error || "Failed to create user");
           }
 
-          if (activeTab === "admins") {
-            setCurrentPage(1);
-          } else {
-            setSystemCurrentPage(1);
-          }
+          setSystemCurrentPage(1); // FILTERED VIEW
           await invalidateSystemUserQueries();
           success("User created successfully!");
         }
@@ -1008,14 +1050,8 @@ export default function UserManagement() {
           throw new Error(deleteResult.error || "Failed to delete user");
         }
 
-        if (userType === "admin" && paginatedAdmins.length === 1 && currentPage > 1) {
-          setCurrentPage((page) => Math.max(1, page - 1));
-        } else if (
-          userType === "system" &&
-          paginatedSystemUsers.length === 1 &&
-          systemCurrentPage > 1
-        ) {
-          setSystemCurrentPage((page) => Math.max(1, page - 1));
+        if (paginatedSystemUsers.length === 1 && systemCurrentPage > 1) {
+          setSystemCurrentPage((page) => Math.max(1, page - 1)); // FILTERED VIEW
         }
 
         await invalidateSystemUserQueries();
@@ -1172,276 +1208,6 @@ export default function UserManagement() {
       setFormErrors((prev) => ({ ...prev, [name]: validationError }));
     }
   }, [validateField]);
-
-  const handleAdminChange = useCallback(
-    (e) => {
-      const { name, value } = e.target;
-      setAdminFormData((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
-      // Clear error when user starts typing
-      if (adminFormErrors[name]) {
-        setAdminFormErrors((prev) => ({ ...prev, [name]: null }));
-      }
-    },
-    [adminFormErrors],
-  );
-
-  // Validate admin form field
-  const validateAdminField = useCallback((name, value) => {
-    if (name === "username") {
-      if (!value || value.trim() === "") return "Username is required";
-      if (value.trim().length < 3) return "Must be at least 3 characters";
-    }
-    if (name === "email" && !isValidOptionalEmail(value)) {
-      return "Please enter a valid email address";
-    }
-    if (name === "role_id") {
-      if (!value) return "Please select a role";
-    }
-    if (name === "password") {
-      if (!value) return "Password is required";
-      if (calculatePasswordStrength(value) < 4) return "Password must meet strength requirements (8+ chars, mixed case, numbers, symbols)";
-    }
-    if (name === "confirmPassword") {
-      if (!value) return "Please confirm password";
-      if (value !== adminFormData.password) return "Passwords do not match";
-    }
-    return null;
-  }, [adminFormData.password]);
-
-  // Handle blur for admin form real-time validation
-  const handleAdminBlur = useCallback((e) => {
-    const { name, value } = e.target;
-    setAdminFormTouched((prev) => ({ ...prev, [name]: true }));
-    const validationError = validateAdminField(name, value);
-    if (validationError) {
-      setAdminFormErrors((prev) => ({ ...prev, [name]: validationError }));
-    }
-  }, [validateAdminField]);
-
-  const handleAddAdmin = useCallback(() => {
-    setAdminFormData({
-      ...ADMIN_FORM_INITIAL_STATE,
-      clinic_id: currentClinicId ? String(currentClinicId) : "",
-    });
-    setAdminFormErrors({});
-    setAdminFormTouched({});
-    setShowAddAdminModal(true);
-  }, [currentClinicId]);
-
-  const handleSubmitAdmin = async (e) => {
-    e.preventDefault();
-
-    const validationErrors = {
-      username: validateAdminField("username", adminFormData.username),
-      email: validateAdminField("email", adminFormData.email),
-      role_id: validateAdminField("role_id", adminFormData.role_id),
-      password: validateAdminField("password", adminFormData.password),
-      confirmPassword: validateAdminField(
-        "confirmPassword",
-        adminFormData.confirmPassword,
-      ),
-    };
-
-    const nextErrors = Object.entries(validationErrors).reduce(
-      (acc, [field, value]) => {
-        if (value) {
-          acc[field] = value;
-        }
-        return acc;
-      },
-      {},
-    );
-
-    if (Object.keys(nextErrors).length > 0) {
-      setAdminFormErrors(nextErrors);
-      setAdminFormTouched((prev) => ({
-        ...prev,
-        ...Object.keys(nextErrors).reduce((acc, key) => {
-          acc[key] = true;
-          return acc;
-        }, {}),
-      }));
-      warning(
-        nextErrors.confirmPassword ||
-          nextErrors.password ||
-          nextErrors.username ||
-          nextErrors.role_id ||
-          "Please review the admin account details before submitting.",
-      );
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const resolvedClinicId = resolveClinicId(
-        adminFormData.clinic_id,
-        currentClinicId,
-      );
-
-      if (!resolvedClinicId) {
-        throw new Error("Unable to resolve a clinic for this admin account.");
-      }
-
-      const userData = {
-        username: String(adminFormData.username || "").trim(),
-        role_id: parseInt(adminFormData.role_id, 10),
-        clinic_id: resolvedClinicId,
-        contact: String(adminFormData.contact || "").trim(),
-        password: adminFormData.password,
-      };
-
-      const result = await createUser(userData);
-      if (result.success) {
-        setCurrentPage(1);
-        await invalidateSystemUserQueries();
-        success("Admin account created successfully!");
-        closeAdminModal();
-      } else {
-        notifyError(result.error || "Error creating admin account");
-      }
-    } catch (error) {
-      console.error("Error creating admin account:", error);
-      notifyError(error.message || "Error creating admin account");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const adminColumns = [
-    {
-      key: "username",
-      label: "Username",
-      sortable: true,
-      render: (val, row) => (
-        <div className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-          <ShieldAlert className="w-4 h-4 text-danger-500" />
-          {val}
-        </div>
-      ),
-    },
-    {
-      key: "role_name",
-      label: "Admin Role",
-      sortable: true,
-      render: (val, row) => (
-        <Badge
-          variant={
-            String(row.role_name || "").trim().toLowerCase() === "super_admin"
-              ? "danger"
-              : "warning"
-          }
-        >
-          {row.display_name || val}
-        </Badge>
-      ),
-    },
-    {
-      key: "clinic_name",
-      label: "Clinic",
-      sortable: true,
-    },
-    {
-      key: "contact",
-      label: "Contact",
-      sortable: true,
-      render: (val) => val || <span className="text-gray-400 italic">N/A</span>,
-    },
-    {
-      key: "is_active",
-      label: "Status",
-      sortable: true,
-      render: (val) =>
-        val ? (
-          <Badge variant="success" className="flex items-center gap-1">
-            <Power className="w-3 h-3" /> Active
-          </Badge>
-        ) : (
-          <Badge variant="default" className="flex items-center gap-1">
-            <PowerOff className="w-3 h-3" /> Disabled
-          </Badge>
-        ),
-    },
-    {
-      key: "created_at",
-      label: "Created",
-      sortable: true,
-      render: (val) =>
-        val ? (
-          new Date(val).toLocaleDateString()
-        ) : (
-          <span className="text-gray-400 italic">N/A</span>
-        ),
-    },
-  ];
-
-  const adminActions = (row) => (
-    <div className="flex items-center justify-start gap-1">
-      <Button
-        variant={row.is_active ? "warning" : "success"}
-        size="xs"
-        onClick={() => handleToggleUserActive(row)}
-        className="p-1.5"
-        title={
-          String(row.id) === String(currentUserId)
-            ? "You cannot disable your own account"
-            : row.is_active
-              ? "Disable User"
-              : "Enable User"
-        }
-        disabled={isTogglingActive || String(row.id) === String(currentUserId)}
-        aria-label={row.is_active ? "Disable user" : "Enable user"}
-      >
-        {row.is_active ? (
-          <PowerOff className="w-3.5 h-3.5" />
-        ) : (
-          <Power className="w-3.5 h-3.5" />
-        )}
-      </Button>
-      <Button
-        variant="info"
-        size="xs"
-        onClick={() => openPasswordResetModal(row)}
-        className="p-1.5"
-        title="Reset Password"
-        aria-label="Reset password"
-        disabled={isResettingPassword}
-      >
-        <Key className="w-3.5 h-3.5" />
-      </Button>
-      <Button
-        variant="success"
-        size="xs"
-        onClick={() => handleEditUser(row, "admin")}
-        className="p-1.5"
-        title="Edit User"
-        aria-label="Edit user"
-      >
-        <Edit className="w-3.5 h-3.5" />
-      </Button>
-      {canManageAdmins && (
-        <LoadingButton
-          variant="danger"
-          size="xs"
-          onClick={() => handleDeleteUser(row, "admin")}
-          loading={isDeleting}
-          className="p-1.5"
-          title={
-            String(row.id) === String(currentUserId)
-              ? "You cannot delete your own account"
-              : "Delete User"
-          }
-          aria-label="Delete user"
-          disabled={String(row.id) === String(currentUserId)}
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </LoadingButton>
-      )}
-    </div>
-  );
 
   const guardianColumns = [
     {
@@ -1648,18 +1414,18 @@ export default function UserManagement() {
         <PageHeader
         title="User Management"
         subtitle="Manage admins, system users, and guardians"
-        icon="👥"
+        icon=""
         actions={
           <div className="flex gap-2">
             {activeTab === "admins" && canManageAdmins && canCreateUsers && (
               <Button
-                onClick={handleAddAdmin}
+                onClick={() => handleAddUser("admins")}
                 variant="primary"
                 className="flex items-center gap-2"
                 disabled={isSubmitting}
               >
                 <ShieldAlert className="w-4 h-4" />
-                Add New Admin
+                Add New User
               </Button>
             )}
             {activeTab === "system" && isAdmin && canCreateUsers && (
@@ -1670,7 +1436,7 @@ export default function UserManagement() {
                 disabled={isSubmitting}
               >
                 <UserPlus className="w-4 h-4" />
-                Add New Staff
+                Add New User
               </Button>
             )}
             {activeTab === "guardians" && canCreateUsers && (
@@ -1715,7 +1481,6 @@ export default function UserManagement() {
                 : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
             }`}
           >
-            <span className="text-lg">🛡️</span>
             <span>
               System Users
               {activeTab === "system" ? ` (${systemUserTotalCount || 0})` : ""}
@@ -1729,10 +1494,9 @@ export default function UserManagement() {
                 : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
             }`}
           >
-            <ShieldAlert className="w-4 h-4" />
             <span>
               Admins
-              {activeTab === "admins" ? ` (${systemUserTotalCount || 0})` : ""}
+              {activeTab === "admins" ? ` (${adminTabCount || 0})` : ""}
             </span>
           </button>
 
@@ -1744,7 +1508,6 @@ export default function UserManagement() {
                 : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
             }`}
           >
-            <span className="text-lg">👥</span>
             <span>
               Guardians
               {activeTab === "guardians" ? ` (${guardianTotalCount || 0})` : ""}
@@ -1768,12 +1531,25 @@ export default function UserManagement() {
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
-                  setCurrentPage(1);
                   setSystemCurrentPage(1);
                   setGuardianCurrentPage(1);
                 }}
-                className="w-full pl-9 pr-4 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full pl-9 pr-9 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setSystemCurrentPage(1);
+                    setGuardianCurrentPage(1);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                  <X className="w-4 h-4" aria-hidden="true" />
+                </button>
+              )}
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -1783,7 +1559,6 @@ export default function UserManagement() {
                 placeholder="Start date"
                 onChange={(e) => {
                   setStartDate(e.target.value);
-                  setCurrentPage(1);
                   setSystemCurrentPage(1);
                   setGuardianCurrentPage(1);
                 }}
@@ -1795,7 +1570,6 @@ export default function UserManagement() {
                 placeholder="End date"
                 onChange={(e) => {
                   setEndDate(e.target.value);
-                  setCurrentPage(1);
                   setSystemCurrentPage(1);
                   setGuardianCurrentPage(1);
                 }}
@@ -1808,7 +1582,6 @@ export default function UserManagement() {
                   value={roleFilter}
                   onChange={(e) => {
                     setRoleFilter(e.target.value);
-                    setCurrentPage(1);
                     setSystemCurrentPage(1);
                   }}
                   className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-32"
@@ -1825,7 +1598,6 @@ export default function UserManagement() {
                   value={statusFilter}
                   onChange={(e) => {
                     setStatusFilter(e.target.value);
-                    setCurrentPage(1);
                     setSystemCurrentPage(1);
                   }}
                   className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-32"
@@ -1843,166 +1615,9 @@ export default function UserManagement() {
       {/* Content based on active tab */}
       <div className="flex-1 min-h-0 flex flex-col animate-fade-in">
         <ErrorBoundary>
-        {activeTab === "admins" ? (
+        {isSystemUserTab ? (
           isAdmin ? (
-            admins.length === 0 ? (
-              <EmptyState
-                title="No admin accounts found"
-                description="There are no administrator accounts configured. Super admins can create new admin accounts."
-                icon="🛡️"
-                actionLabel={canManageAdmins ? "Add New Admin" : null}
-                onAction={canManageAdmins ? handleAddAdmin : null}
-                className="py-20"
-              />
-            ) : (
-              <div className="flex-1 flex flex-col overflow-hidden space-y-4 mt-4">
-                {/* Admin Table */}
-                <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                  <div className="flex-1 overflow-auto auto-hide-scrollbar">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 relative">
-                      <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10 shadow-sm">
-                        <tr>
-                          {adminColumns.map((column) => (
-                            <th
-                              key={column.key}
-                              scope="col"
-                              className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                              onClick={() =>
-                                column.sortable && handleSort(column.key)
-                              }
-                            >
-                              <div className="flex items-center gap-1">
-                                {column.label}
-                                {column.sortable &&
-                                  sortField === column.key && (
-                                    <ArrowUpDown
-                                      className={`w-3 h-3 ${sortDirection === "desc" ? "rotate-180" : ""}`}
-                                    />
-                                  )}
-                              </div>
-                            </th>
-                          ))}
-                          <th
-                            scope="col"
-                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                          >
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                        {paginatedAdmins.length === 0 ? (
-                          <tr>
-                            <td
-                              colSpan={adminColumns.length + 1}
-                              className="px-6 py-12 text-center text-gray-500"
-                            >
-                              No admin accounts found matching your criteria.
-                            </td>
-                          </tr>
-                        ) : (
-                          paginatedAdmins.map((row) => (
-                            <tr
-                              key={row.id}
-                              className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                            >
-                              {adminColumns.map((column, colIndex) => (
-                                <td
-                                  key={colIndex}
-                                  className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100"
-                                >
-                                  {column.render
-                                    ? column.render(row[column.key], row)
-                                    : row[column.key]}
-                                </td>
-                              ))}
-                              <td className="px-4 py-4 text-sm font-medium">
-                                {adminActions(row)}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Pagination */}
-                  {totalAdminPages > 1 && (
-                    <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-900">
-                      <div className="text-sm text-gray-500">
-                        Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                        {Math.min(
-                          currentPage * itemsPerPage,
-                          systemUserTotalCount,
-                        )}{" "}
-                        of {systemUserTotalCount} admins
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() =>
-                            setCurrentPage((p) => Math.max(1, p - 1))
-                          }
-                          disabled={currentPage === 1}
-                        >
-                          Previous
-                        </Button>
-                        {Array.from(
-                          { length: Math.min(5, totalAdminPages) },
-                          (_, i) => {
-                            let pageNum;
-                            if (totalAdminPages <= 5) {
-                              pageNum = i + 1;
-                            } else if (currentPage <= 3) {
-                              pageNum = i + 1;
-                            } else if (currentPage >= totalAdminPages - 2) {
-                              pageNum = totalAdminPages - 4 + i;
-                            } else {
-                              pageNum = currentPage - 2 + i;
-                            }
-                            return (
-                              <Button
-                                key={pageNum}
-                                variant={
-                                  currentPage === pageNum
-                                    ? "primary"
-                                    : "secondary"
-                                }
-                                size="sm"
-                                onClick={() => setCurrentPage(pageNum)}
-                              >
-                                {pageNum}
-                              </Button>
-                            );
-                          },
-                        )}
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() =>
-                            setCurrentPage((p) =>
-                              Math.min(totalAdminPages, p + 1),
-                            )
-                          }
-                          disabled={currentPage === totalAdminPages}
-                        >
-                          Next
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          ) : (
-            <Alert variant="error" title="Access Denied">
-              Admin privileges required to view admin accounts.
-            </Alert>
-          )
-        ) : activeTab === "system" ? (
-          isAdmin ? (
-              filteredSystemUsers && filteredSystemUsers.length > 0 ? (
+            paginatedSystemUsers && paginatedSystemUsers.length > 0 ? (
               <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden mt-4">
                 <div className="flex-1 overflow-auto auto-hide-scrollbar">
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 relative">
@@ -2018,103 +1633,104 @@ export default function UserManagement() {
                       </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                      {paginatedSystemUsers.map((row) => (
-                        <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                            {row.username}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                            <Badge variant="primary" className="capitalize">{row.display_name || row.role_name}</Badge>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                            {row.is_password_set ? (
-                              <Badge variant="success" className="flex items-center gap-1 w-fit"><Key className="w-3 h-3" /> Set</Badge>
-                            ) : (
-                              <Badge variant="warning">Not Set</Badge>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                            {row.clinic_name || "San Nicolas Health Center"}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                            {row.contact || <span className="text-gray-400 italic">N/A</span>}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                            {row.is_active ? (
-                              <Badge variant="success" className="flex items-center gap-1 w-fit"><Power className="w-3 h-3" /> Active</Badge>
-                            ) : (
-                              <Badge variant="default" className="flex items-center gap-1 w-fit"><PowerOff className="w-3 h-3" /> Disabled</Badge>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex items-center justify-start gap-1">
-                              <Button
-                                variant={row.is_active ? "warning" : "success"}
-                                size="xs"
-                                onClick={() => handleToggleUserActive(row)}
-                                className="p-1.5"
-                                title={
-                                  String(row.id) === String(currentUserId)
-                                    ? "You cannot disable your own account"
-                                    : row.is_active
-                                      ? "Disable User"
-                                      : "Enable User"
-                                }
-                                disabled={
-                                  isTogglingActive ||
-                                  String(row.id) === String(currentUserId)
-                                }
-                                aria-label={row.is_active ? "Disable user" : "Enable user"}
-                              >
-                                {row.is_active ? <PowerOff className="w-3.5 h-3.5" /> : <Power className="w-3.5 h-3.5" />}
-                              </Button>
-                              <Button
-                                variant="info"
-                                size="xs"
-                                onClick={() => openPasswordResetModal(row)}
-                                className="p-1.5"
-                                title="Reset Password"
-                                aria-label="Reset password"
-                                disabled={isResettingPassword}
-                              >
-                                <Key className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button
-                                variant="success"
-                                size="xs"
-                                onClick={() => handleEditUser(row, "system")}
-                                className="p-1.5"
-                                title="Edit User"
-                                aria-label="Edit user"
-                              >
-                                <Edit className="w-3.5 h-3.5" />
-                              </Button>
-                              {String(row.id) !== String(currentUserId) && (
-                                <LoadingButton
-                                  variant="danger"
-                                  size="xs"
-                                  onClick={() => handleDeleteUser(row, "system")}
-                                  loading={isDeleting}
-                                  className="p-1.5"
-                                  title="Delete User"
-                                  aria-label="Delete user"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </LoadingButton>
+                      {paginatedSystemUsers.map((row) => {
+                        const isSelf = String(row.id) === String(currentUserId);
+                        // SELF-DEACTIVATION TOOLTIP
+                        const deactivateTitle = isSelf
+                          ? "You cannot deactivate your own account"
+                          : row.is_active
+                            ? "Disable User"
+                            : "Enable User";
+
+                        return (
+                          <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                              {row.username}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                              <Badge variant="primary" className="capitalize">{normalizeRoleLabel(row.display_name || row.role_name)}</Badge>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                              {row.is_password_set ? (
+                                <Badge variant="success" className="flex items-center gap-1 w-fit"><Key className="w-3 h-3" /> Set</Badge>
+                              ) : (
+                                <Badge variant="warning">Not Set</Badge>
                               )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                              {row.clinic_name || "San Nicolas Health Center"}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                              {row.contact || <span className="text-gray-400 italic">N/A</span>}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                              {row.is_active ? (
+                                <Badge variant="success" className="flex items-center gap-1 w-fit"><Power className="w-3 h-3" /> Active</Badge>
+                              ) : (
+                                <Badge variant="default" className="flex items-center gap-1 w-fit"><PowerOff className="w-3 h-3" /> Disabled</Badge>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <div className="flex items-center justify-start gap-1">
+                                <span className="inline-flex" title={deactivateTitle}>
+                                  <Button
+                                    variant={row.is_active ? "warning" : "success"}
+                                    size="xs"
+                                    onClick={() => handleToggleUserActive(row)}
+                                    className="p-1.5"
+                                    title={deactivateTitle}
+                                    disabled={isTogglingActive || isSelf}
+                                    aria-label={row.is_active ? "Disable user" : "Enable user"}
+                                  >
+                                    {row.is_active ? <PowerOff className="w-3.5 h-3.5" /> : <Power className="w-3.5 h-3.5" />}
+                                  </Button>
+                                </span>
+                                <Button
+                                  variant="info"
+                                  size="xs"
+                                  onClick={() => openPasswordResetModal(row)}
+                                  className="p-1.5"
+                                  title="Reset Password"
+                                  aria-label="Reset password"
+                                  disabled={isResettingPassword}
+                                >
+                                  <Key className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  variant="success"
+                                  size="xs"
+                                  onClick={() => handleEditUser(row, activeSystemUserType)}
+                                  className="p-1.5"
+                                  title="Edit User"
+                                  aria-label="Edit user"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </Button>
+                                {!isSelf && (
+                                  <LoadingButton
+                                    variant="danger"
+                                    size="xs"
+                                    onClick={() => handleDeleteUser(row, activeSystemUserType)}
+                                    loading={isDeleting}
+                                    className="p-1.5"
+                                    title="Delete User"
+                                    aria-label="Delete user"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </LoadingButton>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
                 {totalSystemPages > 1 && (
                   <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-900">
                     <div className="text-sm text-gray-500">
-                      Showing {(systemCurrentPage - 1) * itemsPerPage + 1} to{" "}
-                      {Math.min(systemCurrentPage * itemsPerPage, systemUserTotalCount)} of{" "}
-                      {systemUserTotalCount} users
+                      Showing {systemUserDisplayStart} to {systemUserDisplayEnd} of {systemUserDisplayCount} {systemUserDisplayLabel}
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -2148,24 +1764,42 @@ export default function UserManagement() {
               </div>
             ) : (
               <EmptyState
-                title="No users found"
-                description="There are no users configured. Add users like doctors, nurses, staff, or guardians."
-                icon="🛡️"
-                actionLabel="Add New Staff"
-                onAction={() => handleAddUser("system")}
+                title={
+                  activeTab === "admins" ? "No admin accounts found" : "No users found"
+                }
+                description={
+                  activeTab === "admins"
+                    ? "There are no administrator accounts configured. Super admins can create new admin accounts."
+                    : "There are no users configured. Add users like doctors, nurses, staff, or guardians."
+                }
+                actionLabel={
+                  activeTab === "admins"
+                    ? canManageAdmins
+                      ? "Add New User"
+                      : null
+                    : "Add New User"
+                }
+                onAction={
+                  activeTab === "admins"
+                    ? canManageAdmins
+                      ? () => handleAddUser("admins")
+                      : null
+                    : () => handleAddUser("system")
+                }
                 className="py-20"
               />
             )
           ) : (
             <Alert variant="error" title="Access Denied">
-              Admin privileges required to view system users.
+              {activeTab === "admins"
+                ? "Admin privileges required to view admin accounts."
+                : "Admin privileges required to view system users."}
             </Alert>
           )
         ) : filteredGuardians.length === 0 ? (
           <EmptyState
             title={searchQuery || startDate || endDate ? "No guardians match filters" : "No guardians registered"}
             description={searchQuery || startDate || endDate ? "Adjust your search or date filters." : "There are no guardians registered in the system yet. Start by adding a new guardian."}
-            icon="👥"
             actionLabel="Add New Guardian"
             onAction={() => handleAddUser("guardians")}
             className="py-20"
@@ -2199,7 +1833,6 @@ export default function UserManagement() {
                     <tr>
                       <td colSpan={guardianColumns.length + 1} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                         <div className="flex flex-col items-center justify-center">
-                          <span className="text-4xl mb-3">👥</span>
                           <p className="text-lg font-medium">No guardians registered yet.</p>
                         </div>
                       </td>
@@ -2267,7 +1900,7 @@ export default function UserManagement() {
         title={
           editingUser
             ? `Edit ${activeTab === "guardians" ? "Guardian" : "User"}`
-            : `Add New ${activeTab === "guardians" ? "Guardian" : activeTab === "admins" ? "Admin" : "User"}`
+            : `Add New ${activeTab === "guardians" ? "Guardian" : "User"}` // MERGED MODAL
         }
         size={activeTab === "guardians" ? "xl" : "lg"}
         footer={
@@ -2516,7 +2149,7 @@ export default function UserManagement() {
                         required
                         options={[
                           { value: "", label: "Select a role" },
-                          ...addStaffRoleOptions,
+                          ...addUserRoleOptions, // MERGED MODAL
                         ]}
                       />
                     </div>
@@ -2724,178 +2357,6 @@ export default function UserManagement() {
         </form>
       </Modal>
 
-      {/* Add Admin Modal */}
-      <Modal
-        isOpen={showAddAdminModal}
-        onClose={closeAdminModal}
-        title="Create New Admin Account"
-        size="lg"
-        footer={
-          <AdminModalActions>
-            <Button
-              variant="cancel"
-              type="button"
-              onClick={closeAdminModal}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" variant="primary" form="adminForm" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <span className="flex items-center gap-2">
-                  <LoadingSpinner size="sm" />
-                  Creating...
-                </span>
-              ) : (
-                "Create Admin Account"
-              )}
-            </Button>
-          </AdminModalActions>
-        }
-      >
-        <form
-          id="adminForm"
-          onSubmit={handleSubmitAdmin}
-          className="admin-form"
-        >
-          <Alert
-            variant="info"
-            title="Admin Account Creation"
-            icon={<ShieldAlert className="h-5 w-5" />}
-          >
-            Create a new administrator account with full system access
-            privileges. The new admin will be able to manage users, guardians,
-            and system settings.
-          </Alert>
-
-          {/* Account Information Section */}
-          <div className="admin-form-card">
-            <div className="admin-form-card-header">
-              <h4 className="admin-form-card-title">
-                <User className="w-4 h-4" />
-                Account Information
-              </h4>
-            </div>
-            <div className="admin-form-card-body">
-              <div className="admin-form-row-2">
-                <div className="admin-field-group">
-                  <TextInput
-                    label="Username"
-                    name="username"
-                    value={adminFormData.username}
-                    onChange={handleAdminChange}
-                    onBlur={handleAdminBlur}
-                    error={adminFormTouched.username ? adminFormErrors.username : undefined}
-                    required
-                    placeholder="Enter admin username"
-                  />
-                </div>
-                <div className="admin-field-group">
-                  <TextInput
-                    label="Email"
-                    name="email"
-                    type="email"
-                    value={adminFormData.email}
-                    onChange={handleAdminChange}
-                    onBlur={handleAdminBlur}
-                    error={adminFormTouched.email ? adminFormErrors.email : undefined}
-                    placeholder="Enter email address"
-                  />
-                </div>
-              </div>
-              <div className="admin-form-row-2">
-                <div className="admin-field-group">
-                  <TextInput
-                    label="Contact"
-                    name="contact"
-                    value={adminFormData.contact}
-                    onChange={handleAdminChange}
-                    onBlur={handleAdminBlur}
-                    error={adminFormTouched.contact ? adminFormErrors.contact : undefined}
-                    placeholder="Phone or email"
-                  />
-                </div>
-                <div className="admin-field-group">
-                  <Select
-                    label="Role"
-                    name="role_id"
-                    value={adminFormData.role_id}
-                    onChange={handleAdminChange}
-                    onBlur={handleAdminBlur}
-                    error={adminFormTouched.role_id ? adminFormErrors.role_id : undefined}
-                    required
-                    options={[
-                      { value: "", label: "Select a role" },
-                      ...roles
-                        .filter(
-                          (role) =>
-                            role.name === "super_admin" ||
-                            role.name === "admin",
-                        )
-                        .map((role) => ({
-                          value: role.id.toString(),
-                          label: role.display_name || role.name,
-                        })),
-                    ]}
-                  />
-                </div>
-              </div>
-              <div className="admin-field-group">
-                <TextInput
-                  label="Clinic"
-                  name="clinic_name"
-                  value={resolvedAdminFormClinicName}
-                  readOnly
-                  disabled
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Password Section */}
-          <div className="admin-form-card">
-            <div className="admin-form-card-header">
-              <h4 className="admin-form-card-title">
-                <Key className="w-4 h-4" />
-                Security Credentials
-              </h4>
-            </div>
-            <div className="admin-form-card-body">
-              <div className="admin-form-row-2">
-                <div className="admin-field-group">
-                  <PasswordInput
-                    label="Password"
-                    name="password"
-                    value={adminFormData.password}
-                    onChange={handleAdminChange}
-                    onBlur={handleAdminBlur}
-                    error={adminFormTouched.password ? adminFormErrors.password : undefined}
-                    showPasswordAriaLabel="Show admin account password"
-                    hidePasswordAriaLabel="Hide admin account password"
-                    required
-                    placeholder="Enter password (min 8 characters)"
-                    minLength={8}
-                  />
-                </div>
-                <div className="admin-field-group">
-                  <PasswordInput
-                    label="Confirm Password"
-                    name="confirmPassword"
-                    value={adminFormData.confirmPassword}
-                    onChange={handleAdminChange}
-                    onBlur={handleAdminBlur}
-                    error={adminFormTouched.confirmPassword ? adminFormErrors.confirmPassword : undefined}
-                    showPasswordAriaLabel="Show admin confirm password"
-                    hidePasswordAriaLabel="Hide admin confirm password"
-                    required
-                    placeholder="Confirm password"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </form>
-      </Modal>
     </div>
   );
 }

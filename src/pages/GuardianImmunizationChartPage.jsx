@@ -9,6 +9,7 @@ import { LoadingSpinner, Alert, Button } from "../components/UI";
 import { FileCheck, ChevronDown, Activity, CheckCircle } from "lucide-react";
 import { trackEvent } from "../utils/telemetry";
 import { normalizeArrayPayload } from "../utils/apiUtils";
+import { formatInfantDob } from "../utils/dateUtils";
 
 /**
  * GuardianImmunizationChartPage
@@ -110,6 +111,67 @@ export default function GuardianImmunizationChartPage() {
       fetchGrowthRecords(selectedChild.id);
     }
   }, [activeTab, selectedChild?.id, fetchGrowthRecords]);
+
+  const toDateKey = (value) => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toISOString().slice(0, 10);
+  };
+
+  const birthWeight =
+    selectedChild?.birth_weight ??
+    selectedChild?.birthWeight ??
+    selectedChild?.birth_weight_kg ??
+    selectedChild?.weight_at_birth ??
+    null;
+  const birthHeight =
+    selectedChild?.birth_height ??
+    selectedChild?.birth_length ??
+    selectedChild?.birthHeight ??
+    selectedChild?.birthLength ??
+    null;
+  const birthHeadCircumference =
+    selectedChild?.birth_head_circumference ??
+    selectedChild?.head_circumference_cm ??
+    selectedChild?.head_circumference ??
+    null;
+  const dobKey = toDateKey(selectedChild?.dob);
+
+  const hasBirthRecordRow = dobKey
+    ? growthRecords.some((record) => {
+        const recordKey = toDateKey(record?.measurement_date || record?.date);
+        return recordKey && recordKey === dobKey;
+      })
+    : false;
+
+  const shouldShowBirthFallback =
+    Boolean(dobKey) &&
+    !hasBirthRecordRow &&
+    (birthWeight !== null || birthHeight !== null || birthHeadCircumference !== null);
+
+  const birthEntry = shouldShowBirthFallback
+    ? {
+        id: "birth",
+        measurement_date: selectedChild?.dob,
+        weight_kg: birthWeight,
+        length_cm: birthHeight,
+        head_circumference_cm: birthHeadCircumference,
+        notes: "Recorded at registration",
+        isBirthFallback: true,
+      }
+    : null;
+
+  const displayRecords = birthEntry
+    ? [...growthRecords, birthEntry].sort((a, b) => {
+        const dateA = new Date(a.measurement_date || a.date || 0).getTime();
+        const dateB = new Date(b.measurement_date || b.date || 0).getTime();
+        return dateB - dateA;
+      })
+    : growthRecords;
+
+  const latestRecord = displayRecords[0] || null;
+  const latestIsBirth = Boolean(latestRecord?.isBirthFallback);
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -251,7 +313,7 @@ export default function GuardianImmunizationChartPage() {
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400 break-words">
                     {calculateAge(selectedChild?.dob)} • Born{" "}
-                    {formatDate(selectedChild?.dob)}
+                    {formatInfantDob(selectedChild?.dob)}
                   </p>
                   <p className="text-xs font-mono text-gray-600 dark:text-gray-300 mt-1 break-all">
                     Infant Control Number: {selectedChild?.control_number || "Pending"}
@@ -324,19 +386,31 @@ export default function GuardianImmunizationChartPage() {
             <div className="bg-theme-bg-card rounded-xl shadow-sm border border-theme-border-primary p-4">
               <p className="text-xs uppercase tracking-wide text-theme-secondary">Latest Weight</p>
               <p className="text-2xl font-bold text-theme-primary mt-2">
-                {growthRecords.length > 0 ? `${growthRecords[0]?.weight_kg || growthRecords[0]?.weight || '-'} kg` : '-'}
+                {latestRecord && (latestRecord.weight_kg ?? latestRecord.weight) != null
+                  ? `${latestRecord.weight_kg ?? latestRecord.weight} kg`
+                  : '-'}
               </p>
+              {latestIsBirth && (latestRecord?.weight_kg ?? null) != null && (
+                <p className="text-xs text-theme-secondary mt-1">(at birth)</p>
+              )}
             </div>
             <div className="bg-theme-bg-card rounded-xl shadow-sm border border-theme-border-primary p-4">
               <p className="text-xs uppercase tracking-wide text-theme-secondary">Latest Height</p>
               <p className="text-2xl font-bold text-theme-primary mt-2">
-                {growthRecords.length > 0 ? `${growthRecords[0]?.length_cm || growthRecords[0]?.height || growthRecords[0]?.length || '-'} cm` : '-'}
+                {latestRecord && (latestRecord.length_cm ?? latestRecord.height ?? latestRecord.length) != null
+                  ? `${latestRecord.length_cm ?? latestRecord.height ?? latestRecord.length} cm`
+                  : '-'}
               </p>
+              {latestIsBirth && (latestRecord?.length_cm ?? null) != null && (
+                <p className="text-xs text-theme-secondary mt-1">(at birth)</p>
+              )}
             </div>
             <div className="bg-theme-bg-card rounded-xl shadow-sm border border-theme-border-primary p-4">
               <p className="text-xs uppercase tracking-wide text-theme-secondary">Head Circumference</p>
               <p className="text-2xl font-bold text-theme-primary mt-2">
-                {growthRecords.length > 0 ? `${growthRecords[0]?.head_circumference_cm || growthRecords[0]?.head_circumference || '-'} cm` : '-'}
+                {latestRecord && (latestRecord.head_circumference_cm ?? latestRecord.head_circumference) != null
+                  ? `${latestRecord.head_circumference_cm ?? latestRecord.head_circumference} cm`
+                  : '-'}
               </p>
             </div>
           </div>
@@ -349,13 +423,13 @@ export default function GuardianImmunizationChartPage() {
               <div className="py-10 flex justify-center">
                 <LoadingSpinner size="md" />
               </div>
-            ) : growthRecords.length === 0 ? (
+            ) : displayRecords.length === 0 ? (
               <div className="py-10 text-center text-theme-secondary">
                 No growth records yet for this child.
               </div>
             ) : (
               <div className="guardian-table-card-list md:hidden">
-                {growthRecords.map((record) => (
+                {displayRecords.map((record) => (
                   <article
                     key={record.id || `${record.measurement_date}-${record.weight_kg}`}
                     className="guardian-table-card"
@@ -390,7 +464,7 @@ export default function GuardianImmunizationChartPage() {
               </div>
             )}
 
-            {!loadingGrowth && growthRecords.length > 0 && (
+            {!loadingGrowth && displayRecords.length > 0 && (
               <div className="guardian-table-scroll-shell hidden md:block">
                 <table className="w-full min-w-[700px]">
                   <thead>
@@ -403,7 +477,7 @@ export default function GuardianImmunizationChartPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {growthRecords.map((record) => (
+                    {displayRecords.map((record) => (
                       <tr key={record.id || `${record.measurement_date}-${record.weight_kg}`} className="border-b border-theme-border-primary/60">
                         <td className="py-3 text-theme-primary">
                           {record.measurement_date ? new Date(record.measurement_date).toLocaleDateString() : '-'}

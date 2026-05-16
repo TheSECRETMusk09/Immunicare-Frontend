@@ -8,7 +8,7 @@ import ImmunizationRecordBooklet from "../components/ImmunizationRecordBooklet";
 import ImmunizationChart from "../components/ImmunizationChart";
 import apiClient from "../utils/api";
 
-jest.mock("../utils/api", () => ({
+jest.mock("../utils/api", () =>( {
   __esModule: true,
   default: {
     request: jest.fn(),
@@ -28,8 +28,8 @@ jest.mock("../utils/api", () => ({
   },
 }));
 
-jest.mock("../contexts/AuthContext", () => ({
-  useAuth: () => ({
+jest.mock("../contexts/AuthContext", () =>( {
+  useAuth: () =>( {
     isAdmin: true,
     isGuardian: false,
   }),
@@ -98,13 +98,13 @@ const baseDynamicSchedule = {
 
 const renderStrict = (ui) => render(<React.StrictMode>{ui}</React.StrictMode>);
 
-const readBlobAsText = (blob) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = reject;
-    reader.readAsText(blob);
-  });
+
+
+
+
+
+
+
 
 describe("Infant module loading stability under StrictMode lifecycle", () => {
   beforeEach(() => {

@@ -1,9 +1,9 @@
 import React, {
-  useState,
+  useState  ,
   useCallback,
-  useEffect,
-  useMemo,
-  useRef,
+  useEffect  ,
+  useMemo  ,
+  useRef ,
 } from "react";
 import {
   AdminModalActions,
@@ -37,7 +37,7 @@ import {
   getMinBookingDate,
   isWeekend,
 } from "../utils/holidays";
-import { CalendarDays, ChevronLeft, ChevronRight, Plus, Search, ArrowUp, ArrowDown } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Plus, Search, ArrowUp, ArrowDown, X } from "lucide-react";
 import PortalDatePicker from "../components/UI/PortalDatePicker";
 import { useAuth } from "../contexts/AuthContext";
 import { normalizeInfantsResponse } from "../utils/adminDataAdapters";
@@ -47,6 +47,11 @@ import {
   validateLength,
   validateRequired,
 } from "../utils/adminFormValidation";
+import { useSearchParams } from "react-router-dom";
+import {
+  getVaccinationPeriodRange,
+  normalizeVaccinationPeriod,
+} from "../utils/vaccinationPeriods";
 
 // Control number display formatter - consistent with InfantManagement and InfantPersonalRecord
 const formatControlNumberDisplay = (controlNumber, dateValue) => {
@@ -80,6 +85,19 @@ const mergeInfantLookupResults = (...collections) => {
 
 const DEFAULT_APPOINTMENTS_ITEMS_PER_PAGE = 20;
 const APPOINTMENT_ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
+const MAX_DAILY_VACCINATION_SLOTS = 400;
+
+export const getCalendarCellSlotsRemaining = ({
+  dateKey,
+  bookedAppointmentsByDate = {},
+  availability = null,
+  dailyVaccinationSlotLimit = MAX_DAILY_VACCINATION_SLOTS,
+}) =>
+  Math.max(
+    0,
+    dailyVaccinationSlotLimit -
+      (bookedAppointmentsByDate[dateKey] ?? availability?.totalAppointments ?? 0),
+  );
 
 function AppointmentsPaginationFooter({
   totalItems,
@@ -102,7 +120,7 @@ function AppointmentsPaginationFooter({
     return null;
   }
 
-  return (
+  return(
     <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex flex-col gap-3 bg-white dark:bg-gray-800 lg:flex-row lg:items-center lg:justify-between">
       <div className="text-sm text-gray-500">
         Showing {visibleStart} to {visibleEnd} of {totalItems} appointments
@@ -122,11 +140,11 @@ function AppointmentsPaginationFooter({
             className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
             aria-label="Rows per page"
           >
-            {APPOINTMENT_ROWS_PER_PAGE_OPTIONS.map((option) => (
+            {APPOINTMENT_ROWS_PER_PAGE_OPTIONS.map((option) =>(
               <option key={option} value={option}>
                 {option}
-              </option>
-            ))}
+              </option>)
+             )}
           </select>
         </div>
         <div className="flex items-center gap-2">
@@ -178,8 +196,8 @@ function AppointmentsPaginationFooter({
           </Button>
         </div>
       </div>
-    </div>
-  );
+    </div>)
+   ;
 }
 
 // Calendar utility functions (matching GuardianAppointmentsPage)
@@ -394,8 +412,45 @@ const canEditAppointment = (status) =>
 const canCancelAppointment = (status) =>
   ["pending", "scheduled"].includes(normalizeAppointmentStatus(status));
 
+export const getSelectedDateAppointmentsByStatus = (appointments) => {
+  const groupedAppointments = {
+    attended: [],
+    scheduled: [],
+    noShow: [],
+    cancelled: [],
+  };
+
+  (appointments || []).forEach((appointment) => {
+    const normalizedStatus = normalizeAppointmentStatus(
+      appointment?.raw_status || appointment?.status,
+    ).replace(/[\s_]+/g, "");
+
+    if (normalizedStatus === "attended") {
+      groupedAppointments.attended.push(appointment);
+      return;
+    }
+
+    if (normalizedStatus === "scheduled") {
+      groupedAppointments.scheduled.push(appointment);
+      return;
+    }
+
+    if (normalizedStatus === "noshow") {
+      groupedAppointments.noShow.push(appointment);
+      return;
+    }
+
+    if (normalizedStatus === "cancelled") {
+      groupedAppointments.cancelled.push(appointment);
+    }
+  });
+
+  return groupedAppointments;
+};
+
 export default function Appointments() {
   const { isAdmin } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [view, setView] = useState("list");
   const [appointments, setAppointments] = useState([]);
   const [error, setError] = useState(null);
@@ -419,7 +474,7 @@ export default function Appointments() {
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rowAction, setRowAction] = useState({ id: null, action: null });
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get("status") || "all");
   const latestMonthKeyRef = useRef("");
   const [bookingInfantSearchQuery, setBookingInfantSearchQuery] = useState("");
   const [bookingInfantOptions, setBookingInfantOptions] = useState([]);
@@ -428,31 +483,38 @@ export default function Appointments() {
   const [bookingInfantError, setBookingInfantError] = useState("");
 
   // Search state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get("search") || "");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(() => searchParams.get("search") || "");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(
     DEFAULT_APPOINTMENTS_ITEMS_PER_PAGE,
   );
   const [pageInputValue, setPageInputValue] = useState("1");
 
-  // Date filtering state
-  const [dateFilterStart, setDateFilterStart] = useState("");
-  const [dateFilterEnd, setDateFilterEnd] = useState("");
+  // Date filtering state (used for Custom Date Range pickers)
+  const [dateFilterStart, setDateFilterStart] = useState(() => searchParams.get("start_date") || "");
+  const [dateFilterEnd, setDateFilterEnd] = useState(() => searchParams.get("end_date") || "");
+
+  // Period filter
+  const [period, setPeriod] = useState(() => normalizeVaccinationPeriod(searchParams.get("period")) || "month");
 
   // Sorting state
   const [sortField] = useState("scheduled_date");
   const [sortDirection, setSortDirection] = useState("desc");
+  const periodDateRange = useMemo(
+    () => getVaccinationPeriodRange({ period, startDate: dateFilterStart, endDate: dateFilterEnd }),
+    [period, dateFilterStart, dateFilterEnd],
+  );
   const explicitDateRangeFilters = useMemo(
     () => ({
-      ...(dateFilterStart ? { start_date: dateFilterStart } : {}),
-      ...(dateFilterEnd ? { end_date: dateFilterEnd } : {}),
+      ...(periodDateRange.startDate ? { start_date: periodDateRange.startDate } : {}),
+      ...(periodDateRange.endDate ? { end_date: periodDateRange.endDate } : {}),
     }),
-    [dateFilterStart, dateFilterEnd],
+    [periodDateRange],
   );
 
   const listQueryParams = useMemo(
-    () => ({
+    () =>( {
       page: currentPage,
       limit: itemsPerPage,
       ...(debouncedSearchQuery ? { search: debouncedSearchQuery } : {}),
@@ -490,7 +552,7 @@ export default function Appointments() {
     notes: "",
   });
   const infantLookupScope = useMemo(
-    () => (isAdmin ? { scope: "system" } : {}),
+    () =>( isAdmin ? { scope: "system" } : {}),
     [isAdmin],
   );
   const selectedBookingInfant = useMemo(
@@ -594,7 +656,35 @@ export default function Appointments() {
   useEffect(() => {
     setCurrentPage(1);
     setPageInputValue("1");
-  }, [debouncedSearchQuery, statusFilter, dateFilterStart, dateFilterEnd, sortField, sortDirection]);
+  }, [debouncedSearchQuery, period, statusFilter, dateFilterStart, dateFilterEnd, sortField, sortDirection]);
+
+  // Sync filter state to URL so reloading the page restores the active filters
+  useEffect(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("period", period);
+      if (statusFilter && statusFilter !== "all") {
+        next.set("status", statusFilter);
+      } else {
+        next.delete("status");
+      }
+      if (searchQuery) {
+        next.set("search", searchQuery);
+      } else {
+        next.delete("search");
+      }
+      if (period === "custom") {
+        if (dateFilterStart) next.set("start_date", dateFilterStart);
+        else next.delete("start_date");
+        if (dateFilterEnd) next.set("end_date", dateFilterEnd);
+        else next.delete("end_date");
+      } else {
+        next.delete("start_date");
+        next.delete("end_date");
+      }
+      return next;
+    }, { replace: true });
+  }, [period, statusFilter, searchQuery, dateFilterStart, dateFilterEnd, setSearchParams]);
 
   const filteredAppointments = listAppointments;
   const paginatedAppointments = listAppointments;
@@ -630,10 +720,66 @@ export default function Appointments() {
   const [timeSlots, setTimeSlots] = useState([]);
   const [timeSlotsFeedback, setTimeSlotsFeedback] = useState(null);
 
+  const [todayCapacity, setTodayCapacity] = useState(null);
+  const dailyVaccinationSlotLimit = todayCapacity?.maximum ?? MAX_DAILY_VACCINATION_SLOTS;
+
   const [bookingDateDetails, setBookingDateDetails] = useState(null);
   const [bookingAvailabilityStatus, setBookingAvailabilityStatus] = useState(null);
   const [bookingAvailabilityMessage, setBookingAvailabilityMessage] = useState("");
   const bookingAvailabilityTimerRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchTodayCapacity = async () => {
+      try {
+        const data = await apiClient.getAppointmentDailyCapacity({});
+        if (!cancelled) setTodayCapacity(data);
+      } catch (_err) {
+        // silently ignore — capacity meter is informational only
+      }
+    };
+    fetchTodayCapacity();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const todayDateKey = toClinicDateKey(new Date());
+
+    const fetchTodayAvailability = async () => {
+      try {
+        const calendarResult = await apiClient.getAppointmentCalendarAvailability({
+          start_date: todayDateKey,
+          end_date: todayDateKey,
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        const availabilityByDate = (Array.isArray(calendarResult?.dates) ? calendarResult.dates : [])
+          .reduce((accumulator, entry) => {
+            if (entry?.date) {
+              accumulator[entry.date] = entry;
+            }
+            return accumulator;
+          }, {});
+
+        setCalendarAvailabilityByDate((previous) => ({
+          ...previous,
+          ...availabilityByDate,
+        }));
+        setBlockedDates((previous) => ({
+          ...previous,
+          ...(calendarResult?.blockedDates || {}),
+        }));
+      } catch (_err) {
+      }
+    };
+
+    fetchTodayAvailability();
+    return () => { cancelled = true; };
+  }, []);
 
   const [formErrors, setFormErrors] = useState({});
 
@@ -994,22 +1140,22 @@ export default function Appointments() {
   );
 
   // Toggle blocked date handler
-  const handleToggleBlockedDate = async (dateKey) => {
-    try {
-      const result = await apiClient.toggleBlockedDate({
-        date: dateKey,
-        reason: '',
-      });
 
-      // Refresh blocked dates after toggle
-      await fetchCalendarData();
 
-      return result;
-    } catch (err) {
-      console.error('Failed to toggle blocked date:', err);
-      throw err;
-    }
-  };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   // Fetch calendar availability when month changes
   useEffect(() => {
@@ -1065,9 +1211,27 @@ export default function Appointments() {
       .sort((left, right) => {
         const leftDate = normalizeAppointmentDateTimeForDisplay(left.scheduled_date);
         const rightDate = normalizeAppointmentDateTimeForDisplay(right.scheduled_date);
-        return (leftDate?.getTime() || 0) - (rightDate?.getTime() || 0);
+        return (leftDate?.getTime() || 0) -( rightDate?.getTime() || 0);
       });
   }, [appointments, resolveDateAvailability]);
+
+  const bookedAppointmentsByDate = useMemo(
+    () =>
+      appointments.reduce((accumulator, appointment) => {
+        if (normalizeAppointmentStatus(appointment?.status) === "cancelled") {
+          return accumulator;
+        }
+
+        const appointmentDateKey = toClinicDateKey(appointment?.scheduled_date);
+        if (!appointmentDateKey) {
+          return accumulator;
+        }
+
+        accumulator[appointmentDateKey] = (accumulator[appointmentDateKey] || 0) + 1;
+        return accumulator;
+      }, {}),
+    [appointments],
+  );
 
   const selectedDateLabel = useMemo(
     () => formatCalendarDateLabel(selectedDate),
@@ -1089,8 +1253,8 @@ export default function Appointments() {
     const resolvedAvailability = resolveDateAvailability(normalizedDateKey, {
       allowPast: true,
     });
-    const holiday = dayAvailability?.holiday ||
-      (dayAvailability?.isHoliday
+    const holiday = dayAvailability?.holiday ||(
+       dayAvailability?.isHoliday
         ? {
             name: dayAvailability.holidayName || "Holiday",
             type: dayAvailability.holidayType || "regular",
@@ -1121,6 +1285,11 @@ export default function Appointments() {
     selectedDate,
   ]);
 
+  const selectedDateAppointmentsByStatus = useMemo(
+    () => getSelectedDateAppointmentsByStatus(selectedDateDetails?.appointments || []),
+    [selectedDateDetails],
+  );
+
   // Refresh appointments from API
   const refreshAppointments = useCallback(async () => {
     setIsRefreshing(true);
@@ -1146,11 +1315,11 @@ export default function Appointments() {
     {
       key: "first_name",
       label: "Infant",
-      render: (val, row) => (
+      render: (val, row) =>(
         <div className="font-medium text-gray-900 dark:text-gray-100">
           {row.first_name} {row.last_name}
-        </div>
-      ),
+        </div>)
+       ,
     },
     {
       key: "guardian_name",
@@ -1170,28 +1339,28 @@ export default function Appointments() {
       key: "status",
       label: "Status",
       render: (val, row) => {
-        return (
+        return(
           <Badge
             variant={getAppointmentStatusVariant(val)}
             className="capitalize"
           >
             {getAppointmentDisplayStatus(row)}
-          </Badge>
-        );
+          </Badge>)
+         ;
       },
     },
     {
       key: "control_number",
       label: "Control Number",
-      render: (val, row) => (
+      render: (val, row) =>(
         <span className="font-mono text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-gray-600 dark:text-gray-300">
           {formatControlNumberDisplay(val, row.scheduled_date)}
-        </span>
-      ),
+        </span>)
+       ,
     },
   ];
 
-  const tableActions = (row) => (
+  const tableActions = (row) =>(
     <div className="flex items-center gap-1.5">
       <Button
         variant="primary"
@@ -1201,7 +1370,7 @@ export default function Appointments() {
       >
         View
       </Button>
-      {canApproveAppointment(row.status) && (
+      {canApproveAppointment(row.status) &&(
         <Button
           variant="success"
           size="sm"
@@ -1210,9 +1379,9 @@ export default function Appointments() {
           loading={rowAction.id === row.id && rowAction.action === "approve"}
         >
           Approve
-        </Button>
-      )}
-      {canCompleteAppointment(row.status) && (
+        </Button>)
+       }
+      {canCompleteAppointment(row.status) &&(
         <Button
           variant="success"
           size="sm"
@@ -1221,9 +1390,9 @@ export default function Appointments() {
           loading={rowAction.id === row.id && rowAction.action === "complete"}
         >
           Complete
-        </Button>
-      )}
-      {canEditAppointment(row.status) && (
+        </Button>)
+       }
+      {canEditAppointment(row.status) &&(
         <Button
           variant="secondary"
           size="sm"
@@ -1231,9 +1400,9 @@ export default function Appointments() {
           className="gap-1.5"
         >
           Edit
-        </Button>
-      )}
-      {canCancelAppointment(row.status) && (
+        </Button>)
+       }
+      {canCancelAppointment(row.status) &&(
         <Button
           variant="danger"
           size="sm"
@@ -1241,10 +1410,10 @@ export default function Appointments() {
           className="gap-1.5"
         >
           Cancel
-        </Button>
-      )}
-    </div>
-  );
+        </Button>)
+       }
+    </div>)
+   ;
 
   // Handle Cancel Appointment Click
   const handleCancelAppointmentClick = (appointment) => {
@@ -1516,7 +1685,7 @@ export default function Appointments() {
       }
       const backendFields = err?.response?.data?.fields || {};
       if (Object.keys(backendFields).length > 0) {
-        setFormErrors((prev) => ({
+        setFormErrors((prev) =>( {
           ...prev,
           ...backendFields,
         }));
@@ -1605,7 +1774,7 @@ export default function Appointments() {
       setSelectedAppointment(null);
     } catch (err) {
       if (err?.status === 409 || err?.code === "DUPLICATE_APPOINTMENT") {
-        setEditFormErrors((prev) => ({
+        setEditFormErrors((prev) =>( {
           ...prev,
           scheduled_date:
             err.message ||
@@ -1614,7 +1783,7 @@ export default function Appointments() {
       }
       const backendFields = err?.response?.data?.fields || {};
       if (Object.keys(backendFields).length > 0) {
-        setEditFormErrors((prev) => ({
+        setEditFormErrors((prev) =>( {
           ...prev,
           ...backendFields,
         }));
@@ -1630,7 +1799,7 @@ export default function Appointments() {
   const isLoading = loading && !isRefreshing;
 
   if (isLoading) {
-    return (
+    return(
       <div className="space-y-6 p-6">
         <div className="h-20 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse mb-8" />
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
@@ -1638,8 +1807,8 @@ export default function Appointments() {
           <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse" />
         </div>
         <SkeletonTable rows={10} columns={5} />
-      </div>
-    );
+      </div>)
+     ;
   }
 
   // Show error state only when there's a hook error AND no appointments have been loaded
@@ -1650,7 +1819,7 @@ export default function Appointments() {
     !isRefreshing;
 
   if (hasError) {
-    return (
+    return(
       <PageContainer>
         <Alert variant="error" title="Error loading appointments">
           {hookError}
@@ -1660,11 +1829,62 @@ export default function Appointments() {
             </Button>
           </div>
         </Alert>
-      </PageContainer>
-    );
+      </PageContainer>)
+     ;
   }
 
-  return (
+  const todaySlotsDateKey = todayCapacity?.date || toClinicDateKey(new Date());
+  const todaySlotsAvailability = todaySlotsDateKey
+    ? calendarAvailabilityByDate[todaySlotsDateKey] || null
+    : null;
+  const todaySlotsDateValidation = todaySlotsDateKey
+    ? resolveDateAvailability(todaySlotsDateKey, { allowPast: true })
+    : null;
+  const showTodayVaccinationSlotsIndicator = Boolean(todayCapacity) && !(
+    todaySlotsAvailability?.blocked === true ||
+    todaySlotsDateValidation?.isAvailable === false
+  );
+
+  const todayVaccinationSlotsIndicator = showTodayVaccinationSlotsIndicator ?(
+    <div
+      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-800/60 lg:w-[300px] lg:flex-shrink-0 xl:w-[320px]"
+      data-testid="appointments-today-capacity-indicator"
+    >
+      <div className="mb-1.5 flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
+          Today's Vaccination Slots
+        </span>
+        <span className={`text-xs font-bold ${
+          todayCapacity.remaining === 0
+            ? 'text-red-600 dark:text-red-400'
+            : todayCapacity.remaining <= 50
+              ? 'text-amber-600 dark:text-amber-400'
+              : 'text-green-600 dark:text-green-400'
+        }`}>
+          {todayCapacity.remaining} available
+        </span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+        <div
+          className="h-2 rounded-full transition-all duration-500"
+          style={{
+            width: `${Math.min(100, (todayCapacity.current / todayCapacity.maximum) * 100)}%`,
+            backgroundColor:
+              todayCapacity.remaining === 0
+                ? '#ef4444'
+                : todayCapacity.remaining <= 50
+                  ? '#f59e0b'
+                  : '#22c55e',
+          }}
+        />
+      </div>
+      <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+        {todayCapacity.current} booked · {todayCapacity.maximum} daily limit
+      </p>
+    </div>)
+   : null;
+
+  return(
     <div className="flex h-full min-h-0 min-w-0 flex-col" data-testid="admin-appointments-page">
       {/* Page Header - Fixed/Sticky at top */}
       <div className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6">
@@ -1685,7 +1905,7 @@ export default function Appointments() {
                       : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
                   }`}
                 >
-                  📋 List
+                  List
                 </button>
                 <button
                   onClick={() => setView("calendar")}
@@ -1697,7 +1917,7 @@ export default function Appointments() {
                       : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
                   }`}
                 >
-                  📅 Calendar
+                  Calendar
                 </button>
               </div>
               <Button
@@ -1718,9 +1938,44 @@ export default function Appointments() {
             </div>
           }
         />
+        {false && todayCapacity && (
+          <div className="mt-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 px-4 py-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">
+                Today's Vaccination Slots
+              </span>
+              <span className={`text-xs font-bold ${
+                todayCapacity.remaining === 0
+                  ? 'text-red-600 dark:text-red-400'
+                  : todayCapacity.remaining <= 50
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-green-600 dark:text-green-400'
+              }`}>
+                {todayCapacity.remaining} available
+              </span>
+            </div>
+            <div className="w-full h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+              <div
+                className="h-2 rounded-full transition-all duration-500"
+                style={{
+                  width: `${Math.min(100, (todayCapacity.current / todayCapacity.maximum) * 100)}%`,
+                  backgroundColor:
+                    todayCapacity.remaining === 0
+                      ? '#ef4444'
+                      : todayCapacity.remaining <= 50
+                        ? '#f59e0b'
+                        : '#22c55e',
+                }}
+              />
+            </div>
+            <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+              {todayCapacity.current} booked · {todayCapacity.maximum} daily limit
+            </p>
+          </div>
+        )}
       </div>
 
-      {view === "calendar" ? (
+      {view === "calendar" ?(
         <div
           className="flex-1 min-h-0 overflow-y-auto modern-scrollbar overflow-x-hidden p-4 pt-3 sm:px-6 sm:pb-6"
           data-testid="admin-appointments-calendar-scroll-region"
@@ -1787,20 +2042,20 @@ export default function Appointments() {
             </div>
 
             {/* Calendar Grid */}
-            {calendarLoading ? (
+            {calendarLoading ?(
               <div className="p-8 text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
                 <p className="text-sm text-gray-500 mt-2">Loading calendar...</p>
-              </div>
-            ) : (
+              </div>)
+              :(
               <>
                 {/* Weekday Headers */}
                 <div className="grid grid-cols-7 gap-1 sm:gap-2 px-2 sm:px-4 pt-3 sm:pt-4 text-[10px] sm:text-xs font-semibold text-gray-500">
-                  {WEEKDAY_LABELS.map((label) => (
+                  {WEEKDAY_LABELS.map((label) =>(
                     <div key={label} className="text-center uppercase tracking-wide py-1">
                       {label}
-                    </div>
-                  ))}
+                    </div>)
+                   )}
                 </div>
 
                 {/* Calendar Cells */}
@@ -1827,28 +2082,30 @@ export default function Appointments() {
                     });
                     const isUnavailableDay =
                       availability?.blocked === true || !dateAvailability.isAvailable;
-                    const showAppointmentsInCell = hasAppointments && !isUnavailableDay;
+                    const isPastDate = isCurrentMonth && cell.dateKey < toClinicDateKey(new Date());
+                    const slotsRemaining = (isCurrentMonth && !isWeekendDay && !isBlocked && !holiday && !isUnavailableDay)
+                      ? getCalendarCellSlotsRemaining({
+                          dateKey: cell.dateKey,
+                          bookedAppointmentsByDate,
+                          availability,
+                          dailyVaccinationSlotLimit,
+                        })
+                      : null;
 
-                    // Determine cell styling
                     let cellClass = "relative flex flex-col justify-start items-stretch min-h-[60px] sm:min-h-[70px] p-1.5 sm:p-2 rounded-lg border transition-all ";
-
                     if (!isCurrentMonth) {
-                      // Non-current month days - faded
                       cellClass += "border-gray-100 bg-gray-50/50 dark:border-gray-800 dark:bg-gray-900/30 opacity-50 ";
                     } else if (isBlocked) {
-                      // Admin blocked date
                       cellClass += "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-900/20 ";
                     } else if (holiday) {
-                      // Holiday
                       cellClass += "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 ";
                     } else if (isWeekendDay) {
-                      // Weekend - Saturday or Sunday
                       cellClass += "border-gray-300 bg-gray-100 dark:border-gray-700 dark:bg-gray-800 ";
                     } else if (isUnavailableDay) {
-                      // Unavailable for other operational reasons
                       cellClass += "border-yellow-300 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20 ";
+                    } else if (isPastDate) {
+                      cellClass += "border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/40 ";
                     } else {
-                      // Regular weekday
                       cellClass += "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 hover:shadow-md ";
                     }
 
@@ -1856,7 +2113,7 @@ export default function Appointments() {
                       cellClass += "ring-2 ring-primary-500 ";
                     }
 
-                    return (
+                    return(
                       <button
                         key={cell.dateKey}
                         type="button"
@@ -1889,65 +2146,68 @@ export default function Appointments() {
                           >
                             {cell.date.getDate()}
                           </span>
-                          {isCurrentMonth && (
+                          {isCurrentMonth &&(
                             <div className="flex items-center gap-1">
-                              {isBlocked && (
-                                <span className="w-2 h-2 rounded-full bg-red-500" title="Blocked by Admin" />
-                              )}
-                              {showAppointmentsInCell && (
-                                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary-600 text-white">
-                                  {dayAppointments.length}
-                                </span>
-                              )}
-                            </div>
-                          )}
+                              {isBlocked &&(
+                                <span className="w-2 h-2 rounded-full bg-red-500" title="Blocked by Admin" />)
+                               }
+                              {!isWeekendDay && !isBlocked && !holiday && !isUnavailableDay && !isPastDate && slotsRemaining !== null &&(
+                                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold text-white ${
+                                  slotsRemaining === 0 ? 'bg-red-500' : slotsRemaining <= 50 ? 'bg-amber-500' : 'bg-green-500'
+                                }`}>
+                                  {slotsRemaining}
+                                </span>)
+                               }
+                            </div>)
+                           }
                         </div>
 
                         <div className="mt-1 space-y-0.5">
-                          {isCurrentMonth && isBlocked && (
+                          {isCurrentMonth && isBlocked &&(
                             <p className="text-[9px] sm:text-[10px] font-semibold text-red-600 dark:text-red-400 truncate">
                               Blocked
-                            </p>
-                          )}
-                          {isCurrentMonth && holiday && (
+                            </p>)
+                           }
+                          {isCurrentMonth && holiday &&(
                             <p className="text-[9px] sm:text-[10px] font-semibold text-amber-700 dark:text-amber-300 truncate">
                               {holiday.name}
-                            </p>
-                          )}
-                          {isCurrentMonth && isWeekendDay && !holiday && !isBlocked && (
+                            </p>)
+                           }
+                          {isCurrentMonth && isWeekendDay && !holiday && !isBlocked &&(
                             <p className="text-[9px] sm:text-[10px] font-semibold text-gray-500 dark:text-gray-400">
                               Weekend
-                            </p>
-                          )}
-                          {isCurrentMonth && isUnavailableDay && !isBlocked && !holiday && !isWeekendDay && (
+                            </p>)
+                           }
+                          {isCurrentMonth && isUnavailableDay && !isBlocked && !holiday && !isWeekendDay &&(
                             <p className="text-[9px] sm:text-[10px] font-semibold text-yellow-700 dark:text-yellow-300 truncate">
                               Unavailable
-                            </p>
-                          )}
-                          {isCurrentMonth && showAppointmentsInCell && (
-                            <div className="space-y-0.5">
-                              {dayAppointments.slice(0, 2).map((apt, idx) => (
-                                <p key={idx} className="text-[9px] sm:text-[10px] text-gray-600 dark:text-gray-400 truncate">
-                                  {apt.first_name} {apt.last_name?.charAt(0)}.
-                                </p>
-                              ))}
-                              {dayAppointments.length > 2 && (
-                                <p className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-500">
-                                  +{dayAppointments.length - 2} more
-                                </p>
-                              )}
-                            </div>
-                          )}
+                            </p>)
+                           }
+                          {isCurrentMonth && !isWeekendDay && !isBlocked && !holiday && !isUnavailableDay && isPastDate &&(
+                            <p className="text-[9px] sm:text-[10px] font-semibold text-gray-400 dark:text-gray-500">
+                              Past
+                            </p>)
+                           }
+                          {isCurrentMonth && !isWeekendDay && !isBlocked && !holiday && !isUnavailableDay && !isPastDate && slotsRemaining !== null &&(
+                            <p className={`text-[9px] sm:text-[10px] font-semibold truncate ${
+                              slotsRemaining === 0
+                                ? 'text-red-600 dark:text-red-400'
+                                : slotsRemaining <= 50
+                                  ? 'text-amber-600 dark:text-amber-400'
+                                  : 'text-green-600 dark:text-green-400'
+                            }`}>
+                              {slotsRemaining === 0 ? 'Full' : `${slotsRemaining} slots`}
+                            </p>)
+                           }
                         </div>
-                      </button>
-                    );
+                      </button>)
+                     ;
                   })}
                 </div>
-              </>
-            )}
+              </>)
+             }
           </div>
 
-          {/* Calendar Legend */}
           <div className="mt-4 flex flex-wrap gap-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg text-sm">
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded bg-red-50 border border-red-300 dark:bg-red-900/20 dark:border-red-800"></div>
@@ -1955,78 +2215,141 @@ export default function Appointments() {
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded bg-gray-100 border border-gray-300 dark:bg-gray-800 dark:border-gray-600"></div>
-              <span className="text-gray-600 dark:text-gray-400">Weekend (Sat/Sun)</span>
+              <span className="text-gray-600 dark:text-gray-400">Weekend / Past</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded bg-amber-50 border border-amber-300 dark:bg-amber-900/20 dark:border-amber-800"></div>
               <span className="text-gray-600 dark:text-gray-400">Holiday</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700"></div>
-              <span className="text-gray-600 dark:text-gray-400">Available</span>
+              <span className="w-3 h-3 rounded-full bg-green-500 inline-block"></span>
+              <span className="text-gray-600 dark:text-gray-400">Slots open</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-primary-600"></div>
-              <span className="text-gray-600 dark:text-gray-400">Has Appointments</span>
+              <span className="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>
+              <span className="text-gray-600 dark:text-gray-400">&le;50 slots left</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-red-500 inline-block"></span>
+              <span className="text-gray-600 dark:text-gray-400">Full (0 remaining)</span>
             </div>
           </div>
 
           {/* Selected Date Details */}
-          {selectedDate && (
+          {selectedDate &&(
             <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
               <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
                 Appointments for {selectedDateLabel}
               </h4>
-              {(() => {
+              { (()=> {
                 if (selectedDateDetails?.availability?.available === false) {
-                  return (
+                  return(
                     <Alert variant="warning">
                       This date is unavailable for booking. Appointment entries are hidden.
-                    </Alert>
-                  );
+                    </Alert>)
+                   ;
                 }
-                if ((selectedDateDetails?.appointments || []).length === 0) {
-                  return (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      No appointments scheduled for this date.
-                    </p>
-                  );
-                }
-                return (
-                  <div className="space-y-2">
-                    {(selectedDateDetails?.appointments || []).map((apt, idx) => (
-                      <div
-                        key={`apt-${apt.id}-${idx}`}
-                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
-                      >
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-gray-100">
-                            {apt.first_name} {apt.last_name}
-                          </p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {formatClinicTime(apt.scheduled_date)} - {apt.type || "General Checkup"}
-                          </p>
-                        </div>
-                        <Badge
-                          variant={getAppointmentStatusVariant(apt.status)}
+                return(
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    {[
+                      {
+                        key: "attended",
+                        label: "Attended",
+                        emptyLabel: "No attended appointments",
+                        headerClassName:
+                          "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300",
+                        countClassName:
+                          "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-200",
+                      },
+                      {
+                        key: "scheduled",
+                        label: "Scheduled",
+                        emptyLabel: "No scheduled appointments",
+                        headerClassName:
+                          "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300",
+                        countClassName:
+                          "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200",
+                      },
+                      {
+                        key: "noShow",
+                        label: "No Show",
+                        emptyLabel: "No no show appointments",
+                        headerClassName:
+                          "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300",
+                        countClassName:
+                          "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
+                      },
+                      {
+                        key: "cancelled",
+                        label: "Cancelled",
+                        emptyLabel: "No cancelled appointments",
+                        headerClassName:
+                          "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300",
+                        countClassName:
+                          "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200",
+                      },
+                    ].map((column) => {
+                      const columnAppointments =
+                        selectedDateAppointmentsByStatus[column.key] || [];
+
+                      return(
+                        <div
+                          key={column.key}
+                          className="min-w-0 rounded-xl border border-gray-200 bg-gray-50/60 dark:border-gray-700 dark:bg-gray-900/20"
                         >
-                          {getAppointmentDisplayStatus(apt)}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-            </div>
-          )}
+                          <div
+                            className={`flex items-center justify-between gap-3 rounded-t-xl border-b px-4 py-3 ${column.headerClassName}`}
+                          >
+                            <p className="text-sm font-semibold uppercase tracking-wide">
+                              {column.label}
+                            </p>
+                            <span
+                              className={`inline-flex min-w-[2rem] items-center justify-center rounded-full px-2 py-1 text-xs font-bold ${column.countClassName}`}
+                            >
+                              {columnAppointments.length}
+                            </span>
+                          </div>
+                          <div className="max-h-[320px] space-y-2 overflow-y-auto p-3 modern-scrollbar">
+                            {columnAppointments.length === 0 ?(
+                              <p className="rounded-lg border border-dashed border-gray-200 bg-white px-3 py-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400">
+                                {column.emptyLabel}
+                              </p>)
+                              :(
+                              columnAppointments.map((appointment, idx) =>(
+                                <div
+                                  key={`apt-${column.key}-${appointment.id}-${idx}`}
+                                  className="rounded-lg bg-white p-3 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800/70 dark:ring-gray-700/70"
+                                >
+                                  <p className="font-medium text-gray-900 dark:text-gray-100">
+                                    {appointment.guardian_name || `${appointment.first_name || ""} ${appointment.last_name || ""}`.trim()}
+                                  </p>
+                                  <p className="text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                                    {appointment.type || "General Checkup"}
+                                  </p>
+                                </div>)
+                               ))
+                             }
+                          </div>
+                        </div>)
+                       ;
+                    })}
+                  </div>)
+                 ;
+              }  )()}
+            </div>)
+           }
           </div>
         </PageContainer>
-        </div>
-      ) : (
+        </div>)
+        :(
         <div className="flex-1 flex min-h-0 min-w-0 flex-col overflow-hidden p-4 pt-3 sm:px-6 sm:pb-6">
           {/* Filter Controls */}
-          <div className="flex-shrink-0 z-20 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4 mb-3">
-            <div className="flex flex-wrap items-center gap-3">
+          <div
+            className="flex-shrink-0 z-20 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4 mb-3"
+            data-testid="appointments-list-toolbar"
+          >
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
               {/* 1. Search Input */}
               <div className="relative flex-shrink-0 w-48">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -2035,8 +2358,18 @@ export default function Appointments() {
                   placeholder="Search..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full pl-10 pr-9 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    aria-label="Clear search"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  >
+                    <X className="w-4 h-4" aria-hidden="true" />
+                  </button>
+                )}
               </div>
 
               {/* 2. Status Dropdown */}
@@ -2057,28 +2390,43 @@ export default function Appointments() {
                 </select>
               </div>
 
-              {/* 3. Date Range Start */}
+              {/* 3. Period Dropdown */}
               <div className="flex-shrink-0">
-                <PortalDatePicker
-                  value={dateFilterStart}
-                  onChange={(e) => setDateFilterStart(e.target.value)}
-                  aria-label="Start date"
-                  placeholder="Start date"
-                />
+                <select
+                  value={period}
+                  onChange={(e) => setPeriod(e.target.value)}
+                  className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-[140px]"
+                  aria-label="Period filter"
+                >
+                  <option value="today">Today</option>
+                  <option value="week">This Week</option>
+                  <option value="month">This Month</option>
+                  <option value="custom">Custom Date Range</option>
+                </select>
               </div>
 
-              {/* 4. Separator Text */}
-              <span className="text-gray-500 dark:text-gray-400 text-sm flex-shrink-0">to</span>
-
-              {/* 5. Date Range End */}
-              <div className="flex-shrink-0">
-                <PortalDatePicker
-                  value={dateFilterEnd}
-                  onChange={(e) => setDateFilterEnd(e.target.value)}
-                  aria-label="End date"
-                  placeholder="End date"
-                />
-              </div>
+              {/* 4. Custom Date Pickers — only visible when Custom Date Range is selected */}
+              {period === "custom" && (
+                <>
+                  <div className="flex-shrink-0">
+                    <PortalDatePicker
+                      value={dateFilterStart}
+                      onChange={(e) => setDateFilterStart(e.target.value)}
+                      aria-label="Start date"
+                      placeholder="Start date"
+                    />
+                  </div>
+                  <span className="text-gray-500 dark:text-gray-400 text-sm flex-shrink-0">to</span>
+                  <div className="flex-shrink-0">
+                    <PortalDatePicker
+                      value={dateFilterEnd}
+                      onChange={(e) => setDateFilterEnd(e.target.value)}
+                      aria-label="End date"
+                      placeholder="End date"
+                    />
+                  </div>
+                </>
+              )}
 
               {/* 6. Sort Direction Toggle */}
               <button
@@ -2093,19 +2441,20 @@ export default function Appointments() {
               </button>
 
               {/* 7. Clear Filters Button (optional, when filters are active) */}
-              {(searchQuery || statusFilter !== 'all' || dateFilterStart || dateFilterEnd) && (
+              {(searchQuery || statusFilter !== 'all' || period !== 'month' || dateFilterStart || dateFilterEnd) &&(
                 <button
                   onClick={() => {
                     setSearchQuery("");
                     setStatusFilter("all");
+                    setPeriod("month");
                     setDateFilterStart("");
                     setDateFilterEnd("");
                   }}
                   className="px-3 py-2 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium flex-shrink-0"
                 >
                   Clear
-                </button>
-              )}
+                </button>)
+               }
 
               {/* Results Count - Spacer */}
               <div className="flex-1 min-w-[100px]">
@@ -2113,33 +2462,35 @@ export default function Appointments() {
                   {visibleAppointmentEnd} of {totalAppointments}
                 </span>
               </div>
+              </div>
+
+              {todayVaccinationSlotsIndicator}
             </div>
           </div>
 
-          {filteredAppointments.length === 0 ? (
+          {filteredAppointments.length === 0 ?(
             <EmptyState
               title="No appointments found"
               description="No appointments match your search criteria. Try adjusting your filters or schedule a new appointment."
-              icon="📅"
               actionLabel="Schedule New Appointment"
               onAction={() => setShowBookingModal(true)}
               className="py-20 flex-1"
-            />
-          ) : (
+            />)
+            :(
             <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
               <div className="flex-1 overflow-auto auto-hide-scrollbar">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 relative">
                   <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                     <tr>
-                      {columns.map((col) => (
+                      {columns.map((col) =>(
                         <th
                           key={col.key}
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700"
                         >
                           {col.label}
-                        </th>
-                      ))}
+                        </th>)
+                       )}
                       <th
                         scope="col"
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700"
@@ -2149,22 +2500,22 @@ export default function Appointments() {
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {paginatedAppointments.map((row) => (
+                    {paginatedAppointments.map((row) =>(
                       <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                        {columns.map((col, colIndex) => (
+                        {columns.map((col, colIndex) =>(
                           <td key={col.key || colIndex} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                             {col.render
                               ? col.render(row[col.key], row)
                               : col.type === "datetime" && row[col.key]
-                                ? formatClinicDateTime(row[col.key])
+                                ? formatClinicDateLabel(row[col.key])
                                 : row[col.key]}
-                          </td>
-                        ))}
+                          </td>)
+                         )}
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           {tableActions(row)}
                         </td>
-                      </tr>
-                    ))}
+                      </tr>)
+                     )}
                   </tbody>
                 </table>
               </div>
@@ -2198,10 +2549,10 @@ export default function Appointments() {
                 disablePrevious={!listPagination?.hasPrev || listPage === 1}
                 disableNext={!listPagination?.hasNext || listPage === totalPages}
               />
-            </div>
-          )}
-        </div>
-      )}
+            </div>)
+           }
+        </div>)
+       }
 
       {/* Date Details Modal */}
       <Modal
@@ -2226,7 +2577,7 @@ export default function Appointments() {
                 setShowDateDetailsModal(false);
                 setShowBookingModal(true);
                 if (selectedDate) {
-                  setCreateFormData((prev) => ({
+                  setCreateFormData((prev) =>( {
                     ...prev,
                     scheduled_date: selectedDate,
                   }));
@@ -2244,7 +2595,7 @@ export default function Appointments() {
       >
         <div className="space-y-4">
           {/* Availability Info */}
-          {selectedDate && (() => {
+          {selectedDate &&  (()=> {
             const holiday = selectedDateDetails?.holiday || isPhilippineHoliday(selectedDate);
             const selectedDateAvailability = selectedDateDetails?.availability || resolveDateAvailability(selectedDate, {
               allowPast: true,
@@ -2252,39 +2603,39 @@ export default function Appointments() {
             const isBlocked = selectedDateDetails?.blocked || blockedDates[selectedDate]?.is_blocked;
 
             if (isBlocked) {
-              return (
+              return(
                 <Alert variant="danger">
                   <strong>Blocked by Administrator</strong> - This date has been blocked and appointments cannot be scheduled. Click on the date in the calendar to unblock it.
-                </Alert>
-              );
+                </Alert>)
+               ;
             }
             if (!selectedDateAvailability.isAvailable && holiday) {
-              return (
+              return(
                 <Alert variant="warning">
                   <strong>{holiday.name}</strong> - This is a Philippine {holiday.type || 'regular'} holiday. Appointments cannot be scheduled on holidays.
-                </Alert>
-              );
+                </Alert>)
+               ;
             }
             if (!selectedDateAvailability.isAvailable && selectedDateAvailability.code === "WEEKEND_RESTRICTED") {
-              return (
+              return(
                 <Alert variant="warning">
                   This date falls on a weekend (Saturday or Sunday). Appointments are only available on weekdays (Monday-Friday).
-                </Alert>
-              );
+                </Alert>)
+               ;
             }
             if (!selectedDateAvailability.isAvailable) {
-              return (
+              return(
                 <Alert variant="warning">
                   {selectedDateAvailability.reason || "This date is unavailable for booking."}
-                </Alert>
-              );
+                </Alert>)
+               ;
             }
-            return (
+            return(
               <Alert variant="info">
                 This date is available for booking appointments.
-              </Alert>
-            );
-          })()}
+              </Alert>)
+             ;
+          }                  )()}
 
           {/* Appointment Summary */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -2303,7 +2654,7 @@ export default function Appointments() {
             <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
               <p className="text-xs text-gray-500">Status</p>
               <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                {(() => {
+                { (()=> {
                   const selectedDateAvailability = selectedDateDetails?.availability || resolveDateAvailability(selectedDate, {
                     allowPast: true,
                   });
@@ -2316,7 +2667,7 @@ export default function Appointments() {
                     return "Holiday";
                   }
 
-                  if (!selectedDateAvailability.isAvailable && (selectedDateDetails?.isWeekend ?? (selectedDate && isWeekend(selectedDate)))) {
+                  if (!selectedDateAvailability.isAvailable &&                                    (selectedDateDetails?.isWeekend??(selectedDate&&isWeekend(selectedDate)))){
                     return "Weekend (Sat/Sun)";
                   }
 
@@ -2325,7 +2676,7 @@ export default function Appointments() {
                   }
 
                   return "Available";
-                })()}
+                }  )()}
               </p>
             </div>
           </div>
@@ -2335,21 +2686,21 @@ export default function Appointments() {
             <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
               Appointments for this date:
             </h4>
-            {selectedDateDetails?.availability?.available === false ? (
+            {selectedDateDetails?.availability?.available === false ?(
               <Alert variant="warning">
                 Appointment entries are hidden for unavailable dates.
-              </Alert>
-            ) : ((selectedDateDetails?.appointments || []).length === 0 ? (
-              <p className="text-sm text-gray-500">No appointments scheduled for this date.</p>
-            ) : (
-              (selectedDateDetails?.appointments || []).map((appointment, index) => (
+              </Alert>)
+              :                                                           ((selectedDateDetails?.appointments||[]).length===0?(
+              <p className="text-sm text-gray-500">No appointments scheduled for this date.</p>)
+              :
+                                                           ((selectedDateDetails?.appointments||[]).map((appointment,index)=>(
                 <div
                   key={`appointment-${appointment.id}-${index}`}
                   className="rounded-xl border border-gray-200 dark:border-gray-700 p-3"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
-                      {(appointment.first_name || "Infant") + " " + (appointment.last_name || "")}
+                      {(appointment.first_name || "Infant") + " " +( appointment.last_name || "")}
                     </p>
                     <Badge
                       variant={getAppointmentStatusVariant(appointment.status)}
@@ -2361,9 +2712,9 @@ export default function Appointments() {
                   <p className="text-xs text-gray-500 mt-1">
                     {formatClinicTime(appointment.scheduled_date)} - {appointment.type || "General Checkup"}
                   </p>
-                </div>
-              ))
-            ))}
+                </div>)
+               )))
+              }
           </div>
         </div>
       </Modal>
@@ -2433,16 +2784,16 @@ export default function Appointments() {
         }
       >
         <div className="admin-form">
-          {selectedSlot && (
+          {selectedSlot &&(
             <div className="admin-info-card admin-info-card-info">
               <div className="admin-info-card-content">
                 <p className="admin-info-card-text flex items-center gap-2">
-                  <span>📅</span> Selected Date:{" "}
+                  Selected Date:{" "}
                   {selectedDateLabel}
                 </p>
               </div>
-            </div>
-          )}
+            </div>)
+           }
 
           {/* Patient Selection */}
           <SearchableInfantSelect
@@ -2461,19 +2812,19 @@ export default function Appointments() {
                 );
               }
 
-              setCreateFormData((prev) => ({
+              setCreateFormData((prev) =>( {
                 ...prev,
                 infant_id: infantId,
               }));
-              setFormErrors((prev) => ({ ...prev, infant_id: undefined }));
+              setFormErrors((prev) =>( { ...prev, infant_id: undefined }));
             }}
             label="Select Infant"
             required
             placeholder="Search by name, control number, or date of birth..."
             disabled={isSubmitting}
             error={
-              formErrors.infant_id ||
-              (bookingInfantError
+              formErrors.infant_id ||(
+               bookingInfantError
                 ? "Unable to load infants right now. Please try again."
                 : "")
             }
@@ -2515,7 +2866,7 @@ export default function Appointments() {
                     ...createFormData,
                     scheduled_date: e.target.value,
                   });
-                  setFormErrors((prev) => ({
+                  setFormErrors((prev) =>( {
                     ...prev,
                     scheduled_date: undefined,
                   }));
@@ -2540,31 +2891,31 @@ export default function Appointments() {
                     ...createFormData,
                     scheduled_time: e.target.value,
                   });
-                  setFormErrors((prev) => ({
+                  setFormErrors((prev) =>( {
                     ...prev,
                     scheduled_time: undefined,
                   }));
                 }}
                 error={formErrors.scheduled_time}
-                disabled={isSubmitting || timeSlotsLoading || (timeSlotsFeedback && !timeSlotsFeedback.available)}
+                disabled={isSubmitting || timeSlotsLoading ||( timeSlotsFeedback && !timeSlotsFeedback.available)}
                 aria-required="true"
               >
                 <option value="">
                   {timeSlotsLoading ? "Loading time slots..." : "Select time"}
                 </option>
-                {timeSlots.map((slot) => (
+                {timeSlots.map((slot) =>(
                   <option key={slot} value={slot}>
                     {formatTimeSlotLabel(slot)}
-                  </option>
-                ))}
+                  </option>)
+                 )}
               </Select>
-              {timeSlotsFeedback && !timeSlotsFeedback.available && !timeSlotsLoading && (
-                <p className="text-xs text-red-500 mt-1">{timeSlotsFeedback.message}</p>
-              )}
+              {timeSlotsFeedback && !timeSlotsFeedback.available && !timeSlotsLoading &&(
+                <p className="text-xs text-red-500 mt-1">{timeSlotsFeedback.message}</p>)
+               }
             </div>
           </div>
 
-          {bookingAvailabilityStatus ? (
+          {bookingAvailabilityStatus ?(
             <Alert
               variant={
                 bookingAvailabilityStatus === "available"
@@ -2576,8 +2927,8 @@ export default function Appointments() {
               className="mb-4"
             >
               {bookingAvailabilityMessage}
-            </Alert>
-          ) : null}
+            </Alert>)
+            : null}
 
           <div className="admin-field-group">
             <label className="admin-field-label">Appointment Type</label>
@@ -2588,7 +2939,7 @@ export default function Appointments() {
                   ...createFormData,
                   type: e.target.value,
                 });
-                setFormErrors((prev) => ({ ...prev, type: undefined }));
+                setFormErrors((prev) =>( { ...prev, type: undefined }));
               }}
               disabled={isSubmitting}
               error={formErrors.type}
@@ -2611,7 +2962,7 @@ export default function Appointments() {
                   ...createFormData,
                   notes: e.target.value,
                 });
-                setFormErrors((prev) => ({ ...prev, notes: undefined }));
+                setFormErrors((prev) =>( { ...prev, notes: undefined }));
               }}
               disabled={isSubmitting}
               rows={3}
@@ -2619,22 +2970,22 @@ export default function Appointments() {
               placeholder="Additional notes..."
               maxLength={500}
             />
-            {formErrors.notes && (
-              <span className="admin-field-error">{formErrors.notes}</span>
-            )}
+            {formErrors.notes &&(
+              <span className="admin-field-error">{formErrors.notes}</span>)
+             }
           </div>
 
-          {error && (
+          {error &&(
             <Alert variant="error" className="mb-4">
               {error}
-            </Alert>
-          )}
+            </Alert>)
+           }
 
-          {createFormError && (
+          {createFormError &&(
             <Alert variant="error" className="mb-4">
               {createFormError}
-            </Alert>
-          )}
+            </Alert>)
+           }
         </div>
       </Modal>
 
@@ -2662,7 +3013,7 @@ export default function Appointments() {
           </AdminModalActions>
         }
       >
-        {selectedAppointment && (
+        {selectedAppointment &&(
           <div className="space-y-4">
             <div className="admin-form-row-2">
               <div>
@@ -2715,8 +3066,8 @@ export default function Appointments() {
               </div>
             </div>
 
-          </div>
-        )}
+          </div>)
+         }
       </Modal>
 
       {/* Edit Appointment Modal */}
@@ -2755,17 +3106,17 @@ export default function Appointments() {
       }
       >
         <form id="appointmentEditForm" className="admin-form" onSubmit={handleUpdateAppointment}>
-          {editFormData.scheduled_date && resolveDateAvailability(editFormData.scheduled_date, { allowPast: false }) && !resolveDateAvailability(editFormData.scheduled_date, { allowPast: false }).isAvailable && (
+          {editFormData.scheduled_date && resolveDateAvailability(editFormData.scheduled_date, { allowPast: false }) && !resolveDateAvailability(editFormData.scheduled_date, { allowPast: false }).isAvailable &&(
             <Alert variant="warning" className="mb-3">
               {resolveDateAvailability(editFormData.scheduled_date, { allowPast: false }).reason}
-            </Alert>
-          )}
+            </Alert>)
+           }
 
           {/* Patient Info Card */}
           <div className="admin-form-card admin-form-card-info">
             <div className="admin-form-card-header">
               <h4 className="admin-form-card-title">
-                <span>👶</span> Patient Information
+                Patient Information
               </h4>
             </div>
             <div className="admin-form-row-2">
@@ -2805,7 +3156,7 @@ export default function Appointments() {
                     ...editFormData,
                     scheduled_date: e.target.value,
                   });
-                  setEditFormErrors((prev) => ({
+                  setEditFormErrors((prev) =>( {
                     ...prev,
                     scheduled_date: undefined,
                   }));
@@ -2830,27 +3181,27 @@ export default function Appointments() {
                     ...editFormData,
                     scheduled_time: e.target.value,
                   });
-                  setEditFormErrors((prev) => ({
+                  setEditFormErrors((prev) =>( {
                     ...prev,
                     scheduled_time: undefined,
                   }));
                 }}
-                disabled={isSubmitting || timeSlotsLoading || (timeSlotsFeedback && !timeSlotsFeedback.available)}
+                disabled={isSubmitting || timeSlotsLoading ||( timeSlotsFeedback && !timeSlotsFeedback.available)}
                 error={editFormErrors.scheduled_time}
                 aria-required="true"
               >
                 <option value="">
                   {timeSlotsLoading ? "Loading time slots..." : "Select time"}
                 </option>
-                {timeSlots.map((slot) => (
+                {timeSlots.map((slot) =>(
                   <option key={slot} value={slot}>
                     {formatTimeSlotLabel(slot)}
-                  </option>
-                ))}
+                  </option>)
+                 )}
               </Select>
-              {timeSlotsFeedback && !timeSlotsFeedback.available && !timeSlotsLoading && (
-                <p className="text-xs text-red-500 mt-1">{timeSlotsFeedback.message}</p>
-              )}
+              {timeSlotsFeedback && !timeSlotsFeedback.available && !timeSlotsLoading &&(
+                <p className="text-xs text-red-500 mt-1">{timeSlotsFeedback.message}</p>)
+               }
             </div>
           </div>
 
@@ -2860,7 +3211,7 @@ export default function Appointments() {
               value={editFormData.type}
               onChange={(e) => {
                 setEditFormData({ ...editFormData, type: e.target.value });
-                setEditFormErrors((prev) => ({ ...prev, type: undefined }));
+                setEditFormErrors((prev) =>( { ...prev, type: undefined }));
               }}
               disabled={isSubmitting}
               error={editFormErrors.type}
@@ -2880,7 +3231,7 @@ export default function Appointments() {
               value={editFormData.notes}
               onChange={(e) => {
                 setEditFormData({ ...editFormData, notes: e.target.value });
-                setEditFormErrors((prev) => ({ ...prev, notes: undefined }));
+                setEditFormErrors((prev) =>( { ...prev, notes: undefined }));
               }}
               disabled={isSubmitting}
               rows={3}
@@ -2888,16 +3239,16 @@ export default function Appointments() {
               placeholder="Additional notes..."
               maxLength={500}
             />
-            {editFormErrors.notes && (
-              <span className="admin-field-error">{editFormErrors.notes}</span>
-            )}
+            {editFormErrors.notes &&(
+              <span className="admin-field-error">{editFormErrors.notes}</span>)
+             }
           </div>
 
-          {error && (
+          {error &&(
             <Alert variant="error" className="mb-4">
               {error}
-            </Alert>
-          )}
+            </Alert>)
+           }
         </form>
       </Modal>
 
@@ -2942,7 +3293,6 @@ export default function Appointments() {
         <form id="appointmentCancelForm" className="admin-form" onSubmit={handleConfirmCancelAppointment}>
         <div className="text-center mb-6">
           <div className="w-16 h-16 mx-auto bg-danger-100 dark:bg-danger-900/30 rounded-full flex items-center justify-center mb-4">
-            <span className="text-3xl">⚠️</span>
           </div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
             Are you sure you want to cancel this appointment?
@@ -2953,7 +3303,7 @@ export default function Appointments() {
           </p>
         </div>
 
-        {selectedAppointment && (
+        {selectedAppointment &&(
           <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-4">
             <div className="admin-form-row-2 text-sm">
               <div>
@@ -2976,8 +3326,8 @@ export default function Appointments() {
                 </p>
               </div>
             </div>
-          </div>
-        )}
+          </div>)
+         }
 
         <div className="admin-field-group">
           <label className="admin-field-label">Cancellation Reason</label>
@@ -2995,11 +3345,11 @@ export default function Appointments() {
             />
         </div>
 
-        {cancelModalError && (
+        {cancelModalError &&(
           <Alert variant="error" className="mt-2">
             {cancelModalError}
-          </Alert>
-        )}
+          </Alert>)
+         }
         </form>
       </Modal>
       {/* Screen reader announcements */}
@@ -3014,6 +3364,5 @@ export default function Appointments() {
           : `List view showing ${visibleAppointmentEnd} of ${totalAppointments} appointments`
         }
       </div>
-    </div>
-  );
-}
+    </div>)
+   ;  }

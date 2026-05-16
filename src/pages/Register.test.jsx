@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen                     } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import Register from './Register';
 import { AuthProvider } from '../contexts/AuthContext';
@@ -11,7 +11,7 @@ jest.mock('../hooks/useNetworkStatus');
 jest.mock('../utils/api');
 
 const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
+jest.mock('react-router-dom', () =>( {
   ...jest.requireActual('react-router-dom'),
   useNavigate: () => mockNavigate,
   Link: ({ children, to }) => <a href={to}>{children}</a>,
@@ -48,5 +48,5 @@ describe('Register Component', () => {
     expect(screen.getByLabelText(/Confirm Password/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Create Account/i })).toBeInTheDocument();
   });
-  
+
 });

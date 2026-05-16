@@ -1155,6 +1155,20 @@ body {
     display: none !important;
   }
 
+  /* Keep Records / Booklet visible on mobile for guardian vaccination records */
+  .guardian-vaccination-records-page .guardian-module-mobile-header .page-header__actions {
+    display: flex !important;
+    align-items: stretch;
+  }
+
+  .guardian-vaccination-records-page .guardian-vaccination-records-view-toggle {
+    width: 100%;
+  }
+
+  .guardian-vaccination-records-page .guardian-vaccination-records-view-toggle > * {
+    flex: 1 1 100%;
+  }
+
   .guardian-module-mobile-header .page-header__container {
     padding: 0.875rem 0.95rem;
   }

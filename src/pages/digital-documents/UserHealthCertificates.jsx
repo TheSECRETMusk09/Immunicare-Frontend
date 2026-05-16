@@ -6,7 +6,7 @@ import { Button, Card, PageHeader } from "../../components/UI";
 import { normalizeArrayPayload } from "../../utils/apiUtils";
 
 export default function UserHealthCertificates() {
-  const { user, guardianId } = useAuth();
+  const {       guardianId } = useAuth();
   const navigate = useNavigate();
   const [children, setChildren] = useState([]);
   const [selectedChild, setSelectedChild] = useState(null);
@@ -137,25 +137,25 @@ export default function UserHealthCertificates() {
   });
 
   if (loading) {
-    return (
+    return(
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+      </div>)
+     ;
   }
 
   if (error) {
-    return (
+    return(
       <div className="text-center py-8">
         <div className="text-red-600">Error: {error}</div>
         <Button onClick={fetchChildren} className="mt-4">
           Retry
         </Button>
-      </div>
-    );
+      </div>)
+     ;
   }
 
-  return (
+  return(
     <div className="space-y-6">
       {/* Header */}
       <PageHeader
@@ -164,7 +164,7 @@ export default function UserHealthCertificates() {
         actions={<Button>📋 Request Certificate</Button>}
       />
 
-      {children.length === 0 ? (
+      {children.length === 0 ?(
         <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center">
           <div className="text-6xl mb-4">🏥</div>
           <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">
@@ -177,8 +177,8 @@ export default function UserHealthCertificates() {
           <Button onClick={() => navigate("/guardian/children")}>
             Register Child
           </Button>
-        </div>
-      ) : (
+        </div>)
+        :(
         <>
           {/* Child Selector */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6">
@@ -186,7 +186,7 @@ export default function UserHealthCertificates() {
               Select Child
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {children.map((child) => (
+              {children.map((child) =>(
                 <button
                   key={child.id}
                   onClick={() => setSelectedChild(child)}
@@ -211,8 +211,8 @@ export default function UserHealthCertificates() {
                       </p>
                     </div>
                   </div>
-                </button>
-              ))}
+                </button>)
+               )}
             </div>
           </div>
 
@@ -223,7 +223,7 @@ export default function UserHealthCertificates() {
                 { key: "all", label: "All Certificates" },
                 { key: "available", label: "Available" },
                 { key: "requested", label: "Requested" },
-              ].map((tab) => (
+              ].map((tab) =>(
                 <button
                   key={tab.key}
                   onClick={() => setFilter(tab.key)}
@@ -234,15 +234,15 @@ export default function UserHealthCertificates() {
                   }`}
                 >
                   {tab.label}
-                </button>
-              ))}
+                </button>)
+               )}
             </div>
           </div>
 
           {/* Certificates List */}
-          {selectedChild && (
+          {selectedChild &&(
             <div className="space-y-4">
-              {filteredCertificates.length === 0 ? (
+              {filteredCertificates.length === 0 ?(
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center">
                   <div className="text-6xl mb-4">📄</div>
                   <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">
@@ -251,11 +251,11 @@ export default function UserHealthCertificates() {
                   <p className="text-gray-600 dark:text-gray-400">
                     No certificates match the current filter.
                   </p>
-                </div>
-              ) : (
-                filteredCertificates.map((certificate) => {
+                </div>)
+                :
+                                        (filteredCertificates.map((certificate)=>{
                   const status = getStatusBadge(certificate.status);
-                  return (
+                  return(
                     <Card key={certificate.id} className="p-6">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
@@ -280,30 +280,30 @@ export default function UserHealthCertificates() {
                               >
                                 {status.text}
                               </span>
-                              {certificate.issued_date && (
+                              {certificate.issued_date &&(
                                 <span className="text-sm text-gray-500 dark:text-gray-400">
                                   Issued: {formatDate(certificate.issued_date)}
-                                </span>
-                              )}
-                              {certificate.expiry_date && (
+                                </span>)
+                               }
+                              {certificate.expiry_date &&(
                                 <span className="text-sm text-gray-500 dark:text-gray-400">
                                   Expires: {formatDate(certificate.expiry_date)}
-                                </span>
-                              )}
+                                </span>)
+                               }
                             </div>
                           </div>
                         </div>
                         <div className="flex gap-2">
                           {certificate.status === "available" &&
-                          certificate.document_url ? (
+                          certificate.document_url ?(
                             <Button onClick={() => handleDownload(certificate)}>
                               📄 Download
-                            </Button>
-                          ) : certificate.status === "requested" ? (
+                            </Button>)
+                            : certificate.status === "requested" ?(
                             <Button variant="secondary" disabled>
                               ⏳ Processing
-                            </Button>
-                          ) : (
+                            </Button>)
+                            :(
                             <Button
                               variant="secondary"
                               onClick={() =>
@@ -311,16 +311,16 @@ export default function UserHealthCertificates() {
                               }
                             >
                               📋 Request
-                            </Button>
-                          )}
+                            </Button>)
+                           }
                         </div>
                       </div>
-                    </Card>
-                  );
-                })
-              )}
-            </div>
-          )}
+                    </Card>)
+                   ;
+                }))
+               }
+            </div>)
+           }
 
           {/* Available Certificate Types */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6">
@@ -359,7 +359,7 @@ export default function UserHealthCertificates() {
                   icon: "🏫",
                   description: "School enrollment medical form",
                 },
-              ].map((cert) => (
+              ].map((cert) =>(
                 <div
                   key={cert.type}
                   className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
@@ -381,12 +381,12 @@ export default function UserHealthCertificates() {
                   >
                     📋 Request
                   </Button>
-                </div>
-              ))}
+                </div>)
+               )}
             </div>
           </div>
-        </>
-      )}
-    </div>
-  );
+        </>)
+       }
+    </div>)
+   ;
 }

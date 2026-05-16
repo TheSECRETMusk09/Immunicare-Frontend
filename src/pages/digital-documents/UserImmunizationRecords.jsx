@@ -2,12 +2,12 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../utils/api";
-import { Button, Card, PageHeader } from "../../components/UI";
+import { Button,       PageHeader } from "../../components/UI";
 import ImmunizationRecordBooklet from "../../components/ImmunizationRecordBooklet";
 import { normalizeArrayPayload } from "../../utils/apiUtils";
 
 export default function UserImmunizationRecords() {
-  const { user, guardianId } = useAuth();
+  const {       guardianId } = useAuth();
   const navigate = useNavigate();
   const [children, setChildren] = useState([]);
   const [selectedChild, setSelectedChild] = useState(null);
@@ -51,7 +51,7 @@ export default function UserImmunizationRecords() {
   const fetchVaccinationRecords = async (childId) => {
     try {
       const response = await apiClient.getVaccinationsByInfant(childId);
-      setVaccinationRecords(Array.isArray(response) ? response : (response?.data || []));
+      setVaccinationRecords(Array.isArray(response) ? response :( response?.data || []));
     } catch (err) {
       console.error("Error fetching vaccination records:", err);
     }
@@ -89,25 +89,25 @@ export default function UserImmunizationRecords() {
   };
 
   if (loading) {
-    return (
+    return(
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+      </div>)
+     ;
   }
 
   if (error) {
-    return (
+    return(
       <div className="text-center py-8">
         <div className="text-red-600">Error: {error}</div>
         <Button onClick={fetchChildren} className="mt-4">
           Retry
         </Button>
-      </div>
-    );
+      </div>)
+     ;
   }
 
-  return (
+  return(
     <div className="space-y-6">
       {/* Header */}
       <PageHeader
@@ -131,7 +131,7 @@ export default function UserImmunizationRecords() {
         }
       />
 
-      {children.length === 0 ? (
+      {children.length === 0 ?(
         <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center">
           <div className="text-6xl mb-4">💉</div>
           <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">
@@ -144,8 +144,8 @@ export default function UserImmunizationRecords() {
           <Button onClick={() => navigate("/guardian/children")}>
             Register Child
           </Button>
-        </div>
-      ) : (
+        </div>)
+        :(
         <>
           {/* Child Selector */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6">
@@ -153,7 +153,7 @@ export default function UserImmunizationRecords() {
               Select Child
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {children.map((child) => (
+              {children.map((child) =>(
                 <div
                   key={child.id}
                   className={`p-4 rounded-lg border-2 transition-all ${
@@ -197,15 +197,15 @@ export default function UserImmunizationRecords() {
                       Click to view detailed records
                     </div>
                   </button>
-                </div>
-              ))}
+                </div>)
+               )}
             </div>
           </div>
 
           {/* Records Content */}
-          {selectedChild && (
+          {selectedChild &&(
             <>
-              {viewMode === "list" ? (
+              {viewMode === "list" ?(
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
                   <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex justify-between items-center">
@@ -247,7 +247,7 @@ export default function UserImmunizationRecords() {
                       <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         {vaccinationRecords.map((vaccine) => {
                           const status = getVaccineStatus(vaccine);
-                          return (
+                          return(
                             <tr
                               key={vaccine.id}
                               className="hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -288,26 +288,26 @@ export default function UserImmunizationRecords() {
                                   📄 Certificate
                                 </Button>
                               </td>
-                            </tr>
-                          );
+                            </tr>)
+                           ;
                         })}
                       </tbody>
                     </table>
                   </div>
 
-                  {vaccinationRecords.length === 0 && (
+                  {vaccinationRecords.length === 0 &&(
                     <div className="p-6 text-center text-gray-500 dark:text-gray-400">
                       No immunization records found.
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <ImmunizationRecordBooklet infantId={selectedChild.id} />
-              )}
-            </>
-          )}
-        </>
-      )}
-    </div>
-  );
+                    </div>)
+                   }
+                </div>)
+                :(
+                <ImmunizationRecordBooklet infantId={selectedChild.id} />)
+               }
+            </>)
+           }
+        </>)
+       }
+    </div>)
+   ;
 }

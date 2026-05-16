@@ -42,7 +42,6 @@ export default function HealthAlerts({
           newAlerts.push({
             id: `vaccine-overdue-${infant.id}`,
             type: "critical",
-            icon: "⚠️",
             title: "Vaccination Overdue",
             message: `${infant.first_name} ${infant.last_name} is overdue for ${infant.nextVaccination} vaccination`,
             childId: infant.id,
@@ -56,7 +55,6 @@ export default function HealthAlerts({
           newAlerts.push({
             id: `vaccine-due-soon-${infant.id}`,
             type: "warning",
-            icon: "⚠️",
             title: "Vaccination Due Soon",
             message: `${infant.first_name} ${infant.last_name} is due for ${infant.nextVaccination} in ${daysUntilDue} days`,
             childId: infant.id,
@@ -70,7 +68,6 @@ export default function HealthAlerts({
           newAlerts.push({
             id: `vaccine-due-${infant.id}`,
             type: "info",
-            icon: "💉",
             title: "Upcoming Vaccination",
             message: `${infant.first_name} ${infant.last_name} has ${infant.nextVaccination} scheduled`,
             childId: infant.id,
@@ -88,7 +85,6 @@ export default function HealthAlerts({
         newAlerts.push({
           id: `growth-update-${infant.id}`,
           type: "warning",
-          icon: "📊",
           title: "Growth Tracking Update Needed",
           message: `Growth tracking data for ${infant.first_name} ${infant.last_name} needs to be updated`,
           childId: infant.id,
@@ -111,7 +107,6 @@ export default function HealthAlerts({
           newAlerts.push({
             id: `cert-expiring-${infant.id}`,
             type: "warning",
-            icon: "📋",
             title: "Health Certificate Expiring",
             message: `Annual health certificate for ${infant.first_name} ${infant.last_name} expires in ${daysUntilExpiry} days`,
             childId: infant.id,
@@ -125,7 +120,6 @@ export default function HealthAlerts({
           newAlerts.push({
             id: `cert-expired-${infant.id}`,
             type: "critical",
-            icon: "📋",
             title: "Health Certificate Expired",
             message: `Annual health certificate for ${infant.first_name} ${infant.last_name} has expired`,
             childId: infant.id,
@@ -143,7 +137,6 @@ export default function HealthAlerts({
         newAlerts.push({
           id: `appointment-reminder-${infant.id}`,
           type: "info",
-          icon: "📅",
           title: "Upcoming Appointment",
           message: `${infant.first_name} ${infant.last_name} has ${infant.upcomingAppointments} upcoming appointment(s)`,
           childId: infant.id,
@@ -280,7 +273,6 @@ export default function HealthAlerts({
 
       {alerts.length === 0 ? (
         <div className="text-center py-8">
-          <div className="text-4xl mb-2">✅</div>
           <p className="text-gray-600 dark:text-gray-400">
             No health alerts at this time
           </p>

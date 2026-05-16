@@ -2,22 +2,17 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Alert,
   Box,
-  Button,
   Card,
   CardContent,
   Chip,
   Divider,
   FormControl,
-  FormControlLabel,
   Grid,
-  IconButton,
   InputLabel,
   MenuItem,
   Select,
   Skeleton,
   Snackbar,
-  Switch,
-  Tooltip,
   Typography,
   useMediaQuery,
   useTheme,
@@ -25,14 +20,12 @@ import {
 import {
   Assessment,
   CalendarToday,
-  Download,
   ErrorOutline,
   Female,
   Inventory2,
   LocalHospital,
   Male,
   People,
-  Refresh,
   Warning,
 } from "@mui/icons-material";
 import {
@@ -183,26 +176,6 @@ const GENDER_VISUAL_COLORS = Object.freeze({
   male: "#3B82F6",
 });
 
-const REPORT_SHORTCUT_GENERATION_MAP = Object.freeze({
-  "vaccination-summary": { type: "vaccination", format: "pdf" },
-  "appointments-followup": { type: "appointment", format: "csv" },
-  "inventory-status": { type: "inventory", format: "excel" },
-  "sms-reminder-log": { type: "consolidated", format: "csv" },
-});
-
-const SHORTCUT_FORMAT_ALIASES = Object.freeze({
-  pdf: "pdf",
-  csv: "csv",
-  excel: "excel",
-  xlsx: "excel",
-});
-
-const SHORTCUT_FORMAT_EXTENSION = Object.freeze({
-  pdf: "pdf",
-  csv: "csv",
-  excel: "xlsx",
-});
-
 const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const MONTH_ABBREVIATIONS = Object.freeze([
   "Jan",
@@ -278,76 +251,6 @@ const toMonthDayLabel = (value) => {
   const monthIndex = Number(match[2]) - 1;
   const day = Number(match[3]);
   return `${MONTH_ABBREVIATIONS[monthIndex] || ""} ${day}`.trim();
-};
-
-const formatDateToIsoDay = (value) => {
-  return toLocalDateKey(value);
-};
-
-const resolveShortcutDateRange = (filters = {}) => {
-  const period = String(filters.period || "month").toLowerCase();
-
-  if (period === "custom") {
-    return {
-      startDate: filters.startDate || "",
-      endDate: filters.endDate || "",
-    };
-  }
-
-  const end = new Date();
-  const today = parseLocalDateValue(end) || end;
-
-  const start = new Date(today);
-  if (period === "today") {
-    // same-day report range
-  } else if (period === "week") {
-    start.setDate(start.getDate() - 6);
-  } else {
-    start.setFullYear(today.getFullYear(), today.getMonth(), 1);
-  }
-
-  return {
-    startDate: formatDateToIsoDay(start),
-    endDate: formatDateToIsoDay(today),
-  };
-};
-
-const normalizeShortcutReportFormat = (value) => {
-  const normalized = String(value || "").trim().toLowerCase();
-  return SHORTCUT_FORMAT_ALIASES[normalized] || null;
-};
-
-const resolveShortcutGenerationConfig = (report = {}) => {
-  const normalizedKey = String(report?.key || "").trim().toLowerCase();
-  const mapped = REPORT_SHORTCUT_GENERATION_MAP[normalizedKey] || null;
-
-  if (mapped) {
-    return {
-      type: mapped.type,
-      format: normalizeShortcutReportFormat(report?.format) || mapped.format,
-    };
-  }
-
-  const reportType = String(report?.reportType || "").trim().toLowerCase() || "consolidated";
-  return {
-    type: reportType,
-    format: normalizeShortcutReportFormat(report?.format) || "pdf",
-  };
-};
-
-const extractFilenameFromContentDisposition = (contentDisposition = "") => {
-  const value = String(contentDisposition || "");
-  const utf8Match = value.match(/filename\*=UTF-8''([^;]+)/i);
-  if (utf8Match?.[1]) {
-    return decodeURIComponent(utf8Match[1].trim().replace(/^"|"$/g, ""));
-  }
-
-  const filenameMatch = value.match(/filename=([^;]+)/i);
-  if (filenameMatch?.[1]) {
-    return filenameMatch[1].trim().replace(/^"|"$/g, "");
-  }
-
-  return "";
 };
 
 const formatTrendLabelTick = (value) => {
@@ -810,44 +713,6 @@ const resolveAlertTone = (severity, isDark) => {
   };
 };
 
-const resolveActivityTone = (type, isDark) => {
-  const normalized = String(type || "activity").toLowerCase();
-
-  if (normalized.includes("appointment")) {
-    return {
-      badgeBg: isDark ? "rgba(59,130,246,0.28)" : "rgba(219,234,254,0.92)",
-      badgeText: isDark ? "#BFDBFE" : "#1D4ED8",
-      cardBg: isDark ? "rgba(30,58,138,0.22)" : "rgba(239,246,255,0.82)",
-      border: isDark ? "rgba(96,165,250,0.34)" : "rgba(147,197,253,0.5)",
-    };
-  }
-
-  if (normalized.includes("vaccination") || normalized.includes("immun")) {
-    return {
-      badgeBg: isDark ? "rgba(16,185,129,0.28)" : "rgba(209,250,229,0.92)",
-      badgeText: isDark ? "#A7F3D0" : "#047857",
-      cardBg: isDark ? "rgba(6,95,70,0.2)" : "rgba(236,253,245,0.84)",
-      border: isDark ? "rgba(52,211,153,0.34)" : "rgba(134,239,172,0.52)",
-    };
-  }
-
-  if (normalized.includes("inventory") || normalized.includes("stock")) {
-    return {
-      badgeBg: isDark ? "rgba(245,158,11,0.28)" : "rgba(254,243,199,0.92)",
-      badgeText: isDark ? "#FDE68A" : "#B45309",
-      cardBg: isDark ? "rgba(146,64,14,0.2)" : "rgba(255,251,235,0.84)",
-      border: isDark ? "rgba(252,211,77,0.34)" : "rgba(245,158,11,0.44)",
-    };
-  }
-
-  return {
-    badgeBg: isDark ? "rgba(148,163,184,0.26)" : "rgba(241,245,249,0.92)",
-    badgeText: isDark ? "#CBD5E1" : "#334155",
-    cardBg: isDark ? "rgba(30,41,59,0.34)" : "rgba(248,250,252,0.84)",
-    border: isDark ? "rgba(148,163,184,0.3)" : "rgba(203,213,225,0.72)",
-  };
-};
-
 const resolveChartAppearance = (isDark) => {
 
   return {
@@ -1028,6 +893,14 @@ const mapDashboardPayload = (payload) => {
     summary.vaccinationsToday ??
     summary.completedToday ??
     validatedMetrics.vaccinationsToday;
+  const summaryVaccinationsInPeriod =
+    summary.uniqueInfantsServed ??
+    summary.administeredInPeriod ??
+    summary.completedDoseTotal ??
+    validatedMetrics.uniqueInfantsServed ??
+    validatedMetrics.administeredInPeriod ??
+    validatedMetrics.completedDoseTotal ??
+    summaryVaccinationsToday;
 
   const summaryDueForVaccination =
     summary.infantsDueForVaccination ??
@@ -1057,6 +930,7 @@ const mapDashboardPayload = (payload) => {
     totalInfants: safeNum(summaryTotalInfants),
     totalGuardians: safeNum(summaryTotalGuardians),
     vaccinationsToday: safeNum(summaryVaccinationsToday),
+    vaccinationsInPeriod: safeNum(summaryVaccinationsInPeriod),
     dueForVaccination: Math.max(
       safeNum(summaryDueForVaccination),
       safeNum(summaryOverdueVaccinations),
@@ -1267,14 +1141,15 @@ const mapDashboardPayload = (payload) => {
 const FilterBar = ({
   filters,
   onChange,
-  onRefresh,
-  onExport,
-  loading,
   liveSyncEnabled,
   autoRefresh,
   onAutoRefreshToggle,
   isDark,
   scopeLabel,
+  generatedAt,
+  tabs,
+  activeTab,
+  onTabChange,
 }) => {
   const surfaceBg = isDark
     ? ANALYTICS_DARK_UI.filterBg
@@ -1284,6 +1159,41 @@ const FilterBar = ({
   const helperColor = isDark ? ANALYTICS_DARK_UI.textMuted : "#64748B";
   const fieldOutlineDefault = isDark ? ANALYTICS_DARK_UI.strongBorder : "rgba(148,163,184,0.35)";
   const selectMenuProps = useMemo(() => getSelectMenuProps(isDark), [isDark]);
+  const compactFieldSx = {
+    "& .MuiInputLabel-root": {
+      fontSize: "0.75rem",
+      color: helperColor,
+      fontWeight: 500,
+    },
+    "& .MuiInputLabel-root.Mui-focused": {
+      color: isDark ? "#93C5FD" : "primary.main",
+    },
+    "& .MuiOutlinedInput-root": {
+      height: 40,
+      color: isDark ? ANALYTICS_DARK_UI.textPrimary : "text.primary",
+      backgroundColor: isDark ? ANALYTICS_DARK_UI.fieldBg : "transparent",
+      backdropFilter: isDark ? "blur(10px)" : "none",
+      "& .MuiOutlinedInput-notchedOutline": {
+        borderColor: fieldOutlineDefault,
+      },
+      "&:hover .MuiOutlinedInput-notchedOutline": {
+        borderColor: isDark ? "rgba(191,219,254,0.42)" : "rgba(100,116,139,0.56)",
+      },
+      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+        borderColor: isDark ? "#60A5FA" : "primary.main",
+      },
+    },
+    "& .MuiSelect-select": {
+      fontSize: "0.8125rem",
+      py: 1,
+      minHeight: "40px",
+      display: "flex",
+      alignItems: "center",
+    },
+    "& .MuiSelect-icon": {
+      color: labelColor,
+    },
+  };
 
   return (
     <Card
@@ -1299,30 +1209,6 @@ const FilterBar = ({
         mb: 0,
         '& .MuiCardContent-root': {
           backgroundColor: isDark ? "rgba(15,23,42,0.16)" : "transparent",
-        },
-        "& .MuiInputLabel-root": {
-          color: helperColor,
-          fontWeight: 500,
-        },
-        "& .MuiInputLabel-root.Mui-focused": {
-          color: isDark ? "#93C5FD" : "primary.main",
-        },
-        "& .MuiOutlinedInput-root": {
-          color: isDark ? ANALYTICS_DARK_UI.textPrimary : "text.primary",
-          backgroundColor: isDark ? ANALYTICS_DARK_UI.fieldBg : "transparent",
-          backdropFilter: isDark ? "blur(10px)" : "none",
-          "& .MuiOutlinedInput-notchedOutline": {
-            borderColor: fieldOutlineDefault,
-          },
-          "&:hover .MuiOutlinedInput-notchedOutline": {
-            borderColor: isDark ? "rgba(191,219,254,0.42)" : "rgba(100,116,139,0.56)",
-          },
-          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-            borderColor: isDark ? "#60A5FA" : "primary.main",
-          },
-        },
-        "& .MuiSelect-icon": {
-          color: labelColor,
         },
         "& .MuiChip-outlined": {
           borderColor: isDark ? ANALYTICS_DARK_UI.border : "divider",
@@ -1341,199 +1227,133 @@ const FilterBar = ({
       }}
     >
       <CardContent>
-        <Grid container spacing={2} alignItems="center">
-          <Grid size={{ xs: 12, lg: 9 }}>
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel id="analytics-period-label">Period</InputLabel>
-                  <Select
-                    labelId="analytics-period-label"
-                    value={filters.period}
-                    label="Period"
-                    MenuProps={selectMenuProps}
-                    onChange={(event) => onChange("period", event.target.value)}
-                  >
-                    {PERIOD_OPTIONS.map((option) => (
-                      <MenuItem key={option.value} value={option.value}>
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel id="analytics-vaccine-label">Vaccine</InputLabel>
-                  <Select
-                    labelId="analytics-vaccine-label"
-                    value={filters.vaccineType}
-                    label="Vaccine"
-                    MenuProps={selectMenuProps}
-                    onChange={(event) => onChange("vaccineType", event.target.value)}
-                  >
-                    {VACCINE_OPTIONS.map((option) => (
-                      <MenuItem key={option.value} value={option.value}>
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel id="analytics-status-label">Vaccination Status</InputLabel>
-                  <Select
-                    labelId="analytics-status-label"
-                    value={filters.vaccinationStatus}
-                    label="Vaccination Status"
-                    MenuProps={selectMenuProps}
-                    onChange={(event) => onChange("vaccinationStatus", event.target.value)}
-                  >
-                    {STATUS_OPTIONS.map((option) => (
-                      <MenuItem key={option.value} value={option.value}>
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              {filters.period === "custom" && (
-                <>
-                  <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-                    <PortalDatePicker
-                      variant="outlined"
-                      size="small"
-                      fullWidth
-                      label="Start Date"
-                      value={filters.startDate || ""}
-                      onChange={(event) => onChange("startDate", event.target.value)}
-                      max={filters.endDate || undefined}
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-                    <PortalDatePicker
-                      variant="outlined"
-                      size="small"
-                      fullWidth
-                      label="End Date"
-                      value={filters.endDate || ""}
-                      onChange={(event) => onChange("endDate", event.target.value)}
-                      min={filters.startDate || undefined}
-                    />
-                  </Grid>
-                </>
-              )}
-            </Grid>
-          </Grid>
-
-          <Grid size={{ xs: 12, lg: 3 }}>
-            <Box sx={{ display: "flex", justifyContent: { xs: "flex-start", lg: "flex-end" }, gap: 1 }}>
-              <Tooltip title="Refresh analytics now">
-                <span>
-                  <IconButton
-                    onClick={onRefresh}
-                    disabled={loading}
-                    color="primary"
-                    aria-label="Refresh analytics"
-                    sx={isDark ? {
-                      color: "#60A5FA",
-                      border: "1px solid rgba(96,165,250,0.18)",
-                      "&:hover": {
-                        backgroundColor: ANALYTICS_DARK_UI.iconHover,
-                      },
-                    } : undefined}
-                  >
-                    <Refresh />
-                  </IconButton>
-                </span>
-              </Tooltip>
-
-              <Button
-                variant="outlined"
-                startIcon={<Download />}
-                onClick={onExport}
-                disabled={loading}
-                sx={isDark ? {
-                  borderColor: ANALYTICS_DARK_UI.buttonBorder,
-                  backgroundColor: ANALYTICS_DARK_UI.buttonBg,
-                  color: ANALYTICS_DARK_UI.buttonText,
-                  "&:hover": {
-                    borderColor: "#60A5FA",
-                    backgroundColor: ANALYTICS_DARK_UI.buttonBgHover,
-                  },
-                } : undefined}
-              >
-                Export CSV
-              </Button>
-            </Box>
-          </Grid>
-
-          <Grid size={12}>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                gap: 1,
-              }}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
+          <Box sx={{ flex: "1 1 520px", minWidth: 0 }}>
+            <nav
+              className="flex space-x-2 overflow-x-auto bg-gray-100 dark:bg-gray-800 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700"
+              aria-label="Analytics content sections"
             >
-              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                <Chip
-                  size="small"
-                  color={liveSyncEnabled ? "success" : "default"}
-                  label={liveSyncEnabled ? "Real-time updates active" : "Polling fallback active"}
-                  sx={isDark && !liveSyncEnabled ? {
-                    fontWeight: 700,
-                    color: ANALYTICS_DARK_UI.textSecondary,
-                    backgroundColor: ANALYTICS_DARK_UI.chipBg,
-                    border: "1px solid",
-                    borderColor: ANALYTICS_DARK_UI.border,
-                  } : isDark ? { fontWeight: 700 } : undefined}
-                />
-                <Chip
-                  size="small"
-                  variant="outlined"
-                  label={scopeLabel || "Current health center scope"}
-                  sx={isDark ? {
-                    fontWeight: 600,
-                    color: ANALYTICS_DARK_UI.textSecondary,
-                    borderColor: ANALYTICS_DARK_UI.border,
-                    backgroundColor: ANALYTICS_DARK_UI.chipOutlinedBg,
-                  } : undefined}
-                />
-              </Box>
+              {tabs.map((tabConfig, tabIndex) => (
+                <button
+                  key={tabConfig.key}
+                  onClick={() => onTabChange(null, tabIndex)}
+                  className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
+                    activeTab === tabIndex
+                      ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                      : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+                  }`}
+                  aria-selected={activeTab === tabIndex}
+                  role="tab"
+                >
+                  {tabConfig.label}
+                </button>
+              ))}
+            </nav>
+          </Box>
 
-              <FormControlLabel
-                control={
-                  <Switch
-                    size="small"
-                    checked={autoRefresh}
-                    onChange={(event) => onAutoRefreshToggle(event.target.checked)}
-                    sx={isDark ? {
-                      "& .MuiSwitch-track": {
-                        backgroundColor: "rgba(71,85,105,0.9)",
-                        opacity: 1,
-                      },
-                      "& .MuiSwitch-thumb": {
-                        backgroundColor: "#E2E8F0",
-                      },
-                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
-                        backgroundColor: "#2563EB",
-                        opacity: 1,
-                      },
-                    } : undefined}
-                  />
-                }
-                label="Auto-refresh"
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              flexWrap: "wrap",
+              justifyContent: { xs: "flex-start", xl: "flex-end" },
+              ml: "auto",
+              width: { xs: "100%", xl: "auto" },
+            }}
+          >
+            <FormControl size="small" sx={{ ...compactFieldSx, width: { xs: "100%", sm: 140 }, maxWidth: 140 }}>
+              <InputLabel id="analytics-period-label">Period</InputLabel>
+              <Select
+                labelId="analytics-period-label"
+                value={filters.period}
+                label="Period"
+                MenuProps={selectMenuProps}
+                onChange={(event) => onChange("period", event.target.value)}
+              >
+                {PERIOD_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl size="small" sx={{ ...compactFieldSx, width: { xs: "100%", sm: 150 }, maxWidth: 150 }}>
+              <InputLabel id="analytics-vaccine-label">Vaccine</InputLabel>
+              <Select
+                labelId="analytics-vaccine-label"
+                value={filters.vaccineType}
+                label="Vaccine"
+                MenuProps={selectMenuProps}
+                onChange={(event) => onChange("vaccineType", event.target.value)}
+              >
+                {VACCINE_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl size="small" sx={{ ...compactFieldSx, width: { xs: "100%", sm: 170 }, maxWidth: 170 }}>
+              <InputLabel id="analytics-status-label">Vaccination Status</InputLabel>
+              <Select
+                labelId="analytics-status-label"
+                value={filters.vaccinationStatus}
+                label="Vaccination Status"
+                MenuProps={selectMenuProps}
+                onChange={(event) => onChange("vaccinationStatus", event.target.value)}
+              >
+                {STATUS_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        </Box>
+
+        {filters.period === "custom" && (
+          <Box
+            sx={{
+              mt: 1.5,
+              display: "flex",
+              gap: 1,
+              flexWrap: "wrap",
+              justifyContent: { xs: "stretch", xl: "flex-end" },
+            }}
+          >
+            <Box sx={{ width: { xs: "100%", sm: 180 } }}>
+              <PortalDatePicker
+                variant="outlined"
+                size="small"
+                fullWidth
+                label="Start Date"
+                value={filters.startDate || ""}
+                onChange={(event) => onChange("startDate", event.target.value)}
+                max={filters.endDate || undefined}
               />
             </Box>
-          </Grid>
-        </Grid>
+            <Box sx={{ width: { xs: "100%", sm: 180 } }}>
+              <PortalDatePicker
+                variant="outlined"
+                size="small"
+                fullWidth
+                label="End Date"
+                value={filters.endDate || ""}
+                onChange={(event) => onChange("endDate", event.target.value)}
+                min={filters.startDate || undefined}
+              />
+            </Box>
+          </Box>
+        )}
+
+        <Typography variant="caption" sx={{ display: "block", mt: 1.5, color: isDark ? ANALYTICS_DARK_UI.textMuted : "text.secondary" }}>
+          Scope: {scopeLabel || "Current health center scope"}
+          {generatedAt ? ` • Last generated: ${toShortDateTime(generatedAt)}` : ""}
+        </Typography>
       </CardContent>
     </Card>
   );
@@ -1598,9 +1418,42 @@ const KpiCard = ({ title, value, subtitle, icon, color = "primary", loading, isD
   );
 };
 
-const KpiSummaryGrid = ({ data, loading, isDark }) => {
+const getVaccinationCardContent = (period, kpis) => {
+  if (period === "month" || period === "this_month") {
+    return {
+      title: "Vaccinations Completed This Month",
+      subtitle: "Unique children vaccinated this month",
+      value: kpis.vaccinationsInPeriod,
+    };
+  }
+
+  if (period === "week" || period === "this_week") {
+    return {
+      title: "Vaccinations Completed This Week",
+      subtitle: "Unique children vaccinated this week",
+      value: kpis.vaccinationsInPeriod,
+    };
+  }
+
+  if (period === "custom") {
+    return {
+      title: "Vaccinations Completed in Selected Range",
+      subtitle: "Unique children vaccinated in selected range",
+      value: kpis.vaccinationsInPeriod,
+    };
+  }
+
+  return {
+    title: "Vaccinations Completed Today",
+    subtitle: "Unique children vaccinated",
+    value: kpis.vaccinationsToday,
+  };
+};
+
+const KpiSummaryGrid = ({ data, loading, isDark, period }) => {
   const kpis = data?.kpis || {};
   const reminders = data?.reminders || {};
+  const vaccinationCard = getVaccinationCardContent(period, kpis);
 
   return (
     <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -1628,9 +1481,9 @@ const KpiSummaryGrid = ({ data, loading, isDark }) => {
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <KpiCard
-          title="Vaccinations Completed Today"
-          value={kpis.vaccinationsToday}
-          subtitle="Unique children vaccinated"
+          title={vaccinationCard.title}
+          value={vaccinationCard.value}
+          subtitle={vaccinationCard.subtitle}
           icon={LocalHospital}
           color="success"
           loading={loading}
@@ -1843,59 +1696,6 @@ const VaccineProgressSection = ({ data, loading, chartAppearance }) => {
         </ChartCard>
       </Grid>
 
-      <Grid size={{ xs: 12, lg: 4 }}>
-        <ChartCard
-          title="Coverage Rate by Vaccine"
-          subtitle="Unique infant coverage percentage"
-          loading={loading}
-          empty={rows.length === 0}
-          ariaLabel="Horizontal bar chart of infant coverage rate by vaccine"
-          chartAppearance={chartAppearance}
-          chartHeight={320}
-        >
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={rows} layout="vertical" margin={{ left: 24, right: 16, top: 12, bottom: 8 }}>
-              <CartesianGrid
-                stroke={chartAppearance.gridStroke}
-                strokeDasharray={CHART_THEME.layout.gridDash}
-                vertical={false}
-              />
-              <XAxis
-                type="number"
-                domain={[0, 100]}
-                unit="%"
-                tick={axisTick}
-                axisLine={axisLine}
-                tickLine={axisLine}
-              />
-              <YAxis
-                type="category"
-                dataKey="vaccineName"
-                width={128}
-                tick={axisTick}
-                axisLine={axisLine}
-                tickLine={axisLine}
-              />
-              <RechartsTooltip
-                cursor={{ fill: chartAppearance.isDark ? "rgba(148,163,184,0.10)" : "rgba(148,163,184,0.12)" }}
-                content={
-                  <DashboardChartTooltip
-                    chartAppearance={chartAppearance}
-                    valueFormatter={(value) => `${safeNum(value).toFixed(1)}%`}
-                  />
-                }
-              />
-              <Bar
-                dataKey="coverageRate"
-                fill={CHART_THEME.palette.secondary}
-                name="Coverage Rate (%)"
-                radius={CHART_THEME.layout.horizontalBarRadius}
-                maxBarSize={20}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-      </Grid>
     </Grid>
   );
 };
@@ -2263,14 +2063,324 @@ const GenderStatRing = ({
   );
 };
 
+const SmsReminderAnalyticsPanel = ({
+  reminder,
+  loading,
+  chartAppearance,
+  surfaceBg,
+  surfaceBorder,
+}) => (
+  <Card
+    sx={{
+      ...buildAnalyticsCardSx({
+        isDark: chartAppearance.isDark,
+        background: surfaceBg,
+        borderColor: surfaceBorder,
+        shadow: chartAppearance.isDark
+          ? "0 16px 32px rgba(2,6,23,0.42)"
+          : "0 8px 18px rgba(15,23,42,0.06)",
+      }),
+      height: "100%",
+      '& .MuiCardContent-root': {
+        backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+      },
+    }}
+  >
+    <CardContent
+      sx={{
+        backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+      }}
+    >
+      <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: chartAppearance.isDark ? '#FFFFFF' : 'text.primary' }}>
+        SMS Reminder Analytics
+      </Typography>
+      {loading ? (
+        <>
+          <Skeleton height={64} />
+          <Skeleton height={64} />
+          <Skeleton height={64} />
+          <Skeleton height={64} />
+        </>
+      ) : (
+        <Grid container spacing={1.5}>
+          <Grid size={6}>
+            <SummaryMiniCard label="SMS Sent" value={reminder.smsSent} isDark={chartAppearance.isDark} />
+          </Grid>
+          <Grid size={6}>
+            <SummaryMiniCard label="SMS Delivered" value={reminder.smsDelivered} isDark={chartAppearance.isDark} />
+          </Grid>
+          <Grid size={6}>
+            <SummaryMiniCard label="SMS Failed" value={reminder.smsFailed} error isDark={chartAppearance.isDark} />
+          </Grid>
+          <Grid size={6}>
+            <SummaryMiniCard label="Delivery Rate" value={`${safeNum(reminder.deliveryRate).toFixed(1)}%`} isDark={chartAppearance.isDark} />
+          </Grid>
+          <Grid size={6}>
+            <SummaryMiniCard label="Unread Notifications" value={reminder.unreadNotifications} isDark={chartAppearance.isDark} />
+          </Grid>
+          <Grid size={6}>
+            <SummaryMiniCard label="Failed SMS Count" value={reminder.failedSmsCount} error isDark={chartAppearance.isDark} />
+          </Grid>
+        </Grid>
+      )}
+    </CardContent>
+  </Card>
+);
+
+const MaleFemaleDistributionPanel = ({
+  loading,
+  chartAppearance,
+  hasGenderError,
+  genderHasActualValues,
+  genderTotal,
+  femaleCount,
+  maleCount,
+  femalePercent,
+  malePercent,
+  femaleMaleTotal,
+  otherCount,
+}) => (
+  <ChartCard
+    title="Male vs Female Distribution"
+    subtitle="Registered infant gender composition"
+    loading={loading}
+    empty={false}
+    ariaLabel="Gender distribution infographic showing female and male infant percentages"
+    chartAppearance={chartAppearance}
+    chartHeight={320}
+  >
+    <Box sx={{ width: "100%", height: 320, display: "flex", flexDirection: "column" }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 1,
+          flexWrap: "wrap",
+          mb: 1.5,
+        }}
+      >
+        <Chip
+          size="small"
+          color={hasGenderError ? "warning" : genderHasActualValues ? "success" : "default"}
+          variant={hasGenderError ? "filled" : "outlined"}
+          label={hasGenderError
+            ? "Data unavailable"
+            : genderHasActualValues
+              ? "Live demographic split"
+              : "No records yet"}
+        />
+        <Typography variant="caption" sx={{ color: chartAppearance.axisTick, fontWeight: 700 }}>
+          {`Total infants: ${safeNum(genderTotal).toLocaleString()}`}
+        </Typography>
+      </Box>
+
+      <Box
+        sx={{
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexDirection: { xs: "column", sm: "row" },
+          gap: { xs: 1.5, sm: 1 },
+        }}
+      >
+        <GenderStatRing
+          label="Female"
+          count={femaleCount}
+          percent={femalePercent}
+          color={GENDER_VISUAL_COLORS.female}
+          chartAppearance={chartAppearance}
+          IconComponent={Female}
+        />
+
+        <Box
+          sx={{
+            px: 1,
+            py: 0.5,
+            textAlign: "center",
+            minWidth: { xs: "100%", sm: 100 },
+          }}
+        >
+          <Typography variant="caption" sx={{ color: chartAppearance.centerLabel, fontWeight: 700 }}>
+            Female vs Male
+          </Typography>
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: 800,
+              color: chartAppearance.centerValue,
+              lineHeight: 1.15,
+              letterSpacing: "-0.01em",
+              my: 0.35,
+            }}
+          >
+            {`${femalePercent}% : ${malePercent}%`}
+          </Typography>
+          <Typography variant="caption" sx={{ color: chartAppearance.axisTick, fontWeight: 600 }}>
+            {`${safeNum(femaleMaleTotal).toLocaleString()} profiled infants`}
+          </Typography>
+        </Box>
+
+        <GenderStatRing
+          label="Male"
+          count={maleCount}
+          percent={malePercent}
+          color={GENDER_VISUAL_COLORS.male}
+          chartAppearance={chartAppearance}
+          IconComponent={Male}
+        />
+      </Box>
+
+      <Box sx={{ mt: 1.25 }}>
+        {hasGenderError ? (
+          <Alert
+            severity="warning"
+            sx={{
+              ...buildAnalyticsAlertSx(chartAppearance.isDark, "warning"),
+              py: 0,
+              '& .MuiAlert-message': {
+                py: 0.45,
+                fontSize: 12,
+                fontWeight: 600,
+              },
+            }}
+          >
+            Unable to load gender analytics right now. Displaying safe defaults of 0% Female and 0% Male.
+          </Alert>
+        ) : !genderHasActualValues ? (
+          <Typography
+            variant="caption"
+            sx={{
+              display: "block",
+              color: chartAppearance.axisTick,
+              fontWeight: 600,
+              textAlign: "center",
+            }}
+          >
+            No demographic gender records were returned for the selected filters. Showing explicit 0% Female and 0% Male.
+          </Typography>
+        ) : otherCount > 0 ? (
+          <Typography
+            variant="caption"
+            sx={{
+              display: "block",
+              color: chartAppearance.axisTick,
+              textAlign: "center",
+            }}
+          >
+            {`${safeNum(otherCount).toLocaleString()} record${safeNum(otherCount) === 1 ? " is" : "s are"} marked as Other / Not specified and excluded from the Female vs Male percentage split.`}
+          </Typography>
+        ) : null}
+      </Box>
+    </Box>
+  </ChartCard>
+);
+
+const CriticalAlertsPanel = ({ alerts, loading, isDark }) => {
+  const surfaceBg = isDark
+    ? ANALYTICS_DARK_UI.cardBg
+    : "background.paper";
+  const surfaceBorder = isDark ? ANALYTICS_DARK_UI.border : "divider";
+  const headingColor = isDark ? ANALYTICS_DARK_UI.textPrimary : "text.primary";
+  const subTextColor = isDark ? ANALYTICS_DARK_UI.textMuted : "text.secondary";
+
+  return (
+    <Card
+      sx={{
+        ...buildAnalyticsCardSx({
+          isDark,
+          background: surfaceBg,
+          borderColor: surfaceBorder,
+          shadow: isDark ? "0 16px 32px rgba(2,6,23,0.42)" : "0 8px 18px rgba(15,23,42,0.06)",
+        }),
+        height: "100%",
+        '& .MuiCardContent-root': {
+          backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+        },
+      }}
+    >
+      <CardContent
+        sx={{
+          backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
+        }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: headingColor }}>
+          Critical Alerts
+        </Typography>
+        {loading ? (
+          <>
+            <Skeleton height={80} />
+            <Skeleton height={80} />
+            <Skeleton height={80} />
+          </>
+        ) : alerts.length === 0 ? (
+          <Alert severity="success" sx={buildAnalyticsAlertSx(isDark, "success")}>
+            No critical alerts for current filters.
+          </Alert>
+        ) : (
+          <Box sx={{ display: "grid", gap: 1.25 }}>
+            {alerts.slice(0, 6).map((item) => (
+              (() => {
+                const tone = resolveAlertTone(item.severity, isDark);
+
+                return (
+              <Box
+                key={item.id}
+                sx={{
+                  border: "1px solid",
+                  borderColor: tone.border,
+                  borderRadius: 2,
+                  px: 1.25,
+                  py: 1,
+                  background: tone.cardBg,
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, mb: 0.75 }}>
+                  <Chip
+                    size="small"
+                    icon={<ErrorOutline sx={{ color: tone.accent }} fontSize="small" />}
+                    label={tone.label}
+                    sx={{
+                      height: 24,
+                      fontWeight: 700,
+                      bgcolor: tone.chipBg,
+                      color: tone.chipText,
+                      border: "1px solid",
+                      borderColor: tone.border,
+                      '& .MuiChip-icon': {
+                        ml: 0.5,
+                      },
+                    }}
+                  />
+                  <Typography variant="caption" sx={{ color: subTextColor, fontWeight: 600 }}>
+                    {toShortDateTime(item.timestamp)}
+                  </Typography>
+                </Box>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: headingColor, lineHeight: 1.4 }}>
+                  {item.message}
+                </Typography>
+              </Box>
+                );
+              })()
+            ))}
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 const SmsAndDemographicsSection = ({
   data,
   loading,
   chartAppearance,
   showGenderChart = false,
   genderError = "",
+  showCriticalAlerts = false,
 }) => {
   const reminder = data?.reminders || {};
+  const alerts = data?.alerts || [];
   const genderSnapshot = normalizeGenderSnapshot(data?.demographicsGender || []);
   const {
     femaleCount,
@@ -2284,207 +2394,54 @@ const SmsAndDemographicsSection = ({
   } = genderSnapshot;
   const hasGenderError = Boolean(genderError) && !genderHasActualValues;
 
-  const summaryGridSize = showGenderChart ? { xs: 12, lg: 6 } : { xs: 12 };
   const surfaceBg = chartAppearance.isDark
     ? ANALYTICS_DARK_UI.cardBg
     : "background.paper";
   const surfaceBorder = chartAppearance.isDark ? ANALYTICS_DARK_UI.border : "divider";
+  const summaryGridSize = showGenderChart
+    ? showCriticalAlerts
+      ? { xs: 12, lg: 4 }
+      : { xs: 12, lg: 6 }
+    : { xs: 12 };
+  const genderGridSize = showCriticalAlerts ? { xs: 12, lg: 4 } : { xs: 12, lg: 6 };
 
   return (
-    <Grid container spacing={2} sx={{ mb: 3 }}>
-      <Grid size={summaryGridSize}>
-        <Card
-          sx={{
-            ...buildAnalyticsCardSx({
-              isDark: chartAppearance.isDark,
-              background: surfaceBg,
-              borderColor: surfaceBorder,
-              shadow: chartAppearance.isDark
-                ? "0 16px 32px rgba(2,6,23,0.42)"
-                : "0 8px 18px rgba(15,23,42,0.06)",
-            }),
-            '& .MuiCardContent-root': {
-              backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
-            },
-          }}
-        >
-          <CardContent
-            sx={{
-              backgroundColor: chartAppearance.isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
-            }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: chartAppearance.isDark ? '#FFFFFF' : 'text.primary' }}>
-              SMS Reminder Analytics            </Typography>
-            {loading ? (
-              <>
-                <Skeleton height={64} />
-                <Skeleton height={64} />
-                <Skeleton height={64} />
-                <Skeleton height={64} />
-              </>
-            ) : (
-              <Grid container spacing={1.5}>
-                <Grid size={6}>
-                  <SummaryMiniCard label="SMS Sent" value={reminder.smsSent} isDark={chartAppearance.isDark} />
-                </Grid>
-                <Grid size={6}>
-                  <SummaryMiniCard label="SMS Delivered" value={reminder.smsDelivered} isDark={chartAppearance.isDark} />
-                </Grid>
-                <Grid size={6}>
-                  <SummaryMiniCard label="SMS Failed" value={reminder.smsFailed} error isDark={chartAppearance.isDark} />
-                </Grid>
-                <Grid size={6}>
-                  <SummaryMiniCard label="Delivery Rate" value={`${safeNum(reminder.deliveryRate).toFixed(1)}%`} isDark={chartAppearance.isDark} />
-                </Grid>
-                <Grid size={6}>
-                  <SummaryMiniCard label="Unread Notifications" value={reminder.unreadNotifications} isDark={chartAppearance.isDark} />
-                </Grid>
-                <Grid size={6}>
-                  <SummaryMiniCard label="Failed SMS Count" value={reminder.failedSmsCount} error isDark={chartAppearance.isDark} />
-                </Grid>
-              </Grid>
-            )}
-          </CardContent>
-        </Card>
+    <Grid container spacing={2} sx={{ mb: 3 }} alignItems="stretch">
+      <Grid size={summaryGridSize} sx={{ display: "flex" }}>
+        <SmsReminderAnalyticsPanel
+          reminder={reminder}
+          loading={loading}
+          chartAppearance={chartAppearance}
+          surfaceBg={surfaceBg}
+          surfaceBorder={surfaceBorder}
+        />
       </Grid>
 
       {showGenderChart ? (
-        <Grid size={{ xs: 12, lg: 6 }}>
-          <ChartCard
-            title="Male vs Female Distribution"
-            subtitle="Registered infant gender composition"
+        <Grid size={genderGridSize} sx={{ display: "flex" }}>
+          <MaleFemaleDistributionPanel
             loading={loading}
-            empty={false}
-            ariaLabel="Gender distribution infographic showing female and male infant percentages"
             chartAppearance={chartAppearance}
-            chartHeight={320}
-          >
-            <Box sx={{ width: "100%", height: 320, display: "flex", flexDirection: "column" }}>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 1,
-                  flexWrap: "wrap",
-                  mb: 1.5,
-                }}
-              >
-                <Chip
-                  size="small"
-                  color={hasGenderError ? "warning" : genderHasActualValues ? "success" : "default"}
-                  variant={hasGenderError ? "filled" : "outlined"}
-                  label={hasGenderError
-                    ? "Data unavailable"
-                    : genderHasActualValues
-                      ? "Live demographic split"
-                      : "No records yet"}
-                />
-                <Typography variant="caption" sx={{ color: chartAppearance.axisTick, fontWeight: 700 }}>
-                  {`Total infants: ${safeNum(genderTotal).toLocaleString()}`}
-                </Typography>
-              </Box>
+            hasGenderError={hasGenderError}
+            genderHasActualValues={genderHasActualValues}
+            genderTotal={genderTotal}
+            femaleCount={femaleCount}
+            maleCount={maleCount}
+            femalePercent={femalePercent}
+            malePercent={malePercent}
+            femaleMaleTotal={femaleMaleTotal}
+            otherCount={otherCount}
+          />
+        </Grid>
+      ) : null}
 
-              <Box
-                sx={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  flexDirection: { xs: "column", sm: "row" },
-                  gap: { xs: 1.5, sm: 1 },
-                }}
-              >
-                <GenderStatRing
-                  label="Female"
-                  count={femaleCount}
-                  percent={femalePercent}
-                  color={GENDER_VISUAL_COLORS.female}
-                  chartAppearance={chartAppearance}
-                  IconComponent={Female}
-                />
-
-                <Box
-                  sx={{
-                    px: 1,
-                    py: 0.5,
-                    textAlign: "center",
-                    minWidth: { xs: "100%", sm: 100 },
-                  }}
-                >
-                  <Typography variant="caption" sx={{ color: chartAppearance.centerLabel, fontWeight: 700 }}>
-                    Female vs Male
-                  </Typography>
-                  <Typography
-                    variant="h5"
-                    sx={{
-                      fontWeight: 800,
-                      color: chartAppearance.centerValue,
-                      lineHeight: 1.15,
-                      letterSpacing: "-0.01em",
-                      my: 0.35,
-                    }}
-                  >
-                    {`${femalePercent}% : ${malePercent}%`}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: chartAppearance.axisTick, fontWeight: 600 }}>
-                    {`${safeNum(femaleMaleTotal).toLocaleString()} profiled infants`}
-                  </Typography>
-                </Box>
-
-                <GenderStatRing
-                  label="Male"
-                  count={maleCount}
-                  percent={malePercent}
-                  color={GENDER_VISUAL_COLORS.male}
-                  chartAppearance={chartAppearance}
-                  IconComponent={Male}
-                />
-              </Box>
-
-              <Box sx={{ mt: 1.25 }}>
-                {hasGenderError ? (
-                  <Alert
-                    severity="warning"
-                    sx={{
-                      ...buildAnalyticsAlertSx(chartAppearance.isDark, "warning"),
-                      py: 0,
-                      '& .MuiAlert-message': {
-                        py: 0.45,
-                        fontSize: 12,
-                        fontWeight: 600,
-                      },
-                    }}
-                  >
-                    Unable to load gender analytics right now. Displaying safe defaults of 0% Female and 0% Male.
-                  </Alert>
-                ) : !genderHasActualValues ? (
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      display: "block",
-                      color: chartAppearance.axisTick,
-                      fontWeight: 600,
-                      textAlign: "center",
-                    }}
-                  >
-                    No demographic gender records were returned for the selected filters. Showing explicit 0% Female and 0% Male.
-                  </Typography>
-                ) : otherCount > 0 ? (
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      display: "block",
-                      color: chartAppearance.axisTick,
-                      textAlign: "center",
-                    }}
-                  >
-                    {`${safeNum(otherCount).toLocaleString()} record${safeNum(otherCount) === 1 ? " is" : "s are"} marked as Other / Not specified and excluded from the Female vs Male percentage split.`}
-                  </Typography>
-                ) : null}
-              </Box>
-            </Box>
-          </ChartCard>
+      {showCriticalAlerts ? (
+        <Grid size={{ xs: 12, lg: 4 }} sx={{ display: "flex" }}>
+          <CriticalAlertsPanel
+            alerts={alerts}
+            loading={loading}
+            isDark={chartAppearance.isDark}
+          />
         </Grid>
       ) : null}
     </Grid>
@@ -2640,298 +2597,6 @@ const TrendsSection = ({ data, loading, chartAppearance }) => {
   );
 };
 
-const AlertsActivityReportsSection = ({
-  data,
-  loading,
-  isDark,
-  onReportShortcutDownload,
-  shortcutLoadingKey,
-}) => {
-  const alerts = data?.alerts || [];
-  const activity = data?.activity || [];
-  const reports = data?.reportShortcuts || [];
-  const surfaceBg = isDark
-    ? ANALYTICS_DARK_UI.cardBg
-    : "background.paper";
-  const surfaceBorder = isDark ? ANALYTICS_DARK_UI.border : "divider";
-  const headingColor = isDark ? ANALYTICS_DARK_UI.textPrimary : "text.primary";
-  const subTextColor = isDark ? ANALYTICS_DARK_UI.textMuted : "text.secondary";
-
-  return (
-    <Grid container spacing={2}>
-      <Grid size={{ xs: 12, lg: 4 }}>
-        <Card
-          sx={{
-            ...buildAnalyticsCardSx({
-              isDark,
-              background: surfaceBg,
-              borderColor: surfaceBorder,
-              shadow: isDark ? "0 16px 32px rgba(2,6,23,0.42)" : "0 8px 18px rgba(15,23,42,0.06)",
-            }),
-            '& .MuiCardContent-root': {
-              backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
-            },
-          }}
-        >
-          <CardContent
-            sx={{
-              backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
-            }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: headingColor }}>
-              Critical Alerts
-            </Typography>
-            {loading ? (
-              <>
-                <Skeleton height={80} />
-                <Skeleton height={80} />
-                <Skeleton height={80} />
-              </>
-            ) : alerts.length === 0 ? (
-              <Alert severity="success" sx={buildAnalyticsAlertSx(isDark, "success")}>
-                No critical alerts for current filters.
-              </Alert>
-            ) : (
-              <Box sx={{ display: "grid", gap: 1.25 }}>
-                {alerts.slice(0, 6).map((item) => (
-                  (() => {
-                    const tone = resolveAlertTone(item.severity, isDark);
-
-                    return (
-                  <Box
-                    key={item.id}
-                    sx={{
-                      border: "1px solid",
-                      borderColor: tone.border,
-                      borderRadius: 2,
-                      px: 1.25,
-                      py: 1,
-                      background: tone.cardBg,
-                    }}
-                  >
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, mb: 0.75 }}>
-                      <Chip
-                        size="small"
-                        icon={<ErrorOutline sx={{ color: tone.accent }} fontSize="small" />}
-                        label={tone.label}
-                        sx={{
-                          height: 24,
-                          fontWeight: 700,
-                          bgcolor: tone.chipBg,
-                          color: tone.chipText,
-                          border: "1px solid",
-                          borderColor: tone.border,
-                          '& .MuiChip-icon': {
-                            ml: 0.5,
-                          },
-                        }}
-                      />
-                      <Typography variant="caption" sx={{ color: subTextColor, fontWeight: 600 }}>
-                        {toShortDateTime(item.timestamp)}
-                      </Typography>
-                    </Box>
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: headingColor, lineHeight: 1.4 }}>
-                      {item.message}
-                    </Typography>
-                  </Box>
-                    );
-                  })()
-                ))}
-              </Box>
-            )}
-          </CardContent>
-        </Card>
-      </Grid>
-
-      <Grid size={{ xs: 12, lg: 5 }}>
-        <Card
-          sx={{
-            ...buildAnalyticsCardSx({
-              isDark,
-              background: surfaceBg,
-              borderColor: surfaceBorder,
-              shadow: isDark ? "0 16px 32px rgba(2,6,23,0.42)" : "0 8px 18px rgba(15,23,42,0.06)",
-            }),
-            '& .MuiCardContent-root': {
-              backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
-            },
-          }}
-        >
-          <CardContent
-            sx={{
-              backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
-            }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: headingColor }}>
-              Recent Activity Feed
-            </Typography>
-            {loading ? (
-              <>
-                <Skeleton height={60} />
-                <Skeleton height={60} />
-                <Skeleton height={60} />
-                <Skeleton height={60} />
-              </>
-            ) : activity.length === 0 ? (
-              <Alert severity="info" sx={buildAnalyticsAlertSx(isDark, "info")}>
-                No recent activity for current filter range.
-              </Alert>
-            ) : (
-              <Box
-                sx={{
-                  display: "grid",
-                  gap: 1,
-                  maxHeight: 332,
-                  overflowY: "auto",
-                  pr: 0.5,
-                  "&::-webkit-scrollbar": {
-                    width: 8,
-                  },
-                  "&::-webkit-scrollbar-thumb": {
-                    backgroundColor: isDark ? "rgba(148,163,184,0.36)" : "rgba(148,163,184,0.5)",
-                    borderRadius: 999,
-                  },
-                }}
-              >
-                {activity.slice(0, 10).map((item) => (
-                  (() => {
-                    const tone = resolveActivityTone(item.type, isDark);
-
-                    return (
-                  <Box
-                    key={item.id}
-                    sx={{
-                      border: "1px solid",
-                      borderColor: tone.border,
-                      borderRadius: 2,
-                      p: 1.1,
-                      background: tone.cardBg,
-                    }}
-                  >
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1, mb: 0.6 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: headingColor, lineHeight: 1.35 }}>
-                        {item.title}
-                      </Typography>
-                      <Chip
-                        size="small"
-                        label={statusLabel(item.type)}
-                        sx={{
-                          height: 22,
-                          borderRadius: 1,
-                          bgcolor: tone.badgeBg,
-                          color: tone.badgeText,
-                          fontWeight: 700,
-                          border: "1px solid",
-                          borderColor: tone.border,
-                          '& .MuiChip-label': {
-                            px: 0.75,
-                          },
-                        }}
-                      />
-                    </Box>
-                    {item.description ? (
-                      <Typography
-                        variant="caption"
-                        display="block"
-                        sx={{ color: subTextColor, lineHeight: 1.45, mb: 0.55 }}
-                      >
-                        {item.description}
-                      </Typography>
-                    ) : null}
-                    <Typography variant="caption" sx={{ color: subTextColor, fontWeight: 600 }}>
-                      {toShortDateTime(item.timestamp)}
-                    </Typography>
-                  </Box>
-                    );
-                  })()
-                ))}
-              </Box>
-            )}
-          </CardContent>
-        </Card>
-      </Grid>
-
-      <Grid size={{ xs: 12, lg: 3 }}>
-        <Card
-          sx={{
-            ...buildAnalyticsCardSx({
-              isDark,
-              background: surfaceBg,
-              borderColor: surfaceBorder,
-              shadow: isDark ? "0 16px 32px rgba(2,6,23,0.42)" : "0 8px 18px rgba(15,23,42,0.06)",
-            }),
-            '& .MuiCardContent-root': {
-              backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
-            },
-          }}
-        >
-          <CardContent
-            sx={{
-              backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'transparent',
-            }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: headingColor }}>
-              Report Shortcuts
-            </Typography>
-
-            {loading ? (
-              <>
-                <Skeleton height={54} />
-                <Skeleton height={54} />
-                <Skeleton height={54} />
-              </>
-            ) : reports.length === 0 ? (
-              <Alert severity="info" sx={buildAnalyticsAlertSx(isDark, "info")}>
-                No report shortcuts available.
-              </Alert>
-            ) : (
-              <Box sx={{ display: "grid", gap: 1 }}>
-                {reports.map((report) => (
-                  (() => {
-                    const reportShortcutKey = String(report?.key || report?.title || "shortcut");
-                    const isShortcutDownloading = shortcutLoadingKey === reportShortcutKey;
-
-                    return (
-                  <Button
-                    key={reportShortcutKey}
-                    variant="outlined"
-                    size="small"
-                    onClick={() => onReportShortcutDownload?.(report)}
-                    disabled={isShortcutDownloading}
-                    sx={{
-                      justifyContent: "space-between",
-                      textTransform: "none",
-                      borderColor: isDark ? "rgba(96,165,250,0.58)" : "rgba(59,130,246,0.52)",
-                      backgroundColor: isDark ? "rgba(30,41,59,0.48)" : "rgba(239,246,255,0.7)",
-                      color: isDark ? "#BFDBFE" : "#1D4ED8",
-                      '&:hover': {
-                        borderColor: isDark ? "rgba(96,165,250,0.8)" : "rgba(37,99,235,0.72)",
-                        backgroundColor: isDark ? "rgba(30,58,138,0.35)" : "rgba(219,234,254,0.85)",
-                      },
-                    }}
-                    endIcon={isShortcutDownloading ? <Refresh fontSize="small" /> : <Download fontSize="small" />}
-                  >
-                    <Box sx={{ textAlign: "left" }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {report.title}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: subTextColor }}>
-                        {isShortcutDownloading ? "PREPARING…" : String(report.format || "").toUpperCase()}
-                      </Typography>
-                    </Box>
-                  </Button>
-                    );
-                  })()
-                ))}
-              </Box>
-            )}
-          </CardContent>
-        </Card>
-      </Grid>
-    </Grid>
-  );
-};
-
 const SummaryMiniCard = ({ label, value, error = false, isDark = false }) => {
   const labelColor = isDark ? ANALYTICS_DARK_UI.textMuted : "text.secondary";
   const valueColor = error ? (isDark ? "#FCA5A5" : "error.main") : (isDark ? ANALYTICS_DARK_UI.textPrimary : "text.primary");
@@ -3027,7 +2692,6 @@ const AnalyticsDashboard = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshWarning, setRefreshWarning] = useState("");
-  const [shortcutLoadingKey, setShortcutLoadingKey] = useState("");
 
   const pollRef = useRef(null);
   const fetchRef = useRef(null);
@@ -3217,94 +2881,6 @@ const AnalyticsDashboard = () => {
     }
   };
 
-  const handleReportShortcutDownload = useCallback(async (report) => {
-    const shortcutKey = String(report?.key || report?.title || "report-shortcut");
-    setShortcutLoadingKey(shortcutKey);
-
-    try {
-      const shortcutConfig = resolveShortcutGenerationConfig(report);
-      const dateRange = resolveShortcutDateRange(filters);
-      const reportFilters = {
-        ...(dateRange.startDate ? { startDate: dateRange.startDate } : {}),
-        ...(dateRange.endDate ? { endDate: dateRange.endDate } : {}),
-      };
-
-      if (filters.vaccineType && filters.vaccineType !== "ALL") {
-        reportFilters.vaccineType = filters.vaccineType;
-      }
-
-      if (filters.vaccinationStatus && filters.vaccinationStatus !== "all") {
-        reportFilters.status = filters.vaccinationStatus;
-        reportFilters.vaccinationStatus = filters.vaccinationStatus;
-      }
-
-      const generationResponse = await apiClient.post("/reports/generate", {
-        type: shortcutConfig.type,
-        format: shortcutConfig.format,
-        ...(dateRange.startDate ? { startDate: dateRange.startDate } : {}),
-        ...(dateRange.endDate ? { endDate: dateRange.endDate } : {}),
-        filters: reportFilters,
-      });
-
-      const generatedReportId = generationResponse?.data?.id || generationResponse?.id;
-      if (!generatedReportId) {
-        throw new Error("Report generation did not return a downloadable report identifier.");
-      }
-
-      const downloadResponse = await apiClient.customRequest(
-        `/reports/${generatedReportId}/download`,
-        {
-          method: "GET",
-          responseType: "blob",
-        },
-      );
-
-      const contentDisposition =
-        downloadResponse?.headers?.["content-disposition"] ||
-        downloadResponse?.headers?.["Content-Disposition"] ||
-        "";
-      const resolvedFilename = extractFilenameFromContentDisposition(contentDisposition);
-      const fallbackExtension = SHORTCUT_FORMAT_EXTENSION[shortcutConfig.format] || "dat";
-      const fallbackFilename = `${shortcutConfig.type}-report.${fallbackExtension}`;
-      const filename = resolvedFilename || fallbackFilename;
-
-      const mimeType =
-        downloadResponse?.headers?.["content-type"] ||
-        downloadResponse?.headers?.["Content-Type"] ||
-        "application/octet-stream";
-
-      const responseData = downloadResponse?.data;
-      const fileBlob = responseData instanceof Blob
-        ? responseData
-        : new Blob([responseData], { type: mimeType });
-
-      const objectUrl = window.URL.createObjectURL(fileBlob);
-      const anchor = document.createElement("a");
-      anchor.href = objectUrl;
-      anchor.setAttribute("download", filename);
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      window.URL.revokeObjectURL(objectUrl);
-
-      setSnackbar({
-        open: true,
-        message: `${report?.title || "Report"} downloaded`,
-        severity: "success",
-      });
-    } catch (shortcutError) {
-      console.error("Report shortcut download error:", shortcutError);
-      const message = shortcutError?.message || "Unable to download report from shortcut.";
-      setSnackbar({
-        open: true,
-        message,
-        severity: /no data found/i.test(message) ? "info" : "error",
-      });
-    } finally {
-      setShortcutLoadingKey("");
-    }
-  }, [filters]);
-
   const liveSyncEnabled = useMemo(() => connectionState === "connected", [connectionState]);
   const chartAppearance = useMemo(() => resolveChartAppearance(isDark), [isDark]);
   const tabFromUrl = useMemo(() => {
@@ -3367,7 +2943,9 @@ const AnalyticsDashboard = () => {
 
   return (
     <Box sx={{
-      p: { xs: 2, sm: 2.5, md: 3 },
+      px: { xs: 2, sm: 2.5, md: 3 },
+      pb: { xs: 2, sm: 2.5, md: 3 },
+      pt: 0,
       bgcolor: isDark ? ANALYTICS_DARK_UI.pageBg : 'transparent',
       minHeight: '100vh',
       borderRadius: isDark ? 2 : 0,
@@ -3394,30 +2972,11 @@ const AnalyticsDashboard = () => {
           onAutoRefreshToggle={setAutoRefresh}
           isDark={isDark}
           scopeLabel={dashboardData?.scopeLabel}
+          generatedAt={dashboardData?.generatedAt}
+          tabs={tabs}
+          activeTab={tab}
+          onTabChange={handleTabChange}
         />
-
-        <Box sx={{ mt: 3, mb: 2 }}>
-          <nav
-            className="flex space-x-2 overflow-x-auto bg-gray-100 dark:bg-gray-800 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700"
-            aria-label="Analytics content sections"
-          >
-            {tabs.map((tabConfig, tabIndex) => (
-              <button
-                key={tabConfig.key}
-                onClick={() => handleTabChange(null, tabIndex)}
-                className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
-                  tab === tabIndex
-                    ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
-                    : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
-                }`}
-                aria-selected={tab === tabIndex}
-                role="tab"
-              >
-                {tabConfig.label}
-              </button>
-            ))}
-          </nav>
-        </Box>
       </Box>
 
       {/* Scrollable Content Area */}
@@ -3441,11 +3000,6 @@ const AnalyticsDashboard = () => {
         {error ? (
           <Alert
             severity="error"
-            action={
-              <Button color="inherit" size="small" onClick={handleManualRefresh}>
-                Retry
-              </Button>
-            }
             sx={{ mb: 2, ...buildAnalyticsAlertSx(isDark, "error") }}
           >
             {error}
@@ -3458,21 +3012,26 @@ const AnalyticsDashboard = () => {
           </Alert>
         ) : null}
 
-        <Typography variant="caption" sx={{ display: "block", mb: 2, color: isDark ? ANALYTICS_DARK_UI.textMuted : 'text.secondary' }}>
-          Scope: {dashboardData?.scopeLabel || "Current health center scope"}
-          {dashboardData?.generatedAt ? ` • Last generated: ${toShortDateTime(dashboardData.generatedAt)}` : ""}
-        </Typography>
-
         {tab === 0 && (
           <>
-            <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
+            <KpiSummaryGrid
+              data={dashboardData}
+              loading={loading}
+              isDark={isDark}
+              period={filters.period}
+            />
             <TrendsSection data={dashboardData} loading={loading} chartAppearance={chartAppearance} />
           </>
         )}
 
         {tab === 1 && (
           <>
-            <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
+            <KpiSummaryGrid
+              data={dashboardData}
+              loading={loading}
+              isDark={isDark}
+              period={filters.period}
+            />
             <Divider sx={sectionDividerSx} />
             <VaccineProgressSection data={dashboardData} loading={loading} chartAppearance={chartAppearance} />
           </>
@@ -3480,7 +3039,12 @@ const AnalyticsDashboard = () => {
 
         {tab === 2 && (
           <>
-            <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
+            <KpiSummaryGrid
+              data={dashboardData}
+              loading={loading}
+              isDark={isDark}
+              period={filters.period}
+            />
             <Divider sx={sectionDividerSx} />
             <AppointmentAndFollowupSection
               data={dashboardData}
@@ -3492,7 +3056,12 @@ const AnalyticsDashboard = () => {
 
         {tab === 3 && (
           <>
-            <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
+            <KpiSummaryGrid
+              data={dashboardData}
+              loading={loading}
+              isDark={isDark}
+              period={filters.period}
+            />
             <Divider sx={sectionDividerSx} />
             <InventorySection
               data={dashboardData}
@@ -3511,7 +3080,12 @@ const AnalyticsDashboard = () => {
 
         {tab === 4 && (
           <>
-            <KpiSummaryGrid data={dashboardData} loading={loading} isDark={isDark} />
+            <KpiSummaryGrid
+              data={dashboardData}
+              loading={loading}
+              isDark={isDark}
+              period={filters.period}
+            />
             <Divider sx={sectionDividerSx} />
             <SmsAndDemographicsSection
               data={dashboardData}
@@ -3519,13 +3093,7 @@ const AnalyticsDashboard = () => {
               chartAppearance={chartAppearance}
               showGenderChart
               genderError={error}
-            />
-            <AlertsActivityReportsSection
-              data={dashboardData}
-              loading={loading}
-              isDark={isDark}
-              onReportShortcutDownload={handleReportShortcutDownload}
-              shortcutLoadingKey={shortcutLoadingKey}
+              showCriticalAlerts
             />
           </>
         )}

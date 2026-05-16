@@ -6,9 +6,9 @@
 import apiClient from './api';
 
 // Official vaccination schedule (will be fetched from backend)
-const VACCINE_SCHEDULE = {
-  // Structure: { vaccineName: { doses: [{ number, ageInMonths, vaccines: [...] }] } }
-};
+
+
+
 
 // Cache for vaccination schedule
 let scheduleCache = null;
@@ -34,7 +34,7 @@ const normalizeScheduleShape = (schedule = {}) => {
       accumulator[scheduleKey] = {
         name: displayName,
         doses: value
-          .map((dose) => ({
+          .map((dose) =>( {
             number: Number(dose?.number ?? dose?.dose ?? dose?.dose_number),
             ageInMonths: Number(dose?.ageInMonths ?? dose?.minAgeMonths ?? 0),
             maxAgeMonths:
@@ -52,7 +52,7 @@ const normalizeScheduleShape = (schedule = {}) => {
         ...value,
         name: value.name || scheduleKey,
         doses: value.doses
-          .map((dose) => ({
+          .map((dose) =>( {
             ...dose,
             number: Number(dose?.number ?? dose?.dose ?? dose?.dose_number),
             ageInMonths: Number(dose?.ageInMonths ?? dose?.minAgeMonths ?? 0),
@@ -104,26 +104,26 @@ const buildCompletedDoseSummary = (vaccinationHistory = []) => {
   return completed;
 };
 
-const toCompletedDoseLookup = (completedDoses = {}, schedule = {}) => {
-  const normalizedSchedule = normalizeScheduleShape(schedule);
-  const counts = {};
 
-  Object.values(normalizedSchedule).forEach((vaccine) => {
-    counts[vaccine.name] = 0;
-  });
 
-  Object.entries(completedDoses || {}).forEach(([vaccineName, value]) => {
-    if (typeof value === "number") {
-      counts[vaccineName] = value;
-      return;
-    }
 
-    const doses = Array.isArray(value?.doses) ? value.doses : [];
-    counts[vaccineName] = doses.length;
-  });
 
-  return counts;
-};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /**
  * Fetch official vaccination schedule from backend
@@ -157,7 +157,7 @@ export const getVaccinationSchedule = async () => {
   const normalizedSchedule = await fetchVaccinationSchedule();
 
   return Object.values(normalizedSchedule).reduce((accumulator, vaccine) => {
-    accumulator[vaccine.name] = vaccine.doses.map((dose) => ({
+    accumulator[vaccine.name] = vaccine.doses.map((dose) =>( {
       dose: dose.number,
       minAgeMonths: dose.ageInMonths,
       maxAgeMonths: dose.maxAgeMonths,
@@ -171,7 +171,7 @@ export const getVaccinationSchedule = async () => {
  * Get mock vaccination schedule for development
  * @returns {Object} Mock vaccination schedule
  */
-const getMockVaccinationSchedule = () => ({
+const getMockVaccinationSchedule = () =>( {
   hepatitis_b: {
     name: 'Hepatitis B',
     doses: [
@@ -343,7 +343,7 @@ export const calculateNextValidDose = (
   if (!Number.isFinite(ageInMonths)) {
     const birthDate = new Date(child.dob);
     const today = new Date();
-    ageInMonths = (today - birthDate) / (1000 * 60 * 60 * 24 * 30.44);
+    ageInMonths = (today - birthDate) /( 1000 * 60 * 60 * 24 * 30.44);
   }
 
   const normalizedSchedule = normalizeScheduleShape(schedule);
@@ -510,13 +510,13 @@ export const assignTriageCategory = (transferInData = {}, schedule = {}) => {
 
   const birthDate = new Date(childDOB);
   const today = new Date();
-  const ageInMonths = (today - birthDate) / (1000 * 60 * 60 * 24 * 30.44);
+  const ageInMonths = (today - birthDate) /( 1000 * 60 * 60 * 24 * 30.44);
   const normalizedSchedule = normalizeScheduleShape(schedule);
 
   // Check for invalid dates
   const hasInvalidDates = submittedVaccines.some(vaccine =>
-    vaccine.dateReceived &&
-    (new Date(vaccine.dateReceived) < birthDate || new Date(vaccine.dateReceived) > today)
+    vaccine.dateReceived &&(
+     new Date(vaccine.dateReceived) < birthDate || new Date(vaccine.dateReceived) > today)
   );
 
   if (hasInvalidDates) {

@@ -4,29 +4,30 @@ import apiClient from "../../utils/api";
 import {
   Card,
   Button,
-  DataTable,
+
   PageHeader,
-  Alert,
+  Alert     ,
   LoadingSpinner,
-  Input,
+  Input         ,
   Badge,
 } from "../../components/UI";
 import {
-  Plus,
+
   Search,
   RefreshCw,
-  Filter,
-  Download,
+
+  Download ,
   ArrowUpCircle,
   ArrowDownCircle,
-  Package,
+  Package      ,
+  X,
 } from "lucide-react";
 
 const StockTransactions = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [transactions, setTransactions] = useState([]);
-  const [vaccines, setVaccines] = useState([]);
+  const [        , setVaccines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -155,58 +156,58 @@ const StockTransactions = () => {
     }
   };
 
-  const columns = [
-    {
-      key: "date",
-      label: "Date",
-      type: "date",
-    },
-    {
-      key: "type",
-      label: "Type",
-      render: (val) => (
-        <div className="flex items-center gap-2">
-          {getTypeIcon(val)}
-          <Badge variant={getTypeBadgeVariant(val)}>
-            {val?.replace(/_/g, " ")}
-          </Badge>
-        </div>
-      ),
-    },
-    {
-      key: "vaccine_name",
-      label: "Vaccine",
-      render: (val) => (
-        <span className="font-medium text-gray-900 dark:text-gray-100">
-          {val}
-        </span>
-      ),
-    },
-    {
-      key: "quantity",
-      label: "Quantity",
-      render: (val) => (
-        <span className="font-mono font-medium">{val} doses</span>
-      ),
-    },
-    {
-      key: "lot_number",
-      label: "Lot Number",
-    },
-    {
-      key: "reference",
-      label: "Reference",
-    },
-    {
-      key: "status",
-      label: "Status",
-      render: (val) => (
-        <Badge variant={val === "Completed" ? "success" : "warning"}>
-          {val}
-        </Badge>
-      ),
-    },
-  ];
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   const stats = {
     total: filteredTransactions.length,
@@ -218,18 +219,18 @@ const StockTransactions = () => {
   };
 
   if (loading) {
-    return (
+    return(
       <div className="flex flex-col items-center justify-center py-24">
         <LoadingSpinner size="lg" />
         <span className="mt-4 text-gray-600 dark:text-gray-400 font-medium">
           Loading stock transactions...
         </span>
-      </div>
-    );
+      </div>)
+     ;
   }
 
   if (error) {
-    return (
+    return(
       <div className="text-center py-8">
         <Alert variant="error" title="Error loading transactions">
           {error}
@@ -239,11 +240,11 @@ const StockTransactions = () => {
             </Button>
           </div>
         </Alert>
-      </div>
-    );
+      </div>)
+     ;
   }
 
-  return (
+  return(
     <div className="p-6 space-y-6">
       <PageHeader
         title="Stock Transactions"
@@ -296,8 +297,18 @@ const StockTransactions = () => {
             placeholder="Search transactions..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 pr-9"
           />
+          {searchQuery && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+            >
+              <X className="w-4 h-4" aria-hidden="true" />
+            </button>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           {[
@@ -307,7 +318,7 @@ const StockTransactions = () => {
             { value: "TRANSFER_IN", label: "Transfer In" },
             { value: "TRANSFER_OUT", label: "Transfer Out" },
             { value: "EXPIRE", label: "Expired" },
-          ].map((filter) => (
+          ].map((filter) =>(
             <button
               key={filter.value}
               onClick={() => setTypeFilter(filter.value)}
@@ -318,8 +329,8 @@ const StockTransactions = () => {
               }`}
             >
               {filter.label}
-            </button>
-          ))}
+            </button>)
+           )}
         </div>
       </div>
 
@@ -353,8 +364,8 @@ const StockTransactions = () => {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredTransactions.length > 0 ? (
-                filteredTransactions.map((transaction) => (
+              {filteredTransactions.length > 0 ?
+                                        (filteredTransactions.map((transaction)=>(
                   <tr
                     key={transaction.id}
                     className="hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -397,9 +408,9 @@ const StockTransactions = () => {
                         {transaction.status}
                       </Badge>
                     </td>
-                  </tr>
-                ))
-              ) : (
+                  </tr>)
+                 ))
+                :(
                 <tr>
                   <td
                     colSpan="7"
@@ -407,8 +418,8 @@ const StockTransactions = () => {
                   >
                     No transactions found matching your criteria.
                   </td>
-                </tr>
-              )}
+                </tr>)
+               }
             </tbody>
           </table>
         </div>
@@ -430,8 +441,8 @@ const StockTransactions = () => {
           <Download className="w-4 h-4" /> View Reports
         </Button>
       </div>
-    </div>
-  );
-};
+    </div>)
+   ;}
+ ;
 
 export default StockTransactions;

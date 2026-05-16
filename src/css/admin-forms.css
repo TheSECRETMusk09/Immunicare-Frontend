@@ -1,18 +1,6 @@
-/* ==========================================================================
-    Admin Dashboard Forms - Responsive Layout System
-    Immunicare Vaccination Management System
+/* Admin form layout helpers */
 
-    Features:
-    - Prevents width overflow in all form containers
-    - Responsive grid layouts that adapt to screen size
-    - Standardized input field sizing and alignment
-    - Mobile-first approach with proper touch targets
-    - Dark mode support
-    ========================================================================== */
-
-/* ==========================================================================
-    Form Container Overflow Prevention
-    ========================================================================== */
+/* Form container overflow */
 
 /* Base form container - prevents horizontal overflow */
 .admin-form {
@@ -59,9 +47,7 @@
   color: var(--color-slate-500, #64748b);
 }
 
-/* ==========================================================================
-    Responsive Form Grid System
-    ========================================================================== */
+/* Responsive form grid */
 
 /* Base grid row - single column on mobile by default */
 .admin-form-row {
@@ -129,9 +115,7 @@
   }
 }
 
-/* ==========================================================================
-    Form Field Group - Standardized Input Container
-    ========================================================================== */
+/* Field groups */
 
 .admin-field-group {
   width: 100%;
@@ -180,9 +164,7 @@
   color: var(--color-danger-500, #ef4444);
 }
 
-/* ==========================================================================
-    Form Validation Styles
-    ========================================================================== */
+/* Validation styles */
 
 /* Error state for inputs */
 .admin-input-error,
@@ -232,9 +214,7 @@
   margin-left: 0.125rem;
 }
 
-/* ==========================================================================
-    Form Loading State Styles
-    ========================================================================== */
+/* Loading state */
 
 /* Button loading state */
 .admin-button-loading {
@@ -281,9 +261,7 @@
   position: relative;
 }
 
-/* ==========================================================================
-    Standardized Input Styles
-    ========================================================================== */
+/* Base input styles */
 
 /* Base input styling */
 .admin-input,
@@ -359,9 +337,7 @@
   resize: vertical;
 }
 
-/* ==========================================================================
-    Form Field Sizing Variants
-    ========================================================================== */
+/* Field sizing variants */
 
 /* Small inputs */
 .admin-input-sm,
@@ -409,9 +385,7 @@
   max-width: 20rem;
 }
 
-/* ==========================================================================
-    Form Cards and Sections
-    ========================================================================== */
+/* Form cards and sections */
 
 /* Form card container */
 .admin-form-card {
@@ -479,9 +453,7 @@
   border-color: rgba(239, 68, 68, 0.2);
 }
 
-/* ==========================================================================
-    Modal Form Specific Styles
-    ========================================================================== */
+/* Modal form styles */
 
 /* Modal form container */
 .admin-modal-form {
@@ -552,9 +524,7 @@
   }
 }
 
-/* ==========================================================================
-    Form Actions (Buttons)
-    ========================================================================== */
+/* Form actions */
 
 .admin-form-actions,
 .form-actions {
@@ -618,9 +588,7 @@
   }
 }
 
-/* ==========================================================================
-    Page Header Actions Cleanup
-    ========================================================================== */
+/* Page header actions */
 
 .page-header__container .page-header__actions {
   display: flex;
@@ -647,9 +615,7 @@
   box-shadow: none;
 }
 
-/* ==========================================================================
-    Info Cards within Forms
-    ========================================================================== */
+/* Info cards */
 
 .admin-info-card {
   width: 100%;
@@ -743,9 +709,7 @@
   color: #ef4444;
 }
 
-/* ==========================================================================
-    User Info Display (for showing selected user/patient info)
-    ========================================================================== */
+/* User info display */
 
 .admin-user-info {
   width: 100%;
@@ -800,9 +764,7 @@
   text-overflow: ellipsis;
 }
 
-/* ==========================================================================
-    Dark Mode Styles - Using class-based dark mode (matches Tailwind config)
-    ========================================================================== */
+/* Dark mode */
 
 .dark .admin-form .form-section {
   border-bottom-color: var(--color-slate-700, #334155);
@@ -1012,9 +974,7 @@
   color: #f87171;
 }
 
-/* ==========================================================================
-    Utility Classes for Form Layout
-    ========================================================================== */
+/* Utility classes */
 
 /* Prevent text overflow */
 .admin-text-truncate {
@@ -1092,9 +1052,7 @@
   }
 }
 
-/* ==========================================================================
-    Responsive Table Container (for forms with inline tables)
-    ========================================================================== */
+/* Responsive table container */
 
 .admin-table-container {
   width: 100%;
@@ -1143,9 +1101,7 @@
   border-bottom: none;
 }
 
-/* ==========================================================================
-    Form Section Styles
-    ========================================================================== */
+/* Form section styles */
 
 .admin-form-section {
   width: 100%;
@@ -1197,9 +1153,7 @@
   color: var(--color-slate-300, #cbd5e1);
 }
 
-/* ==========================================================================
-    Print Styles
-    ========================================================================== */
+/* Print */
 
 @media print {
   .admin-form,
@@ -1217,9 +1171,7 @@
   }
 }
 
-/* ==========================================================================
-    Standardized Form Actions Container
-    ========================================================================== */
+/* Standardized form actions */
 .form-actions-standardized {
   display: flex;
   justify-content: center;
@@ -1235,9 +1187,7 @@
     border-top-color: var(--color-slate-700, #334155);
 }
 
-/* ==========================================================================
-    Password Reset Modal Theme Overrides
-    ========================================================================== */
+/* Password reset modal overrides */
 
 .user-password-reset-form {
   display: flex;

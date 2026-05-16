@@ -3,7 +3,7 @@
  * Tests the complete workflow from guardian submission to admin validation
  */
 
-import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent         } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import React from 'react';
 
@@ -87,10 +87,10 @@ const MockTransferInForm = ({ onSubmit, isLoading }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(        (prev                      )=>({...prev,[name]:value}));
   };
 
-  return (
+  return(
     <form onSubmit={handleSubmit} data-testid="transfer-in-form">
       <div data-testid="form-field-health-center">
         <label htmlFor="previousHealthCenter">Previous Health Center</label>
@@ -142,16 +142,16 @@ const MockTransferInForm = ({ onSubmit, isLoading }) => {
       >
         {isLoading ? 'Submitting...' : 'Submit Transfer Request'}
       </button>
-    </form>
-  );
+    </form>)
+   ;
 };
 
 // Mock notification preference toggle component
 const MockNotificationSettings = ({ preferences, onToggle, isSaving }) => {
-  return (
+  return(
     <div data-testid="notification-settings">
       <h2 data-testid="settings-title">Notification Preferences</h2>
-      {preferences.map((pref) => (
+      {preferences.map((pref) =>(
         <div key={pref.notification_type} data-testid={`pref-${pref.notification_type}`}>
           <span data-testid={`label-${pref.notification_type}`}>
             {pref.notification_type.replace('_', ' ')}
@@ -170,10 +170,10 @@ const MockNotificationSettings = ({ preferences, onToggle, isSaving }) => {
           >
             Email: {pref.email_enabled ? 'ON' : 'OFF'}
           </button>
-        </div>
-      ))}
-    </div>
-  );
+        </div>)
+       )}
+    </div>)
+   ;
 };
 
 describe('Transfer-In End-to-End Flow', () => {

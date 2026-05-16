@@ -1,8 +1,3 @@
-/**
- * useGuardianNotifications Hook
- * Custom hook for managing guardian notifications with real-time updates
- */
-
 import { useState, useEffect, useCallback, useRef } from "react";
 import guardianNotificationService from "../services/guardianNotificationService";
 import { useAuth } from "../contexts/AuthContext";
@@ -11,7 +6,7 @@ const useGuardianNotifications = (options = {}) => {
   const { limit = 20, pollingInterval = 60000, autoFetch = true } = options;
   const { guardianId, isGuardian } = useAuth();
 
-  const sanitizeFiltersForApi = useCallback((rawFilters = {}) => {
+  const cleanFilters = useCallback((rawFilters = {}) => {
     const next = {};
 
     if (typeof rawFilters.type === "string") {
@@ -52,23 +47,17 @@ const useGuardianNotifications = (options = {}) => {
   const cachedCountRef = useRef(0);
   const lastRequestKeyRef = useRef("");
 
-  // Check if we should fetch (prevent redundant fetches)
   const shouldFetch = useCallback(() => {
     const now = Date.now();
-    // Only fetch if it's been at least 5 seconds since last fetch
     return now - lastFetchTimeRef.current > 5000;
   }, []);
 
-  // Fetch notifications with caching
   const fetchNotifications = useCallback(
     async (force = false) => {
-      // Only fetch for actual guardian users
       if (!guardianId || !isGuardian) return;
 
-      const queryFilters = sanitizeFiltersForApi(filters);
+      const queryFilters = cleanFilters(filters);
 
-      // Skip if not forced and recently fetched (within last 5 seconds)
-      // Note: We skip this check if filters change to ensure UI updates immediately
       const requestKey = JSON.stringify({ limit, filters: queryFilters });
       if (!force && !shouldFetch() && requestKey === lastRequestKeyRef.current) {
         return;
@@ -97,7 +86,6 @@ const useGuardianNotifications = (options = {}) => {
         if (isMountedRef.current) {
           if (notificationsRes?.success) {
             const newNotifications = notificationsRes.data || [];
-            // Only update if data has changed (prevent unnecessary re-renders)
             if (
               JSON.stringify(newNotifications) !==
               JSON.stringify(cachedNotificationsRef.current)
@@ -113,7 +101,6 @@ const useGuardianNotifications = (options = {}) => {
               countRes?.count ??
               countRes?.data?.data?.count ??
               0;
-            // Only update if count has changed
             if (newCount !== cachedCountRef.current) {
               cachedCountRef.current = newCount;
               setUnreadCount(newCount);
@@ -134,15 +121,13 @@ const useGuardianNotifications = (options = {}) => {
         }
       }
     },
-    [guardianId, isGuardian, limit, shouldFetch, filters, sanitizeFiltersForApi],
+    [guardianId, isGuardian, limit, shouldFetch, filters, cleanFilters],
   );
 
-  // Mark notification as read
   const markAsRead = useCallback(async (notificationId) => {
     try {
       await guardianNotificationService.markAsRead(notificationId);
 
-      // Update local state
       if (isMountedRef.current) {
         setNotifications((prev) =>
           prev.map((n) =>
@@ -159,12 +144,10 @@ const useGuardianNotifications = (options = {}) => {
     }
   }, []);
 
-  // Mark notification as unread
   const markAsUnread = useCallback(async (notificationId) => {
     try {
       await guardianNotificationService.markAsUnread(notificationId);
 
-      // Update local state
       if (isMountedRef.current) {
         setNotifications((prev) =>
           prev.map((n) =>
@@ -181,12 +164,10 @@ const useGuardianNotifications = (options = {}) => {
     }
   }, []);
 
-  // Mark all as read
   const markAllAsRead = useCallback(async () => {
     try {
       await guardianNotificationService.markAllAsRead();
 
-      // Update local state
       if (isMountedRef.current) {
         setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
         setUnreadCount(0);
@@ -199,11 +180,9 @@ const useGuardianNotifications = (options = {}) => {
     }
   }, []);
 
-  // Delete notification
   const deleteNotification = useCallback(
     async (notificationId) => {
       try {
-        // First, find the notification to check if it was unread
         const notificationToDelete = notifications.find(
           (n) => n.id === notificationId,
         );
@@ -211,12 +190,10 @@ const useGuardianNotifications = (options = {}) => {
 
         await guardianNotificationService.deleteNotification(notificationId);
 
-        // Update local state - filter out the deleted notification and update unread count
         if (isMountedRef.current) {
           setNotifications((prev) =>
             prev.filter((n) => n.id !== notificationId),
           );
-          // Decrement unread count if the deleted notification was unread
           if (wasUnread) {
             setUnreadCount((prev) => Math.max(0, prev - 1));
           }
@@ -247,22 +224,19 @@ const useGuardianNotifications = (options = {}) => {
     });
   }, []);
 
-  // Refresh notifications (force fetch regardless of cache)
   const refresh = useCallback(() => {
-    return fetchNotifications(true); // Force refresh
+    return fetchNotifications(true);
   }, [fetchNotifications]);
 
-  // Initial fetch and polling setup
   useEffect(() => {
     isMountedRef.current = true;
 
     if (autoFetch && guardianId && isGuardian) {
-      fetchNotifications(true); // Initial fetch is always forced
+      fetchNotifications(true);
 
-      // Set up polling with increased interval to reduce API calls
       if (pollingInterval > 0) {
         pollingIntervalRef.current = setInterval(
-          () => fetchNotifications(false), // Subsequent fetches respect cache
+          () => fetchNotifications(false),
           pollingInterval,
         );
       }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import apiClient from "../utils/api";
@@ -12,24 +12,131 @@ import {
   CheckCircle,
   Clock,
   AlertTriangle,
-  Syringe,
   Calendar,
   FileText,
   ChevronDown,
-  RefreshCw,
-  Bell,
-  User,
+  Activity,
+  FileCheck,
 } from "lucide-react";
 import { trackEvent } from "../utils/telemetry";
 import ImmunizationRecordBooklet from "../components/ImmunizationRecordBooklet";
+import EnhancedGuardianImmunizationChart from "../components/GuardianImmunizationChart";
+import { normalizeVaccinationRecordsResponse, computeVaccinationComplianceSummary } from "../utils/adminDataAdapters";
 import { normalizeArrayPayload } from "../utils/apiUtils";
+import { formatClinicDateTime, formatInfantDob } from "../utils/dateUtils";
 
 const PROVIDER_FALLBACK_LABEL = "Provider unavailable";
+const EMPTY_BOOKLET_VALUE = "\u2014";
+const HALF_FRACTION = "\u00BD";
+
+const vaccineDisplayName = {
+  BCG: "BCG Vaccine",
+  "Hepa B": "Hepatitis B Vaccine",
+  "Hepatitis B": "Hepatitis B Vaccine",
+  "Penta Valent": "Pentavalent Vaccine (DPT-Hep B-HIB)",
+  Pentavalent: "Pentavalent Vaccine (DPT-Hep B-HIB)",
+  "OPV 20-doses": "Oral Polio Vaccine (OPV)",
+  OPV: "Oral Polio Vaccine (OPV)",
+  "IPV multi dose": "Inactivated Polio Vaccine (IPV)",
+  IPV: "Inactivated Polio Vaccine (IPV)",
+  "PCV 13/PCV 10": "Pneumococcal Conjugate Vaccine (PCV)",
+  PCV: "Pneumococcal Conjugate Vaccine (PCV)",
+  MMR: "Measles, Mumps, Rubella Vaccine (MMR)",
+};
+
+const getVaccineName = (raw) => {
+  for (const key of Object.keys(vaccineDisplayName)) {
+    if (raw && raw.toLowerCase().includes(key.toLowerCase())) return vaccineDisplayName[key];
+  }
+  return raw;
+};
+
+const epiAgeSchedule = {
+  "BCG Vaccine": { 1: "At birth" },
+  "Hepatitis B Vaccine": { 1: "At birth" },
+  "Pentavalent Vaccine (DPT-Hep B-HIB)": { 1: "1\u00BD mos", 2: "2\u00BD mos", 3: "3\u00BD mos" },
+  "Oral Polio Vaccine (OPV)": { 1: "1\u00BD mos", 2: "2\u00BD mos", 3: "3\u00BD mos" },
+  "Inactivated Polio Vaccine (IPV)": { 1: "3\u00BD mos", 2: "9 mos" },
+  "Pneumococcal Conjugate Vaccine (PCV)": { 1: "1\u00BD mos", 2: "2\u00BD mos", 3: "3\u00BD mos" },
+  "Measles, Mumps, Rubella Vaccine (MMR)": { 1: "9 mos", 2: "1 year" },
+};
+
+const vaccineOrder = [
+  "BCG Vaccine",
+  "Hepatitis B Vaccine",
+  "Pentavalent Vaccine (DPT-Hep B-HIB)",
+  "Oral Polio Vaccine (OPV)",
+  "Inactivated Polio Vaccine (IPV)",
+  "Pneumococcal Conjugate Vaccine (PCV)",
+  "Measles, Mumps, Rubella Vaccine (MMR)",
+];
+
+const getVaccineOrderIndex = (displayName) => {
+  const idx = vaccineOrder.indexOf(displayName);
+  return idx === -1 ? Number.POSITIVE_INFINITY : idx;
+};
+
+const ageLabelToMonths = (label) => {
+  if (!label) return null;
+  if (/at\s*birth/i.test(label)) return 0;
+  const yearMatch = label.match(/(\d+(?:\.\d+)?)\s*year/i);
+  if (yearMatch) return Number(yearMatch[1]) * 12;
+  const halfPresent = /[\u00BD]|\.5/.test(label);
+  const monthMatch = label.match(/(\d+)\s*mos?/i);
+  if (monthMatch) {
+    return Number(monthMatch[1]) + (halfPresent ? 0.5 : 0);
+  }
+  return null;
+};
+
+const monthsSinceDob = (dob) => {
+  if (!dob) return null;
+  const dobDate = new Date(dob);
+  if (Number.isNaN(dobDate.getTime())) return null;
+  const now = new Date();
+  const diffMs = now.getTime() - dobDate.getTime();
+  if (diffMs < 0) return 0;
+  return diffMs / (1000 * 60 * 60 * 24 * 30.4375);
+};
+
+const getDoseAge = (vaccineName, doseNumber) => {
+  const displayName = getVaccineName(vaccineName);
+  return epiAgeSchedule[displayName]?.[doseNumber] ?? "";
+};
 
 const resolveProviderName = (record) =>
   record?.provider_name ||
   record?.administered_by_name ||
   PROVIDER_FALLBACK_LABEL;
+
+const resolveVaccineDisplayName = (entry) =>
+  entry?.vaccine_display_name ||
+  entry?.vaccineFullName ||
+  entry?.vaccine_full_name ||
+  entry?.vaccine?.fullName ||
+  entry?.vaccine?.full_name ||
+  entry?.vaccine?.name ||
+  entry?.vaccine_name ||
+  entry?.vaccineName ||
+  "Unknown vaccine";
+
+const normalizeAgeScheduleLabel = (value) => {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) {
+    return "";
+  }
+
+  if (/at\s*birth/i.test(rawValue)) {
+    return "At birth";
+  }
+
+  return rawValue
+    .replace(/(\d+)\.5/g, (_, whole) => `${whole}${HALF_FRACTION}`)
+    .replace(/\bmonths?\b/gi, "mos")
+    .replace(/\bmos\s+old\b/gi, "mos")
+    .replace(/\s+/g, " ")
+    .trim();
+};
 
 const normalizeScheduleRecord = (scheduleItem) => ({
   id:
@@ -39,7 +146,9 @@ const normalizeScheduleRecord = (scheduleItem) => ({
   vaccine_id: scheduleItem?.vaccine?.id || scheduleItem?.vaccineId || null,
   vaccine_name:
     scheduleItem?.vaccine?.name || scheduleItem?.vaccineName || "Unknown vaccine",
+  vaccine_display_name: resolveVaccineDisplayName(scheduleItem),
   dose_no: scheduleItem?.dose?.number || scheduleItem?.doseNumber || 1,
+  dose_number: scheduleItem?.dose?.number || scheduleItem?.doseNumber || 1,
   total_doses: scheduleItem?.dose?.total || scheduleItem?.totalDoses || 1,
   due_date: scheduleItem?.schedule?.dueDate || scheduleItem?.dueDate || null,
   admin_date: scheduleItem?.lastAdministered || scheduleItem?.adminDate || null,
@@ -48,6 +157,17 @@ const normalizeScheduleRecord = (scheduleItem) => ({
   isReady: Boolean(scheduleItem?.isReady),
   canBeAdministered: Boolean(scheduleItem?.canBeAdministered),
   schedule_id: scheduleItem?.schedule?.id || scheduleItem?.scheduleId || null,
+  scheduleId: scheduleItem?.schedule?.id || scheduleItem?.scheduleId || null,
+  age_in_months: scheduleItem?.schedule?.ageInMonths ?? scheduleItem?.ageInMonths ?? null,
+  minimum_age_days:
+    scheduleItem?.schedule?.minimumAgeDays ?? scheduleItem?.minimumAgeDays ?? null,
+  age_description:
+    scheduleItem?.schedule?.ageDescription ||
+    scheduleItem?.schedule?.age_description ||
+    scheduleItem?.ageDescription ||
+    scheduleItem?.age_description ||
+    null,
+  description: scheduleItem?.schedule?.description || scheduleItem?.description || "",
   source_facility: scheduleItem?.source_facility || null,
 });
 
@@ -79,100 +199,153 @@ const resolveCanonicalStatusKey = (record) => {
   return normalizedStatus;
 };
 
-const resolveStatusDisplay = (record) => {
+const buildVaccineMatchKey = (entry) => {
+  const vaccineId = entry?.vaccine_id || entry?.vaccineId || entry?.vaccine?.id || null;
+  if (vaccineId) {
+    return `vaccine:${vaccineId}`;
+  }
+
+  return `vaccine:${String(
+    entry?.vaccine_name || entry?.vaccineName || entry?.vaccine?.name || "unknown",
+  )
+    .trim()
+    .toLowerCase()}`;
+};
+
+const buildDoseMatchKey = (entry) =>
+  `${buildVaccineMatchKey(entry)}:dose:${Number(
+    entry?.dose_no || entry?.dose_number || entry?.doseNumber || entry?.dose?.number || 1,
+  )}`;
+
+const formatNumericDate = (value) => {
+  if (!value) return EMPTY_BOOKLET_VALUE;
+
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return EMPTY_BOOKLET_VALUE;
+  }
+
+  return [
+    String(parsedDate.getMonth() + 1).padStart(2, "0"),
+    String(parsedDate.getDate()).padStart(2, "0"),
+    parsedDate.getFullYear(),
+  ].join("/");
+};
+
+const formatMonthAgeLabel = (months) => {
+  if (!Number.isFinite(months) || months < 0) {
+    return "";
+  }
+
+  if (months === 0) {
+    return "At birth";
+  }
+
+  if (Math.abs(months - 0.5) < 0.01) {
+    return `${HALF_FRACTION} mo`;
+  }
+
+  if (months >= 12) {
+    const years = months / 12;
+    if (Math.abs(years - Math.round(years)) < 0.1) {
+      const roundedYears = Math.round(years);
+      return roundedYears === 1 ? "1 year" : `${roundedYears} years`;
+    }
+  }
+
+  const roundedMonths = Math.round(months * 2) / 2;
+  const isWholeMonth = Math.abs(roundedMonths - Math.round(roundedMonths)) < 0.01;
+  const monthLabel = isWholeMonth
+    ? String(Math.round(roundedMonths))
+    : roundedMonths.toFixed(1).replace(".5", HALF_FRACTION);
+
+  return monthLabel === "1" ? "1 mo" : `${monthLabel} mos`;
+};
+
+const formatDoseAgeLabel = (entry) => {
+  const ageDescription = normalizeAgeScheduleLabel(
+    entry?.age_description || entry?.ageDescription || entry?.ageLabel,
+  );
+  if (ageDescription) {
+    return ageDescription;
+  }
+
+  const minimumAgeDays = Number(entry?.minimum_age_days);
+  if (Number.isFinite(minimumAgeDays)) {
+    if (minimumAgeDays <= 0) {
+      return "At birth";
+    }
+
+    if (minimumAgeDays >= 365) {
+      const years = Math.max(1, Math.round(minimumAgeDays / 365));
+      return years === 1 ? "1 year" : `${years} years`;
+    }
+
+    const monthLabel = formatMonthAgeLabel(minimumAgeDays / 30);
+    if (monthLabel) {
+      return monthLabel;
+    }
+  }
+
+  const ageInMonths = Number(entry?.age_in_months);
+  if (Number.isFinite(ageInMonths)) {
+    const monthLabel = formatMonthAgeLabel(ageInMonths);
+    if (monthLabel) {
+      return monthLabel;
+    }
+  }
+
+  const description = String(entry?.description || "").trim();
+  if (!description) {
+    return EMPTY_BOOKLET_VALUE;
+  }
+
+  const normalizedDescription = normalizeAgeScheduleLabel(description);
+  return normalizedDescription || EMPTY_BOOKLET_VALUE;
+};
+
+const resolveBookletStatusDisplay = (record) => {
   const statusKey = resolveCanonicalStatusKey(record);
 
-  const statusMap = {
-    completed: { status: "Completed", color: "green", label: "Completed" },
-    ready: { status: "Ready", color: "green", label: "Ready" },
-    overdue: { status: "Overdue", color: "red", label: "Overdue" },
-    pending_confirmation: {
-      status: "Pending Confirmation",
-      color: "yellow",
+  if (statusKey === "completed") {
+    return {
+      key: "completed",
+      label: "Completed",
+      className: "bg-green-600 text-white dark:bg-green-500 dark:text-white",
+    };
+  }
+
+  if (statusKey === "overdue") {
+    return {
+      key: "overdue",
+      label: "Overdue",
+      className: "bg-red-600 text-white dark:bg-red-500 dark:text-white",
+    };
+  }
+
+  if (statusKey === "pending_confirmation") {
+    return {
+      key: "pending_confirmation",
       label: "Pending Confirmation",
-    },
-    due_soon: { status: "Due Soon", color: "yellow", label: "Due Soon" },
-    upcoming: { status: "Upcoming", color: "gray", label: "Upcoming" },
-    pending: { status: "Pending", color: "gray", label: "Pending" },
-    scheduled: { status: "Scheduled", color: "gray", label: "Scheduled" },
-    cancelled: { status: "Cancelled", color: "gray", label: "Cancelled" },
+      className: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+    };
+  }
+
+  if (statusKey === "pending" || statusKey === "cancelled") {
+    return {
+      key: "pending",
+      label: "Pending",
+      className:
+        "border border-gray-300 bg-white text-gray-700 dark:border-gray-600 dark:bg-transparent dark:text-gray-200",
+    };
+  }
+
+  return {
+    key: "upcoming",
+    label: "Upcoming",
+    className: "bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900",
   };
-
-  return statusMap[statusKey] || statusMap.pending;
 };
-
-const getStatusBadgeClass = (color) => {
-  if (color === "green") {
-    return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-  }
-
-  if (color === "red") {
-    return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
-  }
-
-  if (color === "yellow") {
-    return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
-  }
-
-  return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
-};
-
-const VaccinationRecordCard = ({
-  vaccine,
-  status,
-  formatDate,
-  actionLabel,
-  onAction,
-}) => (
-  <article className="guardian-table-card md:hidden">
-    <div className="guardian-table-card__header">
-      <div className="min-w-0">
-        <h3 className="guardian-table-card__title">{vaccine.vaccine_name}</h3>
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Dose {vaccine.dose_no || 1}
-        </p>
-      </div>
-      <span
-        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClass(status.color)}`}
-      >
-        {status.label}
-      </span>
-    </div>
-    <div className="guardian-table-card__rows">
-      <div className="guardian-table-card__row">
-        <span className="guardian-table-card__label">Provider</span>
-        <span className="guardian-table-card__value">{resolveProviderName(vaccine)}</span>
-      </div>
-      <div className="guardian-table-card__row">
-        <span className="guardian-table-card__label">Due Date</span>
-        <span className="guardian-table-card__value">{formatDate(vaccine.due_date)}</span>
-      </div>
-      <div className="guardian-table-card__row">
-        <span className="guardian-table-card__label">Date Given</span>
-        <span className="guardian-table-card__value">{formatDate(vaccine.admin_date)}</span>
-      </div>
-      <div className="guardian-table-card__row">
-        <span className="guardian-table-card__label">Action</span>
-        <span className="guardian-table-card__value">
-          {actionLabel ? (
-            <button
-              type="button"
-              onClick={() => onAction?.(vaccine)}
-              className="mb-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700"
-            >
-              {actionLabel}
-            </button>
-          ) : null}
-          {vaccine.isScheduleOnly
-            ? "Awaiting dose"
-            : vaccine.admin_date
-              ? "Recorded by health center"
-              : "Not recorded"}
-        </span>
-      </div>
-    </div>
-  </article>
-);
 
 export default function UserVaccinationRecords() {
   const { guardianId } = useAuth();
@@ -186,11 +359,25 @@ export default function UserVaccinationRecords() {
   const [scheduleSummary, setScheduleSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState("records"); // "records", "schedule", "upcoming"
+  const [viewMode, setViewMode] = useState("records");
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [showChildDropdown, setShowChildDropdown] = useState(false);
   const [vaccinationActionTarget, setVaccinationActionTarget] = useState(null);
   const [actionFeedback, setActionFeedback] = useState("");
+  const [chartSubTab, setChartSubTab] = useState("immunization");
+  const [growthRecords, setGrowthRecords] = useState([]);
+  const [loadingGrowth, setLoadingGrowth] = useState(false);
+
+  const recordsBookletRef = useRef(null);
+  const triggerBookletAction = useCallback((action) => {
+    const node = recordsBookletRef.current;
+    if (!node) return;
+    const target = node.querySelector(`[data-print-action="${action}"]`);
+    if (target && typeof target.click === "function") {
+      target.click();
+    }
+  }, []);
 
   // Readiness state for next-dose prediction
   const [childReadiness, setChildReadiness] = useState(null);
@@ -228,19 +415,16 @@ export default function UserVaccinationRecords() {
         apiClient.getVaccinationsByInfant(childId),
         apiClient.getInfantVaccinationSchedule(childId),
       ]);
-      // Handle both direct array response and wrapped response
-      const recordsData = Array.isArray(recordsResponse)
-        ? recordsResponse
-        : recordsResponse?.data || recordsResponse || [];
 
-      const normalizedRecords = (Array.isArray(recordsData) ? recordsData : []).map(
-        (record) => ({
-          ...record,
-          due_date: record.due_date || record.next_due_date || null,
-          dose_no: record.dose_no || record.dose_number || 1,
-          provider_name: resolveProviderName(record),
-        }),
-      );
+      const normalizedRecords = normalizeVaccinationRecordsResponse(recordsResponse).map((record) => ({
+        ...record,
+        due_date: record?.due_date || record?.next_due_date || null,
+        dose_no: record?.dose_no || record?.dose_number || 1,
+        dose_number: record?.dose_number || record?.dose_no || 1,
+        provider_name: resolveProviderName(record),
+        vaccine_display_name: resolveVaccineDisplayName(record),
+        age_description: record?.ageDescription || record?.age_description || null,
+      }));
 
       setVaccinationRecords(normalizedRecords);
       const normalizedScheduleResponse =
@@ -330,6 +514,34 @@ export default function UserVaccinationRecords() {
     }
   }, [selectedChild, fetchVaccinationData, fetchReadiness]);
 
+  const fetchGrowthRecords = useCallback(async (targetChildId) => {
+    if (!targetChildId) {
+      setGrowthRecords([]);
+      return;
+    }
+    try {
+      setLoadingGrowth(true);
+      const response = await apiClient.getGrowthRecordsByInfant(targetChildId);
+      const normalized = Array.isArray(response) ? response : response?.data || [];
+      setGrowthRecords(normalized.sort((a, b) => {
+        const dateA = new Date(a.measurement_date || a.date || 0);
+        const dateB = new Date(b.measurement_date || b.date || 0);
+        return dateB - dateA;
+      }));
+    } catch (err) {
+      console.error("Error fetching growth records:", err);
+      setGrowthRecords([]);
+    } finally {
+      setLoadingGrowth(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (viewMode === "chart" && chartSubTab === "growth" && selectedChild?.id) {
+      fetchGrowthRecords(selectedChild.id);
+    }
+  }, [viewMode, chartSubTab, selectedChild?.id, fetchGrowthRecords]);
+
   const normalizedScheduleRecords = useMemo(
     () => vaccinationSchedules.map((scheduleItem) => normalizeScheduleRecord(scheduleItem)),
     [vaccinationSchedules],
@@ -369,15 +581,6 @@ export default function UserVaccinationRecords() {
     [fetchReadiness, fetchVaccinationData, selectedChild],
   );
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
-
   const calculateAge = (dob) => {
     if (!dob) return "-";
     const birthDate = new Date(dob);
@@ -399,6 +602,16 @@ export default function UserVaccinationRecords() {
     }
   };
 
+  const complianceSummary = useMemo(
+    () =>
+      computeVaccinationComplianceSummary({
+        schedules: vaccinationSchedules,
+        records: vaccinationRecords,
+        infantDob: selectedChild?.dob,
+      }),
+    [vaccinationSchedules, vaccinationRecords, selectedChild?.dob],
+  );
+
   // Calculate vaccination statistics
   const stats = useMemo(() => {
     if (scheduleSummary) {
@@ -412,6 +625,7 @@ export default function UserVaccinationRecords() {
             vaccinationRecords.length ||
             0,
         ),
+        completionRate: scheduleSummary.completionRate ?? complianceSummary.completionRate,
       };
     }
 
@@ -433,45 +647,264 @@ export default function UserVaccinationRecords() {
         normalizedScheduleRecords.length ||
         vaccinationRecords.length ||
         completed + upcoming + overdue,
+      completionRate: complianceSummary.completionRate,
     };
-  }, [normalizedScheduleRecords, scheduleSummary, vaccinationRecords]);
+  }, [complianceSummary, normalizedScheduleRecords, scheduleSummary, vaccinationRecords]);
 
-  const getVaccineStatus = (vaccine) => resolveStatusDisplay(vaccine);
+  const bookletRows = useMemo(() => {
+    const recordByDoseKey = new Map(
+      vaccinationRecords.map((record) => [buildDoseMatchKey(record), record]),
+    );
+    const groupedRows = new Map();
+    const seenDoseKeys = new Set();
+
+    const upsertSlot = (entry, matchedRecord = null) => {
+      const doseKey = buildDoseMatchKey(entry);
+      if (seenDoseKeys.has(doseKey)) {
+        return;
+      }
+
+      seenDoseKeys.add(doseKey);
+
+      const vaccineKey = buildVaccineMatchKey(entry);
+      const doseNumber = Number(entry?.dose_no || entry?.dose_number || 1);
+      const effectiveRecord = matchedRecord || recordByDoseKey.get(doseKey) || null;
+      const scheduleLabel = formatDoseAgeLabel(entry);
+      const adminDate = effectiveRecord?.admin_date || entry?.admin_date || null;
+      const notes = String(effectiveRecord?.notes || entry?.notes || "").trim();
+      const statusSource = {
+        ...entry,
+        ...effectiveRecord,
+        admin_date: adminDate,
+        status: adminDate ? "completed" : effectiveRecord?.status || entry?.status || "pending",
+      };
+      const statusDisplay = resolveBookletStatusDisplay(statusSource);
+      const actionTarget = {
+        ...entry,
+        ...effectiveRecord,
+        id: effectiveRecord?.id || entry?.id,
+        recordId: effectiveRecord?.id || effectiveRecord?.recordId || entry?.recordId || null,
+        vaccine_id: entry?.vaccine_id || effectiveRecord?.vaccine_id || null,
+        vaccine_name: entry?.vaccine_name || effectiveRecord?.vaccine_name || "Unknown vaccine",
+        vaccine_display_name:
+          entry?.vaccine_display_name ||
+          effectiveRecord?.vaccine_display_name ||
+          entry?.vaccine_name ||
+          effectiveRecord?.vaccine_name ||
+          "Unknown vaccine",
+        dose_no: doseNumber,
+        dose_number: doseNumber,
+        doseNumber,
+        admin_date: adminDate,
+        adminDate,
+        status: statusSource.status,
+        isScheduleOnly: !Boolean(
+          effectiveRecord?.id || effectiveRecord?.recordId || entry?.recordId,
+        ),
+        schedule_id:
+          entry?.schedule_id || entry?.scheduleId || effectiveRecord?.schedule_id || null,
+        scheduleId:
+          entry?.schedule_id || entry?.scheduleId || effectiveRecord?.schedule_id || null,
+        source_facility: effectiveRecord?.source_facility || entry?.source_facility || null,
+        notes,
+      };
+      const slotSortValue = Number.isFinite(Number(entry?.minimum_age_days))
+        ? Number(entry.minimum_age_days)
+        : Number.isFinite(Number(entry?.age_in_months))
+          ? Number(entry.age_in_months) * 30
+          : Number.POSITIVE_INFINITY;
+
+      const existingRow = groupedRows.get(vaccineKey);
+      const nextRow = existingRow || {
+        key: vaccineKey,
+        vaccineLabel:
+          entry?.vaccine_display_name ||
+          effectiveRecord?.vaccine_display_name ||
+          entry?.vaccine_name ||
+          effectiveRecord?.vaccine_name ||
+          "Unknown vaccine",
+        sortValue: slotSortValue,
+        slots: [],
+      };
+
+      nextRow.sortValue = Math.min(nextRow.sortValue, slotSortValue);
+      nextRow.slots.push({
+        key: doseKey,
+        displayDoseNumber: doseNumber,
+        scheduleLabel,
+        adminDate,
+        notes,
+        statusDisplay,
+        actionTarget,
+      });
+
+      groupedRows.set(vaccineKey, nextRow);
+    };
+
+    normalizedScheduleRecords.forEach((record) => {
+      upsertSlot(record, recordByDoseKey.get(buildDoseMatchKey(record)) || null);
+    });
+
+    vaccinationRecords.forEach((record) => {
+      upsertSlot(record, record);
+    });
+
+    const childAgeMonths = monthsSinceDob(selectedChild?.dob);
+
+    return Array.from(groupedRows.values())
+      .map((row) => {
+        const displayLabel = getVaccineName(row.vaccineLabel);
+        const doseSchedule = epiAgeSchedule[displayLabel] || {};
+        const hasCanonicalSchedule = Object.keys(doseSchedule).length > 0;
+        const existingByDoseNum = new Map(row.slots.map((s) => [s.displayDoseNumber, s]));
+
+        const doseNumbers = hasCanonicalSchedule
+          ? Object.keys(doseSchedule).map(Number).sort((a, b) => a - b)
+          : Array.from(new Set(row.slots.map((s) => s.displayDoseNumber))).sort((a, b) => a - b);
+
+        const slots = doseNumbers.map((doseNum) => {
+          const existing = existingByDoseNum.get(doseNum);
+          const ageLabel = doseSchedule[doseNum] || (existing ? existing.scheduleLabel : "");
+
+          if (existing) {
+            return { ...existing, scheduleLabel: ageLabel };
+          }
+
+          const scheduledMonths = ageLabelToMonths(ageLabel);
+          const isOverdueByAge =
+            childAgeMonths !== null &&
+            scheduledMonths !== null &&
+            childAgeMonths > scheduledMonths;
+          const derivedStatus = isOverdueByAge ? "overdue" : "upcoming";
+
+          return {
+            key: `${row.key}:dose:${doseNum}`,
+            displayDoseNumber: doseNum,
+            scheduleLabel: ageLabel,
+            adminDate: null,
+            notes: "",
+            statusDisplay: resolveBookletStatusDisplay({ status: derivedStatus, admin_date: null }),
+            actionTarget: {
+              id: null,
+              recordId: null,
+              vaccine_id: row.slots[0]?.actionTarget?.vaccine_id ?? null,
+              vaccine_name: row.slots[0]?.actionTarget?.vaccine_name ?? displayLabel,
+              vaccine_display_name: displayLabel,
+              dose_no: doseNum,
+              dose_number: doseNum,
+              doseNumber: doseNum,
+              admin_date: null,
+              adminDate: null,
+              status: derivedStatus,
+              isScheduleOnly: true,
+              schedule_id: null,
+              scheduleId: null,
+              source_facility: null,
+              notes: "",
+            },
+          };
+        });
+
+        return {
+          ...row,
+          vaccineLabel: displayLabel,
+          slots,
+          noteEntries: slots.filter((slot) => Boolean(slot.notes)),
+        };
+      })
+      .sort((left, right) => {
+        const leftIdx = getVaccineOrderIndex(left.vaccineLabel);
+        const rightIdx = getVaccineOrderIndex(right.vaccineLabel);
+        if (leftIdx !== rightIdx) {
+          return leftIdx - rightIdx;
+        }
+        return left.vaccineLabel.localeCompare(right.vaccineLabel);
+      });
+  }, [normalizedScheduleRecords, vaccinationRecords, selectedChild?.dob]);
 
   // Filter records based on search and view mode
-  const filteredRecords = useMemo(() => {
-    let records =
-      viewMode === "records"
-        ? [...vaccinationRecords]
-        : normalizedScheduleRecords.map((record) => ({
-            ...record,
-            provider_name: resolveProviderName(record),
-          }));
+  const filteredBookletRows = useMemo(() => {
+    let rows = [...bookletRows];
 
-    // Filter by search
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      records = records.filter(
-        (v) =>
-          (v.vaccine_name && v.vaccine_name.toLowerCase().includes(query)) ||
-          (v.dose_no && v.dose_no.toString().includes(query)),
-      );
+      rows = rows.filter((row) => row.vaccineLabel.toLowerCase().includes(query));
     }
 
-    // Filter by view mode
-    if (viewMode === "upcoming") {
-      records = records.filter((v) => {
-        const canonicalStatus = resolveCanonicalStatusKey(v);
-        return !["completed", "overdue", "cancelled"].includes(canonicalStatus);
+    if (statusFilter !== "all") {
+      rows = rows.filter((row) => {
+        if (statusFilter === "completed") {
+          return row.slots.some((slot) => slot.statusDisplay.key === "completed");
+        }
+
+        if (statusFilter === "overdue") {
+          return row.slots.some((slot) => slot.statusDisplay.key === "overdue");
+        }
+
+        if (statusFilter === "upcoming") {
+          return row.slots.some((slot) =>
+            ["upcoming", "pending"].includes(slot.statusDisplay.key),
+          );
+        }
+
+        return true;
       });
     }
 
-    return records;
-  }, [normalizedScheduleRecords, searchQuery, vaccinationRecords, viewMode]);
+    return rows;
+  }, [bookletRows, searchQuery, statusFilter]);
+
+  const growthDisplayData = useMemo(() => {
+    const toDateKey = (value) => {
+      if (!value) return null;
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed.toISOString().slice(0, 10);
+    };
+    const birthWeight = selectedChild?.birth_weight ?? selectedChild?.birthWeight ?? selectedChild?.birth_weight_kg ?? selectedChild?.weight_at_birth ?? null;
+    const birthHeight = selectedChild?.birth_height ?? selectedChild?.birth_length ?? selectedChild?.birthHeight ?? selectedChild?.birthLength ?? null;
+    const birthHeadCircumference =
+      selectedChild?.birth_head_circumference ??
+      selectedChild?.head_circumference_cm ??
+      selectedChild?.head_circumference ??
+      null;
+    const dobKey = toDateKey(selectedChild?.dob);
+    const hasBirthRow = dobKey ? growthRecords.some((r) => toDateKey(r?.measurement_date || r?.date) === dobKey) : false;
+    const showBirthFallback =
+      Boolean(dobKey) &&
+      !hasBirthRow &&
+      (birthWeight !== null || birthHeight !== null || birthHeadCircumference !== null);
+    const birthEntry = showBirthFallback
+      ? {
+          id: "birth",
+          measurement_date: selectedChild?.dob,
+          weight_kg: birthWeight,
+          length_cm: birthHeight,
+          head_circumference_cm: birthHeadCircumference,
+          notes: "Recorded at registration",
+          isBirthFallback: true,
+        }
+      : null;
+    const displayRecords = birthEntry
+      ? [...growthRecords, birthEntry].sort((a, b) => {
+          const dateA = new Date(a.measurement_date || a.date || 0).getTime();
+          const dateB = new Date(b.measurement_date || b.date || 0).getTime();
+          return dateB - dateA;
+        })
+      : growthRecords;
+    return {
+      displayRecords,
+      latestRecord: displayRecords[0] || null,
+      latestIsBirth: Boolean(displayRecords[0]?.isBirthFallback),
+    };
+  }, [growthRecords, selectedChild]);
+
+  const scheduledAppointment = childReadiness?.scheduledAppointment || null;
 
   const handleChildSelect = (child) => {
     setShowChildDropdown(false);
     setSearchQuery("");
+    setStatusFilter("all");
 
     if (Number(selectedChild?.id) !== Number(child.id)) {
       navigate(`/guardian/vaccination-records/${child.id}`);
@@ -496,7 +929,7 @@ export default function UserVaccinationRecords() {
   }
 
   return (
-    <div className="guardian-page-wrapper min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+    <div className="guardian-page-wrapper guardian-vaccination-records-page min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
       <div className="min-[1025px]:hidden fixed top-0 left-0 right-0 z-40 w-full bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-200">
         <GuardianTopHeader
           title=""
@@ -517,51 +950,15 @@ export default function UserVaccinationRecords() {
         subtitle="Track and manage your child's vaccination history"
         icon={<FileText className="w-8 h-8 text-white" />}
         actions={
-          <div className="guardian-inline-actions flex items-center gap-2">
-            <div className="hidden min-[1025px]:flex guardian-desktop-pageheader-actions mr-2">
-              <button
-                type="button"
-                onClick={() => {
-                  fetchChildren();
-                  if (selectedChild) {
-                    fetchVaccinationData(selectedChild.id);
-                    fetchReadiness(selectedChild.id);
-                  }
-                }}
-                className="guardian-desktop-pageheader-icon-btn"
-                aria-label="Refresh Vaccination Records"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate('/guardian/notifications')}
-                className="guardian-desktop-pageheader-icon-btn guardian-desktop-pageheader-icon-btn--notif"
-                aria-label="Open notifications"
-              >
-                <Bell className="w-4 h-4" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate('/guardian/profile')}
-                className="guardian-desktop-pageheader-icon-btn"
-                aria-label="Open profile"
-              >
-                <User className="w-4 h-4" />
-              </button>
-            </div>
+          <div
+            className="guardian-inline-actions guardian-vaccination-records-view-toggle flex items-center gap-2"
+            style={{ flexDirection: "row", flexWrap: "nowrap" }}
+          >
             <Button
-              variant={
-                viewMode === "records" ||
-                viewMode === "schedule" ||
-                viewMode === "upcoming"
-                  ? "primary"
-                  : "secondary"
-              }
+              variant={viewMode === "records" ? "primary" : "secondary"}
               onClick={() => setViewMode("records")}
               size="sm"
+              style={{ flex: 1 }}
             >
               Records
             </Button>
@@ -569,8 +966,17 @@ export default function UserVaccinationRecords() {
               variant={viewMode === "booklet" ? "primary" : "secondary"}
               onClick={() => setViewMode("booklet")}
               size="sm"
+              style={{ flex: 1 }}
             >
               Booklet
+            </Button>
+            <Button
+              variant={viewMode === "chart" ? "primary" : "secondary"}
+              onClick={() => setViewMode("chart")}
+              size="sm"
+              style={{ flex: 1 }}
+            >
+              Immunization Chart
             </Button>
           </div>
         }
@@ -614,7 +1020,7 @@ export default function UserVaccinationRecords() {
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400 break-words">
                       {calculateAge(selectedChild?.dob)} • Born{" "}
-                      {formatDate(selectedChild?.dob)}
+                      {formatInfantDob(selectedChild?.dob)}
                     </p>
                     <p className="text-xs font-mono text-gray-600 dark:text-gray-300 mt-1 break-all">
                       Infant Control Number: {selectedChild?.control_number || "Pending"}
@@ -640,7 +1046,7 @@ export default function UserVaccinationRecords() {
                   <div
                     className="bg-green-500 h-2 rounded-full transition-all"
                     style={{
-                      width: `${stats.total > 0 ? (stats.completed / stats.total) * 100 : 0}%`,
+                      width: `${stats.completionRate ?? 0}%`,
                     }}
                   ></div>
                 </div>
@@ -733,7 +1139,9 @@ export default function UserVaccinationRecords() {
           {/* Next-Dose Prediction Banner */}
           {selectedChild && !readinessLoading && childReadiness && (
             <div className={`rounded-xl p-4 ${
-              childReadiness.readinessStatus === 'READY'
+              scheduledAppointment
+                ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
+                : childReadiness.readinessStatus === 'READY'
                 ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
                 : childReadiness.readinessStatus === 'OVERDUE'
                   ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
@@ -743,7 +1151,9 @@ export default function UserVaccinationRecords() {
             }`}>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="flex items-start gap-3">
-                  {childReadiness.readinessStatus === 'READY' ? (
+                  {scheduledAppointment ? (
+                    <Calendar className="w-6 h-6 text-blue-600 dark:text-blue-400 mt-0.5" />
+                  ) : childReadiness.readinessStatus === 'READY' ? (
                     <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400 mt-0.5" />
                   ) : childReadiness.readinessStatus === 'OVERDUE' ? (
                     <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400 mt-0.5" />
@@ -752,7 +1162,9 @@ export default function UserVaccinationRecords() {
                   )}
                   <div>
                     <h4 className={`font-semibold ${
-                      childReadiness.readinessStatus === 'READY'
+                      scheduledAppointment
+                        ? 'text-blue-800 dark:text-blue-300'
+                        : childReadiness.readinessStatus === 'READY'
                         ? 'text-green-800 dark:text-green-300'
                         : childReadiness.readinessStatus === 'OVERDUE'
                           ? 'text-red-800 dark:text-red-300'
@@ -760,7 +1172,9 @@ export default function UserVaccinationRecords() {
                             ? 'text-yellow-800 dark:text-yellow-300'
                             : 'text-blue-800 dark:text-blue-300'
                     }`}>
-                      {childReadiness.readinessStatus === 'READY'
+                      {scheduledAppointment
+                        ? 'Appointment Scheduled'
+                        : childReadiness.readinessStatus === 'READY'
                         ? 'Ready for Next Vaccination!'
                         : childReadiness.readinessStatus === 'OVERDUE'
                           ? 'Overdue - Schedule Appointment Now!'
@@ -769,22 +1183,33 @@ export default function UserVaccinationRecords() {
                             : 'Upcoming Vaccination'}
                     </h4>
 
+                    {scheduledAppointment && (
+                      <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                        Scheduled{scheduledAppointment.vaccine_name ? ` for ${scheduledAppointment.vaccine_name}` : ""}:{" "}
+                        {formatClinicDateTime(scheduledAppointment.scheduled_date)}
+                      </p>
+                    )}
+
                     {/* Due Vaccines */}
-                    {childReadiness.dueVaccines && childReadiness.dueVaccines.length > 0 && (
+                    {!scheduledAppointment &&
+                      childReadiness.dueVaccines &&
+                      childReadiness.dueVaccines.length > 0 && (
                       <p className="text-sm text-green-700 dark:text-green-400 mt-1">
                         Due: {childReadiness.dueVaccines.map(v => v.label).join(', ')}
                       </p>
-                    )}
+                      )}
 
                     {/* Overdue Vaccines */}
-                    {childReadiness.overdueVaccines && childReadiness.overdueVaccines.length > 0 && (
+                    {!scheduledAppointment &&
+                      childReadiness.overdueVaccines &&
+                      childReadiness.overdueVaccines.length > 0 && (
                       <p className="text-sm text-red-700 dark:text-red-400 mt-1">
                         Overdue: {childReadiness.overdueVaccines.map(v => v.label).join(', ')}
                       </p>
-                    )}
+                      )}
 
                     {/* Next Appointment Prediction */}
-                    {childReadiness.nextAppointmentPrediction && (
+                    {!scheduledAppointment && childReadiness.nextAppointmentPrediction && (
                       <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">
                         <span className="font-medium">Recommended Date:</span>{' '}
                         {childReadiness.nextAppointmentPrediction.date
@@ -801,18 +1226,21 @@ export default function UserVaccinationRecords() {
                 </div>
 
                 {/* Book Appointment Button */}
-                {(childReadiness.readinessStatus === 'READY' ||
+                {(scheduledAppointment ||
+                  childReadiness.readinessStatus === 'READY' ||
                   childReadiness.readinessStatus === 'OVERDUE' ||
                   (childReadiness.nextAppointmentPrediction && childReadiness.nextAppointmentPrediction.date)) && (
                   <Button
                     onClick={() =>
-                      navigate(guardianRoutePaths.appointmentBooking(selectedChild.id))
+                      scheduledAppointment
+                        ? navigate(`${guardianRoutePaths.appointments}?childId=${selectedChild.id}`)
+                        : navigate(guardianRoutePaths.appointmentBooking(selectedChild.id))
                     }
                     size="sm"
                     className="shrink-0"
                   >
                     <Calendar className="w-4 h-4 mr-2" />
-                    Book Appointment
+                    {scheduledAppointment ? "Open Appointment" : "Book Appointment"}
                   </Button>
                 )}
               </div>
@@ -842,44 +1270,9 @@ export default function UserVaccinationRecords() {
             </div>
           )}
 
-          {/* Tab Navigation - Simplified for Guardian */}
-          {viewMode !== "booklet" && (
-            <div className="guardian-tab-bar border-b border-gray-200 dark:border-gray-700 pb-2">
-              <button
-                onClick={() => setViewMode("records")}
-                className={`guardian-tab-bar__item flex items-center gap-2 text-sm font-medium transition-all ${
-                  viewMode === "records"
-                    ? "bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border-b-2 border-primary-500"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
-                }`}
-              >
-                <FileText className="w-4 h-4" /> Records
-              </button>
-              <button
-                onClick={() => setViewMode("schedule")}
-                className={`guardian-tab-bar__item hidden md:flex items-center gap-2 text-sm font-medium transition-all ${
-                  viewMode === "schedule"
-                    ? "bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border-b-2 border-primary-500"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
-                }`}
-              >
-                <Calendar className="w-4 h-4" /> Scheduling
-              </button>
-              <button
-                onClick={() => setViewMode("upcoming")}
-                className={`guardian-tab-bar__item hidden md:flex items-center gap-2 text-sm font-medium transition-all ${
-                  viewMode === "upcoming"
-                    ? "bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border-b-2 border-primary-500"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
-                }`}
-              >
-                <Syringe className="w-4 h-4" /> Upcoming
-              </button>
-            </div>
-          )}
 
           {/* Search Bar */}
-          {viewMode !== "booklet" && (
+          {viewMode === "records" && (
             <div className="w-full max-w-md">
               <Input
                 placeholder="Search vaccinations..."
@@ -890,132 +1283,340 @@ export default function UserVaccinationRecords() {
             </div>
           )}
 
+          {viewMode === "records" && (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                {["all", "completed", "upcoming", "overdue"].map((filter) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => setStatusFilter(filter)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                      statusFilter === filter
+                        ? filter === "completed"
+                          ? "bg-green-600 text-white"
+                          : filter === "upcoming"
+                            ? "bg-gray-600 text-white"
+                            : filter === "overdue"
+                              ? "bg-red-600 text-white"
+                              : "bg-indigo-600 text-white"
+                        : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                    }`}
+                  >
+                    {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                  </button>
+                ))}
+              </div>
+              {selectedChild && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    onClick={() => triggerBookletAction("immunization-record-download-word")}
+                    variant="secondary"
+                    size="sm"
+                  >
+                    Download Word
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Content */}
           {selectedChild && (
             <>
               {viewMode === "booklet" ? (
                 <ImmunizationRecordBooklet infantId={selectedChild.id} />
-              ) : (
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
-                  <div className="guardian-table-card-list p-4 md:hidden">
-                    {filteredRecords.map((vaccine) => {
-                      const status = getVaccineStatus(vaccine);
-                      return (
-                        <VaccinationRecordCard
-                          key={vaccine.id || vaccine.vaccine_id}
-                          vaccine={vaccine}
-                          status={status}
-                          formatDate={formatDate}
-                          actionLabel={resolveActionLabel(vaccine)}
-                          onAction={openVaccinationActionModal}
-                        />
-                      );
-                    })}
+              ) : viewMode === "chart" ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2 bg-white dark:bg-gray-800 rounded-xl p-1.5 border border-gray-200 dark:border-gray-700 shadow-sm w-full">
+                    <button
+                      type="button"
+                      onClick={() => setChartSubTab("immunization")}
+                      className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-all ${
+                        chartSubTab === "immunization"
+                          ? "bg-emerald-500 text-white shadow-sm"
+                          : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      <FileCheck className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">Immunization Chart</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChartSubTab("growth")}
+                      className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-all ${
+                        chartSubTab === "growth"
+                          ? "bg-emerald-500 text-white shadow-sm"
+                          : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      <Activity className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">Growth Charts</span>
+                    </button>
                   </div>
+                  {chartSubTab === "immunization" && (
+                    <div className="guardian-chart-scroll-container bg-theme-bg-card rounded-xl shadow-sm border border-theme-border-primary p-4">
+                      <EnhancedGuardianImmunizationChart
+                        childId={selectedChild.id}
+                      />
+                    </div>
+                  )}
+                  {chartSubTab === "growth" && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 min-[768px]:grid-cols-2 min-[1025px]:grid-cols-3 gap-4">
+                        <div className="bg-theme-bg-card rounded-xl shadow-sm border border-theme-border-primary p-4">
+                          <p className="text-xs uppercase tracking-wide text-theme-secondary">Latest Weight</p>
+                          <p className="text-2xl font-bold text-theme-primary mt-2">
+                            {growthDisplayData.latestRecord && (growthDisplayData.latestRecord.weight_kg ?? growthDisplayData.latestRecord.weight) != null
+                              ? `${growthDisplayData.latestRecord.weight_kg ?? growthDisplayData.latestRecord.weight} kg`
+                              : '-'}
+                          </p>
+                          {growthDisplayData.latestIsBirth && (growthDisplayData.latestRecord?.weight_kg ?? null) != null && (
+                            <p className="text-xs text-theme-secondary mt-1">(at birth)</p>
+                          )}
+                        </div>
+                        <div className="bg-theme-bg-card rounded-xl shadow-sm border border-theme-border-primary p-4">
+                          <p className="text-xs uppercase tracking-wide text-theme-secondary">Latest Height</p>
+                          <p className="text-2xl font-bold text-theme-primary mt-2">
+                            {growthDisplayData.latestRecord && (growthDisplayData.latestRecord.length_cm ?? growthDisplayData.latestRecord.height ?? growthDisplayData.latestRecord.length) != null
+                              ? `${growthDisplayData.latestRecord.length_cm ?? growthDisplayData.latestRecord.height ?? growthDisplayData.latestRecord.length} cm`
+                              : '-'}
+                          </p>
+                          {growthDisplayData.latestIsBirth && (growthDisplayData.latestRecord?.length_cm ?? null) != null && (
+                            <p className="text-xs text-theme-secondary mt-1">(at birth)</p>
+                          )}
+                        </div>
+                        <div className="bg-theme-bg-card rounded-xl shadow-sm border border-theme-border-primary p-4">
+                          <p className="text-xs uppercase tracking-wide text-theme-secondary">Head Circumference</p>
+                          <p className="text-2xl font-bold text-theme-primary mt-2">
+                            {growthDisplayData.latestRecord && (growthDisplayData.latestRecord.head_circumference_cm ?? growthDisplayData.latestRecord.head_circumference) != null
+                              ? `${growthDisplayData.latestRecord.head_circumference_cm ?? growthDisplayData.latestRecord.head_circumference} cm`
+                              : '-'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="bg-theme-bg-card rounded-xl shadow-sm border border-theme-border-primary p-4 sm:p-6">
+                        <h3 className="text-lg font-semibold text-theme-primary mb-4">Growth History</h3>
+                        {loadingGrowth ? (
+                          <div className="py-10 flex justify-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+                          </div>
+                        ) : growthDisplayData.displayRecords.length === 0 ? (
+                          <div className="py-10 text-center text-theme-secondary">
+                            No growth records yet for this child.
+                          </div>
+                        ) : (
+                          <div className="guardian-table-card-list md:hidden">
+                            {growthDisplayData.displayRecords.map((record) => (
+                              <article
+                                key={record.id || `${record.measurement_date}-${record.weight_kg}`}
+                                className="guardian-table-card"
+                              >
+                                <div className="guardian-table-card__header">
+                                  <h4 className="guardian-table-card__title">
+                                    {record.measurement_date
+                                      ? new Date(record.measurement_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                                      : "Measurement"}
+                                  </h4>
+                                </div>
+                                <div className="guardian-table-card__rows">
+                                  <div className="guardian-table-card__row">
+                                    <span className="guardian-table-card__label">Weight</span>
+                                    <span className="guardian-table-card__value">{record.weight_kg || record.weight || '-'} kg</span>
+                                  </div>
+                                  <div className="guardian-table-card__row">
+                                    <span className="guardian-table-card__label">Height</span>
+                                    <span className="guardian-table-card__value">{record.length_cm || record.height || record.length || '-'} cm</span>
+                                  </div>
+                                  <div className="guardian-table-card__row">
+                                    <span className="guardian-table-card__label">Head Circ.</span>
+                                    <span className="guardian-table-card__value">{record.head_circumference_cm || record.head_circumference || '-'} cm</span>
+                                  </div>
+                                  <div className="guardian-table-card__row">
+                                    <span className="guardian-table-card__label">Notes</span>
+                                    <span className="guardian-table-card__value">{record.notes || '-'}</span>
+                                  </div>
+                                </div>
+                              </article>
+                            ))}
+                          </div>
+                        )}
+                        {!loadingGrowth && growthDisplayData.displayRecords.length > 0 && (
+                          <div className="guardian-table-scroll-shell hidden md:block">
+                            <table className="w-full min-w-[700px]">
+                              <thead>
+                                <tr className="border-b border-theme-border-primary">
+                                  <th className="text-left text-xs uppercase tracking-wide text-theme-secondary py-2">Date</th>
+                                  <th className="text-left text-xs uppercase tracking-wide text-theme-secondary py-2">Weight (kg)</th>
+                                  <th className="text-left text-xs uppercase tracking-wide text-theme-secondary py-2">Height (cm)</th>
+                                  <th className="text-left text-xs uppercase tracking-wide text-theme-secondary py-2">Head Circ. (cm)</th>
+                                  <th className="text-left text-xs uppercase tracking-wide text-theme-secondary py-2">Notes</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {growthDisplayData.displayRecords.map((record) => (
+                                  <tr key={record.id || `${record.measurement_date}-${record.weight_kg}`} className="border-b border-theme-border-primary/60">
+                                    <td className="py-3 text-theme-primary">
+                                      {record.measurement_date ? new Date(record.measurement_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : '-'}
+                                    </td>
+                                    <td className="py-3 text-theme-primary">{record.weight_kg || record.weight || '-'}</td>
+                                    <td className="py-3 text-theme-primary">{record.length_cm || record.height || record.length || '-'}</td>
+                                    <td className="py-3 text-theme-primary">{record.head_circumference_cm || record.head_circumference || '-'}</td>
+                                    <td className="py-3 text-theme-secondary max-w-[220px] truncate">{record.notes || '-'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                <div
+                  ref={recordsBookletRef}
+                  aria-hidden="true"
+                  style={{ position: "absolute", width: 0, height: 0, overflow: "hidden", clip: "rect(0 0 0 0)" }}
+                >
+                  <ImmunizationRecordBooklet infantId={selectedChild.id} />
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
                   {/* Tablet/Desktop table */}
-                  <div className="guardian-table-scroll-shell hidden md:block">
-                    <table className="w-full">
+                  <div className="guardian-table-scroll-shell overflow-x-auto">
+                    <table className="w-full min-w-[980px]">
                       <thead className="bg-gray-50 dark:bg-gray-700">
                         <tr>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Vaccine
+                            Bakuna (Vaccine)
                           </th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Dose
+                            Doses
                           </th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Provider
+                            Date Administered
                           </th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Due Date
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Date Given
+                            Remarks
                           </th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                             Status
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Action
-                          </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        {filteredRecords.map((vaccine) => {
-                          const status = getVaccineStatus(vaccine);
-                          return (
-                            <tr
-                              key={vaccine.id || vaccine.vaccine_id}
-                              className="hover:bg-gray-50 dark:hover:bg-gray-700"
-                            >
-                              <td className="px-4 py-4">
-                                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                  {vaccine.vaccine_name}
+                        {filteredBookletRows.map((row) => (
+                          <tr
+                            key={row.key}
+                            className="hover:bg-gray-50 dark:hover:bg-gray-700 align-top"
+                          >
+                            <td className="px-4 py-4">
+                              <div className="min-w-[190px] text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                {row.vaccineLabel}
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="min-w-[180px] space-y-2">
+                                {row.slots.map((slot) => (
+                                  <div key={`${row.key}-${slot.key}-dose`} className="flex items-center gap-3">
+                                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">
+                                      {slot.displayDoseNumber}
+                                    </span>
+                                    <span className="text-sm text-gray-700 dark:text-gray-200">
+                                      {slot.scheduleLabel}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div
+                                className="grid min-w-[320px] gap-2"
+                                style={{
+                                  gridTemplateColumns: `repeat(${row.slots.length}, minmax(140px, 1fr))`,
+                                }}
+                              >
+                                {row.slots.map((slot) => (
+                                  <button
+                                    key={`${row.key}-${slot.key}-card`}
+                                    type="button"
+                                    onClick={() => openVaccinationActionModal(slot.actionTarget)}
+                                    title={resolveActionLabel(slot.actionTarget)}
+                                    className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left transition hover:border-emerald-300 hover:bg-emerald-50 dark:border-gray-700 dark:bg-gray-900/40 dark:hover:border-emerald-500/60 dark:hover:bg-emerald-900/10"
+                                  >
+                                    <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                      DOSE {slot.displayDoseNumber}
+                                    </div>
+                                    <div className="mt-1 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                      {formatNumericDate(slot.adminDate)}
+                                    </div>
+                                    <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                                      {slot.scheduleLabel}
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              {row.noteEntries.length > 0 ? (
+                                <div className="min-w-[220px] space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                                  {row.noteEntries.map((slot) => (
+                                    <div key={`${row.key}-${slot.key}-note`}>
+                                      <span className="font-semibold text-gray-900 dark:text-gray-100">
+                                        Dose {slot.displayDoseNumber}:
+                                      </span>{" "}
+                                      <span>{slot.notes}</span>
+                                    </div>
+                                  ))}
                                 </div>
-                              </td>
-                              <td className="px-4 py-4">
-                                <div className="text-sm text-gray-500 dark:text-gray-300">
-                                  Dose {vaccine.dose_no || 1}
-                                </div>
-                              </td>
-                              <td className="px-4 py-4">
-                                <div className="text-sm text-gray-500 dark:text-gray-300">
-                                  {resolveProviderName(vaccine)}
-                                </div>
-                              </td>
-                              <td className="px-4 py-4">
-                                <div className="text-sm text-gray-500 dark:text-gray-300">
-                                  {formatDate(vaccine.due_date)}
-                                </div>
-                              </td>
-                              <td className="px-4 py-4">
-                                <div className="text-sm text-gray-500 dark:text-gray-300">
-                                  {formatDate(vaccine.admin_date)}
-                                </div>
-                              </td>
-                              <td className="px-4 py-4">
-                                <span
-                                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClass(status.color)}`}
-                                >
-                                  {status.label}
-                                </span>
-                              </td>
-                              <td className="px-4 py-4 whitespace-nowrap text-sm">
-                                <button
-                                  type="button"
-                                  onClick={() => openVaccinationActionModal(vaccine)}
-                                  className="mb-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700"
-                                >
-                                  {resolveActionLabel(vaccine)}
-                                </button>
-                                <span className="text-xs text-gray-400 dark:text-gray-500">
-                                  {vaccine.isScheduleOnly
-                                    ? "Awaiting dose"
-                                    : vaccine.admin_date
-                                      ? "Recorded by health center"
-                                      : "Not recorded"}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
+                              ) : (
+                                <span className="text-sm text-gray-400 dark:text-gray-500">{EMPTY_BOOKLET_VALUE}</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="min-w-[180px] space-y-2">
+                                {row.slots.map((slot) => (
+                                  <div
+                                    key={`${row.key}-${slot.key}-status`}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <span className="min-w-[54px] text-xs font-medium text-gray-500 dark:text-gray-400">
+                                      Dose {slot.displayDoseNumber}
+                                    </span>
+                                    <span
+                                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${slot.statusDisplay.className}`}
+                                    >
+                                      {slot.statusDisplay.label}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
 
-                  {filteredRecords.length === 0 && (
+                  {filteredBookletRows.length === 0 && (
                     <div className="p-8 text-center">
                       <div className="text-4xl mb-3">💉</div>
                       <p className="text-gray-500 dark:text-gray-400">
                         {searchQuery
                           ? "No vaccinations match your search."
-                          : viewMode === "upcoming"
+                          : statusFilter === "upcoming"
                             ? "No upcoming vaccinations scheduled."
-                            : "No vaccination records found."}
+                            : statusFilter === "overdue"
+                              ? "No overdue vaccinations."
+                              : statusFilter === "completed"
+                                ? "No completed vaccinations."
+                                : "No vaccination records found."}
                       </p>
                     </div>
                   )}
                 </div>
+                </>
               )}
             </>
           )}

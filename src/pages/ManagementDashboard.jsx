@@ -364,7 +364,6 @@ export default function ManagementDashboard() {
                 className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-primary-500"
                 onClick={() => setActiveSection("users")}
               >
-                <div className="text-4xl mb-3">👥</div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                   User Management
                 </h3>
@@ -377,7 +376,6 @@ export default function ManagementDashboard() {
                 className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-success-500"
                 onClick={() => setActiveSection("infants")}
               >
-                <div className="text-4xl mb-3">👶</div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                   Infant Management
                 </h3>
@@ -389,7 +387,6 @@ export default function ManagementDashboard() {
                 className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-info-500"
                 onClick={() => setActiveSection("appointments")}
               >
-                <div className="text-4xl mb-3">📅</div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                   Appointments
                 </h3>
@@ -401,7 +398,6 @@ export default function ManagementDashboard() {
                 className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-warning-500"
                 onClick={() => navigate("/inventory")}
               >
-                <div className="text-4xl mb-3">📦</div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                   Inventory
                 </h3>
@@ -417,7 +413,6 @@ export default function ManagementDashboard() {
                 className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-danger-500"
                 onClick={() => navigate("/vaccination-management")}
               >
-                <div className="text-4xl mb-3">💉</div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                   Vaccinations
                 </h3>
@@ -429,7 +424,6 @@ export default function ManagementDashboard() {
                 className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-purple-500"
                 onClick={() => navigate("/analytics")}
               >
-                <div className="text-4xl mb-3">📈</div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                   Analytics
                 </h3>
@@ -441,7 +435,6 @@ export default function ManagementDashboard() {
                 className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-indigo-500"
                 onClick={() => navigate("/digital-papers")}
               >
-                <div className="text-4xl mb-3">📄</div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                   Digital Papers
                 </h3>
@@ -457,7 +450,6 @@ export default function ManagementDashboard() {
                 className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-pink-500"
                 onClick={() => navigate("/announcements")}
               >
-                <div className="text-4xl mb-3">📢</div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                   Announcements
                 </h3>
@@ -469,7 +461,6 @@ export default function ManagementDashboard() {
                 className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-yellow-500"
                 onClick={() => navigate("/notifications")}
               >
-                <div className="text-4xl mb-3">🔔</div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                   Notifications
                 </h3>
@@ -481,7 +472,6 @@ export default function ManagementDashboard() {
                 className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-teal-500"
                 onClick={() => navigate("/health-information")}
               >
-                <div className="text-4xl mb-3">🏥</div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                   Health Information
                 </h3>
@@ -497,7 +487,6 @@ export default function ManagementDashboard() {
                 className="p-6 text-center hover:shadow-lg transition-all cursor-pointer border-t-4 border-t-cyan-500"
                 onClick={() => setActiveSection("reports")}
               >
-                <div className="text-4xl mb-3">📑</div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                   Reports
                 </h3>
@@ -512,7 +501,7 @@ export default function ManagementDashboard() {
               {canManageUsers && (
               <Card
                 className="p-6 flex flex-col h-full"
-                title="👥 User Management"
+                title="User Management"
               >
                 <p className="text-gray-600 dark:text-gray-400 mb-6 flex-grow">
                   Comprehensive user management system for guardians and
@@ -530,7 +519,7 @@ export default function ManagementDashboard() {
 
               <Card
                 className="p-6 flex flex-col h-full"
-                title="👶 Infant Management"
+                title="Infant Management"
               >
                 <p className="text-gray-600 dark:text-gray-400 mb-6 flex-grow">
                   Digital booklets and records for pediatric patients. Track
@@ -547,7 +536,7 @@ export default function ManagementDashboard() {
 
               <Card
                 className="p-6 flex flex-col h-full"
-                title="📅 Appointment System"
+                title="Appointment System"
               >
                 <p className="text-gray-600 dark:text-gray-400 mb-6 flex-grow">
                   Schedule and track vaccination appointments. View upcoming
@@ -564,7 +553,7 @@ export default function ManagementDashboard() {
 
               <Card
                 className="p-6 flex flex-col h-full"
-                title="📦 Inventory Control"
+                title="Inventory Control"
               >
                 <p className="text-gray-600 dark:text-gray-400 mb-6 flex-grow">
                   Monitor vaccine stock levels and usage. Receive alerts for low
@@ -581,7 +570,7 @@ export default function ManagementDashboard() {
 
               <Card
                 className="p-6 flex flex-col h-full"
-                title="💉 Vaccination Management"
+                title="Vaccination Management"
               >
                 <p className="text-gray-600 dark:text-gray-400 mb-6 flex-grow">
                   Manage vaccination records, schedules, and immunization
@@ -596,7 +585,7 @@ export default function ManagementDashboard() {
                 </Button>
               </Card>
 
-              <Card className="p-6 flex flex-col h-full" title="📈 Analytics">
+              <Card className="p-6 flex flex-col h-full" title="Analytics">
                 <p className="text-gray-600 dark:text-gray-400 mb-6 flex-grow">
                   View comprehensive analytics and insights. Analyze vaccination
                   trends and facility performance.
@@ -612,7 +601,7 @@ export default function ManagementDashboard() {
 
               <Card
                 className="p-6 flex flex-col h-full"
-                title="📄 Digital Papers"
+                title="Digital Papers"
               >
                 <p className="text-gray-600 dark:text-gray-400 mb-6 flex-grow">
                   Manage digital immunization records and documents. Create and
@@ -629,7 +618,7 @@ export default function ManagementDashboard() {
 
               <Card
                 className="p-6 flex flex-col h-full"
-                title="📢 Announcements"
+                title="Announcements"
               >
                 <p className="text-gray-600 dark:text-gray-400 mb-6 flex-grow">
                   Post and manage facility announcements. Keep guardians and
@@ -646,7 +635,7 @@ export default function ManagementDashboard() {
 
               <Card
                 className="p-6 flex flex-col h-full"
-                title="🔔 Notifications"
+                title="Notifications"
               >
                 <p className="text-gray-600 dark:text-gray-400 mb-6 flex-grow">
                   Send and manage notifications. Alert users about appointments,
@@ -663,7 +652,7 @@ export default function ManagementDashboard() {
 
               <Card
                 className="p-6 flex flex-col h-full"
-                title="🏥 Health Information"
+                title="Health Information"
               >
                 <p className="text-gray-600 dark:text-gray-400 mb-6 flex-grow">
                   Access and manage patient health information. View medical
@@ -678,7 +667,7 @@ export default function ManagementDashboard() {
                 </Button>
               </Card>
 
-              <Card className="p-6 flex flex-col h-full" title="📊 Reporting">
+              <Card className="p-6 flex flex-col h-full" title="Reporting">
                 <p className="text-gray-600 dark:text-gray-400 mb-6 flex-grow">
                   Generate comprehensive reports for facility management.
                   Analyze vaccination coverage and inventory trends.

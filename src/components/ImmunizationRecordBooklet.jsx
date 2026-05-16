@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import apiClient from "../utils/api";
 import { Button, Alert, LoadingSpinner } from "./UI";
-import PrintDateRangeControls from "./PrintDateRangeControls";
 import usePrintDateRange from "../hooks/usePrintDateRange";
 import {
   normalizeInfantResponse,
@@ -922,11 +921,19 @@ const resolveSlotStatus = ({ record, timelineEntry }) => {
     return recordStatus;
   }
 
-  return "pending";
+  const dueDateStr = timelineEntry?.due_date || record?.due_date || null;
+  if (dueDateStr) {
+    const dueDate = new Date(dueDateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return dueDate < today ? "overdue" : "upcoming";
+  }
+
+  return "upcoming";
 };
 
 const getStatusLabel = (status) => {
-  const normalized = normalizeCanonicalStatus(status) || "pending";
+  const normalized = normalizeCanonicalStatus(status) || "upcoming";
 
   const labels = {
     completed: "Completed",
@@ -1475,9 +1482,6 @@ export default function ImmunizationRecordBooklet({ infantId }) {
             </div>
           </div>
 
-          <div className="mt-4">
-            <PrintDateRangeControls controller={printDateRange} />
-          </div>
         </div>
 
         <div className="guardian-table-scroll-shell p-4 pt-0">

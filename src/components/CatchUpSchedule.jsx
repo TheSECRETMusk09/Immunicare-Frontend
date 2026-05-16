@@ -112,7 +112,6 @@ export default function CatchUpSchedule({ infantId, onScheduleAppointment }) {
           </span>
         </div>
         <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
-          <span className="text-2xl">🎉</span>
           <p className="mt-2 text-green-800 dark:text-green-300">
             {catchUpData.message}
           </p>
@@ -138,7 +137,7 @@ export default function CatchUpSchedule({ infantId, onScheduleAppointment }) {
           </p>
         </div>
         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
-          ⚠️ Action Required
+Action Required
         </span>
       </div>
 
@@ -146,7 +145,6 @@ export default function CatchUpSchedule({ infantId, onScheduleAppointment }) {
       {totalOverdue > 0 && (
         <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
           <div className="flex items-start">
-            <span className="text-red-500 mr-2">⚠️</span>
             <div>
               <p className="text-sm font-medium text-red-800 dark:text-red-300">
                 {totalOverdue} vaccine{totalOverdue > 1 ? 's are' : ' is'} overdue
@@ -216,7 +214,7 @@ export default function CatchUpSchedule({ infantId, onScheduleAppointment }) {
                   variant={item.isOverdue ? "danger" : "secondary"}
                   onClick={() => handleScheduleAppointment(item)}
                 >
-                  📅 Schedule
+Schedule
                 </Button>
               </div>
             </div>

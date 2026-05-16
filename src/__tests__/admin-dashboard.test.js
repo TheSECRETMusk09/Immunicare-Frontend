@@ -5,9 +5,9 @@
  * including authentication, CRUD operations, and user interactions
  */
 
-const React = require('react');
-const { render, screen, fireEvent, waitFor, act } = require('@testing-library/react');
-const { BrowserRouter } = require('react-router-dom');
+              require('react');
+                                                    require('@testing-library/react');
+                          require('react-router-dom');
 
 // Mock API calls
 const mockApi = {

@@ -21,7 +21,7 @@ export default function InventoryReports() {
   const [inventory, setInventory] = useState([]);
   const [categories, setCategories] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
+  const [         , setSuppliers] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [transactions, setTransactions] = useState([]);
 
@@ -139,7 +139,7 @@ export default function InventoryReports() {
   const inventoryStats = useMemo(() => {
     const totalItems = filteredInventory.length;
     const totalValue = filteredInventory.reduce(
-      (sum, item) => sum + (item.total_value || 0),
+      (sum, item) => sum +( item.total_value || 0),
       0,
     );
     const criticalCount = filteredInventory.filter(
@@ -152,7 +152,7 @@ export default function InventoryReports() {
       (i) => i.stock_status === "overstock",
     ).length;
     const totalQuantity = filteredInventory.reduce(
-      (sum, item) => sum + (item.current_stock_level || 0),
+      (sum, item) => sum +( item.current_stock_level || 0),
       0,
     );
 
@@ -190,13 +190,13 @@ export default function InventoryReports() {
       },
     };
     const variant = variants[status] || variants.adequate;
-    return (
+    return(
       <span
         className={`px-2 py-1 text-xs font-medium rounded-full ${variant.color}`}
       >
         {variant.label}
-      </span>
-    );
+      </span>)
+     ;
   };
 
   // Alert severity badge helper
@@ -204,30 +204,30 @@ export default function InventoryReports() {
     const variants = {
       critical: {
         color: "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400",
-        icon: "🔴",
+        icon: "",
       },
       high: {
         color:
           "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400",
-        icon: "🟠",
+        icon: "",
       },
       medium: {
         color:
           "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400",
-        icon: "🟡",
+        icon: "",
       },
       low: {
         color:
           "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400",
-        icon: "🔵",
+        icon: "",
       },
     };
     const variant = variants[severity] || variants.low;
-    return (
+    return(
       <span className={`px-2 py-0.5 text-xs rounded ${variant.color}`}>
         {variant.icon} {severity?.toUpperCase()}
-      </span>
-    );
+      </span>)
+     ;
   };
 
   // Transaction type badge helper
@@ -262,15 +262,15 @@ export default function InventoryReports() {
       color: "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400",
       label: type,
     };
-    return (
+    return(
       <span className={`px-2 py-0.5 text-xs rounded ${variant.color}`}>
         {variant.label}
-      </span>
-    );
+      </span>)
+     ;
   };
 
   if (!isAdmin) {
-    return (
+    return(
       <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
         <div className="flex">
           <div className="flex-shrink-0">
@@ -298,20 +298,20 @@ export default function InventoryReports() {
             </div>
           </div>
         </div>
-      </div>
-    );
+      </div>)
+     ;
   }
 
   if (loading) {
-    return (
+    return(
       <div className="flex items-center justify-center h-64">
         <LoadingSpinner size="lg" />
-      </div>
-    );
+      </div>)
+     ;
   }
 
   if (error) {
-    return (
+    return(
       <Alert variant="error" title="Error loading inventory data">
         {error}
         <div className="mt-4">
@@ -319,11 +319,11 @@ export default function InventoryReports() {
             Retry
           </Button>
         </div>
-      </Alert>
-    );
+      </Alert>)
+     ;
   }
 
-  return (
+  return(
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -485,11 +485,11 @@ export default function InventoryReports() {
               }
             >
               <option value="">All Categories</option>
-              {categories.map((cat) => (
+              {categories.map((cat) =>(
                 <option key={cat.category_id} value={cat.category_id}>
                   {cat.category_name}
-                </option>
-              ))}
+                </option>)
+               )}
             </Select>
           </div>
 
@@ -504,11 +504,11 @@ export default function InventoryReports() {
               }
             >
               <option value="">All Warehouses</option>
-              {warehouses.map((wh) => (
+              {warehouses.map((wh) =>(
                 <option key={wh.warehouse_id} value={wh.warehouse_id}>
                   {wh.warehouse_name}
-                </option>
-              ))}
+                </option>)
+               )}
             </Select>
           </div>
 
@@ -566,7 +566,7 @@ export default function InventoryReports() {
 
       {/* Tabs */}
       <Tabs activeTab={activeTab} onTabChange={setActiveTab}>
-        <Tab id="inventory" label="Inventory Items" icon="📦">
+        <Tab id="inventory" label="Inventory Items">
           {/* Inventory Table */}
           <Card className="overflow-hidden">
             <div className="overflow-x-auto">
@@ -600,7 +600,7 @@ export default function InventoryReports() {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {filteredInventory.map((item) => (
+                  {filteredInventory.map((item) =>(
                     <tr
                       key={item.item_id}
                       className="hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -612,11 +612,11 @@ export default function InventoryReports() {
                         <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                           {item.product_name}
                         </div>
-                        {item.description && (
+                        {item.description &&(
                           <div className="text-xs text-gray-500 truncate max-w-xs">
                             {item.description}
-                          </div>
-                        )}
+                          </div>)
+                         }
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                         {item.category_name}
@@ -634,11 +634,11 @@ export default function InventoryReports() {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                         {item.warehouse_name || "N/A"}
-                        {item.bin_location && (
+                        {item.bin_location &&(
                           <div className="text-xs">
                             Bin: {item.bin_location}
-                          </div>
-                        )}
+                          </div>)
+                         }
                       </td>
                       <td className="px-4 py-3">
                         {getStockStatusBadge(item.stock_status)}
@@ -657,15 +657,15 @@ export default function InventoryReports() {
                           </Button>
                         </div>
                       </td>
-                    </tr>
-                  ))}
+                    </tr>)
+                   )}
                 </tbody>
               </table>
             </div>
           </Card>
         </Tab>
 
-        <Tab id="alerts" label="Stock Alerts" icon="🔔">
+        <Tab id="alerts" label="Stock Alerts">
           {/* Alerts Table */}
           <Card className="overflow-hidden">
             <div className="overflow-x-auto">
@@ -699,7 +699,7 @@ export default function InventoryReports() {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {alerts.map((alert) => (
+                  {alerts.map((alert) =>(
                     <tr
                       key={alert.alert_id}
                       className="hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -746,15 +746,15 @@ export default function InventoryReports() {
                             : "View"}
                         </Button>
                       </td>
-                    </tr>
-                  ))}
+                    </tr>)
+                   )}
                 </tbody>
               </table>
             </div>
           </Card>
         </Tab>
 
-        <Tab id="transactions" label="Transactions" icon="📋">
+        <Tab id="transactions" label="Transactions">
           {/* Transactions Table */}
           <Card className="overflow-hidden">
             <div className="overflow-x-auto">
@@ -785,7 +785,7 @@ export default function InventoryReports() {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {transactions.slice(0, 20).map((trans) => (
+                  {transactions.slice(0, 20).map((trans) =>(
                     <tr
                       key={trans.transaction_id}
                       className="hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -826,8 +826,8 @@ export default function InventoryReports() {
                           {trans.transaction_status}
                         </span>
                       </td>
-                    </tr>
-                  ))}
+                    </tr>)
+                   )}
                 </tbody>
               </table>
             </div>
@@ -934,7 +934,7 @@ export default function InventoryReports() {
         title="Item Details"
         size="lg"
       >
-        {selectedItem && (
+        {selectedItem &&(
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -1045,9 +1045,9 @@ export default function InventoryReports() {
                 Close
               </Button>
             </div>
-          </div>
-        )}
+          </div>)
+         }
       </Modal>
-    </div>
-  );
+    </div>)
+   ;
 }

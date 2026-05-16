@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState            } from "react";
 import {
   Settings as SettingsIcon,
-  Save,
+
   RotateCcw,
   CheckCircle,
   AlertCircle,
-  Loader2,
+  Loader2    ,
 } from "lucide-react";
 import GeneralSettings from "./GeneralSettings";
 import ProfileSettings from "./ProfileSettings";
@@ -23,9 +23,9 @@ const SettingsManager = () => {
   const {
     settings,
     loading,
-    error,
+
     updateSettings,
-    resetCategory,
+    resetCategory ,
     exportSettings,
     importSettings,
     refreshSettings,
@@ -49,7 +49,7 @@ const SettingsManager = () => {
 
     try {
       const settingsArray = Object.entries(categorySettings).map(
-        ([key, value]) => ({
+        ([key, value]) =>( {
           category,
           key,
           value,
@@ -123,14 +123,14 @@ const SettingsManager = () => {
   };
 
   if (loading) {
-    return (
+    return(
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-      </div>
-    );
+      </div>)
+     ;
   }
 
-  return (
+  return(
     <div className="space-y-4 sm:space-y-6 p-3 sm:p-0">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
@@ -171,30 +171,30 @@ const SettingsManager = () => {
       </div>
 
       {/* Network Status */}
-      {!isOnline && (
+      {!isOnline &&(
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-200 px-4 py-3 rounded-lg flex items-center gap-2">
           <AlertCircle className="w-5 h-5" />
           <span>
             You are currently offline. Changes will be saved when you reconnect.
           </span>
-        </div>
-      )}
+        </div>)
+       }
 
       {/* Success Message */}
-      {saveSuccess && (
+      {saveSuccess &&(
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 px-4 py-3 rounded-lg flex items-center gap-2">
           <CheckCircle className="w-5 h-5" />
           <span>Settings saved successfully!</span>
-        </div>
-      )}
+        </div>)
+       }
 
       {/* Error Message */}
-      {saveError && (
+      {saveError &&(
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 px-4 py-3 rounded-lg flex items-center gap-2">
           <AlertCircle className="w-5 h-5" />
           <span>{saveError}</span>
-        </div>
-      )}
+        </div>)
+       }
 
       {/* Settings Container */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
@@ -203,7 +203,7 @@ const SettingsManager = () => {
           <nav className="flex min-w-max">
             {tabs.map((tab) => {
               const Icon = tab.icon;
-              return (
+              return(
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
@@ -216,46 +216,46 @@ const SettingsManager = () => {
                 >
                   <Icon className="w-4 h-4 flex-shrink-0" />
                   <span>{tab.label}</span>
-                </button>
-              );
+                </button>)
+               ;
             })}
           </nav>
         </div>
 
         {/* Tab Content */}
         <div className="p-4 sm:p-6">
-          {activeTab === "general" && (
+          {activeTab === "general" &&(
             <GeneralSettings
               settings={settings?.general || {}}
               onSave={(s) => handleSave("general", s)}
               onReset={() => handleReset("general")}
-            />
-          )}
-          {activeTab === "profile" && (
+            />)
+           }
+          {activeTab === "profile" &&(
             <ProfileSettings
               settings={settings?.profile || {}}
               onSave={(s) => handleSave("profile", s)}
               onReset={() => handleReset("profile")}
-            />
-          )}
-          {activeTab === "security" && (
+            />)
+           }
+          {activeTab === "security" &&(
             <SecuritySettings
               settings={settings?.security || {}}
               onSave={(s) => handleSave("security", s)}
               onReset={() => handleReset("security")}
-            />
-          )}
-          {activeTab === "notification" && (
+            />)
+           }
+          {activeTab === "notification" &&(
             <NotificationSettings
               settings={settings?.notification || {}}
               onSave={(s) => handleSave("notification", s)}
               onReset={() => handleReset("notification")}
-            />
-          )}
+            />)
+           }
         </div>
       </div>
-    </div>
-  );
+    </div>)
+   ;
 };
 
 export default SettingsManager;

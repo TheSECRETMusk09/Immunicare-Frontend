@@ -1,12 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
-/**
- * useAnalyticsStream
- * - mode: "sse" | "ws"
- * - url: for SSE: "/analytics/stream"; for WS: "wss://..."
- * - params: query params for SSE, or subscribe payload for WS
- * - onMessage: (eventObj) => void
- */
+// Stream analytics updates over SSE or WebSocket.
 export function useAnalyticsStream({
   mode = "sse",
   url,

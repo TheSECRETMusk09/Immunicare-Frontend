@@ -13,7 +13,21 @@ describe("notification routing", () => {
     };
 
     expect(resolveNotificationCategory(notification)).toBe("appointment");
-    expect(resolveNotificationActionUrl(notification)).toBe("/appointments");
+    expect(resolveNotificationActionUrl(notification)).toBe("/appointments?period=month");
+  });
+
+  test("enriches admin appointment notifications with month period and infant search", () => {
+    const notification = {
+      notification_type: "appointment_created",
+      action_url: "/appointments?period=today",
+      title: "Guardian created appointment",
+      message:
+        "Christine Samorin created an appointment for Christian Samorin on 5/12/2026, 8:00:00 AM.",
+    };
+
+    expect(resolveNotificationActionUrl(notification)).toBe(
+      "/appointments?period=month&search=Christian+Samorin",
+    );
   });
 
   test("maps low stock notifications to the inventory module", () => {

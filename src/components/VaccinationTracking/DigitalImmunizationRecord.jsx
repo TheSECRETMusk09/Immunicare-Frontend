@@ -4,14 +4,14 @@ import {
   Download,
   Printer,
   Share2,
-  Edit,
+
   Plus,
   Calendar,
   CheckCircle,
-  Clock,
+  Clock      ,
   AlertTriangle,
-  FileText,
-  User,
+  FileText     ,
+  User    ,
   MapPin,
 } from "lucide-react";
 import jsPDF from "jspdf";
@@ -209,7 +209,7 @@ export const DigitalImmunizationRecord = () => {
       status: "completed",
     };
 
-    setSelectedPatient((prev) => ({
+    setSelectedPatient((prev) =>( {
       ...prev,
       vaccinationHistory: [...prev.vaccinationHistory, newVaccination],
     }));
@@ -323,7 +323,7 @@ export const DigitalImmunizationRecord = () => {
     }
   };
 
-  return (
+  return(
     <div className="digital-immunization-record space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
@@ -353,7 +353,7 @@ export const DigitalImmunizationRecord = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {patients.map((patient) => (
+          {patients.map((patient) =>(
             <div
               key={patient.id}
               className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
@@ -389,8 +389,8 @@ export const DigitalImmunizationRecord = () => {
                   <span className="text-xs text-gray-500">
                     Age:{" "}
                     {Math.floor(
-                      (new Date() - new Date(patient.dateOfBirth)) /
-                        (1000 * 60 * 60 * 24 * 365.25),
+                      (new Date() - new Date(patient.dateOfBirth)) /(
+                         1000 * 60 * 60 * 24 * 365.25),
                     )}{" "}
                     years
                   </span>
@@ -414,13 +414,13 @@ export const DigitalImmunizationRecord = () => {
                   Record Vaccination
                 </Button>
               </div>
-            </div>
-          ))}
+            </div>)
+           )}
         </div>
       </Card>
 
       {/* Record Modal */}
-      {showRecordModal && (
+      {showRecordModal &&(
         <Modal
           title={`${selectedPatient?.name || "Patient"} - Immunization Record`}
           onClose={() => setShowRecordModal(false)}
@@ -547,7 +547,7 @@ export const DigitalImmunizationRecord = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {selectedPatient?.vaccinationHistory.map(
-                      (vaccine, index) => (
+                      (vaccine, index) =>(
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             {vaccine.vaccine}
@@ -575,8 +575,8 @@ export const DigitalImmunizationRecord = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {vaccine.remarks}
                           </td>
-                        </tr>
-                      ),
+                        </tr>)
+
                     )}
                   </tbody>
                 </table>
@@ -593,7 +593,7 @@ export const DigitalImmunizationRecord = () => {
                   <div className="text-2xl font-bold text-green-600">
                     {
                       selectedPatient?.vaccinationHistory.filter(
-                        (v) => v.status === "completed",
+                        (v) => v.status === "completed"
                       ).length
                     }
                   </div>
@@ -603,7 +603,7 @@ export const DigitalImmunizationRecord = () => {
                   <div className="text-2xl font-bold text-yellow-600">
                     {
                       selectedPatient?.vaccinationHistory.filter(
-                        (v) => v.status === "due",
+                        (v) => v.status === "due"
                       ).length
                     }
                   </div>
@@ -613,7 +613,7 @@ export const DigitalImmunizationRecord = () => {
                   <div className="text-2xl font-bold text-red-600">
                     {
                       selectedPatient?.vaccinationHistory.filter(
-                        (v) => v.status === "overdue",
+                        (v) => v.status === "overdue"
                       ).length
                     }
                   </div>
@@ -622,11 +622,11 @@ export const DigitalImmunizationRecord = () => {
               </div>
             </Card>
           </div>
-        </Modal>
-      )}
+        </Modal>)
+       }
 
       {/* Vaccination Recording Modal */}
-      {showVaccinationModal && (
+      {showVaccinationModal &&(
         <Modal
           title={`Record Vaccination for ${selectedPatient?.name}`}
           onClose={() => setShowVaccinationModal(false)}
@@ -740,8 +740,8 @@ export const DigitalImmunizationRecord = () => {
               Record Vaccination
             </Button>
           </div>
-        </Modal>
-      )}
-    </div>
-  );
+        </Modal>)
+       }
+    </div>)
+   ;
 };

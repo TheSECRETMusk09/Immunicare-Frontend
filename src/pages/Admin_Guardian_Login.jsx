@@ -16,7 +16,6 @@ import { Button, TextInput, PasswordInput, Alert } from "../components/UI";
 import { motion, AnimatePresence } from "framer-motion";
 import { trackEvent, identifyUser } from "../utils/telemetry";
 
-// Mobile Detection Hook
 const useIsMobile = (breakpoint = 768) => {
   const [isMobile, setIsMobile] = useState(false);
 
@@ -35,7 +34,6 @@ const useIsMobile = (breakpoint = 768) => {
   return isMobile;
 };
 
-// Branding Panel - Sliding gradient panel for desktop
 const BrandingPanel = ({ currentRole, onSwitch, isMobile }) => {
   const isGuardianMode = currentRole === "guardian";
 
@@ -48,7 +46,6 @@ const BrandingPanel = ({ currentRole, onSwitch, isMobile }) => {
       }}
     >
       <div className="max-w-md mx-auto text-center relative z-10">
-        {/* Logo Section */}
         <div className="text-center mb-6">
           <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-white/95 border-4 border-white/30 flex items-center justify-center shadow-xl">
             <span className="text-[#4F46E5] font-bold text-2xl">+</span>
@@ -61,7 +58,6 @@ const BrandingPanel = ({ currentRole, onSwitch, isMobile }) => {
           </p>
         </div>
 
-        {/* Divider */}
         <div className="h-1.5 w-14 bg-red-400 rounded-full mb-5 mx-auto"></div>
 
         <h2 className="text-xl font-semibold mb-3">
@@ -75,7 +71,6 @@ const BrandingPanel = ({ currentRole, onSwitch, isMobile }) => {
         </p>
       </div>
 
-      {/* Switch Portal Link - Only on desktop, bottom aligned */}
       {!isMobile && (
         <div className="text-center relative z-10">
           <button
@@ -91,7 +86,6 @@ const BrandingPanel = ({ currentRole, onSwitch, isMobile }) => {
   );
 };
 
-// Guardian Login Form
 const GuardianLoginForm = ({
   formData,
   errors,
@@ -103,7 +97,6 @@ const GuardianLoginForm = ({
   return (
     <div className="w-full h-full bg-[#4F46E5] flex flex-col justify-center text-white rounded-r-3xl">
       <div className="max-w-md mx-auto px-6">
-        {/* Logo Section */}
         <div className="text-center mb-6">
           <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-white flex items-center justify-center shadow-lg">
             <User size={32} className="text-[#4F46E5]" />
@@ -184,7 +177,6 @@ const GuardianLoginForm = ({
   );
 };
 
-// Admin Login Form
 const AdminLoginForm = ({
   formData,
   errors,
@@ -196,7 +188,6 @@ const AdminLoginForm = ({
   return (
     <div className="w-full h-full bg-[#4B148B] flex flex-col justify-center text-white rounded-l-3xl">
       <div className="max-w-md mx-auto px-6">
-        {/* Logo Section */}
         <div className="text-center mb-6">
           <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-white flex items-center justify-center shadow-lg">
             <User size={32} className="text-[#4B148B]" />
@@ -265,7 +256,6 @@ const AdminLoginForm = ({
   );
 };
 
-// Animation variants for spring sliding and premium crossfade transitions
 const formMotionVariants = {
   initial: (xDirection) => ({ opacity: 0, x: xDirection, scale: 0.985 }),
   animate: {
@@ -289,7 +279,6 @@ const panelSpringTransition = {
   mass: 0.9,
 };
 
-// Main Component
 const AdminGuardianLogin = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -312,7 +301,6 @@ const AdminGuardianLogin = () => {
   const { login, isAuthenticated, user } = useAuth();
   const { isOnline } = useNetworkStatus();
 
-  // Detect route and set initial role
   useEffect(() => {
     if (isMobile) {
       setRole("guardian");
@@ -326,7 +314,6 @@ const AdminGuardianLogin = () => {
     }
   }, [location.pathname, isMobile, navigate]);
 
-  // Redirect if logged in
   useEffect(() => {
     if (isAuthenticated) {
       const storedUser = JSON.parse(
@@ -343,7 +330,6 @@ const AdminGuardianLogin = () => {
     }
   }, [isAuthenticated, navigate, user]);
 
-  // Auto-clear server error
   useEffect(() => {
     if (serverError) {
       const timer = setTimeout(() => setServerError(null), 5000);
@@ -391,7 +377,6 @@ const AdminGuardianLogin = () => {
     const targetUrl = newRole === "admin" ? "/admin/login" : "/guardian/login";
     navigate(targetUrl, { replace: true });
 
-    // Reset form state
     setFormData({
       guardian_id: "",
       admin_user: "",
@@ -468,7 +453,6 @@ const AdminGuardianLogin = () => {
     }
   };
 
-  // OFFLINE SCREEN
   if (!isOnline) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
@@ -486,7 +470,6 @@ const AdminGuardianLogin = () => {
     );
   }
 
-  // MOBILE VIEW - ONLY GUARDIAN LOGIN (UNCHANGED)
   if (isMobile) {
     return (
       <>
@@ -591,7 +574,6 @@ const AdminGuardianLogin = () => {
     );
   }
 
-  // DESKTOP VIEW - Sliding 50/50 split panel with spring animation
   return (
     <>
       <style>{`
@@ -601,7 +583,6 @@ const AdminGuardianLogin = () => {
             color: #111827 !important;
           }
 
-          /* Simple hover effects - no perspective transforms or glow borders */
           .login-button {
             transition: all 0.2s ease;
           }
@@ -669,7 +650,6 @@ const AdminGuardianLogin = () => {
             padding-left: 2.5rem !important;
           }
 
-          /* Switch button hover effects */
           .switch-portal-btn {
             transition: all 0.2s ease;
             cursor: pointer;
@@ -719,9 +699,7 @@ const AdminGuardianLogin = () => {
         className="min-h-screen flex items-center justify-center bg-[#eef2f6] login-page-container"
         data-theme="light"
       >
-        {/* Main Container - Fixed size with animated split-screen */}
         <div className="w-[960px] h-[620px] rounded-3xl shadow-2xl auth-shell">
-          {/* Sliding branding panel */}
           <motion.div
             className="auth-brand-layer"
             animate={{ x: role === "guardian" ? "0%" : "100%" }}
@@ -741,7 +719,6 @@ const AdminGuardianLogin = () => {
             </div>
           </motion.div>
 
-          {/* Animated form layer (crossfade + slight horizontal motion) */}
           <AnimatePresence mode="wait" initial={false}>
             {role === "guardian" ? (
               <motion.div
@@ -785,7 +762,6 @@ const AdminGuardianLogin = () => {
           </AnimatePresence>
         </div>
 
-        {/* Footer */}
         <div className="absolute bottom-6 login-copyright">
           <p className="text-xs text-gray-400">
             © 2026 Immunicare. All rights reserved.

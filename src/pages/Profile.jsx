@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { AlertCircle, CheckCircle, RefreshCw, Bell, User } from "lucide-react";
+import { AlertCircle, CheckCircle, User } from "lucide-react";
 import { Alert } from "../components/UI";
 import apiClient from "../utils/api";
 import { trackEvent } from "../utils/telemetry";
@@ -12,10 +11,8 @@ import "../css/guardian-profile.css";
 // Profile Components
 import {
   PersonalInfoCard,
-  EmergencyContactCard,
+
   ChildrenSummaryCard,
-  AccountStatsCard,
-  QuickActionsCard,
   PasswordChangeModal,
   LogoutConfirmationModal,
 } from "../components/Profile";
@@ -34,7 +31,6 @@ import {
  */
 export default function Profile() {
   const { user, logout, isGuardian, guardianId } = useAuth();
-  const navigate = useNavigate();
 
   // Form state
   const [formData, setFormData] = useState({
@@ -276,37 +272,7 @@ export default function Profile() {
           subtitle="Manage your account information, emergency contacts, and security settings"
           icon={<User className="w-8 h-8 text-white" />}
           className="guardian-profile-header-shell"
-          actions={(
-            <div className="hidden min-[1025px]:flex guardian-desktop-pageheader-actions">
-              <button
-                type="button"
-                onClick={fetchProfileData}
-                className="guardian-desktop-pageheader-icon-btn"
-                aria-label="Refresh My Profile"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate("/guardian/notifications")}
-                className="guardian-desktop-pageheader-icon-btn guardian-desktop-pageheader-icon-btn--notif"
-                aria-label="Open notifications"
-              >
-                <Bell className="w-4 h-4" />
-                <span className="guardian-desktop-pageheader-notif-dot" aria-hidden="true" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate("/guardian/profile")}
-                className="guardian-desktop-pageheader-icon-btn"
-                aria-label="Open profile"
-              >
-                <User className="w-4 h-4" />
-              </button>
-            </div>
-          )}
+          showOnMobile={false}
         />
 
         {/* Main Content */}
@@ -366,7 +332,7 @@ export default function Profile() {
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 min-[768px]:grid-cols-2 min-[1025px]:grid-cols-3 gap-4 sm:gap-5 lg:gap-6 lg:px-0">
             {/* Left Column - Main Content */}
-            <div className="min-[768px]:col-span-2 min-[1025px]:col-span-2 space-y-4 sm:space-y-5 lg:space-y-6">
+            <div className="min-[768px]:col-span-2 min-[1025px]:col-span-3 space-y-4 sm:space-y-5 lg:space-y-6">
               {/* Personal Information */}
               <PersonalInfoCard
                 formData={formData}
@@ -374,21 +340,11 @@ export default function Profile() {
                 isEditing={isEditing}
                 onSave={handleSave}
                 onCancel={handleCancel}
+                onChangePassword={() => setShowPasswordModal(true)}
                 loading={saving}
                 fieldErrors={fieldErrors}
               />
-
-              {/* Emergency Contact */}
-              <EmergencyContactCard
-                formData={formData}
-                onChange={handleInputChange}
-                isEditing={isEditing}
-                onSave={handleSave}
-                onCancel={handleCancel}
-                loading={saving}
-                fieldErrors={fieldErrors}
-              />
-
+              
               {/* Children Summary (Guardians only) */}
               {isGuardian && (
                 <ChildrenSummaryCard
@@ -396,22 +352,6 @@ export default function Profile() {
                   loading={loading}
                 />
               )}
-            </div>
-
-            {/* Right Column - Sidebar */}
-            <div className="space-y-4 sm:space-y-5 lg:space-y-6">
-              {/* Account Stats */}
-              <AccountStatsCard
-                user={user}
-                childrenCount={stats.childrenCount}
-                vaccinationCount={stats.vaccinationCount}
-              />
-
-              {/* Quick Actions */}
-              <QuickActionsCard
-                onChangePassword={() => setShowPasswordModal(true)}
-                onOpenLogoutModal={() => setShowLogoutModal(true)}
-              />
             </div>
           </div>
         </div>
@@ -424,11 +364,7 @@ export default function Profile() {
           loading={saving}
         />
 
-        <LogoutConfirmationModal
-          isOpen={showLogoutModal}
-          onClose={() => setShowLogoutModal(false)}
-          onConfirm={logout}
-        />
+        
         </main>
       </div>
     </div>

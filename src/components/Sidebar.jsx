@@ -2,6 +2,7 @@ import React, { useState, useEffect, memo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { adminRoutePaths } from "../utils/routePaths";
+import { normalizeRoleLabel } from "../utils/roleLabels";
 import {
   BarChart3,
   Users,
@@ -10,11 +11,9 @@ import {
   Package,
   Calendar,
   ClipboardList,
-  Megaphone,
   Bell,
   ChevronDown,
   ChevronRight,
-  Building2,
   LogOut,
   Sun,
   Moon,
@@ -48,7 +47,6 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
     { name: "Inventory", icon: Package },
     { name: "Appointments", icon: Calendar },
     { name: "Reports", icon: ClipboardList },
-    { name: "Announcements", icon: Megaphone },
     { name: "Notifications", icon: Bell },
   ];
 
@@ -102,7 +100,6 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
   // Get current active item based on location
   const getActiveItem = () => {
     const path = location.pathname;
-
     // Check for inventory path
     if (path === "/inventory") {
       return "Inventory";
@@ -242,7 +239,6 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
                 aria-current={isActive(item.name) ? "page" : undefined}
                 style={{ animationDelay: `${index * 50}ms` }}
               >
-                <item.icon className="w-5 h-5 flex-shrink-0" />
                 <span className="hidden md:block font-bold">{item.name}</span>
                 {item.badge && (
                   <span className="ml-auto flex items-center justify-center w-5 h-5 text-xs font-bold bg-red-500 text-white rounded-full">
@@ -307,9 +303,6 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
         <div className="mt-auto border-t dark:border-gray-700 p-4 space-y-2">
           {/* Health Center Info */}
           <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/30">
-            <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-800/50 rounded-full flex items-center justify-center shrink-0">
-              <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-            </div>
             <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300 truncate">
               {(() => {
                 const healthCenter = user?.clinic || user?.healthCenter;
@@ -349,10 +342,7 @@ const Sidebar = memo(({ isOpen, onClose, darkMode, onToggleDarkMode }) => {
               <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 tracking-wide mt-0.5 mb-0.5 truncate">
                 {(() => {
                   const roleStr = user?.display_role || user?.role_name || user?.role || "User";
-                  return roleStr
-                    .split('_')
-                    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-                    .join(' ');
+                  return normalizeRoleLabel(roleStr);
                 })()}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">

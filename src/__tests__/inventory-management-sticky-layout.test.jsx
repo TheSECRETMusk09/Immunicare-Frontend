@@ -1,12 +1,12 @@
 import React from "react";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {                 render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import apiClient from "../utils/api";
 import InventoryManagement from "../components/InventoryManagement";
 
-jest.mock("../utils/api", () => ({
+jest.mock("../utils/api", () =>( {
   __esModule: true,
   default: {
     getFacilityInfo: jest.fn(),
@@ -18,13 +18,13 @@ jest.mock("../utils/api", () => ({
   },
 }));
 
-jest.mock("../contexts/AuthContext", () => ({
-  useAuth: () => ({
+jest.mock("../contexts/AuthContext", () =>( {
+  useAuth: () =>( {
     user: { id: 100, role_type: "SYSTEM_ADMIN", clinic_id: 7, facility_id: 7 },
   }),
 }));
 
-jest.mock("../components/InventoryMonitoringDashboard", () => ({
+jest.mock("../components/InventoryMonitoringDashboard", () =>( {
   __esModule: true,
   default: () => <div>Inventory Monitoring Dashboard</div>,
 }));
@@ -38,7 +38,7 @@ const renderInventoryRoute = (initialEntry) =>
     </MemoryRouter>,
   );
 
-const createStockMovement = (id) => ({
+const createStockMovement = (id) =>( {
   id,
   transaction_type: id % 3 === 0 ? "ISSUE" : "RECEIVE",
   created_at: `2026-03-${String((id % 28) + 1).padStart(2, "0")}T08:00:00.000Z`,
@@ -54,7 +54,7 @@ const createStockMovement = (id) => ({
   performed_by_role: "SYSTEM_ADMIN",
 });
 
-const createPersistedAlert = (id) => ({
+const createPersistedAlert = (id) =>( {
   id,
   vaccine_name: `Alert Vaccine ${id}`,
   alert_type: "CRITICAL_STOCK",
@@ -71,7 +71,7 @@ describe("Inventory Management sticky layout", () => {
   beforeEach(() => {
     Object.defineProperty(window, "matchMedia", {
       writable: true,
-      value: jest.fn().mockImplementation((query) => ({
+      value: jest.fn().mockImplementation((query) =>( {
         matches: false,
         media: query,
         onchange: null,

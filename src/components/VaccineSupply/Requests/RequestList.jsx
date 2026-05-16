@@ -10,7 +10,7 @@ const RequestList = () => {
   const { user } = useAuth();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [     , setError] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewData, setReviewData] = useState({
@@ -96,20 +96,20 @@ const RequestList = () => {
       medium: "warning",
       low: "info",
     };
-    return (
-      <Badge variant={variants[priority] || "secondary"}>{priority}</Badge>
-    );
+    return(
+      <Badge variant={variants[priority] || "secondary"}>{priority}</Badge>)
+     ;
   };
 
   if (loading) {
     return <div className="loading">Loading requests...</div>;
   }
 
-  return (
+  return(
     <div className="request-list">
       <div className="page-header">
         <h1>Vaccine Requests</h1>
-        {isCityLevel && (
+        {isCityLevel &&(
           <div className="filters">
             <Form.Select
               value={filters.status}
@@ -135,8 +135,8 @@ const RequestList = () => {
               <option value="medium">Medium</option>
               <option value="low">Low</option>
             </Form.Select>
-          </div>
-        )}
+          </div>)
+         }
       </div>
 
       <Card>
@@ -156,7 +156,7 @@ const RequestList = () => {
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {requests.map((request) => (
+              {requests.map((request) =>(
                 <Table.Row key={request.id}>
                   <Table.Cell>{request.request_number}</Table.Cell>
                   <Table.Cell>{request.requesting_barangay_name}</Table.Cell>
@@ -178,7 +178,7 @@ const RequestList = () => {
                     >
                       View
                     </Button>
-                    {isCityLevel && request.status === "pending" && (
+                    {isCityLevel && request.status === "pending" &&(
                       <Button
                         variant="primary"
                         size="sm"
@@ -189,18 +189,18 @@ const RequestList = () => {
                         }}
                       >
                         Review
-                      </Button>
-                    )}
+                      </Button>)
+                     }
                   </Table.Cell>
-                </Table.Row>
-              ))}
+                </Table.Row>)
+               )}
             </Table.Body>
           </Table>
-          {requests.length === 0 && (
+          {requests.length === 0 &&(
             <div className="empty-state">
               <p>No requests found</p>
-            </div>
-          )}
+            </div>)
+           }
         </Card.Body>
       </Card>
 
@@ -210,7 +210,7 @@ const RequestList = () => {
           <Modal.Title>Review Request</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {selectedRequest && (
+          {selectedRequest &&(
             <div className="request-details mb-4">
               <p>
                 <strong>Request #:</strong> {selectedRequest.request_number}
@@ -230,8 +230,8 @@ const RequestList = () => {
                 <strong>Priority:</strong>{" "}
                 {getPriorityBadge(selectedRequest.priority)}
               </p>
-            </div>
-          )}
+            </div>)
+           }
           <Form.Group>
             <Form.Label>Status</Form.Label>
             <Form.Select
@@ -246,7 +246,7 @@ const RequestList = () => {
               <option value="rejected">Reject</option>
             </Form.Select>
           </Form.Group>
-          {reviewData.status === "approved" && (
+          {reviewData.status === "approved" &&(
             <Form.Group>
               <Form.Label>Allocated Quantity</Form.Label>
               <Form.Input
@@ -260,8 +260,8 @@ const RequestList = () => {
                 }
                 placeholder="Enter allocated quantity"
               />
-            </Form.Group>
-          )}
+            </Form.Group>)
+           }
           <Form.Group>
             <Form.Label>Notes</Form.Label>
             <Form.Textarea
@@ -282,8 +282,8 @@ const RequestList = () => {
           </Button>
         </Modal.Footer>
       </Modal>
-    </div>
-  );
+    </div>)
+   ;
 };
 
 export default RequestList;

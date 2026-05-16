@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Card, Button, Badge, Modal, Input, Select, Alert } from "../UI";
+import { Card, Button, Badge, Modal, Input                } from "../UI";
 import {
   Syringe,
   Calendar,
@@ -7,11 +7,11 @@ import {
   Thermometer,
   Plus,
   CheckCircle,
-  AlertTriangle,
-  Clock,
-  FileText,
+
+
+  FileText     ,
   Download,
-  Eye,
+  Eye     ,
 } from "lucide-react";
 
 export const VaccinationAdministration = () => {
@@ -43,7 +43,6 @@ export const VaccinationAdministration = () => {
 
   const loadTodaysSchedule = async () => {
     // Mock data for demonstration
-    const today = new Date().toISOString().split("T")[0];
     const mockSchedule = [
       {
         id: 1,
@@ -181,15 +180,15 @@ export const VaccinationAdministration = () => {
   };
 
   const getVaccineIcon = (vaccineName) => {
-    if (vaccineName.includes("Pentavalent")) return "💉";
-    if (vaccineName.includes("OPV")) return "🩹";
-    if (vaccineName.includes("MMR")) return "🛡️";
-    if (vaccineName.includes("BCG")) return "🦠";
-    if (vaccineName.includes("Hepatitis")) return "💉";
-    return "💉";
+    if (vaccineName.includes("Pentavalent")) return "";
+    if (vaccineName.includes("OPV")) return "";
+    if (vaccineName.includes("MMR")) return "";
+    if (vaccineName.includes("BCG")) return "";
+    if (vaccineName.includes("Hepatitis")) return "";
+    return "";
   };
 
-  const TodaySchedule = () => (
+  const TodaySchedule = () =>(
     <Card>
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold">Today's Vaccination Schedule</h3>
@@ -204,7 +203,7 @@ export const VaccinationAdministration = () => {
       </div>
 
       <div className="space-y-4">
-        {todaysSchedule.map((appointment) => (
+        {todaysSchedule.map((appointment) =>(
           <div
             key={appointment.id}
             className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
@@ -247,7 +246,7 @@ export const VaccinationAdministration = () => {
                   Scheduled Vaccines:
                 </h5>
                 <div className="space-y-2">
-                  {appointment.scheduledVaccines.map((vaccine, index) => (
+                  {appointment.scheduledVaccines.map((vaccine, index) =>(
                     <div
                       key={index}
                       className="flex items-center justify-between p-2 bg-gray-50 rounded"
@@ -271,8 +270,8 @@ export const VaccinationAdministration = () => {
                         <Eye className="w-4 h-4 mr-1" />
                         Batch Info
                       </Button>
-                    </div>
-                  ))}
+                    </div>)
+                   )}
                 </div>
               </div>
 
@@ -323,20 +322,20 @@ export const VaccinationAdministration = () => {
                 View Full Record
               </Button>
             </div>
-          </div>
-        ))}
+          </div>)
+         )}
 
-        {todaysSchedule.length === 0 && (
+        {todaysSchedule.length === 0 &&(
           <div className="text-center py-8 text-gray-500">
             <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-400" />
             No vaccination appointments scheduled for today
-          </div>
-        )}
+          </div>)
+         }
       </div>
-    </Card>
-  );
+    </Card>)
+   ;
 
-  const PatientQueue = () => (
+  const PatientQueue = () =>(
     <Card>
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold">Patient Queue</h3>
@@ -369,7 +368,7 @@ export const VaccinationAdministration = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {todaysSchedule.map((appointment) => (
+            {todaysSchedule.map((appointment) =>(
               <tr key={appointment.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
@@ -413,15 +412,15 @@ export const VaccinationAdministration = () => {
                     Details
                   </Button>
                 </td>
-              </tr>
-            ))}
+              </tr>)
+             )}
           </tbody>
         </table>
       </div>
-    </Card>
-  );
+    </Card>)
+   ;
 
-  const MonitoringDashboard = () => (
+  const MonitoringDashboard = () =>(
     <Card>
       <h3 className="text-lg font-semibold mb-4">
         Post-Vaccination Monitoring
@@ -467,7 +466,7 @@ export const VaccinationAdministration = () => {
         <h4 className="font-semibold">Current Monitoring</h4>
         {todaysSchedule
           .filter((app) => app.status === "pending")
-          .map((appointment) => (
+          .map((appointment) =>(
             <div
               key={appointment.id}
               className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
@@ -491,13 +490,13 @@ export const VaccinationAdministration = () => {
                   30 min observation
                 </span>
               </div>
-            </div>
-          ))}
+            </div>)
+           )}
       </div>
-    </Card>
-  );
+    </Card>)
+   ;
 
-  return (
+  return(
     <div className="vaccination-administration space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
@@ -538,7 +537,7 @@ export const VaccinationAdministration = () => {
       <PatientQueue />
 
       {/* Vaccination Administration Modal */}
-      {showAdminModal && selectedPatient && (
+      {showAdminModal && selectedPatient &&(
         <Modal
           title={`Administer Vaccines to ${selectedPatient.name}`}
           onClose={() => setShowAdminModal(false)}
@@ -593,7 +592,7 @@ export const VaccinationAdministration = () => {
               <div className="space-y-4">
                 {todaysSchedule
                   .find((app) => app.patientId === selectedPatient.id)
-                  ?.scheduledVaccines.map((vaccine, index) => (
+                  ?.scheduledVaccines.map((vaccine, index) =>(
                     <div
                       key={index}
                       className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
@@ -624,8 +623,8 @@ export const VaccinationAdministration = () => {
                           Administer
                         </Button>
                       </div>
-                    </div>
-                  ))}
+                    </div>)
+                   )}
               </div>
             </Card>
 
@@ -725,11 +724,11 @@ export const VaccinationAdministration = () => {
               </Button>
             </div>
           </div>
-        </Modal>
-      )}
+        </Modal>)
+       }
 
       {/* Batch Information Modal */}
-      {showBatchModal && batchInfo && (
+      {showBatchModal && batchInfo &&(
         <Modal
           title={`${batchInfo.name} - Batch Information`}
           onClose={() => setShowBatchModal(false)}
@@ -770,7 +769,7 @@ export const VaccinationAdministration = () => {
             <div>
               <h4 className="font-semibold mb-2">Available Batches</h4>
               <div className="space-y-3">
-                {batchInfo.availableBatches.map((batch, index) => (
+                {batchInfo.availableBatches.map((batch, index) =>(
                   <div
                     key={index}
                     className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
@@ -797,13 +796,13 @@ export const VaccinationAdministration = () => {
                     >
                       Select Batch
                     </Button>
-                  </div>
-                ))}
+                  </div>)
+                 )}
               </div>
             </div>
           </div>
-        </Modal>
-      )}
-    </div>
-  );
+        </Modal>)
+       }
+    </div>)
+   ;
 };
