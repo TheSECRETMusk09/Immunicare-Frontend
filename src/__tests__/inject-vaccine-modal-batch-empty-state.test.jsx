@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
 import InjectVaccineModal from "../components/InjectVaccineModal";
@@ -118,6 +118,7 @@ describe("InjectVaccineModal FEFO and brand empty states", () => {
     await waitFor(() => {
       expect(apiClient.getAvailableInventoryLots).toHaveBeenCalledWith({
         vaccine_id: 4,
+        include_history: true,
       });
     });
 
@@ -154,5 +155,159 @@ describe("InjectVaccineModal FEFO and brand empty states", () => {
     expect(
       within(vaccineBrandSelect).getByRole("option", { name: "Brand optional" }),
     ).toBeInTheDocument();
+  });
+
+  test("keeps overdue OPV 20-doses selectable when the dose is past due", async () => {
+    apiClient.getVaccines.mockResolvedValue([
+      {
+        id: 5,
+        name: "OPV 20-doses",
+        code: "OPV",
+        allowed_brands: [],
+      },
+    ]);
+    apiClient.getEligibleVaccines.mockResolvedValue({
+      eligibleVaccines: [],
+      upcomingVaccines: [],
+      notEligibleVaccines: [
+        {
+          vaccineId: 5,
+          vaccineName: "OPV 20-doses",
+          nextDoseNumber: 2,
+          totalDoses: 3,
+          dueDate: "2026-05-11",
+          status: "interval_not_met",
+          reason: "Must wait 23 more days before next dose",
+        },
+      ],
+      completedVaccines: [],
+    });
+
+    render(
+      <InjectVaccineModal
+        isOpen
+        infantId={1}
+        prefillContext={{ infant_id: 1 }}
+        onClose={jest.fn()}
+        onSuccess={jest.fn()}
+      />,
+    );
+
+    const vaccineSelect = await screen.findByDisplayValue("Select Vaccine");
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("option", {
+          name: /overdue: opv 20-doses - dose 2\/3 \(due: 2026-05-11\)/i,
+        }),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.change(vaccineSelect, { target: { value: "5" } });
+
+    await waitFor(() => {
+      expect(vaccineSelect).toHaveValue("5");
+      expect(screen.getByLabelText(/dose number/i)).toHaveValue(2);
+    });
+  });
+
+  test("shows the full approved vaccine list even when eligibility only returns a subset", async () => {
+    apiClient.getVaccines.mockResolvedValue([
+      { id: 1, name: "BCG", code: "BCG", allowed_brands: [] },
+      { id: 2, name: "Hepa B", code: "HEPB", allowed_brands: [] },
+      { id: 3, name: "IPV multi dose", code: "IPV", allowed_brands: [] },
+      { id: 4, name: "MMR", code: "MMR", allowed_brands: [] },
+      { id: 5, name: "OPV 20-doses", code: "OPV", allowed_brands: [] },
+      { id: 6, name: "Penta Valent", code: "PENTA", allowed_brands: [] },
+      { id: 7, name: "PCV 13/PCV 10", code: "PCV", allowed_brands: [] },
+    ]);
+    apiClient.getEligibleVaccines.mockResolvedValue({
+      eligibleVaccines: [
+        {
+          vaccineId: 6,
+          vaccineName: "Penta Valent",
+          nextDoseNumber: 2,
+          totalDoses: 3,
+          status: "ready",
+        },
+      ],
+      upcomingVaccines: [],
+      notEligibleVaccines: [],
+      completedVaccines: [],
+    });
+
+    render(
+      <InjectVaccineModal
+        isOpen
+        infantId={1}
+        prefillContext={{ infant_id: 1 }}
+        onClose={jest.fn()}
+        onSuccess={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: "BCG" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "Hepa B" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: /ready: penta valent - dose 2\/3/i })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "PCV 13/PCV 10" })).toBeInTheDocument();
+    });
+  });
+
+  test("filters administered-by suggestions to the selected role and keeps the list role-scoped after clearing the name", async () => {
+    apiClient.getSystemUsers.mockResolvedValue({
+      data: [
+        {
+          id: 200113,
+          role_name: "physician",
+          username: "admin",
+          clinic_id: 203,
+          facility_id: 203,
+          is_active: true,
+        },
+        {
+          id: 3101,
+          role_name: "nurse",
+          username: "nurse.one",
+          first_name: "Nurse",
+          last_name: "One",
+          clinic_id: 203,
+          facility_id: 203,
+          is_active: true,
+        },
+        {
+          id: 4101,
+          role_name: "midwife",
+          username: "midwife.one",
+          first_name: "Midwife",
+          last_name: "One",
+          clinic_id: 203,
+          facility_id: 203,
+          is_active: true,
+        },
+      ],
+    });
+
+    renderModal();
+
+    const roleSelect = await screen.findByLabelText(/administered by role/i);
+    const nameInput = await screen.findByLabelText(/administered by name/i);
+
+    fireEvent.change(roleSelect, { target: { value: "midwife" } });
+
+    await waitFor(() => {
+      expect(roleSelect).toHaveValue("midwife");
+      expect(nameInput).toHaveValue("");
+    });
+
+    fireEvent.focus(nameInput);
+    fireEvent.change(nameInput, { target: { value: "" } });
+
+    await waitFor(() => {
+      expect(screen.getByText("Midwife One")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("admin")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nurse One")).not.toBeInTheDocument();
   });
 });

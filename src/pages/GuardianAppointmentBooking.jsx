@@ -11,12 +11,13 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import apiClient from "../utils/api";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
 import { Button, Input, Select, Alert } from "../components/UI";
 import DocumentChecklist from "../components/Guardian/DocumentChecklist";
+import { fetchEligibleVaccinesForAppointment } from "../utils/eligibleVaccines";
 import {
   Calendar,
   Clock,
@@ -36,7 +37,6 @@ import { isDateAvailableForBooking, getMinBookingDate } from "../utils/holidays"
 import {
   combineClinicDateTime,
   formatClinicDateLabel,
-  formatClinicTime,
   formatTimeSlotLabel,
   formatInfantDobShort,
 } from "../utils/dateUtils";
@@ -116,14 +116,6 @@ const normalizeDatePrefill = (value) => {
   const month = String(parsed.getMonth() + 1).padStart(2, "0");
   const day = String(parsed.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-};
-
-const resolveSuggestedDateValue = (slot) => {
-  if (!slot || typeof slot !== "object") {
-    return "";
-  }
-
-  return normalizeDatePrefill(slot.date || slot.suggestedDate || "");
 };
 
 const resolvePatientSexLabel = (patient) => {
@@ -230,7 +222,11 @@ export default function GuardianAppointmentBooking() {
   const { guardianId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { appointmentId } = useParams();
   const [searchParams] = useSearchParams();
+  const routeAppointment = location.state?.appointment || null;
+  const routeChild = location.state?.child || null;
+  const isViewingAppointment = Boolean(appointmentId);
   const childId = searchParams.get("childId") || location.state?.childId || "";
   const prefilledDate = normalizeDatePrefill(
     searchParams.get("date") || location.state?.selectedDate || "",
@@ -238,12 +234,14 @@ export default function GuardianAppointmentBooking() {
   const todayDateStr = new Date().toISOString().split('T')[0];
 
   const [children, setChildren] = useState([]);
-  const [selectedChild, setSelectedChild] = useState(null);
+  const [selectedChild, setSelectedChild] = useState(routeChild);
   const [loading, setLoading] = useState(true);
+  const [appointmentLoading, setAppointmentLoading] = useState(isViewingAppointment && !routeAppointment);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
-  const [createdAppointment, setCreatedAppointment] = useState(null);
+  const [success, setSuccess] = useState(Boolean(isViewingAppointment && routeAppointment));
+  const [createdAppointment, setCreatedAppointment] = useState(routeAppointment);
+  const [confirmationVaccines, setConfirmationVaccines] = useState([]);
   const [timeSlotsLoading, setTimeSlotsLoading] = useState(false);
   const [timeSlots, setTimeSlots] = useState([]);
   const [timeSlotsFeedback, setTimeSlotsFeedback] = useState(null);
@@ -273,6 +271,23 @@ export default function GuardianAppointmentBooking() {
   const bookingMonthKey = formData.scheduled_date ? String(formData.scheduled_date).slice(0, 7) : "";
   const clearBookingError = useCallback(() => {
     setError(null);
+  }, []);
+
+  const syncAppointmentIntoForm = useCallback((appointment) => {
+    if (!appointment) {
+      return;
+    }
+
+    setFormData((previous) => ({
+      ...previous,
+      infant_id: appointment?.infant_id ? String(appointment.infant_id) : previous.infant_id,
+      scheduled_date: normalizeDatePrefill(appointment?.scheduled_date) || previous.scheduled_date,
+      scheduled_time:
+        normalizeTimeForSubmit(appointment?.scheduled_time) ||
+        normalizeTimeForSubmit(previous.scheduled_time),
+      type: appointment?.type || previous.type,
+      notes: appointment?.notes || previous.notes,
+    }));
   }, []);
 
   // Fetch children for this guardian
@@ -312,6 +327,64 @@ export default function GuardianAppointmentBooking() {
   }, [fetchChildren]);
 
   useEffect(() => {
+    if (!routeAppointment) {
+      return;
+    }
+
+    syncAppointmentIntoForm(routeAppointment);
+  }, [routeAppointment, syncAppointmentIntoForm]);
+
+  useEffect(() => {
+    if (!appointmentId) {
+      setAppointmentLoading(false);
+      return;
+    }
+
+    if (routeAppointment && String(routeAppointment.id) === String(appointmentId)) {
+      setCreatedAppointment(routeAppointment);
+      setSuccess(true);
+      setAppointmentLoading(false);
+      return;
+    }
+
+    let active = true;
+
+    const loadAppointment = async () => {
+      setAppointmentLoading(true);
+      setError(null);
+
+      try {
+        const appointment = await apiClient.getAppointment(appointmentId);
+        if (!active) {
+          return;
+        }
+
+        setCreatedAppointment(appointment || null);
+        setSuccess(Boolean(appointment));
+        syncAppointmentIntoForm(appointment);
+      } catch (err) {
+        if (!active) {
+          return;
+        }
+
+        setCreatedAppointment(null);
+        setSuccess(false);
+        setError(err?.message || "Failed to load appointment details.");
+      } finally {
+        if (active) {
+          setAppointmentLoading(false);
+        }
+      }
+    };
+
+    loadAppointment();
+
+    return () => {
+      active = false;
+    };
+  }, [appointmentId, routeAppointment, syncAppointmentIntoForm]);
+
+  useEffect(() => {
     const handleInfantRegistered = async () => {
       await fetchChildren();
     };
@@ -330,7 +403,7 @@ export default function GuardianAppointmentBooking() {
   }, [fetchChildren]);
 
   const fetchTimeSlots = useCallback(async () => {
-    if (!guardianId || !formData.scheduled_date || !formData.vaccine_id) {
+    if (isViewingAppointment || !guardianId || !formData.scheduled_date || !formData.vaccine_id) {
       setTimeSlots([]);
       setTimeSlotsFeedback(null);
       return;
@@ -367,11 +440,10 @@ export default function GuardianAppointmentBooking() {
       setTimeSlotsFeedback(result || null);
 
       setFormData((previous) => {
-        if (!previous.scheduled_time) return previous;
         const previousTime = normalizeTimeForSubmit(previous.scheduled_time);
         const normalizedSlots = slots.map((slot) => normalizeTimeForSubmit(slot)).filter(Boolean);
         if (previousTime && normalizedSlots.includes(previousTime)) return previous;
-        return { ...previous, scheduled_time: "" };
+        return { ...previous, scheduled_time: normalizedSlots[0] || "" };
       });
     } catch (slotError) {
       setTimeSlots([]);
@@ -385,6 +457,7 @@ export default function GuardianAppointmentBooking() {
     }
   }, [
     guardianId,
+    isViewingAppointment,
     formData.scheduled_date,
     formData.vaccine_id,
     selectedChild?.clinic_id,
@@ -398,16 +471,16 @@ export default function GuardianAppointmentBooking() {
 
   useEffect(() => {
     setDateCapacity(null);
-    if (!formData.scheduled_date) return;
+    if (isViewingAppointment || !formData.scheduled_date) return;
     apiClient
       .getAppointmentDailyCapacity({ date: formData.scheduled_date })
       .then((result) => setDateCapacity(result || null))
       .catch(() => setDateCapacity(null));
-  }, [formData.scheduled_date]);
+  }, [formData.scheduled_date, isViewingAppointment]);
 
   // Fetch child readiness when a child is selected
   const fetchChildReadiness = useCallback(async (infantId, scheduledDate = null) => {
-    if (!infantId) return;
+    if (isViewingAppointment || !infantId) return;
 
     setReadinessLoading(true);
     try {
@@ -452,11 +525,11 @@ export default function GuardianAppointmentBooking() {
     } finally {
       setReadinessLoading(false);
     }
-  }, []);
+  }, [isViewingAppointment]);
 
   // Fetch suggested appointments based on readiness
   const fetchSuggestedAppointments = useCallback(async (infantId, clinicId = null) => {
-    if (!infantId) return;
+    if (isViewingAppointment || !infantId) return;
 
     try {
       const result = await apiClient.getAppointmentSuggestions({
@@ -469,7 +542,73 @@ export default function GuardianAppointmentBooking() {
       console.error("Error fetching suggestions:", err);
       setSuggestedAppointments([]);
     }
-  }, [guardianId]);
+  }, [guardianId, isViewingAppointment]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!createdAppointment?.infant_id || !createdAppointment?.scheduled_date) {
+      setConfirmationVaccines([]);
+      return undefined;
+    }
+
+    if (Array.isArray(createdAppointment.vaccines_to_administer)) {
+      const normalizedEntries = createdAppointment.vaccines_to_administer.map((entry) => {
+        const doseNumber = Number(entry?.dose_number ?? entry?.doseNumber ?? 1) || 1;
+        const totalDoses = Number(entry?.total_doses ?? entry?.totalDoses ?? 0) || null;
+        const vaccineName = String(entry?.vaccine_name || entry?.vaccineName || "").trim() ||
+          (entry?.vaccine_id ? `Vaccine ${entry.vaccine_id}` : "Vaccine");
+        const doseLabel = entry?.doseLabel ||
+          (totalDoses ? `Dose ${doseNumber}/${totalDoses}` : `Dose ${doseNumber}`);
+        const statusValue = String(entry?.status || "").toLowerCase();
+        const tone = statusValue === "overdue" ? "red" : statusValue === "due" ? "amber" : "green";
+        return {
+          id: `${entry?.vaccine_id ?? entry?.vaccineId ?? vaccineName}-${doseNumber}`,
+          vaccineId: entry?.vaccine_id ?? entry?.vaccineId ?? null,
+          vaccineName,
+          doseNumber,
+          doseLabel,
+          label: entry?.label || `${vaccineName} (${doseLabel})`,
+          dueDate: entry?.due_date ?? entry?.dueDate ?? null,
+          status: entry?.status || "Eligible",
+          tone,
+        };
+      });
+      setConfirmationVaccines(normalizedEntries);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const dateKey = String(createdAppointment.scheduled_date).slice(0, 10);
+    fetchEligibleVaccinesForAppointment(createdAppointment.infant_id, dateKey)
+      .then((entries) => {
+        if (!cancelled) setConfirmationVaccines(entries);
+      })
+      .catch(() => {
+        if (!cancelled) setConfirmationVaccines([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    createdAppointment?.infant_id,
+    createdAppointment?.scheduled_date,
+    createdAppointment?.vaccines_to_administer,
+  ]);
+
+  useEffect(() => {
+    if (!createdAppointment?.infant_id || children.length === 0) {
+      return;
+    }
+
+    const matchingChild = children.find(
+      (child) => Number.parseInt(child.id, 10) === Number.parseInt(createdAppointment.infant_id, 10),
+    );
+
+    if (matchingChild) {
+      setSelectedChild(matchingChild);
+    }
+  }, [children, createdAppointment?.infant_id]);
 
   useEffect(() => {
     if (!selectedChild?.id) {
@@ -707,11 +846,11 @@ export default function GuardianAppointmentBooking() {
       const newAppointment = await apiClient.createAppointment(appointmentData);
       const createdAppointmentPayload = newAppointment?.data || newAppointment;
       setCreatedAppointment(createdAppointmentPayload);
-      setSuccess(true);
 
       trackEvent("appointment_booked", {
         appointmentType: formData.type,
-        hasControlNumber: !!selectedChild?.control_number
+        hasControlNumber: !!selectedChild?.control_number,
+        suggestionCount: suggestedAppointments.length,
       });
 
       // Dispatch synchronization event to update charts and components
@@ -722,6 +861,19 @@ export default function GuardianAppointmentBooking() {
           })
         );
       }
+
+      if (createdAppointmentPayload?.id) {
+        navigate(`/guardian/appointments/${createdAppointmentPayload.id}`, {
+          replace: true,
+          state: {
+            appointment: createdAppointmentPayload,
+            child: selectedChild || null,
+          },
+        });
+        return;
+      }
+
+      setSuccess(true);
 
       // Send SMS confirmation (backend should handle this)
     } catch (err) {
@@ -739,27 +891,12 @@ export default function GuardianAppointmentBooking() {
     }
   };
 
-  // Loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Success state - show confirmation
   if (success && createdAppointment) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 p-4 sm:p-6">
-        <div className="max-w-2xl mx-auto">
-          {/* Success Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden">
-            {/* Success Header */}
-            <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 p-6 text-center">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 p-4 sm:p-6 transition-none transform-none animate-none">
+        <div className="max-w-2xl mx-auto transition-none transform-none animate-none">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden transition-none transform-none animate-none">
+            <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 p-6 text-center transition-none transform-none animate-none">
               <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle className="w-12 h-12 text-white" />
               </div>
@@ -771,7 +908,6 @@ export default function GuardianAppointmentBooking() {
               </p>
             </div>
 
-            {/* Appointment Details */}
             <div className="p-6 space-y-6">
               {(createdAppointment.stock_warning || createdAppointment.stockWarning) && (
                 <Alert variant="warning">
@@ -779,7 +915,6 @@ export default function GuardianAppointmentBooking() {
                 </Alert>
               )}
 
-              {/* Child Info */}
               {selectedChild && (
                 <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4">
                   <div className="flex items-center gap-3 mb-3">
@@ -823,7 +958,6 @@ export default function GuardianAppointmentBooking() {
                 </div>
               )}
 
-              {/* Appointment Date & Time */}
               <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4">
                 <div className="flex items-center gap-3 mb-3">
                   <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -831,20 +965,14 @@ export default function GuardianAppointmentBooking() {
                     Appointment Schedule
                   </h3>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-blue-500" />
-                    <span className="font-semibold text-gray-900 dark:text-white">
-                      {formatClinicDateLabel(createdAppointment.scheduled_date)}
-                    </span>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-blue-500" />
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        {formatClinicDateLabel(createdAppointment.scheduled_date)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-blue-500" />
-                    <span className="font-semibold text-gray-900 dark:text-white">
-                      {formatClinicTime(createdAppointment.scheduled_date)}
-                    </span>
-                  </div>
-                </div>
                 <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800">
                   <span className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium">
                     <Syringe className="w-4 h-4" />
@@ -853,13 +981,58 @@ export default function GuardianAppointmentBooking() {
                 </div>
               </div>
 
-              {/* Document Checklist */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
+                <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-3">
+                  <h3 className="font-bold text-white flex items-center gap-2">
+                    <Syringe className="w-5 h-5" />
+                    Vaccines to be Administered
+                  </h3>
+                </div>
+                <div className="p-5">
+                  {confirmationVaccines.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      No pending vaccines due for this visit.
+                    </p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {confirmationVaccines.map((entry) => (
+                        <li
+                          key={entry.id}
+                          className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                              {entry.vaccineName}
+                            </p>
+                            {entry.doseLabel && (
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {entry.doseLabel}
+                              </p>
+                            )}
+                          </div>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                              entry.tone === "red"
+                                ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                                : entry.tone === "amber"
+                                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                                  : "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                            }`}
+                          >
+                            {entry.status}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
               <DocumentChecklist
                 onFilesChange={setAppointmentDocuments}
                 infantId={formData.infant_id || null}
               />
 
-              {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row gap-3 pt-4">
                 <Button
                   onClick={() => navigate("/guardian/dashboard")}
@@ -879,6 +1052,17 @@ export default function GuardianAppointmentBooking() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if ((loading || appointmentLoading) && !(success && createdAppointment)) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
     );
@@ -1152,6 +1336,7 @@ export default function GuardianAppointmentBooking() {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Appointment Time (8AM - 4PM) <span className="text-red-500">*</span>
                       </label>
+                      <input type="hidden" value={formData.scheduled_time} readOnly />
                       {!timeSlotsLoading && timeSlotsFeedback && !timeSlotsFeedback.available && (
                         <Alert variant="warning" className="mt-2">
                           {timeSlotsFeedback.message}
@@ -1295,7 +1480,7 @@ export default function GuardianAppointmentBooking() {
               )}
 
               {/* Appointment Summary Preview */}
-              {formData.scheduled_date && formData.scheduled_time && (
+              {formData.scheduled_date && (
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
                   <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-5 py-3">
                     <h3 className="font-bold text-white flex items-center gap-2 break-words">
@@ -1312,17 +1497,6 @@ export default function GuardianAppointmentBooking() {
                         </p>
                         <p className="font-medium text-gray-900 dark:text-white">
                           {formatClinicDateLabel(formData.scheduled_date)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Clock className="w-5 h-5 text-blue-500" />
-                      <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          Time
-                        </p>
-                        <p className="font-medium text-gray-900 dark:text-white">
-                          {formatTimeSlotLabel(formData.scheduled_time)}
                         </p>
                       </div>
                     </div>
@@ -1363,59 +1537,6 @@ export default function GuardianAppointmentBooking() {
                     ? blockedBookingMessage
                     : 'This child is not yet eligible for vaccination. Please check the recommended appointment date.'}
               </Alert>
-            )}
-
-            {/* Suggested Appointments */}
-            {suggestedAppointments.length > 0 && selectedChild && (
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 mb-4">
-                <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-emerald-500" />
-                  Recommended Slots
-                </h4>
-                <div className="space-y-2">
-                  {suggestedAppointments.slice(0, 3).map((slot, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        clearBookingError();
-                        const suggestedDate = resolveSuggestedDateValue(slot);
-                        const suggestedTime = normalizeTimeForSubmit(slot.time || slot.suggestedTime || "");
-                        setFormData(prev => ({
-                          ...prev,
-                          vaccine_id: slot.vaccineId ? String(slot.vaccineId) : prev.vaccine_id,
-                          scheduled_date: suggestedDate || prev.scheduled_date,
-                          scheduled_time: suggestedTime || ""
-                        }));
-                      }}
-                      className="w-full text-left p-3 rounded-lg border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
-                    >
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-medium text-emerald-700 dark:text-emerald-400">
-                            {slot.vaccine || "Suggested vaccine"}
-                          </p>
-                          <p className="font-medium text-gray-900 dark:text-white">
-                            {slot.date
-                              ? new Date(slot.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-                              : slot.suggestedDate
-                                ? new Date(slot.suggestedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-                                : 'Available'}
-                          </p>
-                          {slot.reason && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{slot.reason}</p>
-                          )}
-                        </div>
-                        {slot.time && (
-                          <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                            {slot.time}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
             )}
 
             <Button

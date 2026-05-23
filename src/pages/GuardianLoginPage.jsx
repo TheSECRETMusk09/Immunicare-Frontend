@@ -452,12 +452,12 @@ const GuardianLoginPage = () => {
       {/* Main Container - Card with rounded corners */}
       <div className="w-[900px] h-[580px] bg-white rounded-3xl shadow-2xl overflow-hidden flex">
         {/* Left panel - Nurse image only */}
-        <div className="w-1/2 h-full">
+        <div className="hidden w-1/2 h-full">
           <BrandingPanel />
         </div>
 
         {/* Right panel - Login form */}
-        <div className="w-1/2 h-full">
+        <div className="w-full h-full">
           <GuardianLoginForm
             formData={formData}
             errors={errors}

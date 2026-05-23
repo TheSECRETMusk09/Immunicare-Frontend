@@ -512,7 +512,7 @@ function AppContent() {
             <Route path="appointments/book" element={<GuardianAppointmentBooking />} />
             <Route
               path="appointments/:appointmentId"
-              element={<GuardianAppointmentsPage />}
+              element={<GuardianAppointmentBooking />}
             />
             <Route
               path="vaccination-records"

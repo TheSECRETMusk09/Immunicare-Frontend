@@ -23,6 +23,7 @@ const EDITABLE_INFANT_FIELDS = [
   "father_name",
   "birth_weight",
   "birth_height",
+  "birth_head_circumference",
   "place_of_birth",
   "barangay",
   "health_center",
@@ -49,7 +50,11 @@ const sanitizeInfantUpdatePayload = (raw = {}) => {
       // Convert empty strings to null to avoid backend validation errors on dates/times/numbers
       if (value === "") {
         acc[field] = null;
-      } else if (field === "birth_weight" || field === "birth_height") {
+      } else if (
+        field === "birth_weight" ||
+        field === "birth_height" ||
+        field === "birth_head_circumference"
+      ) {
         acc[field] = value !== null ? Number(value) : null;
       } else {
         acc[field] = value;
@@ -178,7 +183,9 @@ export default function InfantPersonalRecord({
       }
 
       setIsEditing(false);
-      if (onUpdate) onUpdate();
+      if (onUpdate) {
+        await Promise.resolve(onUpdate());
+      }
     } catch (err) {
       if (!isMountedRef.current) {
         return;
@@ -456,6 +463,36 @@ export default function InfantPersonalRecord({
                     <p className="text-gray-900 dark:text-gray-100">
                       {infant.birth_height
                         ? `${infant.birth_height} cm`
+                        : "Not specified"}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    HEAD CIRCUMFERENCE AT BIRTH
+                  </label>
+                  {isEditing ? (
+                    <div className="flex items-center space-x-2">
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={formData.birth_head_circumference || ""}
+                        onChange={(e) =>
+                          handleInputChange(
+                            "birth_head_circumference",
+                            e.target.value,
+                          )
+                        }
+                        placeholder="0.0"
+                      />
+                      <span className="text-gray-500">cm</span>
+                    </div>
+                  ) : (
+                    <p className="text-gray-900 dark:text-gray-100">
+                      {infant.birth_head_circumference != null &&
+                      infant.birth_head_circumference !== ""
+                        ? `${infant.birth_head_circumference} cm`
                         : "Not specified"}
                     </p>
                   )}

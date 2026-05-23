@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+﻿import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Card, Button, PageHeader } from "../components/UI";
 import apiClient from "../utils/api";
 import { useAuth } from "../contexts/AuthContext";
 import guardianNotificationService from "../services/guardianNotificationService";
-import { Bell } from "lucide-react";
+import { Bell, CheckCheck, RefreshCw, Moon, Sun } from "lucide-react";
+import { useTheme } from "../contexts/ThemeContext";
 import PortalDatePicker from "../components/UI/PortalDatePicker";
 import {
   CATEGORY_FILTER_OPTIONS,
@@ -68,6 +69,27 @@ const STATUS_META = {
     badgeClass:
       "border-red-200 bg-red-100 text-red-800 dark:border-red-500/40 dark:bg-red-500/20 dark:text-red-200",
   },
+};
+
+const OPEN_MODULE_BUTTON_CLASSNAME = [
+  "inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-semibold",
+  "text-white visited:text-white hover:text-white active:text-white",
+  "dark:text-white dark:visited:text-white dark:hover:text-white dark:active:text-white",
+  "no-underline transition-colors focus:outline-none focus-visible:ring-2",
+  "focus-visible:ring-offset-2 focus-visible:ring-offset-white active:scale-[0.98]",
+  "disabled:pointer-events-none disabled:opacity-50",
+  "border-[var(--color-medical-700)] bg-[var(--color-medical-700)]",
+  "hover:border-[var(--color-medical-800)] hover:bg-[var(--color-medical-800)]",
+  "focus-visible:ring-[var(--color-medical-300)]",
+  "active:border-[var(--color-medical-900)] active:bg-[var(--color-medical-900)]",
+  "dark:border-[var(--color-medical-600)] dark:bg-[var(--color-medical-600)]",
+  "dark:hover:border-[var(--color-medical-500)] dark:hover:bg-[var(--color-medical-500)]",
+  "dark:focus-visible:ring-[var(--color-medical-300)] dark:focus-visible:ring-offset-gray-900",
+  "dark:active:border-[var(--color-medical-700)] dark:active:bg-[var(--color-medical-700)]",
+].join(" ");
+
+const OPEN_MODULE_BUTTON_STYLE = {
+  color: "var(--color-text-inverse)",
 };
 
 const SEVERITY_FILTER_OPTIONS = [
@@ -422,6 +444,7 @@ const Notifications = () => {
   );
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const { isDark, toggleDarkMode } = useTheme();
 
   useEffect(() => {
     setCategoryFilter(
@@ -491,6 +514,18 @@ const Notifications = () => {
       setError("Failed to mark all notifications as read");
     } finally {
       setMarkingAllRead(false);
+    }
+  };
+
+  const handleRetryDelivery = async (notification) => {
+    if (!notification?.persistedId) return;
+    try {
+      if (typeof apiClient.retryNotification === "function") {
+        await apiClient.retryNotification(notification.persistedId);
+      }
+      await fetchNotifications();
+    } catch (err) {
+      console.error("Error retrying notification delivery:", err);
     }
   };
 
@@ -564,6 +599,16 @@ const Notifications = () => {
     [adaptedNotifications],
   );
 
+  const todayCount = useMemo(
+    () => adaptedNotifications.filter((item) => isSameDay(item.timestamp, new Date())).length,
+    [adaptedNotifications],
+  );
+
+  const resolvedCount = useMemo(
+    () => adaptedNotifications.filter((item) => item.isRead).length,
+    [adaptedNotifications],
+  );
+
   const filteredNotifications = useMemo(
     () =>
       adaptedNotifications.filter((item) => {
@@ -616,401 +661,348 @@ const Notifications = () => {
   const hasData = adaptedNotifications.length > 0;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      {/* Page Header - Fixed/Sticky at top */}
-      <div className="flex-shrink-0 sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 pb-4 pt-6 px-6">
-        <PageHeader
-          title="Notifications"
-          subtitle="Automation-focused notification center for appointments, schedules, stock risks, registrations, reports, announcements, and outbound delivery failures"
-          icon={<Bell className="w-8 h-8 text-white" />}
-          actions={
-            <Button
-              variant="secondary"
-              onClick={handleMarkAllRead}
-              loading={markingAllRead}
-              disabled={markingAllRead || !hasData}
-            >
-              Mark All Read
-            </Button>
-          }
-        />
-      </div>
+    <div className={isDark ? "dark" : ""}>
+      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-gray-50 dark:bg-[#0d1424]">
 
-      <div className="flex-1 min-h-0 flex flex-col p-4 sm:px-6 sm:pb-6 pt-3 gap-4 sm:gap-6">
-      {error && (
-        <div className="flex-shrink-0 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-200">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <div className="flex-shrink-0 flex items-center justify-center rounded-xl border border-slate-200 bg-white/85 py-14 dark:border-slate-700 dark:bg-slate-900/70">
-          <svg
-            className="animate-spin h-8 w-8 text-primary-600"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
-        </div>
-      ) : (
-        <div className="flex-1 min-h-0 flex flex-col gap-4 sm:gap-6">
-          <div className="flex-shrink-0 space-y-4 sm:space-y-6">
-            <section className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <button
-              type="button"
-              onClick={() =>
-                setStatusFilter((prev) => (prev === "unread" ? "all" : "unread"))
-              }
-              aria-pressed={statusFilter === "unread"}
-              className={`rounded-xl border p-4 text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
-                statusFilter === "unread"
-                  ? "border-violet-300 bg-violet-50/90 shadow-sm dark:border-violet-400/60 dark:bg-violet-500/15"
-                  : "border-slate-200 bg-white/85 hover:border-violet-200 hover:bg-violet-50/40 dark:border-slate-700 dark:bg-slate-900/70 dark:hover:border-violet-400/30 dark:hover:bg-violet-500/10"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  Unread
+        {/* ── HEADER BANNER ── */}
+        <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 dark:from-[#0d1424] dark:via-[#101c35] dark:to-[#152a4f] px-4 py-4 sm:px-6">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/20 dark:bg-white/10">
+                <Bell className="h-5 w-5 text-white" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold text-white sm:text-2xl">Notifications</h1>
+                <p className="truncate text-xs text-blue-200/80 dark:text-blue-300/60 sm:text-sm">
+                  Appointments · Schedules · Stock risks · Registrations · Reports · Delivery failures
                 </p>
-              </div>
-              <p
-                data-testid="summary-unread-count"
-                className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100"
-              >
-                {unreadCount}
-              </p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Newly generated alerts requiring acknowledgement.
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                setSeverityFilter((prev) =>
-                  prev === "critical" ? "all" : "critical",
-                )
-              }
-              aria-pressed={severityFilter === "critical"}
-              className={`rounded-xl border p-4 text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${
-                severityFilter === "critical"
-                  ? "border-red-300 bg-red-50/90 shadow-sm dark:border-red-400/60 dark:bg-red-500/15"
-                  : "border-slate-200 bg-white/85 hover:border-red-200 hover:bg-red-50/40 dark:border-slate-700 dark:bg-slate-900/70 dark:hover:border-red-400/30 dark:hover:bg-red-500/10"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  Critical
-                </p>
-              </div>
-              <p
-                data-testid="summary-critical-count"
-                className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100"
-              >
-                {criticalCount}
-              </p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Critical events and failed outbound deliveries.
-              </p>
-            </button>
-          </section>
-
-          <Card className="border border-slate-200 bg-white/90 dark:border-slate-700 dark:bg-slate-900/70">
-            <div className="flex flex-col gap-4">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
-                <div>
-                  <label
-                    htmlFor="notifications-category-filter"
-                    className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300"
-                  >
-                    Category
-                  </label>
-                  <select
-                    id="notifications-category-filter"
-                    value={categoryFilter}
-                    onChange={(event) => setCategoryFilter(event.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                  >
-                    {CATEGORY_FILTER_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="notifications-severity-filter"
-                    className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300"
-                  >
-                    Severity
-                  </label>
-                  <select
-                    id="notifications-severity-filter"
-                    value={severityFilter}
-                    onChange={(event) => setSeverityFilter(event.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                  >
-                    {SEVERITY_FILTER_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="notifications-status-filter"
-                    className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300"
-                  >
-                    Status
-                  </label>
-                  <select
-                    id="notifications-status-filter"
-                    value={statusFilter}
-                    onChange={(event) => setStatusFilter(event.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                  >
-                    {STATUS_FILTER_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="notifications-start-date"
-                    className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300"
-                  >
-                    Start Date
-                  </label>
-                  <PortalDatePicker
-                    id="notifications-start-date"
-                    value={startDate}
-                    onChange={(event) => setStartDate(event.target.value)}
-                    fullWidth
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="notifications-end-date"
-                    className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300"
-                  >
-                    End Date
-                  </label>
-                  <PortalDatePicker
-                    id="notifications-end-date"
-                    value={endDate}
-                    onChange={(event) => setEndDate(event.target.value)}
-                    fullWidth
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                <span>
-                  Showing {filteredNotifications.length} of {adaptedNotifications.length} notifications
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCategoryFilter("all");
-                    setSeverityFilter("all");
-                    setStatusFilter("all");
-                    setStartDate("");
-                    setEndDate("");
-                  }}
-                  className="font-semibold text-violet-600 hover:text-violet-700 dark:text-violet-300 dark:hover:text-violet-200"
-                >
-                  Reset filters
-                </button>
               </div>
             </div>
-          </Card>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleDarkMode}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/25 bg-white/10 text-white transition-colors hover:bg-white/20"
+                aria-label="Toggle theme"
+              >
+                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={handleMarkAllRead}
+                disabled={markingAllRead || !hasData}
+                className="flex items-center gap-2 rounded-lg border border-white/30 bg-white/15 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:text-sm"
+              >
+                <CheckCheck className="h-4 w-4" />
+                <span className="hidden sm:inline">{markingAllRead ? "Marking…" : "Mark all read"}</span>
+              </button>
+            </div>
           </div>
+        </div>
 
-          <div className="flex-1 overflow-y-auto modern-scrollbar pr-2 pb-2">
+        {/* ── SCROLLABLE CONTENT ── */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="space-y-4 p-4 sm:space-y-5 sm:p-6">
 
-          {filteredNotifications.length === 0 ? (
-            <Card className="border border-dashed border-slate-300 bg-white/80 p-8 text-center dark:border-slate-600 dark:bg-slate-900/70">
-              <h3 className="mt-3 text-base font-semibold text-slate-900 dark:text-slate-100">
-                No notifications matched the active filters
-              </h3>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Adjust category, severity, or status filters to view other system-generated alerts.
-              </p>
-            </Card>
-          ) : (
-            <div className="space-y-5">
-              {["Today", "This Week", "Earlier"].map((groupLabel) => {
-                const groupItems = groupedNotifications[groupLabel];
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300">
+                {error}
+              </div>
+            )}
 
-                if (!groupItems.length) {
-                  return null;
-                }
+            {/* ── STATS ROW ── */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-2 lg:grid-cols-4">
+              <button
+                type="button"
+                onClick={() => setStatusFilter((p) => (p === "unread" ? "all" : "unread"))}
+                aria-pressed={statusFilter === "unread"}
+                className={`rounded-xl border p-3 text-left transition-all focus:outline-none sm:p-4 ${
+                  statusFilter === "unread"
+                    ? "border-blue-300 bg-blue-50 dark:border-blue-500/50 dark:bg-blue-500/15"
+                    : "border-gray-200 bg-white hover:border-blue-200 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-500/30"
+                }`}
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Unread</p>
+                <p data-testid="summary-unread-count" className="mt-1.5 text-2xl font-bold text-blue-500 dark:text-blue-400 sm:text-3xl">{unreadCount}</p>
+                <p className="mt-1 block text-xs text-gray-400 dark:text-gray-500 sm:hidden md:block">Needs acknowledgement</p>
+              </button>
 
-                return (
-                  <section key={groupLabel} className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-                        {groupLabel}
-                      </h3>
-                      <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:border-slate-600 dark:bg-slate-700/40 dark:text-slate-200">
-                        {groupItems.length}
-                      </span>
+              <button
+                type="button"
+                onClick={() => setSeverityFilter((p) => (p === "critical" ? "all" : "critical"))}
+                aria-pressed={severityFilter === "critical"}
+                className={`rounded-xl border p-3 text-left transition-all focus:outline-none sm:p-4 ${
+                  severityFilter === "critical"
+                    ? "border-red-300 bg-red-50 dark:border-red-500/50 dark:bg-red-500/15"
+                    : "border-gray-200 bg-white hover:border-red-200 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-red-500/30"
+                }`}
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Critical</p>
+                <p data-testid="summary-critical-count" className="mt-1.5 text-2xl font-bold text-red-500 dark:text-red-400 sm:text-3xl">{criticalCount}</p>
+                <p className="mt-1 block text-xs text-gray-400 dark:text-gray-500 sm:hidden md:block">Critical events and failed outbound</p>
+              </button>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900 sm:p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Today Total</p>
+                <p className="mt-1.5 text-2xl font-bold text-gray-900 dark:text-white sm:text-3xl">{todayCount}</p>
+                <p className="mt-1 block text-xs text-gray-400 dark:text-gray-500 sm:hidden md:block">Notifications generated today</p>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900 sm:p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Resolved</p>
+                <p className="mt-1.5 text-2xl font-bold text-green-500 dark:text-green-400 sm:text-3xl">{resolvedCount}</p>
+                <p className="mt-1 block text-xs text-gray-400 dark:text-gray-500 sm:hidden md:block">Marked as read</p>
+              </div>
+            </div>
+
+            {/* ── FILTER BAR ── */}
+            <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <svg className="h-7 w-7 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+                    <div>
+                      <label htmlFor="n-cat" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">Category</label>
+                      <select
+                        id="n-cat"
+                        value={categoryFilter}
+                        onChange={(e) => setCategoryFilter(e.target.value)}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-800 focus:border-blue-400 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                      >
+                        {CATEGORY_FILTER_OPTIONS.filter((o) => !o.label.toLowerCase().includes("announcement")).map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
                     </div>
 
-                    <div className="space-y-3">
-                      {groupItems.map((notification) => {
-                        const severityMeta =
-                          SEVERITY_META[notification.severity] || SEVERITY_META.info;
-                        const statusMeta =
-                          STATUS_META[notification.status] || STATUS_META.new;
-                        const canMarkAsRead =
-                          !notification.isRead &&
-                          notification.persistedId !== null &&
-                          notification.persistedId !== undefined &&
-                          notification.persistedId !== "";
-                        const itemLoading = markingItemIds.includes(
-                          String(notification.persistedId),
-                        );
+                    <div>
+                      <label htmlFor="n-sev" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">Severity</label>
+                      <select
+                        id="n-sev"
+                        value={severityFilter}
+                        onChange={(e) => setSeverityFilter(e.target.value)}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-800 focus:border-blue-400 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                      >
+                        {SEVERITY_FILTER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    </div>
 
-                        return (
-                          <Card
-                            key={notification.id}
-                            className={`border transition-all ${
-                              notification.isRead
-                                ? "border-slate-200 bg-white/85 dark:border-slate-700 dark:bg-slate-900/70"
-                                : "border-violet-200 bg-violet-50/50 shadow-sm dark:border-violet-400/35 dark:bg-violet-500/10"
-                            }`}
-                          >
-                            <div className="flex items-start gap-3">
-                              <div
-                                className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-base ${
-                                  notification.severity === "critical"
-                                    ? "border-red-200 bg-red-50 dark:border-red-500/40 dark:bg-red-500/20"
-                                    : "border-violet-200 bg-violet-50 dark:border-violet-500/40 dark:bg-violet-500/20"
-                                }`}
-                                aria-hidden="true"
-                              >
-                                {notification.icon}
-                              </div>
+                    <div>
+                      <label htmlFor="n-stat" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">Status</label>
+                      <select
+                        id="n-stat"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-800 focus:border-blue-400 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                      >
+                        {STATUS_FILTER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    </div>
 
-                              <div className="min-w-0 flex-1">
-                                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                  <div className="min-w-0">
-                                    <h4 className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100 sm:text-base">
-                                      {notification.title}
-                                    </h4>
-                                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                                      {notification.message}
-                                    </p>
-                                  </div>
-                                  <p className="shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">
-                                    {formatRelativeTimestamp(notification.timestamp)}
-                                  </p>
-                                </div>
+                    <div>
+                      <label htmlFor="n-start" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">Start Date</label>
+                      <PortalDatePicker id="n-start" value={startDate} onChange={(e) => setStartDate(e.target.value)} fullWidth />
+                    </div>
 
-                                <div className="mt-3 flex flex-wrap items-center gap-2">
-                                  <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-700/40 dark:text-slate-200">
-                                    {notification.categoryLabel}
-                                  </span>
-                                  <span
-                                    className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${severityMeta.badgeClass}`}
-                                  >
-                                    {severityMeta.label}
-                                  </span>
-                                  <span
-                                    className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusMeta.badgeClass}`}
-                                  >
-                                    {statusMeta.label}
-                                  </span>
-                                  <span className="text-xs text-slate-500 dark:text-slate-400">
-                                    {formatAbsoluteTimestamp(notification.timestamp)}
-                                  </span>
-                                </div>
+                    <div>
+                      <label htmlFor="n-end" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">End Date</label>
+                      <PortalDatePicker id="n-end" value={endDate} onChange={(e) => setEndDate(e.target.value)} fullWidth />
+                    </div>
 
-                                <div className="mt-3 flex flex-wrap items-center gap-2">
-                                  {canMarkAsRead && (
-                                    <Button
-                                      size="sm"
-                                      variant="secondary"
-                                      onClick={() =>
-                                        handleMarkAsRead(notification.persistedId)
-                                      }
-                                      loading={itemLoading}
-                                      disabled={itemLoading}
-                                      aria-label={`Mark ${notification.title} as read`}
-                                    >
-                                      Mark as Read
-                                    </Button>
+                    <div className="col-span-2 flex items-end justify-end md:col-span-3 lg:col-span-1 lg:justify-center">
+                      <button
+                        type="button"
+                        onClick={() => { setCategoryFilter("all"); setSeverityFilter("all"); setStatusFilter("all"); setStartDate(""); setEndDate(""); }}
+                        className="text-sm font-semibold text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
+                      >
+                        Reset filters
+                      </button>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
+                    Showing {filteredNotifications.length} of {adaptedNotifications.length} notifications
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* ── NOTIFICATION LIST ── */}
+            {!loading && (
+              <>
+                {filteredNotifications.length > 0 && (
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                      {new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" }).format(new Date()).toUpperCase()}
+                    </p>
+                    <span className="text-xs font-bold text-blue-500 dark:text-blue-400">{filteredNotifications.length}</span>
+                  </div>
+                )}
+
+                {filteredNotifications.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-gray-200 bg-white p-10 text-center dark:border-gray-700 dark:bg-gray-900">
+                    <Bell className="mx-auto h-10 w-10 text-gray-300 dark:text-gray-600" />
+                    <h3 className="mt-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      {hasData ? "No notifications matched the active filters" : "Notification feed is currently clear"}
+                    </h3>
+                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                      {hasData
+                        ? "Adjust the category, severity, status, or date filters."
+                        : "System-generated alerts for appointments, inventory, and schedules will appear here."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {["Today", "This Week", "Earlier"].map((groupLabel) => {
+                      const groupItems = groupedNotifications[groupLabel];
+                      if (!groupItems.length) return null;
+
+                      return (
+                        <section key={groupLabel}>
+                          <div className="mb-3 flex items-center justify-between">
+                            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                              {groupLabel === "Today"
+                                ? `Today — ${new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" }).format(new Date()).toUpperCase()}`
+                                : groupLabel}
+                            </h3>
+                            <span className="text-xs font-bold text-blue-500 dark:text-blue-400">{groupItems.length}</span>
+                          </div>
+
+                          <div className="space-y-3">
+                            {groupItems.map((notification) => {
+                              const isCriticalCard = notification.severity === "critical" || notification.status === "failed";
+                              const isUnread = !notification.isRead;
+                              const isInventory = notification.category === "inventory_low_stock" || notification.category === "inventory_out_of_stock";
+                              const severityMeta = SEVERITY_META[notification.severity] || SEVERITY_META.info;
+                              const statusMeta = STATUS_META[notification.status] || STATUS_META.new;
+                              const canMarkAsRead = isUnread && notification.persistedId !== null && notification.persistedId !== undefined && notification.persistedId !== "";
+                              const itemLoading = markingItemIds.includes(String(notification.persistedId));
+
+                              return (
+                                <div
+                                  key={notification.id}
+                                  className="relative flex overflow-hidden rounded-xl border border-gray-200 bg-white transition-all hover:shadow-sm dark:border-gray-700 dark:bg-gray-900"
+                                >
+                                  {/* Left accent bar */}
+                                  <div className={`w-1 shrink-0 ${isCriticalCard ? "bg-red-500" : isUnread ? "bg-blue-600 dark:bg-blue-500" : "bg-transparent"}`} />
+
+                                  {/* Unread dot */}
+                                  {isUnread && (
+                                    <div className={`absolute right-3 top-3 h-2 w-2 rounded-full ${isCriticalCard ? "bg-red-500" : "bg-blue-500"}`} aria-hidden="true" />
                                   )}
 
-                                  {notification.actionUrl &&
-                                    (isExternalNotificationUrl(notification.actionUrl) ? (
-                                      <a
-                                        href={notification.actionUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="inline-flex h-9 items-center rounded-lg border border-violet-200 bg-violet-50 px-3 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-100 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-200 dark:hover:bg-violet-500/20"
-                                      >
-                                        Open Module
-                                      </a>
-                                    ) : (
-                                      <Link
-                                        to={notification.actionUrl}
-                                        className="inline-flex h-9 items-center rounded-lg border border-violet-200 bg-violet-50 px-3 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-100 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-200 dark:hover:bg-violet-500/20"
-                                      >
-                                        Open Module
-                                      </Link>
-                                    ))}
+                                  <div className="flex flex-1 items-start gap-3 p-4 pr-7">
+                                    {/* Category icon square */}
+                                    <div
+                                      className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base sm:h-10 sm:w-10 ${
+                                        isCriticalCard
+                                          ? "bg-red-100 dark:bg-red-500/20"
+                                          : isInventory
+                                          ? "bg-amber-100 dark:bg-amber-500/15"
+                                          : "bg-blue-100 dark:bg-blue-500/15"
+                                      }`}
+                                      aria-hidden="true"
+                                    >
+                                      {notification.icon}
+                                    </div>
+
+                                    <div className="min-w-0 flex-1">
+                                      <h4 className="truncate text-sm font-bold text-gray-900 dark:text-white sm:text-[15px]">
+                                        {notification.title}
+                                      </h4>
+                                      <p className="mt-0.5 text-sm leading-snug text-gray-500 dark:text-gray-400">
+                                        {notification.message}
+                                      </p>
+
+                                      {/* Badges + timestamp */}
+                                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                        <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
+                                          {notification.categoryLabel}
+                                        </span>
+                                        <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${severityMeta.badgeClass}`}>
+                                          {severityMeta.label}
+                                        </span>
+                                        <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${statusMeta.badgeClass}`}>
+                                          {statusMeta.label}
+                                        </span>
+                                        <span className="ml-auto shrink-0 text-[11px] text-gray-400 dark:text-gray-500">
+                                          {formatRelativeTimestamp(notification.timestamp)} · {formatAbsoluteTimestamp(notification.timestamp)}
+                                        </span>
+                                      </div>
+
+                                      {/* Action buttons */}
+                                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                                        {canMarkAsRead && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleMarkAsRead(notification.persistedId)}
+                                            disabled={itemLoading}
+                                            aria-label={`Mark ${notification.title} as read`}
+                                            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                                          >
+                                            {itemLoading ? "Marking…" : "Mark as read"}
+                                          </button>
+                                        )}
+
+                                        {notification.actionUrl && (
+                                          isExternalNotificationUrl(notification.actionUrl) ? (
+                                            <a
+                                              href={notification.actionUrl}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className={OPEN_MODULE_BUTTON_CLASSNAME}
+                                              style={OPEN_MODULE_BUTTON_STYLE}
+                                            >
+                                              → {isInventory ? "View inventory" : "Open module"}
+                                            </a>
+                                          ) : (
+                                            <Link
+                                              to={notification.actionUrl}
+                                              className={OPEN_MODULE_BUTTON_CLASSNAME}
+                                              style={OPEN_MODULE_BUTTON_STYLE}
+                                            >
+                                              → {isInventory ? "View inventory" : "Open module"}
+                                            </Link>
+                                          )
+                                        )}
+
+                                        {isCriticalCard && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRetryDelivery(notification)}
+                                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
+                                          >
+                                            <RefreshCw className="h-3 w-3" />
+                                            Retry delivery
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
-                            </div>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                  </section>
-                );
-              })}
-            </div>
-          )}
+                              );
+                            })}
+                          </div>
+                        </section>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+
           </div>
         </div>
-      )}
 
-      {!hasData && !loading && (
-        <Card className="flex-shrink-0 border border-dashed border-slate-300 bg-white/80 p-8 text-center text-slate-600 dark:border-slate-600 dark:bg-slate-900/70 dark:text-slate-300">
-          <h3 className="mt-3 text-base font-semibold text-slate-900 dark:text-slate-100">
-            Notification feed is currently clear
-          </h3>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            System-generated alerts for appointments, vaccination schedules, inventory, registrations, reports, announcements, and outbound delivery failures will appear here.
-          </p>
-        </Card>
-      )}
       </div>
     </div>
   );
 };
 
 export default Notifications;
+

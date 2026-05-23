@@ -5,7 +5,6 @@ import apiClient from "../utils/api";
 import { guardianRoutePaths } from "../utils/routePaths";
 import GuardianModuleHeader from "../components/GuardianModuleHeader";
 import GuardianTopHeader from "../components/GuardianTopHeader";
-import GuardianVaccinationCompletionModal from "../components/GuardianVaccinationCompletionModal";
 import { Button, Card, Input } from "../components/UI";
 import {
   Search,
@@ -23,7 +22,7 @@ import ImmunizationRecordBooklet from "../components/ImmunizationRecordBooklet";
 import EnhancedGuardianImmunizationChart from "../components/GuardianImmunizationChart";
 import { normalizeVaccinationRecordsResponse, computeVaccinationComplianceSummary } from "../utils/adminDataAdapters";
 import { normalizeArrayPayload } from "../utils/apiUtils";
-import { formatClinicDateTime, formatInfantDob } from "../utils/dateUtils";
+import { formatClinicDateTime, formatClinicDateLabel, formatInfantDob } from "../utils/dateUtils";
 
 const PROVIDER_FALLBACK_LABEL = "Provider unavailable";
 const EMPTY_BOOKLET_VALUE = "\u2014";
@@ -363,8 +362,6 @@ export default function UserVaccinationRecords() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showChildDropdown, setShowChildDropdown] = useState(false);
-  const [vaccinationActionTarget, setVaccinationActionTarget] = useState(null);
-  const [actionFeedback, setActionFeedback] = useState("");
   const [chartSubTab, setChartSubTab] = useState("immunization");
   const [growthRecords, setGrowthRecords] = useState([]);
   const [loadingGrowth, setLoadingGrowth] = useState(false);
@@ -510,7 +507,6 @@ export default function UserVaccinationRecords() {
     if (selectedChild) {
       fetchVaccinationData(selectedChild.id);
       fetchReadiness(selectedChild.id);
-      setActionFeedback("");
     }
   }, [selectedChild, fetchVaccinationData, fetchReadiness]);
 
@@ -555,31 +551,6 @@ export default function UserVaccinationRecords() {
     [normalizedScheduleRecords],
   );
 
-  const resolveActionLabel = (vaccine) => {
-    if (resolveCanonicalStatusKey(vaccine) === "completed") {
-      return "Edit Date";
-    }
-
-    return "Mark Completed";
-  };
-
-  const openVaccinationActionModal = (vaccine) => {
-    setVaccinationActionTarget(vaccine);
-  };
-
-  const handleVaccinationActionSuccess = useCallback(
-    async (message) => {
-      if (!selectedChild?.id) {
-        return;
-      }
-
-      await fetchVaccinationData(selectedChild.id);
-      await fetchReadiness(selectedChild.id);
-      setVaccinationActionTarget(null);
-      setActionFeedback(message);
-    },
-    [fetchReadiness, fetchVaccinationData, selectedChild],
-  );
 
   const calculateAge = (dob) => {
     if (!dob) return "-";
@@ -1186,7 +1157,7 @@ export default function UserVaccinationRecords() {
                     {scheduledAppointment && (
                       <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
                         Scheduled{scheduledAppointment.vaccine_name ? ` for ${scheduledAppointment.vaccine_name}` : ""}:{" "}
-                        {formatClinicDateTime(scheduledAppointment.scheduled_date)}
+                        {formatClinicDateLabel(scheduledAppointment.scheduled_date)}
                       </p>
                     )}
 
@@ -1247,18 +1218,11 @@ export default function UserVaccinationRecords() {
             </div>
           )}
 
-          {actionFeedback ? (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-              {actionFeedback}
-            </div>
-          ) : null}
-
           {pendingConfirmationCount > 0 ? (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-              Your child is old enough for at least one next dose, but this health center has not
-              yet confirmed readiness for on-site administration. If the vaccine was already given
-              elsewhere, use <span className="font-semibold">Mark Completed</span>, enter the
-              administered date, and upload the transfer file or vaccination proof.
+              Your child is old enough for at least one next dose. Please contact this health
+              center to confirm readiness for on-site administration, or visit the health center
+              to have the vaccine recorded.
             </div>
           ) : null}
 
@@ -1484,8 +1448,21 @@ export default function UserVaccinationRecords() {
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
                   {/* Tablet/Desktop table */}
-                  <div className="guardian-table-scroll-shell overflow-x-auto">
-                    <table className="w-full min-w-[980px]">
+                  <div
+                    className="guardian-table-scroll-shell"
+                    style={{ width: "100%", overflow: "hidden" }}
+                  >
+                    <table
+                      className="w-full max-w-full table-fixed"
+                      style={{ tableLayout: "fixed" }}
+                    >
+                      <colgroup>
+                        <col style={{ width: "22%" }} />
+                        <col style={{ width: "18%" }} />
+                        <col style={{ width: "35%" }} />
+                        <col style={{ width: "15%" }} />
+                        <col style={{ width: "10%" }} />
+                      </colgroup>
                       <thead className="bg-gray-50 dark:bg-gray-700">
                         <tr>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -1500,7 +1477,7 @@ export default function UserVaccinationRecords() {
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                             Remarks
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                             Status
                           </th>
                         </tr>
@@ -1511,58 +1488,50 @@ export default function UserVaccinationRecords() {
                             key={row.key}
                             className="hover:bg-gray-50 dark:hover:bg-gray-700 align-top"
                           >
-                            <td className="px-4 py-4">
-                              <div className="min-w-[190px] text-sm font-semibold text-gray-900 dark:text-gray-100">
+                            <td className="px-4 py-4 align-top">
+                              <div className="min-w-0 text-sm font-semibold text-gray-900 dark:text-gray-100 break-words">
                                 {row.vaccineLabel}
                               </div>
                             </td>
-                            <td className="px-4 py-4">
-                              <div className="min-w-[180px] space-y-2">
+                            <td className="px-4 py-4 align-top">
+                              <div className="min-w-0 space-y-2">
                                 {row.slots.map((slot) => (
-                                  <div key={`${row.key}-${slot.key}-dose`} className="flex items-center gap-3">
-                                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">
+                                  <div key={`${row.key}-${slot.key}-dose`} className="flex min-w-0 items-center gap-2">
+                                    <span className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">
                                       {slot.displayDoseNumber}
                                     </span>
-                                    <span className="text-sm text-gray-700 dark:text-gray-200">
+                                    <span className="min-w-0 text-sm text-gray-700 dark:text-gray-200 break-words">
                                       {slot.scheduleLabel}
                                     </span>
                                   </div>
                                 ))}
                               </div>
                             </td>
-                            <td className="px-4 py-4">
-                              <div
-                                className="grid min-w-[320px] gap-2"
-                                style={{
-                                  gridTemplateColumns: `repeat(${row.slots.length}, minmax(140px, 1fr))`,
-                                }}
-                              >
+                            <td className="px-4 py-4 align-top">
+                              <div className="flex w-full gap-1">
                                 {row.slots.map((slot) => (
-                                  <button
+                                  <div
                                     key={`${row.key}-${slot.key}-card`}
-                                    type="button"
-                                    onClick={() => openVaccinationActionModal(slot.actionTarget)}
-                                    title={resolveActionLabel(slot.actionTarget)}
-                                    className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left transition hover:border-emerald-300 hover:bg-emerald-50 dark:border-gray-700 dark:bg-gray-900/40 dark:hover:border-emerald-500/60 dark:hover:bg-emerald-900/10"
+                                    className="min-w-0 flex-1 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 px-2 py-2 text-left dark:border-gray-700 dark:bg-gray-900/40"
                                   >
-                                    <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                    <div className="truncate text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                                       DOSE {slot.displayDoseNumber}
                                     </div>
-                                    <div className="mt-1 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                    <div className="mt-1 truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
                                       {formatNumericDate(slot.adminDate)}
                                     </div>
-                                    <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                                    <div className="mt-1 truncate text-[11px] text-gray-500 dark:text-gray-400">
                                       {slot.scheduleLabel}
                                     </div>
-                                  </button>
+                                  </div>
                                 ))}
                               </div>
                             </td>
-                            <td className="px-4 py-4">
+                            <td className="px-4 py-4 align-top">
                               {row.noteEntries.length > 0 ? (
-                                <div className="min-w-[220px] space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                                <div className="min-w-0 space-y-2 text-sm text-gray-700 dark:text-gray-300">
                                   {row.noteEntries.map((slot) => (
-                                    <div key={`${row.key}-${slot.key}-note`}>
+                                    <div key={`${row.key}-${slot.key}-note`} className="break-words">
                                       <span className="font-semibold text-gray-900 dark:text-gray-100">
                                         Dose {slot.displayDoseNumber}:
                                       </span>{" "}
@@ -1574,18 +1543,18 @@ export default function UserVaccinationRecords() {
                                 <span className="text-sm text-gray-400 dark:text-gray-500">{EMPTY_BOOKLET_VALUE}</span>
                               )}
                             </td>
-                            <td className="px-4 py-4">
-                              <div className="min-w-[180px] space-y-2">
+                            <td className="min-w-[80px] px-4 py-4 align-top">
+                              <div className="min-w-0 space-y-2">
                                 {row.slots.map((slot) => (
                                   <div
                                     key={`${row.key}-${slot.key}-status`}
-                                    className="flex items-center gap-2"
+                                    className="flex min-w-0 flex-col items-center gap-1 text-center"
                                   >
-                                    <span className="min-w-[54px] text-xs font-medium text-gray-500 dark:text-gray-400">
+                                    <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
                                       Dose {slot.displayDoseNumber}
                                     </span>
                                     <span
-                                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${slot.statusDisplay.className}`}
+                                      className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${slot.statusDisplay.className}`}
                                     >
                                       {slot.statusDisplay.label}
                                     </span>
@@ -1623,14 +1592,6 @@ export default function UserVaccinationRecords() {
         </>
       )}
       </main>
-
-      <GuardianVaccinationCompletionModal
-        isOpen={Boolean(vaccinationActionTarget)}
-        onClose={() => setVaccinationActionTarget(null)}
-        child={selectedChild}
-        vaccination={vaccinationActionTarget}
-        onSuccess={handleVaccinationActionSuccess}
-      />
     </div>
   );
 }

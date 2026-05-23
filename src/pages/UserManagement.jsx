@@ -36,6 +36,8 @@ import {
   UserPlus,
   ShieldAlert,
   User,
+  Mail,
+  MapPin,
   Power,
   PowerOff,
   Search,
@@ -45,6 +47,11 @@ import useUserManagementSocket from "../hooks/useUserManagementSocket";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { useDebounce } from "../hooks/usePerformance";
 import { normalizeRoleLabel } from "../utils/roleLabels";
+import {
+  PUROK_OPTIONS,
+  getPurokStreetColorOptions,
+  isValidPurokStreetColorSelection,
+} from "../constants/purokOptions";
 
 const toComparableTimestamp = (value) => {
   if (!value) {
@@ -163,10 +170,14 @@ const resolveUserManagementTab = (value) => {
 
 const USER_FORM_INITIAL_STATE = {
   name: "",
+  firstName: "",
+  lastName: "",
   phone: "",
   email: "",
-  relationship: "",
+  relationship: "parent",
   address: "",
+  purok: "",
+  streetColor: "",
   infant_first_name: "",
   infant_last_name: "",
   infant_dob: "",
@@ -179,9 +190,11 @@ const USER_FORM_INITIAL_STATE = {
   clinic_id: "",
   contact: "",
   password: "",
+  confirmPassword: "",
 };
 
 const GUARDIAN_PHONE_REGEX = /^(\+63|0)\d{10}$/;
+const GUARDIAN_RELATIONSHIP_DEFAULT = "parent";
 
 const toPositiveInteger = (value) => {
   const parsed = Number.parseInt(value, 10);
@@ -361,6 +374,16 @@ export default function UserManagement() {
       })),
     [passwordFormData.password],
   );
+  const guardianCreatePasswordRequirementItems = useMemo(
+    () =>
+      PASSWORD_REQUIREMENT_DEFINITIONS.map((requirement) => ({
+        ...requirement,
+        met: requirement.test(formData.password || ""),
+      })),
+    [formData.password],
+  );
+  const isGuardianRegistrationModal =
+    activeTab === "guardians" && !editingUser;
 
   const closeUserModal = useCallback(() => {
     setShowModal(false);
@@ -373,6 +396,7 @@ export default function UserManagement() {
   // Guardian relationship options
   const relationshipOptions = [
     { value: "", label: "Select relationship" },
+    { value: "parent", label: "Parent" },
     { value: "Mother", label: "Mother" },
     { value: "Father", label: "Father" },
     { value: "Grandmother", label: "Grandmother" },
@@ -381,14 +405,6 @@ export default function UserManagement() {
     { value: "Aunt", label: "Aunt" },
     { value: "Uncle", label: "Uncle" },
     { value: "Other", label: "Other" },
-  ];
-
-  // Sex options for infant
-  const sexOptions = [
-    { value: "", label: "Select sex" },
-    { value: "male", label: "Male" },
-    { value: "female", label: "Female" },
-    { value: "other", label: "Other" },
   ];
 
   const ADMIN_TAB_ROLE_NAMES = useMemo(
@@ -746,6 +762,8 @@ export default function UserManagement() {
     setEditingUser(null);
     setFormData({
       ...USER_FORM_INITIAL_STATE,
+      relationship:
+        userType === "guardians" ? GUARDIAN_RELATIONSHIP_DEFAULT : "",
       clinic_id:
         userType === "guardians" || !currentClinicId
           ? ""
@@ -780,6 +798,7 @@ export default function UserManagement() {
         clinic_id: user.clinic_id ? user.clinic_id.toString() : "",
         contact: user.contact || "",
         password: "",
+        confirmPassword: "",
       });
     } else {
       const guardianRecord = user || {};
@@ -808,6 +827,7 @@ export default function UserManagement() {
         clinic_id: "",
         contact: "",
         password: "",
+        confirmPassword: "",
       });
     }
     setFormErrors({});
@@ -840,29 +860,47 @@ export default function UserManagement() {
     const nextErrors = {};
 
     if (shouldHandleGuardianMutation) {
-      const trimmedName = String(formData.name || "").trim();
-      const compactPhone = String(formData.phone || "").replace(/[\s\-()]/g, "");
+      if (editingUser) {
+        const trimmedName = String(formData.name || "").trim();
+        const compactPhone = String(formData.phone || "").replace(/[\s\-()]/g, "");
 
-      if (!trimmedName) {
-        nextErrors.name = "Name is required";
-      } else if (trimmedName.length < 2) {
-        nextErrors.name = "Must be at least 2 characters";
-      }
+        if (!trimmedName) {
+          nextErrors.name = "Name is required";
+        } else if (trimmedName.length < 2) {
+          nextErrors.name = "Must be at least 2 characters";
+        }
 
-      if (!compactPhone) {
-        nextErrors.phone = "Phone number is required";
-      } else if (!hasOnlyAsciiCharacters(compactPhone)) {
-        nextErrors.phone = "Please enter a valid phone number";
-      } else if (!GUARDIAN_PHONE_REGEX.test(compactPhone)) {
-        nextErrors.phone = "Phone must use 09XXXXXXXXX or +63XXXXXXXXXX format";
-      }
+        if (!compactPhone) {
+          nextErrors.phone = "Phone number is required";
+        } else if (!hasOnlyAsciiCharacters(compactPhone)) {
+          nextErrors.phone = "Please enter a valid phone number";
+        } else if (!GUARDIAN_PHONE_REGEX.test(compactPhone)) {
+          nextErrors.phone = "Phone must use 09XXXXXXXXX or +63XXXXXXXXXX format";
+        }
 
-      if (!formData.relationship) {
-        nextErrors.relationship = "Please select a relationship";
-      }
+        if (!formData.relationship) {
+          nextErrors.relationship = "Please select a relationship";
+        }
 
-      if (!isValidOptionalEmail(formData.email)) {
-        nextErrors.email = "Please enter a valid email address";
+        if (!isValidOptionalEmail(formData.email)) {
+          nextErrors.email = "Please enter a valid email address";
+        }
+      } else {
+        [
+          "firstName",
+          "lastName",
+          "email",
+          "phone",
+          "purok",
+          "streetColor",
+          "password",
+          "confirmPassword",
+        ].forEach((field) => {
+          const fieldError = validateField(field, formData[field]);
+          if (fieldError) {
+            nextErrors[field] = fieldError;
+          }
+        });
       }
     } else if ((activeTab === "system" || activeTab === "admins") && isAdmin) {
       const trimmedUsername = String(formData.username || "").trim();
@@ -908,15 +946,14 @@ export default function UserManagement() {
 
     try {
       if (shouldHandleGuardianMutation) {
-        const guardianData = {
-          name: String(formData.name || "").trim(),
-          phone: String(formData.phone || "").replace(/[\s\-()]/g, ""),
-          email: String(formData.email || "").trim(),
-          address: formData.address,
-          relationship: formData.relationship,
-        };
-
         if (editingUser) {
+          const guardianData = {
+            name: String(formData.name || "").trim(),
+            phone: String(formData.phone || "").replace(/[\s\-()]/g, ""),
+            email: String(formData.email || "").trim(),
+            address: formData.address,
+            relationship: formData.relationship,
+          };
           const result = await userService.updateGuardian(editingUser.id, guardianData, {
             expected_updated_at: toComparableTimestamp(editingUser?.updated_at),
           });
@@ -937,6 +974,24 @@ export default function UserManagement() {
           await invalidateGuardianQueries();
           success("Guardian updated successfully!");
         } else {
+          const guardianData = {
+            firstName: String(formData.firstName || "").trim(),
+            lastName: String(formData.lastName || "").trim(),
+            email: String(formData.email || "").trim().toLowerCase(),
+            phone: String(formData.phone || "").replace(/[\s\-()]/g, ""),
+            password: formData.password,
+            confirmPassword: formData.confirmPassword,
+            purok: formData.purok,
+            streetColor: formData.streetColor,
+            address: [formData.purok, formData.streetColor]
+              .map((fieldValue) => String(fieldValue || "").trim())
+              .filter(Boolean)
+              .join(", "),
+            relationship:
+              String(formData.relationship || GUARDIAN_RELATIONSHIP_DEFAULT)
+                .trim()
+                .toLowerCase(),
+          };
           const result = await userService.createGuardian(guardianData);
           if (!result.success) {
             throw new Error(result.error || "Failed to create guardian");
@@ -968,7 +1023,7 @@ export default function UserManagement() {
               success("Guardian and infant created successfully!");
             }
           } else {
-            success("Guardian created successfully!");
+            success("Guardian account created successfully!");
           }
 
           setGuardianCurrentPage(1);
@@ -1150,10 +1205,17 @@ export default function UserManagement() {
       setFormData((prev) => ({
         ...prev,
         [name]: value,
+        ...(name === "purok" ? { streetColor: "" } : {}),
       }));
       // Clear error when user starts typing
-      if (formErrors[name]) {
-        setFormErrors((prev) => ({ ...prev, [name]: null }));
+      if (formErrors[name] || (name === "purok" && formErrors.streetColor)) {
+        setFormErrors((prev) => {
+          const nextErrors = { ...prev, [name]: null };
+          if (name === "purok") {
+            nextErrors.streetColor = null;
+          }
+          return nextErrors;
+        });
       }
     },
     [formErrors],
@@ -1162,24 +1224,77 @@ export default function UserManagement() {
   // Validate individual field
   const validateField = useCallback((name, value) => {
     if (activeTab === "guardians") {
-      if (name === "name") {
-        if (!value || value.trim() === "") return "Name is required";
-        if (value.trim().length < 2) return "Must be at least 2 characters";
-      }
-      if (name === "phone") {
-        if (!value || value.trim() === "") return "Phone number is required";
-        if (!hasOnlyAsciiCharacters(value))
-          return "Please enter a valid phone number";
-        const compactPhone = value.replace(/[\s\-()]/g, "");
-        if (!GUARDIAN_PHONE_REGEX.test(compactPhone)) {
-          return "Phone must use 09XXXXXXXXX or +63XXXXXXXXXX format";
+      if (editingUser) {
+        if (name === "name") {
+          if (!value || value.trim() === "") return "Name is required";
+          if (value.trim().length < 2) return "Must be at least 2 characters";
         }
-      }
-      if (name === "email" && !isValidOptionalEmail(value)) {
-        return "Please enter a valid email address";
-      }
-      if (name === "relationship") {
-        if (!value) return "Please select a relationship";
+        if (name === "phone") {
+          if (!value || value.trim() === "") return "Phone number is required";
+          if (!hasOnlyAsciiCharacters(value))
+            return "Please enter a valid phone number";
+          const compactPhone = value.replace(/[\s\-()]/g, "");
+          if (!GUARDIAN_PHONE_REGEX.test(compactPhone)) {
+            return "Phone must use 09XXXXXXXXX or +63XXXXXXXXXX format";
+          }
+        }
+        if (name === "email" && !isValidOptionalEmail(value)) {
+          return "Please enter a valid email address";
+        }
+        if (name === "relationship") {
+          if (!value) return "Please select a relationship";
+        }
+      } else {
+        if (name === "firstName") {
+          if (!value || value.trim() === "") return "First name is required";
+          if (value.trim().length < 2) return "Must be at least 2 characters";
+        }
+        if (name === "lastName") {
+          if (!value || value.trim() === "") return "Last name is required";
+          if (value.trim().length < 2) return "Must be at least 2 characters";
+        }
+        if (name === "email") {
+          if (!value || value.trim() === "") return "Email is required";
+          if (!isValidOptionalEmail(value)) {
+            return "Please enter a valid email address";
+          }
+        }
+        if (name === "phone") {
+          if (!value || value.trim() === "") return "Phone number is required";
+          if (!hasOnlyAsciiCharacters(value))
+            return "Please enter a valid phone number";
+          const compactPhone = value.replace(/[\s\-()]/g, "");
+          if (!GUARDIAN_PHONE_REGEX.test(compactPhone)) {
+            return "Phone must use 09XXXXXXXXX or +63XXXXXXXXXX format";
+          }
+        }
+        if (name === "purok" && !value) {
+          return "Purok is required";
+        }
+        if (name === "streetColor") {
+          if (!value) return "Purok-Street-Color is required";
+          if (
+            formData.purok &&
+            !isValidPurokStreetColorSelection(formData.purok, value)
+          ) {
+            return "Selected Purok-Street-Color does not match the selected Purok";
+          }
+        }
+        if (name === "password") {
+          if (!value) return "Password is required";
+          const meetsAllRequirements = PASSWORD_REQUIREMENT_DEFINITIONS.every(
+            (requirement) => requirement.test(value),
+          );
+          if (!meetsAllRequirements) {
+            return "Password must meet all strength requirements";
+          }
+        }
+        if (name === "confirmPassword") {
+          if (!value) return "Please confirm the password";
+          if (value !== formData.password) {
+            return "Passwords do not match";
+          }
+        }
       }
     } else {
       if (name === "username") {
@@ -1197,7 +1312,7 @@ export default function UserManagement() {
       }
     }
     return null;
-  }, [activeTab, editingUser]);
+  }, [activeTab, editingUser, formData.password, formData.purok]);
 
   // Handle blur for real-time validation
   const handleBlur = useCallback((e) => {
@@ -1919,6 +2034,8 @@ export default function UserManagement() {
                   <LoadingSpinner size="sm" />
                   {editingUser ? "Updating..." : "Adding..."}
                 </span>
+              ) : activeTab === "guardians" ? (
+                editingUser ? "Update Guardian" : "Add Guardian"
               ) : editingUser ? (
                 "Update User"
               ) : (
@@ -1931,174 +2048,322 @@ export default function UserManagement() {
         <form id="userForm" onSubmit={handleSubmit} className="admin-form">
           {activeTab === "guardians" ? (
             <>
-              <div className="admin-form-card admin-form-card-info">
-                <div className="admin-form-card-header">
-                  <h3 className="admin-form-card-title">
-                    Guardian Information
-                  </h3>
-                </div>
-                <div className="admin-form-card-body">
-                  <div className="admin-field-group">
-                    <TextInput
-                      label="Full Name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      error={formTouched.name ? formErrors.name : undefined}
-                      required
-                      placeholder="Enter full name"
-                    />
-                  </div>
-                  <div className="admin-form-row-2">
-                    <div className="admin-field-group">
-                      <TextInput
-                        label="Phone Number"
-                        name="phone"
-                        type="tel"
-                        value={formData.phone}
-                        onChange={handleChange}
-                        onBlur={handleBlur}
-                        error={formTouched.phone ? formErrors.phone : undefined}
-                        required
-                        placeholder="Enter phone number"
-                      />
-                    </div>
-                    <div className="admin-field-group">
-                      <TextInput
-                        label="Email Address"
-                        name="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        onBlur={handleBlur}
-                        error={formTouched.email ? formErrors.email : undefined}
-                        placeholder="Enter email address"
-                      />
-                    </div>
-                  </div>
-                  <div className="admin-form-row-2">
-                    <div className="admin-field-group">
-                      <Select
-                        label="Relationship"
-                        name="relationship"
-                        value={formData.relationship}
-                        onChange={handleChange}
-                        onBlur={handleBlur}
-                        error={formTouched.relationship ? formErrors.relationship : undefined}
-                        required
-                        options={relationshipOptions}
-                      />
-                    </div>
-                    <div className="admin-field-group">
-                      <TextInput
-                        label="Address"
-                        name="address"
-                        value={formData.address}
-                        onChange={handleChange}
-                        placeholder="Enter home address"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
+              {isGuardianRegistrationModal ? (
+                <>
+                  <Alert
+                    variant="info"
+                    title="Direct Guardian Account Creation"
+                  >
+                    This uses the guardian registration fields and creates the
+                    account immediately without OTP verification.
+                  </Alert>
 
-              {/* Infant Information Section */}
-              <div className="admin-form-card admin-form-card-success">
-                <div className="admin-form-card-header">
-                  <h3 className="admin-form-card-title">
-                    Infant/Child Information (Optional)
-                  </h3>
-                </div>
-                <p className="text-xs text-green-700 dark:text-green-300 mb-3">
-                  Add the infant/child information connected to this guardian
-                </p>
-                <div className="admin-form-card-body">
-                  <div className="admin-form-row-2">
-                    <div className="admin-field-group">
-                      <TextInput
-                        label="First Name"
-                        name="infant_first_name"
-                        value={formData.infant_first_name}
-                        onChange={handleChange}
-                        placeholder="Enter infant first name"
-                      />
+                  <div className="admin-form-card admin-form-card-info">
+                    <div className="admin-form-card-header">
+                      <h3 className="admin-form-card-title">
+                        <User className="w-4 h-4" />
+                        Personal Information
+                      </h3>
                     </div>
-                    <div className="admin-field-group">
-                      <TextInput
-                        label="Last Name"
-                        name="infant_last_name"
-                        value={formData.infant_last_name}
-                        onChange={handleChange}
-                        placeholder="Enter infant last name"
-                      />
-                    </div>
-                  </div>
-                  <div className="admin-form-row-2">
-                    <div className="admin-field-group">
-                      <TextInput
-                        label="Date of Birth"
-                        name="infant_dob"
-                        type="date"
-                        value={formData.infant_dob}
-                        onChange={handleChange}
-                        placeholder="Select date of birth"
-                      />
-                    </div>
-                    <div className="admin-field-group">
-                      <Select
-                        label="Sex"
-                        name="infant_sex"
-                        value={formData.infant_sex}
-                        onChange={handleChange}
-                        options={sexOptions}
-                      />
+                    <div className="admin-form-card-body">
+                      <div className="admin-form-row-2">
+                        <div className="admin-field-group">
+                          <TextInput
+                            label="First Name"
+                            name="firstName"
+                            value={formData.firstName}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            error={
+                              formTouched.firstName
+                                ? formErrors.firstName
+                                : undefined
+                            }
+                            required
+                            placeholder="Enter first name"
+                          />
+                        </div>
+                        <div className="admin-field-group">
+                          <TextInput
+                            label="Last Name"
+                            name="lastName"
+                            value={formData.lastName}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            error={
+                              formTouched.lastName
+                                ? formErrors.lastName
+                                : undefined
+                            }
+                            required
+                            placeholder="Enter last name"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div className="admin-form-row-2">
-                    <div className="admin-field-group">
-                      <TextInput
-                        label="National ID"
-                        name="infant_national_id"
-                        value={formData.infant_national_id}
-                        onChange={handleChange}
-                        placeholder="Enter national ID"
-                      />
-                    </div>
-                    <div className="admin-field-group">
-                      <TextInput
-                        label="Contact Number"
-                        name="infant_contact"
-                        type="tel"
-                        value={formData.infant_contact}
-                        onChange={handleChange}
-                        placeholder="Enter contact number"
-                      />
-                    </div>
-                  </div>
-                  <div className="admin-field-group">
-                    <TextInput
-                      label="Address"
-                      name="infant_address"
-                      value={formData.infant_address}
-                      onChange={handleChange}
-                      placeholder="Enter infant address (same as guardian if empty)"
-                    />
-                  </div>
-                </div>
-              </div>
 
-              {editingUser && (
-                <Alert
-                  variant="info"
-                  title="Password Configuration"
-                  className="mt-3"
-                >
-                  <p className="text-sm">
-                    To reset this guardian's password, use the "Reset Password"
-                    button in the user list, or set a new password below.
-                  </p>
-                </Alert>
+                  <div className="admin-form-card">
+                    <div className="admin-form-card-header">
+                      <h3 className="admin-form-card-title">
+                        <Mail className="w-4 h-4" />
+                        Contact Information
+                      </h3>
+                    </div>
+                    <div className="admin-form-card-body">
+                      <div className="admin-form-row-2">
+                        <div className="admin-field-group">
+                          <TextInput
+                            label="Email Address"
+                            name="email"
+                            type="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            error={
+                              formTouched.email ? formErrors.email : undefined
+                            }
+                            required
+                            placeholder="Enter email address"
+                          />
+                        </div>
+                        <div className="admin-field-group">
+                          <TextInput
+                            label="Phone Number"
+                            name="phone"
+                            type="tel"
+                            value={formData.phone}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            error={
+                              formTouched.phone ? formErrors.phone : undefined
+                            }
+                            required
+                            placeholder="Enter phone number"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="admin-form-card">
+                    <div className="admin-form-card-header">
+                      <h3 className="admin-form-card-title">
+                        <MapPin className="w-4 h-4" />
+                        Address Information
+                      </h3>
+                    </div>
+                    <div className="admin-form-card-body">
+                      <div className="admin-form-row-2">
+                        <div className="admin-field-group">
+                          <Select
+                            label="Purok"
+                            name="purok"
+                            value={formData.purok}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            error={
+                              formTouched.purok ? formErrors.purok : undefined
+                            }
+                            required
+                            options={PUROK_OPTIONS}
+                          />
+                        </div>
+                        <div className="admin-field-group">
+                          <Select
+                            label="Purok-Street-Color"
+                            name="streetColor"
+                            value={formData.streetColor}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            disabled={!formData.purok}
+                            error={
+                              formTouched.streetColor
+                                ? formErrors.streetColor
+                                : undefined
+                            }
+                            required
+                            options={getPurokStreetColorOptions(formData.purok)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="admin-form-card">
+                    <div className="admin-form-card-header">
+                      <h3 className="admin-form-card-title">
+                        <Key className="w-4 h-4" />
+                        Security
+                      </h3>
+                    </div>
+                    <div className="admin-form-card-body">
+                      <div className="admin-form-row-2">
+                        <div className="admin-field-group">
+                          <PasswordInput
+                            label="Password"
+                            name="password"
+                            value={formData.password}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            error={
+                              formTouched.password
+                                ? formErrors.password
+                                : undefined
+                            }
+                            showPasswordAriaLabel="Show guardian password"
+                            hidePasswordAriaLabel="Hide guardian password"
+                            required
+                            placeholder="Create a password"
+                            autoComplete="new-password"
+                            theme="admin"
+                            showStrengthIndicator
+                          />
+                        </div>
+                        <div className="admin-field-group">
+                          <PasswordInput
+                            label="Confirm Password"
+                            name="confirmPassword"
+                            value={formData.confirmPassword}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            error={
+                              formTouched.confirmPassword
+                                ? formErrors.confirmPassword
+                                : undefined
+                            }
+                            showPasswordAriaLabel="Show guardian confirm password"
+                            hidePasswordAriaLabel="Hide guardian confirm password"
+                            required
+                            placeholder="Confirm the password"
+                            autoComplete="new-password"
+                            theme="admin"
+                          />
+                        </div>
+                      </div>
+                      <div className="user-password-reset-requirements mt-4">
+                        <p className="user-password-reset-requirements-title">
+                          Password Requirements
+                        </p>
+                        <ul className="user-password-reset-requirements-list">
+                          {guardianCreatePasswordRequirementItems.map(
+                            (requirement) => (
+                              <li
+                                key={requirement.id}
+                                className="user-password-reset-requirement-item"
+                                data-met={requirement.met ? "true" : "false"}
+                              >
+                                <span
+                                  aria-hidden="true"
+                                  className="user-password-reset-requirement-bullet"
+                                  data-met={requirement.met ? "true" : "false"}
+                                >
+                                  {requirement.met ? (
+                                    <span className="user-password-reset-requirement-bullet-dot" />
+                                  ) : null}
+                                </span>
+                                <span className="user-password-reset-requirement-label">
+                                  {requirement.label}
+                                </span>
+                              </li>
+                            ),
+                          )}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="admin-form-card admin-form-card-info">
+                    <div className="admin-form-card-header">
+                      <h3 className="admin-form-card-title">
+                        Guardian Information
+                      </h3>
+                    </div>
+                    <div className="admin-form-card-body">
+                      <div className="admin-field-group">
+                        <TextInput
+                          label="Full Name"
+                          name="name"
+                          value={formData.name}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          error={formTouched.name ? formErrors.name : undefined}
+                          required
+                          placeholder="Enter full name"
+                        />
+                      </div>
+                      <div className="admin-form-row-2">
+                        <div className="admin-field-group">
+                          <TextInput
+                            label="Phone Number"
+                            name="phone"
+                            type="tel"
+                            value={formData.phone}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            error={formTouched.phone ? formErrors.phone : undefined}
+                            required
+                            placeholder="Enter phone number"
+                          />
+                        </div>
+                        <div className="admin-field-group">
+                          <TextInput
+                            label="Email Address"
+                            name="email"
+                            type="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            error={formTouched.email ? formErrors.email : undefined}
+                            placeholder="Enter email address"
+                          />
+                        </div>
+                      </div>
+                      <div className="admin-form-row-2">
+                        <div className="admin-field-group">
+                          <Select
+                            label="Relationship"
+                            name="relationship"
+                            value={formData.relationship}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            error={
+                              formTouched.relationship
+                                ? formErrors.relationship
+                                : undefined
+                            }
+                            required
+                            options={relationshipOptions}
+                          />
+                        </div>
+                        <div className="admin-field-group">
+                          <TextInput
+                            label="Address"
+                            name="address"
+                            value={formData.address}
+                            onChange={handleChange}
+                            placeholder="Enter home address"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {editingUser && (
+                    <Alert
+                      variant="info"
+                      title="Password Configuration"
+                      className="mt-3"
+                    >
+                      <p className="text-sm">
+                        To reset this guardian's password, use the "Reset Password"
+                        button in the user list, or set a new password below.
+                      </p>
+                    </Alert>
+                  )}
+                </>
               )}
             </>
           ) : isAdmin ? (

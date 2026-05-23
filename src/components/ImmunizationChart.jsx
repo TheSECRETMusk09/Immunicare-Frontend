@@ -3737,6 +3737,72 @@ export default function ImmunizationChart({ infantId }) {
             onSave={handleVisitSave}
             healthWorkers={healthWorkers}
             disabled={saving}
+            fefoLookup={async (vaccineName) => {
+              try {
+                const allVaccines = toArrayPayload(
+                  await apiClient.getVaccines(),
+                  ["vaccines"],
+                );
+                const vaccine = allVaccines.find(
+                  (entry) =>
+                    String(entry?.name || "").trim().toLowerCase() ===
+                    String(vaccineName || "").trim().toLowerCase(),
+                );
+                if (!vaccine?.id) return null;
+
+                const inventoryRecords = normalizeVaccineInventoryResponse(
+                  await apiClient.getVaccineInventory(
+                    scopedClinicId ? { clinic_id: scopedClinicId } : {},
+                  ),
+                );
+                const availableLots = toArrayPayload(
+                  await apiClient.getAvailableInventoryLots({
+                    vaccine_id: vaccine.id,
+                  }),
+                  ["inventory", "lots", "batches"],
+                );
+                const fefoBatchOptions = buildFefoBatchOptions({
+                  batches: availableLots,
+                  inventoryRecords,
+                  vaccineId: vaccine.id,
+                  clinicId: scopedClinicId,
+                });
+                const recommended =
+                  fefoBatchOptions.find(
+                    (option) =>
+                      option.is_fefo_recommended && !option.selection_disabled,
+                  ) ||
+                  fefoBatchOptions.find(
+                    (option) => !option.selection_disabled,
+                  ) ||
+                  null;
+                if (!recommended) return null;
+
+                const lotBatchValue = resolveLotBatchValue(
+                  recommended.lot_batch_number,
+                  recommended.matched_inventory_record?.lot_batch_number,
+                  recommended.lot_number,
+                  recommended.batch_number,
+                );
+                const expiryRaw =
+                  recommended.expiry_date ||
+                  recommended.expiration_date ||
+                  recommended.matched_inventory_record?.expiry_date ||
+                  recommended.matched_inventory_record?.expiration_date ||
+                  "";
+                const expiryDate = expiryRaw
+                  ? String(expiryRaw).split("T")[0]
+                  : "";
+
+                return {
+                  lot_number: lotBatchValue || "",
+                  expiry_date: expiryDate,
+                };
+              } catch (err) {
+                console.error("FEFO lookup failed:", err);
+                return null;
+              }
+            }}
           />
         )}
       </Modal>

@@ -204,6 +204,7 @@ const documentService = {
     if (!date) return "";
     const d = new Date(date);
     return d.toLocaleDateString("en-US", {
+      timeZone: "Asia/Manila",
       year: "numeric",
       month: "short",
       day: "numeric",

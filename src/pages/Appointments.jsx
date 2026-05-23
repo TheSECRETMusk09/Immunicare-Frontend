@@ -52,6 +52,11 @@ import {
   getVaccinationPeriodRange,
   normalizeVaccinationPeriod,
 } from "../utils/vaccinationPeriods";
+import {
+  MAX_DAILY_VACCINATION_SLOTS,
+  getCalendarCellSlotsRemaining,
+} from "../utils/appointmentCalendarSlots";
+import { fetchEligibleVaccinesForAppointment } from "../utils/eligibleVaccines";
 
 // Control number display formatter - consistent with InfantManagement and InfantPersonalRecord
 const formatControlNumberDisplay = (controlNumber, dateValue) => {
@@ -85,20 +90,6 @@ const mergeInfantLookupResults = (...collections) => {
 
 const DEFAULT_APPOINTMENTS_ITEMS_PER_PAGE = 20;
 const APPOINTMENT_ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
-const MAX_DAILY_VACCINATION_SLOTS = 400;
-
-export const getCalendarCellSlotsRemaining = ({
-  dateKey,
-  bookedAppointmentsByDate = {},
-  availability = null,
-  dailyVaccinationSlotLimit = MAX_DAILY_VACCINATION_SLOTS,
-}) =>
-  Math.max(
-    0,
-    dailyVaccinationSlotLimit -
-      (bookedAppointmentsByDate[dateKey] ?? availability?.totalAppointments ?? 0),
-  );
-
 function AppointmentsPaginationFooter({
   totalItems,
   visibleStart,
@@ -791,6 +782,9 @@ export default function Appointments() {
     type: "",
     notes: "",
   });
+  const [editDateCapacity, setEditDateCapacity] = useState(null);
+  const [bookingDateCapacity, setBookingDateCapacity] = useState(null);
+  const [viewEligibleVaccines, setViewEligibleVaccines] = useState([]);
 
   const resolveDateAvailability = useCallback(
     (dateValue, { allowPast = true } = {}) => {
@@ -854,6 +848,13 @@ export default function Appointments() {
       const slots = Array.isArray(result?.slots) ? result.slots : [];
       setTimeSlots(slots);
       setTimeSlotsFeedback(result || null);
+      // For booking modal: auto-pick the first available slot so submission works without user time selection
+      if (showBookingModal) {
+        setCreateFormData((prev) => ({
+          ...prev,
+          scheduled_time: prev.scheduled_time || (slots.length > 0 ? slots[0] : '08:00'),
+        }));
+      }
     } catch (slotError) {
       if (slotError.name === 'CanceledError' || slotError.code === 'ERR_CANCELED') return;
       setTimeSlots([]);
@@ -1033,6 +1034,43 @@ export default function Appointments() {
     }
     return () => abortController.abort();
   }, [showEditModal, editFormData.scheduled_date, editFormData.id, fetchTimeSlots]);
+
+  useEffect(() => {
+    setEditDateCapacity(null);
+    if (!showEditModal || !editFormData.scheduled_date) return;
+    apiClient
+      .getAppointmentDailyCapacity({ date: editFormData.scheduled_date })
+      .then((result) => setEditDateCapacity(result || null))
+      .catch(() => setEditDateCapacity(null));
+  }, [showEditModal, editFormData.scheduled_date]);
+
+  useEffect(() => {
+    setBookingDateCapacity(null);
+    if (!showBookingModal || !createFormData.scheduled_date) return;
+    apiClient
+      .getAppointmentDailyCapacity({ date: createFormData.scheduled_date })
+      .then((result) => setBookingDateCapacity(result || null))
+      .catch(() => setBookingDateCapacity(null));
+  }, [showBookingModal, createFormData.scheduled_date]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!showViewModal || !selectedAppointment?.infant_id || !selectedAppointment?.scheduled_date) {
+      setViewEligibleVaccines([]);
+      return undefined;
+    }
+    const dateKey = String(selectedAppointment.scheduled_date).slice(0, 10);
+    fetchEligibleVaccinesForAppointment(selectedAppointment.infant_id, dateKey)
+      .then((entries) => {
+        if (!cancelled) setViewEligibleVaccines(entries);
+      })
+      .catch(() => {
+        if (!cancelled) setViewEligibleVaccines([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showViewModal, selectedAppointment?.infant_id, selectedAppointment?.scheduled_date]);
 
   const getSelectedInfantControlNumber = useCallback(
     (infantId) => {
@@ -1327,7 +1365,7 @@ export default function Appointments() {
     },
     {
       key: "scheduled_date",
-      label: "Date & Time",
+      label: "Date",
       type: "datetime",
     },
     {
@@ -1564,13 +1602,6 @@ export default function Appointments() {
       newErrors.scheduled_date = dateRequired;
     }
 
-    const timeRequired = validateRequired(
-      createFormData.scheduled_time,
-      "Please select a time",
-    );
-    if (timeRequired) {
-      newErrors.scheduled_time = timeRequired;
-    }
     const normalizedType = sanitizeText(createFormData.type, { maxLength: 100 });
     const typeLengthError = validateLength(normalizedType, {
       min: 0,
@@ -1604,14 +1635,24 @@ export default function Appointments() {
       return;
     }
 
-    if (timeSlots.length > 0 && !timeSlots.includes(createFormData.scheduled_time)) {
-      setCreateFormError("Selected time is no longer available. Please choose another slot.");
+    const autoSelectedTime =
+      createFormData.scheduled_time ||
+      (timeSlots.length > 0 ? timeSlots[0] : '08:00');
+    if (timeSlots.length > 0 && !timeSlots.includes(autoSelectedTime)) {
+      setCreateFormError("No available time slots remaining for the selected date.");
       return;
     }
 
     const selectedDateDetails = bookingDateDetails;
-    if (selectedDateDetails?.availability && !selectedDateDetails.availability.available) {
-      setCreateFormError(selectedDateDetails.availability.reason);
+    const resolvedAvailability = selectedDateDetails?.availability || null;
+    const resolvedIsDateAvailable =
+      typeof resolvedAvailability?.available === 'boolean'
+        ? resolvedAvailability.available
+        : typeof resolvedAvailability?.isAvailable === 'boolean'
+          ? resolvedAvailability.isAvailable
+          : null;
+    if (resolvedIsDateAvailable === false) {
+      setCreateFormError(resolvedAvailability?.reason || 'Selected date is unavailable.');
       return;
     }
 
@@ -1640,8 +1681,8 @@ export default function Appointments() {
       return;
     }
 
-    if (timeSlots.length > 0 && !timeSlots.includes(createFormData.scheduled_time)) {
-      setError("Selected time is no longer available. Please choose another slot.");
+    if (timeSlots.length > 0 && !timeSlots.includes(autoSelectedTime)) {
+      setError("No available time slots remaining for the selected date.");
       return;
     }
 
@@ -1650,10 +1691,13 @@ export default function Appointments() {
       setError(null);
       setCreateFormError("");
 
-      // Combine date and time
+      // Combine date and time; fall back to first available slot or 08:00 since time is auto-selected
+      const resolvedTime =
+        createFormData.scheduled_time ||
+        (timeSlots.length > 0 ? timeSlots[0] : '08:00');
       const scheduledDateTime = combineClinicDateTime(
         createFormData.scheduled_date,
-        createFormData.scheduled_time,
+        resolvedTime,
       );
 
       const appointmentData = {
@@ -1703,9 +1747,6 @@ export default function Appointments() {
     const nextErrors = {};
     if (!editFormData.scheduled_date) {
       nextErrors.scheduled_date = "Please select a date.";
-    }
-    if (!editFormData.scheduled_time) {
-      nextErrors.scheduled_time = "Please select a time.";
     }
     const normalizedEditType = sanitizeText(editFormData.type, { maxLength: 100 });
     const editTypeLengthError = validateLength(normalizedEditType, {
@@ -2710,7 +2751,7 @@ export default function Appointments() {
                     </Badge>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    {formatClinicTime(appointment.scheduled_date)} - {appointment.type || "General Checkup"}
+                    {appointment.type || "General Checkup"}
                   </p>
                 </div>)
                )))
@@ -2773,9 +2814,8 @@ export default function Appointments() {
                 isSubmitting ||
                 !createFormData.infant_id ||
                 !createFormData.scheduled_date ||
-                !createFormData.scheduled_time ||
-                timeSlotsLoading ||
-                bookingAvailabilityStatus === "unavailable"
+                bookingAvailabilityStatus === "unavailable" ||
+                bookingDateCapacity?.remaining === 0
               }
             >
               {isSubmitting ? "Scheduling..." : "Schedule Appointment"}
@@ -2865,6 +2905,7 @@ export default function Appointments() {
                   setCreateFormData({
                     ...createFormData,
                     scheduled_date: e.target.value,
+                    scheduled_time: "",
                   });
                   setFormErrors((prev) =>( {
                     ...prev,
@@ -2881,37 +2922,55 @@ export default function Appointments() {
               </p>
             </div>
             <div className="admin-field-group">
-              <label className="admin-field-label required">
-                Appointment Time (8AM - 4PM)
+              <label className="admin-field-label">
+                Vaccination Slots for Selected Date
               </label>
-              <Select
-                value={createFormData.scheduled_time}
-                onChange={(e) => {
-                  setCreateFormData({
-                    ...createFormData,
-                    scheduled_time: e.target.value,
-                  });
-                  setFormErrors((prev) =>( {
-                    ...prev,
-                    scheduled_time: undefined,
-                  }));
-                }}
-                error={formErrors.scheduled_time}
-                disabled={isSubmitting || timeSlotsLoading ||( timeSlotsFeedback && !timeSlotsFeedback.available)}
-                aria-required="true"
-              >
-                <option value="">
-                  {timeSlotsLoading ? "Loading time slots..." : "Select time"}
-                </option>
-                {timeSlots.map((slot) =>(
-                  <option key={slot} value={slot}>
-                    {formatTimeSlotLabel(slot)}
-                  </option>)
-                 )}
-              </Select>
-              {timeSlotsFeedback && !timeSlotsFeedback.available && !timeSlotsLoading &&(
-                <p className="text-xs text-red-500 mt-1">{timeSlotsFeedback.message}</p>)
-               }
+              {createFormData.scheduled_date ? (
+                bookingDateCapacity ? (
+                  <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 px-3 py-2.5">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                        Daily Slots
+                      </span>
+                      <span className={`text-[11px] font-bold ${
+                        bookingDateCapacity.remaining === 0
+                          ? 'text-red-600 dark:text-red-400'
+                          : bookingDateCapacity.remaining <= 50
+                            ? 'text-amber-600 dark:text-amber-400'
+                            : 'text-green-600 dark:text-green-400'
+                      }`}>
+                        {bookingDateCapacity.remaining === 0 ? 'Fully Booked' : `${bookingDateCapacity.remaining} available`}
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                      <div
+                        className="h-1.5 rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.min(100, (bookingDateCapacity.current / bookingDateCapacity.maximum) * 100)}%`,
+                          backgroundColor:
+                            bookingDateCapacity.remaining === 0
+                              ? '#ef4444'
+                              : bookingDateCapacity.remaining <= 50
+                                ? '#f59e0b'
+                                : '#22c55e',
+                        }}
+                      />
+                    </div>
+                    <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                      {bookingDateCapacity.current} booked · {bookingDateCapacity.maximum} daily limit
+                    </p>
+                    {bookingDateCapacity.remaining === 0 && (
+                      <p className="mt-1 text-[11px] text-red-600 dark:text-red-400 font-medium">
+                        Daily limit reached. Please select a different date.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Loading slot availability...</p>
+                )
+              ) : (
+                <p className="text-xs text-gray-400 dark:text-gray-500">Select an appointment date to view available slots.</p>
+              )}
             </div>
           </div>
 
@@ -3035,11 +3094,11 @@ export default function Appointments() {
               </div>
               <div>
                 <label className="text-sm text-gray-500 dark:text-gray-400">
-                  Date & Time
+                  Date
                 </label>
                 <p className="font-medium text-gray-900 dark:text-gray-100">
                   {selectedAppointment.scheduled_date
-                    ? formatClinicDateTime(selectedAppointment.scheduled_date)
+                    ? formatClinicDateLabel(selectedAppointment.scheduled_date)
                     : "N/A"}
                 </p>
               </div>
@@ -3063,6 +3122,49 @@ export default function Appointments() {
                 >
                   {getAppointmentDisplayStatus(selectedAppointment)}
                 </Badge>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2">
+                <h4 className="font-bold text-white text-sm">Vaccines to Administer</h4>
+              </div>
+              <div className="p-4">
+                {viewEligibleVaccines.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    No pending vaccines due for this appointment date.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {viewEligibleVaccines.map((entry) => (
+                      <li
+                        key={entry.id}
+                        className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                            {entry.vaccineName}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {entry.doseLabel}
+                            {entry.dueDate ? ` · Due ${formatClinicDateLabel(entry.dueDate)}` : ""}
+                          </p>
+                        </div>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                            entry.tone === "red"
+                              ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                              : entry.tone === "amber"
+                                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                                : "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                          }`}
+                        >
+                          {entry.status}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
 
@@ -3171,37 +3273,48 @@ export default function Appointments() {
               </p>
             </div>
             <div className="admin-field-group">
-              <label className="admin-field-label required">
-                Appointment Time (8AM - 4PM)
+              <label className="admin-field-label">
+                Daily Slot Availability
               </label>
-              <Select
-                value={editFormData.scheduled_time}
-                onChange={(e) => {
-                  setEditFormData({
-                    ...editFormData,
-                    scheduled_time: e.target.value,
-                  });
-                  setEditFormErrors((prev) =>( {
-                    ...prev,
-                    scheduled_time: undefined,
-                  }));
-                }}
-                disabled={isSubmitting || timeSlotsLoading ||( timeSlotsFeedback && !timeSlotsFeedback.available)}
-                error={editFormErrors.scheduled_time}
-                aria-required="true"
-              >
-                <option value="">
-                  {timeSlotsLoading ? "Loading time slots..." : "Select time"}
-                </option>
-                {timeSlots.map((slot) =>(
-                  <option key={slot} value={slot}>
-                    {formatTimeSlotLabel(slot)}
-                  </option>)
-                 )}
-              </Select>
-              {timeSlotsFeedback && !timeSlotsFeedback.available && !timeSlotsLoading &&(
-                <p className="text-xs text-red-500 mt-1">{timeSlotsFeedback.message}</p>)
-               }
+              {editDateCapacity ? (
+                <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 px-3 py-2.5">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                      Remaining Slots
+                    </span>
+                    <span className={`text-[11px] font-bold ${
+                      editDateCapacity.remaining === 0
+                        ? 'text-red-600 dark:text-red-400'
+                        : editDateCapacity.remaining <= 50
+                          ? 'text-amber-600 dark:text-amber-400'
+                          : 'text-green-600 dark:text-green-400'
+                    }`}>
+                      {editDateCapacity.remaining} available
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                    <div
+                      className="h-1.5 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(100, (editDateCapacity.current / editDateCapacity.maximum) * 100)}%`,
+                        backgroundColor:
+                          editDateCapacity.remaining === 0
+                            ? '#ef4444'
+                            : editDateCapacity.remaining <= 50
+                              ? '#f59e0b'
+                              : '#22c55e',
+                      }}
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                    {editDateCapacity.current} booked · {editDateCapacity.maximum} daily limit
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Select a date to see remaining slots.
+                </p>
+              )}
             </div>
           </div>
 

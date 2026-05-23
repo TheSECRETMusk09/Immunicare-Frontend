@@ -27,6 +27,7 @@ import {
   Badge,
   LoadingSpinner,
   Input,
+  TablePagination,
 } from "../components/UI";
 import {
   ArrowLeft,
@@ -583,7 +584,6 @@ export default function InfantManagement() {
   );
   const [activeFilterPanel, setActiveFilterPanel] = useState(null);
   const [filterDraft, setFilterDraft] = useState(null);
-  const [pageInputValue, setPageInputValue] = useState("1");
   const serverSortQuery = React.useMemo(
     () => getInfantServerSortQuery(sortState),
     [sortState],
@@ -667,10 +667,6 @@ export default function InfantManagement() {
       setCurrentPage(1);
     }
   }, [workflowStatusFilterKey]);
-
-  useEffect(() => {
-    setPageInputValue(String(currentPage || 1));
-  }, [currentPage]);
 
   useEffect(() => {
     if (!activeFilterPanel) {
@@ -976,9 +972,8 @@ export default function InfantManagement() {
     syncInfantRouteState(viewType, selectedInfant, { replace: true });
   };
 
-  const handlePersonalUpdate = () => {
-    // Refresh the infants list when personal info is updated
-    void fetchInfants();
+  const handlePersonalUpdate = async () => {
+    await fetchInfants();
   };
 
   const handleAddSuccess = () => {
@@ -1096,18 +1091,6 @@ export default function InfantManagement() {
 
       return DEFAULT_SORT_STATE;
     });
-  };
-
-  const handlePageJumpSubmit = () => {
-    const nextPage = Number.parseInt(pageInputValue, 10);
-    if (!Number.isFinite(nextPage)) {
-      setPageInputValue(String(currentPage || 1));
-      return;
-    }
-
-    const clampedPage = Math.min(Math.max(nextPage, 1), totalPages);
-    setCurrentPage(clampedPage);
-    setPageInputValue(String(clampedPage));
   };
 
   const filteredInfants = filterInfantRows(infants, columnFilters);
@@ -1279,7 +1262,6 @@ export default function InfantManagement() {
       width: "9rem",
       minWidth: "9rem",
       sortable: true,
-      filterable: true,
       filterPanelAlignment: "right",
       headerClassName: "whitespace-nowrap",
       cellClassName: "whitespace-nowrap",
@@ -1515,27 +1497,6 @@ export default function InfantManagement() {
                   className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
                 <span>{option.label}</span>
-              </label>)
-             )}
-          </div>)
-         }
-
-        {column.key === "workflow_status" &&(
-          <div className="space-y-2">
-            {Object.entries(WORKFLOW_STATUS_META).map(([workflowKey, workflowMeta]) =>(
-              <label
-                key={workflowKey}
-                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700/60"
-              >
-                <input
-                  type="checkbox"
-                  checked={
-                    Array.isArray(filterDraft) && filterDraft.includes(workflowKey)
-                  }
-                  onChange={() => toggleDraftSelection(workflowKey)}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span>{workflowMeta.label}</span>
               </label>)
              )}
           </div>)
@@ -2033,6 +1994,30 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
                 <option value="custom">Custom Range</option>
               </select>
             </div>
+            <div className="w-full sm:w-auto">
+              <select
+                value={workflowStatusFilter[0] || ""}
+                onChange={(e) => {
+                  const nextValue = e.target.value;
+                  setColumnFilters((previousFilters) => {
+                    const nextFilters = createColumnFilterState(previousFilters);
+                    nextFilters.workflow_status = nextValue ? [nextValue] : [];
+                    return nextFilters;
+                  });
+                  setCurrentPage(1);
+                }}
+                className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
+                title="Filter by workflow status"
+                aria-label="Filter by workflow status"
+              >
+                <option value="">All Workflows</option>
+                {Object.entries(WORKFLOW_STATUS_META).map(([workflowKey, workflowMeta]) => (
+                  <option key={workflowKey} value={workflowKey}>
+                    {workflowMeta.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             {period === "custom" &&(
               <>
                 <div className="w-full sm:w-auto sm:max-w-[180px]">
@@ -2179,91 +2164,21 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
           </div>
 
           {totalInfants > 0 &&(
-            <div className="flex flex-shrink-0 flex-col gap-3 border-t border-gray-200 bg-white px-5 py-3 dark:border-gray-700 dark:bg-gray-800 lg:flex-row lg:items-center lg:justify-between">
-              <div className="text-sm text-gray-500">
-                {tableSummaryText}
-              </div>
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-                <div className="flex items-center gap-2">
-                  <label
-                    htmlFor="infant-rows-per-page"
-                    className="text-sm font-medium text-gray-600 dark:text-gray-300"
-                  >
-                    Rows
-                  </label>
-                  <select
-                    id="infant-rows-per-page"
-                    value={itemsPerPage}
-                    onChange={(event) => {
-                      const nextPageSize = Number(event.target.value) || DEFAULT_ITEMS_PER_PAGE;
-                      setItemsPerPage(nextPageSize);
-                      setCurrentPage(1);
-                    }}
-                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                    aria-label="Rows per page"
-                  >
-                    {ITEMS_PER_PAGE_OPTIONS.map((option) =>(
-                      <option key={option} value={option}>
-                        {option}
-                      </option>)
-                     )}
-                  </select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={!infantPagination?.hasPrev || currentPage === 1}
-                  >
-                    Previous
-                  </Button>
-                  <span className="flex items-center px-1 text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={!infantPagination?.hasNext || currentPage === totalPages}
-                  >
-                    Next
-                  </Button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <label
-                    htmlFor="infant-page-jump"
-                    className="text-sm font-medium text-gray-600 dark:text-gray-300"
-                  >
-                    Go to page
-                  </label>
-                  <input
-                    id="infant-page-jump"
-                    type="number"
-                    min="1"
-                    max={totalPages}
-                    value={pageInputValue}
-                    onChange={(event) => setPageInputValue(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        handlePageJumpSubmit();
-                      }
-                    }}
-                    className="w-20 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                    aria-label="Go to page"
-                  />
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handlePageJumpSubmit}
-                    disabled={totalPages <= 1}
-                  >
-                    Go
-                  </Button>
-                </div>
-              </div>
-            </div>)
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              itemsPerPage={itemsPerPage}
+              pageSizeOptions={ITEMS_PER_PAGE_OPTIONS}
+              summaryText={tableSummaryText}
+              hasPrev={Boolean(infantPagination?.hasPrev)}
+              hasNext={Boolean(infantPagination?.hasNext)}
+              onPageChange={(nextPage) => setCurrentPage(nextPage)}
+              onPageSizeChange={(nextPageSize) => {
+                setItemsPerPage(nextPageSize || DEFAULT_ITEMS_PER_PAGE);
+                setCurrentPage(1);
+              }}
+              idPrefix="infant"
+            />)
            }
         </div>
           </div>)
@@ -2276,7 +2191,6 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
         onClose={() => setShowAddModal(false)}
         onSuccess={handleAddSuccess}
       />
-
       <VaccineReadinessManager
         isOpen={showReadinessModal}
         onClose={closeReadinessManager}
@@ -2286,7 +2200,6 @@ if (activeView !== "list" && activeView !== "transfer-in" && selectedInfant) {
           void fetchInfants(true);
         }}
       />
-
       {/* Inject Vaccine Modal */}
       <InjectVaccineModal
         isOpen={showInjectModal}

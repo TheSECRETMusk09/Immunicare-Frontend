@@ -33,6 +33,8 @@ import {
 } from "../utils/dateUtils";
 import { getStatusPillClass } from "../constants/statusMappings";
 import { normalizeArrayPayload } from "../utils/apiUtils";
+import { getCalendarCellSlotsRemaining } from "../utils/appointmentCalendarSlots";
+import { fetchEligibleVaccinesForAppointment } from "../utils/eligibleVaccines";
 
 const isWeekendDate = (value) => {
   return isWeekend(value);
@@ -55,7 +57,6 @@ const getEventColor = (status) => {
 
 const canMutateAppointment = (status) => !["completed", "attended", "cancelled"].includes(status);
 const CALENDAR_WEEK_START = 0;
-const MAX_DAILY_VACCINATION_SLOTS = 400;
 
 const normalizeAppointmentDateDetails = (details) => {
   if (!details || typeof details !== "object") {
@@ -152,7 +153,6 @@ export default function GuardianAppointmentsPage() {
   const [selectedDateDetails, setSelectedDateDetails] = useState(null);
   const [blockedDates, setBlockedDates] = useState({});
   const [calendarAvailabilityByDate, setCalendarAvailabilityByDate] = useState({});
-  const [calendarDailyCapacities, setCalendarDailyCapacities] = useState({});
 
   const [pageLoading, setPageLoading] = useState(true);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
@@ -164,6 +164,8 @@ export default function GuardianAppointmentsPage() {
   const [timeSlotsLoading, setTimeSlotsLoading] = useState(false);
   const [timeSlots, setTimeSlots] = useState([]);
   const [timeSlotsFeedback, setTimeSlotsFeedback] = useState(null);
+  const [editDateCapacity, setEditDateCapacity] = useState(null);
+  const [editEligibleVaccines, setEditEligibleVaccines] = useState([]);
 
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -204,6 +206,23 @@ export default function GuardianAppointmentsPage() {
     const queryString = params.toString();
     return queryString ? `?${queryString}` : "";
   }, []);
+
+  const openAppointmentDetailsPage = useCallback((appointment) => {
+    if (!appointment?.id) {
+      return;
+    }
+
+    const linkedChild = children.find(
+      (child) => Number.parseInt(child.id, 10) === Number.parseInt(appointment.infant_id, 10),
+    );
+
+    navigate(`/guardian/appointments/${appointment.id}`, {
+      state: {
+        appointment,
+        child: linkedChild || null,
+      },
+    });
+  }, [children, navigate]);
 
   const calendarCurrentLabel = useMemo(() => {
     const safeCurrentDate =
@@ -258,7 +277,9 @@ export default function GuardianAppointmentsPage() {
     () =>
       appointments.filter((appointment) => {
         const appointmentDateParts = resolveAppointmentClinicDateParts(appointment);
-        return appointmentDateParts?.dateKey === selectedDate;
+        if (appointmentDateParts?.dateKey !== selectedDate) return false;
+        const normalizedStatus = String(appointment?.status || "").trim().toLowerCase();
+        return normalizedStatus !== "cancelled";
       }),
     [appointments, selectedDate],
   );
@@ -564,46 +585,12 @@ export default function GuardianAppointmentsPage() {
         }
         return accumulator;
       }, {});
-      const todayDateKey = toDateKey(new Date());
-      const capacityEntries = await Promise.all(
-        calendarDates
-          .filter((entry) =>
-            entry?.date &&
-            entry.date >= todayDateKey &&
-            !entry.isWeekend &&
-            !entry.isHoliday &&
-            !entry.isAdminBlocked &&
-            entry.blocked !== true,
-          )
-          .map(async (entry) => {
-            try {
-              const capacity = await apiClient.getAppointmentDailyCapacity(
-                { date: entry.date },
-                { signal },
-              );
-              return [entry.date, capacity];
-            } catch (capacityError) {
-              if (capacityError.name === 'CanceledError' || capacityError.code === 'ERR_CANCELED') {
-                throw capacityError;
-              }
-              return [entry.date, null];
-            }
-          }),
-      );
-      const capacitiesByDate = capacityEntries.reduce((accumulator, [dateKey, capacity]) => {
-        if (dateKey && capacity) {
-          accumulator[dateKey] = capacity;
-        }
-        return accumulator;
-      }, {});
 
       setCalendarAvailabilityByDate(availabilityByDate);
-      setCalendarDailyCapacities(capacitiesByDate);
       setBlockedDates(result?.blockedDates || {});
     } catch (err) {
       if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       setCalendarAvailabilityByDate({});
-      setCalendarDailyCapacities({});
       setBlockedDates({});
     } finally {
       setCalendarLoading(false);
@@ -620,39 +607,55 @@ export default function GuardianAppointmentsPage() {
     try {
       const details = await apiClient.getAppointmentDateDetails(selectedDate, {}, { signal });
       const baseDetails = details && typeof details === "object" ? details : {};
-      const selectedDateAvailability = calendarAvailabilityByDate[selectedDate] || null;
-      const selectedDateValidation = isDateAvailableForBooking(selectedDate, {
-        allowPast: true,
-        blockedDate: blockedDates[selectedDate] || null,
-      });
-      const fallbackAvailability = selectedDateAvailability?.blocked === true || !selectedDateValidation.isAvailable
-        ? {
-            available: false,
-            message:
-              selectedDateAvailability?.blockedReason === "no_vaccine_available"
-                ? "No slots available for this date."
-                : selectedDateValidation.reason,
-          }
-        : {
-            available: true,
-            message: "This date is open for booking and monitoring.",
-          };
+      const backendSummary = baseDetails && typeof baseDetails.summary === "object" ? baseDetails.summary : null;
+      const slotsRemaining = typeof baseDetails.slots_remaining === "number" ? baseDetails.slots_remaining : null;
+      const isBlocked = Boolean(baseDetails.is_blocked);
+      const isHoliday = Boolean(baseDetails.is_holiday);
+      const isWeekendDay = Boolean(baseDetails.is_weekend ?? baseDetails.isWeekend);
+      const fullyBooked = slotsRemaining !== null && slotsRemaining <= 0;
+      const resolvedAvailable = !isBlocked && !isHoliday && !isWeekendDay && !fullyBooked;
+      const resolvedMessage = isBlocked
+        ? "This date has been blocked by the clinic and is unavailable for booking."
+        : isHoliday
+          ? `${baseDetails.holiday_name || baseDetails.holiday?.name || "Holiday"} - appointments cannot be scheduled on holidays.`
+          : isWeekendDay
+            ? "This date falls on a weekend (Saturday or Sunday). Appointments are only available on weekdays."
+            : fullyBooked
+              ? "No slots remaining for this date. Please choose another date."
+              : "This date is available for booking appointments.";
       setSelectedDateDetails(
         normalizeAppointmentDateDetails({
           date: selectedDate,
           ...baseDetails,
           appointments: selectedDateAppointments,
-          summary: buildAppointmentDateSummary(selectedDateAppointments),
-          availability:
-            selectedDateAvailability?.blocked === true || !selectedDateValidation.isAvailable
-              ? fallbackAvailability
-              : (baseDetails.availability || fallbackAvailability),
-          isWeekend: Boolean(baseDetails.isWeekend ?? selectedDateAvailability?.isWeekend),
+          summary: {
+            ...(backendSummary || {}),
+            total:
+              typeof baseDetails?.total_appointments === "number"
+                ? baseDetails.total_appointments
+                : backendSummary?.total ?? buildAppointmentDateSummary(selectedDateAppointments).total,
+            byStatus:
+              backendSummary?.byStatus ||
+              buildAppointmentDateSummary(selectedDateAppointments).byStatus,
+            visibleTotal: selectedDateAppointments.length,
+          },
+          availability: {
+            available: resolvedAvailable,
+            message: resolvedMessage,
+          },
+          isWeekend: isWeekendDay,
+          is_weekend: isWeekendDay,
+          is_holiday: isHoliday,
+          is_blocked: isBlocked,
+          slots_remaining: slotsRemaining,
+          daily_slot_capacity:
+            typeof baseDetails.daily_slot_capacity === "number" ? baseDetails.daily_slot_capacity : null,
+          status: baseDetails.status || null,
           holiday:
             baseDetails.holiday ||
-            (selectedDateAvailability?.isHoliday
+            (isHoliday
               ? {
-                  name: selectedDateAvailability.holidayName || "Holiday",
+                  name: baseDetails.holiday_name || "Holiday",
                 }
               : null),
           inventory: baseDetails.inventory || null,
@@ -844,6 +847,33 @@ export default function GuardianAppointmentsPage() {
     return () => abortController.abort();
   }, [fetchTimeSlots]);
 
+  useEffect(() => {
+    setEditDateCapacity(null);
+    if (!editingAppointment || !formData.scheduled_date) return;
+    apiClient
+      .getAppointmentDailyCapacity({ date: formData.scheduled_date })
+      .then((result) => setEditDateCapacity(result || null))
+      .catch(() => setEditDateCapacity(null));
+  }, [formData.scheduled_date, editingAppointment]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!editingAppointment || !formData.infant_id || !formData.scheduled_date) {
+      setEditEligibleVaccines([]);
+      return undefined;
+    }
+    fetchEligibleVaccinesForAppointment(formData.infant_id, formData.scheduled_date)
+      .then((entries) => {
+        if (!cancelled) setEditEligibleVaccines(entries);
+      })
+      .catch(() => {
+        if (!cancelled) setEditEligibleVaccines([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editingAppointment, formData.infant_id, formData.scheduled_date]);
+
   const openBookingPage = useCallback(
     ({ scheduledDate } = {}) => {
       const targetChildId = formData.infant_id || childIdFromQuery;
@@ -870,6 +900,7 @@ export default function GuardianAppointmentsPage() {
     setEditingAppointment(appointment);
     setTimeSlots([]);
     setTimeSlotsFeedback(null);
+    setEditDateCapacity(null);
     setFormData({
       infant_id: String(appointment.infant_id || ""),
       vaccine_id: "",
@@ -891,7 +922,7 @@ export default function GuardianAppointmentsPage() {
   const handleSubmitAppointment = async (event) => {
     event.preventDefault();
 
-    if (!formData.infant_id || !formData.scheduled_date || !formData.scheduled_time) {
+    if (!formData.infant_id || !formData.scheduled_date || (!editingAppointment && !formData.scheduled_time)) {
       setError("Please select a child, date, and time before submitting.");
       return;
     }
@@ -914,7 +945,7 @@ export default function GuardianAppointmentsPage() {
       return;
     }
 
-    if (timeSlots.length > 0 && !timeSlots.includes(formData.scheduled_time)) {
+    if (!editingAppointment && timeSlots.length > 0 && !timeSlots.includes(formData.scheduled_time)) {
       setError("Selected time is no longer available. Please choose another slot.");
       return;
     }
@@ -1015,9 +1046,6 @@ export default function GuardianAppointmentsPage() {
           actions={
             <div className="flex flex-wrap items-center justify-end gap-2">
               <div className="guardian-appointments-header-actions-inner flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-                <Button variant="secondary" size="sm" onClick={handleToday}>
-                  Today
-                </Button>
                 <Button variant="primary" size="sm" onClick={openBookingPage}>
                   <Plus className="w-4 h-4 mr-1" />
                   New Appointment
@@ -1118,25 +1146,40 @@ export default function GuardianAppointmentsPage() {
                 dayHeaderContent={renderDayHeaderContent}
                 dayCellContent={(arg) => {
                   const dateKey = toDateKey(arg.date);
-                  const holiday = isPhilippineHoliday(arg.date);
+                  const displayedMonthKey = toMonthKey(monthCursor);
+                  const availability = calendarAvailabilityByDate[dateKey] || null;
                   const blockedDate = blockedDates[dateKey];
-                  const isUnavailable =
-                    Boolean(blockedDate?.is_blocked) ||
-                    Boolean(holiday) ||
-                    isWeekendDate(arg.date);
+                  const isCurrentMonth = dateKey.startsWith(displayedMonthKey);
+                  const holiday = availability?.isHoliday
+                    ? {
+                        name: availability.holidayName || "Holiday",
+                        type: "regular",
+                      }
+                    : isPhilippineHoliday(arg.date);
+                  const isWeekendDay = availability?.isWeekend ?? isWeekendDate(arg.date);
+                  const isBlockedDay =
+                    availability?.isAdminBlocked ??
+                    blockedDate?.is_blocked ??
+                    false;
+                  const isUnavailable = isBlockedDay || Boolean(holiday) || isWeekendDay;
+                  const dateAvailability = isDateAvailableForBooking(arg.date, {
+                    allowPast: true,
+                    blockedDate,
+                  });
+                  const isSlotUnavailable = availability?.blocked === true || !dateAvailability.isAvailable;
                   const isPastDate = !isUnavailable && dateKey < toDateKey(new Date());
-                  const dateCapacity = calendarDailyCapacities[dateKey] || null;
-                  const totalBooked = calendarAvailabilityByDate[dateKey]?.totalAppointments ?? null;
-                  const slotsRemaining = (!isUnavailable && !isPastDate)
-                    ? (
-                        dateCapacity?.remaining ??
-                        (totalBooked !== null
-                          ? Math.max(
-                              0,
-                              (dateCapacity?.maximum ?? MAX_DAILY_VACCINATION_SLOTS) - totalBooked,
-                            )
-                          : null)
-                      )
+                  const showSlotsPlaceholder =
+                    isCurrentMonth &&
+                    !isUnavailable &&
+                    !isPastDate &&
+                    !isSlotUnavailable &&
+                    calendarLoading &&
+                    !availability;
+                  const slotsRemaining = (isCurrentMonth && !isUnavailable && !isPastDate && !isSlotUnavailable && availability)
+                    ? getCalendarCellSlotsRemaining({
+                        dateKey,
+                        availability,
+                      })
                     : null;
                   return(
                     <div className="flex flex-col w-full h-full min-h-[4rem]">
@@ -1151,14 +1194,19 @@ export default function GuardianAppointmentsPage() {
                           Blocked
                         </div>)
                        }
-                      {!holiday && !blockedDate?.is_blocked && isUnavailable &&(
+                      {!holiday && !blockedDate?.is_blocked && isWeekendDay &&(
                         <div className="text-[10px] font-semibold text-yellow-700 dark:text-yellow-300 truncate px-1 text-right bg-yellow-50 dark:bg-yellow-900/20 rounded mx-1 mb-1">
-                          Unavailable
+                          Weekend
                         </div>)
                        }
                       {isPastDate &&(
                         <div className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 truncate px-1 text-right rounded mx-1 mb-1">
                           Past
+                        </div>)
+                       }
+                      {showSlotsPlaceholder &&(
+                        <div className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 truncate px-1 text-right rounded mx-1 mb-1 bg-gray-100 dark:bg-gray-800">
+                          -
                         </div>)
                        }
                       {slotsRemaining !== null &&(
@@ -1212,7 +1260,7 @@ export default function GuardianAppointmentsPage() {
             <div className="guardian-appointments-calendar-legend mt-4 flex flex-wrap gap-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg text-sm mx-4 mb-4">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded bg-gray-200 border border-gray-300 dark:bg-gray-700 dark:border-gray-600"></div>
-                <span className="text-gray-600 dark:text-gray-400">Weekend (Unavailable)</span>
+                <span className="text-gray-600 dark:text-gray-400">Weekend</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded bg-amber-50 border border-amber-300 dark:bg-amber-800 dark:border-amber-700"></div>
@@ -1270,11 +1318,32 @@ export default function GuardianAppointmentsPage() {
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">{selectedDate || ""}</p>
 
-              {selectedDateDetails?.availability?.available === false ?(
-                <Alert variant="warning">{selectedDateDetails.availability.message}</Alert>)
-                :(
-                <Alert variant="info">This date is open for booking and monitoring.</Alert>)
-               }
+              {(() => {
+                const slotsRemaining = typeof selectedDateDetails?.slots_remaining === "number"
+                  ? selectedDateDetails.slots_remaining
+                  : null;
+                const blocked = Boolean(selectedDateDetails?.is_blocked);
+                const holidayFlag = Boolean(selectedDateDetails?.is_holiday);
+                const weekendFlag = Boolean(selectedDateDetails?.is_weekend ?? selectedDateDetails?.isWeekend);
+                const fullyBooked = slotsRemaining !== null && slotsRemaining <= 0;
+                if (blocked) {
+                  return <Alert variant="danger">Blocked by Administrator.</Alert>;
+                }
+                if (holidayFlag) {
+                  return (
+                    <Alert variant="warning">
+                      {selectedDateDetails?.holiday_name || selectedDateDetails?.holiday?.name || "Holiday"} - unavailable.
+                    </Alert>
+                  );
+                }
+                if (weekendFlag) {
+                  return <Alert variant="warning">Weekend - appointments are weekdays only.</Alert>;
+                }
+                if (fullyBooked) {
+                  return <Alert variant="warning">No slots remaining for this date.</Alert>;
+                }
+                return <Alert variant="info">This date is available for booking appointments.</Alert>;
+              })()}
 
               <div className="mt-4 space-y-2 text-sm">
                 <p className="flex items-center justify-between">
@@ -1306,19 +1375,31 @@ export default function GuardianAppointmentsPage() {
                 :(
                 <div className="space-y-3 max-h-[350px] overflow-y-auto modern-scrollbar pr-1">
                   {upcomingAppointments.map((appointment) =>(
-                    <div key={appointment.id} className="guardian-appointment-card rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40 flex flex-col gap-3 min-[640px]:flex-row min-[640px]:items-start min-[640px]:justify-between">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-gray-900 dark:text-gray-100 truncate">
+                    <div key={appointment.id} className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-none dark:border-gray-700 dark:bg-gray-900/40">
+                      <div className="min-w-0 w-full">
+                        <div className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-gray-100" title={`${appointment.first_name || "Infant"} ${appointment.last_name || ""}`.trim()}>
                           {(appointment.first_name || "Infant") + " " +( appointment.last_name || "")}
-                        </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{appointment.type || "Vaccination"}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{formatClinicDateLabel(appointment.scheduled_date)}</p>
+                        </div>
+                        <div className="mt-1 block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          {appointment.type || "Vaccination"}
+                        </div>
+                        <div className="mt-1 block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-sm text-gray-500 dark:text-gray-400" title={formatClinicDateLabel(appointment.scheduled_date)}>
+                          {formatClinicDateLabel(appointment.scheduled_date)}
+                        </div>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2 mt-2 sm:mt-0">
+                      <div className="mt-3 flex w-full flex-wrap items-center gap-2 border-t border-gray-200/70 pt-3 dark:border-gray-700/70 sm:justify-end">
                         <span className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${getStatusPillClass(appointment.status)}`}>
                           {appointment.status}
                         </span>
+
+                        <button
+                          type="button"
+                          onClick={() => openAppointmentDetailsPage(appointment)}
+                          className="text-xs font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 transition-none"
+                        >
+                          View Booking
+                        </button>
 
                         {canMutateAppointment(appointment.status) &&(
                           <>
@@ -1387,6 +1468,13 @@ export default function GuardianAppointmentsPage() {
                         <span className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${getStatusPillClass(appointment.status)}`}>
                           {appointment.status}
                         </span>
+                        <button
+                          type="button"
+                          onClick={() => openAppointmentDetailsPage(appointment)}
+                          className="text-xs font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+                        >
+                          View
+                        </button>
                       </div>
                     </div>)
                    )}
@@ -1441,6 +1529,44 @@ export default function GuardianAppointmentsPage() {
                )}
             </Select>
 
+            {editingAppointment && (
+              <div className="rounded-lg bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 p-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
+                  Vaccines due for this visit
+                </p>
+                {editEligibleVaccines.length === 0 ? (
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                    No pending vaccines due — all doses up to date.
+                  </p>
+                ) : (
+                  <ul className="space-y-1">
+                    {editEligibleVaccines.map((entry) => (
+                      <li
+                        key={entry.id}
+                        className="flex items-center justify-between gap-2 text-[11px] text-gray-700 dark:text-gray-200"
+                      >
+                        <span className="truncate">
+                          {entry.vaccineName}
+                          {entry.doseLabel ? ` · ${entry.doseLabel}` : ""}
+                        </span>
+                        <span
+                          className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
+                            entry.tone === "red"
+                              ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                              : entry.tone === "amber"
+                                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                                : "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                          }`}
+                        >
+                          {entry.status}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
             {formData.scheduled_date && !isDateAvailableForBooking(formData.scheduled_date, {
               blockedDate: blockedDates[formData.scheduled_date] || null,
             }).isAvailable &&(
@@ -1467,24 +1593,69 @@ export default function GuardianAppointmentsPage() {
                 }
                 required
               />
-              <Select
-                label="Appointment Time (8AM - 4PM)"
-                value={formData.scheduled_time}
-                onChange={(event) =>
-                  setFormData((previous) =>( { ...previous, scheduled_time: event.target.value }))
-                }
-                required
-                disabled={timeSlotsLoading ||( timeSlotsFeedback && !timeSlotsFeedback.available)}
-              >
-                <option value="">
-                  {timeSlotsLoading ? "Loading time slots..." : "Select time"}
-                </option>
-                {timeSlots.map((slot) =>(
-                  <option key={slot} value={slot}>
-                    {formatTimeSlotLabel(slot)}
-                  </option>)
-                 )}
-              </Select>
+              {editingAppointment ? (
+                <div className="w-full">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Appointment Time (8AM - 4PM)
+                  </label>
+                  {timeSlotsFeedback && !timeSlotsFeedback.available && (
+                    <Alert variant="warning" className="mt-2">
+                      {timeSlotsFeedback.message}
+                    </Alert>
+                  )}
+                  {editDateCapacity && (
+                    <div className="mt-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 px-3 py-2.5">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                          Daily Slot Availability
+                        </span>
+                        <span className={`text-[11px] font-bold ${
+                          editDateCapacity.remaining === 0
+                            ? 'text-red-600 dark:text-red-400'
+                            : editDateCapacity.remaining <= 50
+                              ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-green-600 dark:text-green-400'
+                        }`}>
+                          {editDateCapacity.remaining} available
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                        <div
+                          className="h-1.5 rounded-full transition-all duration-500"
+                          style={{
+                            width: `${Math.min(100, (editDateCapacity.current / editDateCapacity.maximum) * 100)}%`,
+                            backgroundColor:
+                              editDateCapacity.remaining === 0
+                                ? '#ef4444'
+                                : editDateCapacity.remaining <= 50
+                                  ? '#f59e0b'
+                                  : '#22c55e',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Select
+                  label="Appointment Time (8AM - 4PM)"
+                  value={formData.scheduled_time}
+                  onChange={(event) =>
+                    setFormData((previous) =>( { ...previous, scheduled_time: event.target.value }))
+                  }
+                  required
+                  disabled={timeSlotsLoading ||( timeSlotsFeedback && !timeSlotsFeedback.available)}
+                >
+                  <option value="">
+                    {timeSlotsLoading ? "Loading time slots..." : "Select time"}
+                  </option>
+                  {timeSlots.map((slot) =>(
+                    <option key={slot} value={slot}>
+                      {formatTimeSlotLabel(slot)}
+                    </option>)
+                   )}
+                </Select>
+              )}
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 sm:col-span-2">
                 Available from 8:00 AM to 4:00 PM (12:00 PM - 1:00 PM lunch break).
               </p>
@@ -1547,8 +1718,8 @@ export default function GuardianAppointmentsPage() {
                 loading={formSubmitting}
                 disabled={
                   (availabilityFeedback ? !availabilityFeedback.available : false) ||
-                  timeSlotsLoading ||(
-                   timeSlotsFeedback ? !timeSlotsFeedback.available : false) ||
+                  (!editingAppointment && timeSlotsLoading) ||(
+                   !editingAppointment &&( timeSlotsFeedback ? !timeSlotsFeedback.available : false)) ||
                   Boolean(formData.scheduled_date && !isDateAvailableForBooking(formData.scheduled_date, {
                     blockedDate: blockedDates[formData.scheduled_date] || null,
                   }).isAvailable)
@@ -1588,27 +1759,83 @@ export default function GuardianAppointmentsPage() {
             </div>)
             :(
             <div className="space-y-4 guardian-modal-body-density--guardian">
-              {selectedDateDetails?.availability?.available === false &&(
-                <Alert variant="warning">{selectedDateDetails.availability.message}</Alert>)
-               }
+              {(() => {
+                const slotsRemaining = typeof selectedDateDetails?.slots_remaining === "number"
+                  ? selectedDateDetails.slots_remaining
+                  : null;
+                const blocked = Boolean(selectedDateDetails?.is_blocked);
+                const holidayFlag = Boolean(selectedDateDetails?.is_holiday);
+                const weekendFlag = Boolean(selectedDateDetails?.is_weekend ?? selectedDateDetails?.isWeekend);
+                const fullyBooked = slotsRemaining !== null && slotsRemaining <= 0;
+                if (blocked) {
+                  return (
+                    <Alert variant="danger">
+                      <strong>Blocked by Administrator</strong> - This date has been blocked and appointments cannot be scheduled.
+                    </Alert>
+                  );
+                }
+                if (holidayFlag) {
+                  return (
+                    <Alert variant="warning">
+                      <strong>{selectedDateDetails?.holiday_name || selectedDateDetails?.holiday?.name || "Holiday"}</strong> - Appointments cannot be scheduled on holidays.
+                    </Alert>
+                  );
+                }
+                if (weekendFlag) {
+                  return (
+                    <Alert variant="warning">
+                      This date falls on a weekend (Saturday or Sunday). Appointments are only available on weekdays.
+                    </Alert>
+                  );
+                }
+                if (fullyBooked) {
+                  return (
+                    <Alert variant="warning">
+                      No slots remaining for this date. Please choose another date.
+                    </Alert>
+                  );
+                }
+                return (
+                  <Alert variant="info">This date is available for booking appointments.</Alert>
+                );
+              })()}
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
                   <p className="text-xs text-gray-500">Total Appointments</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                    {selectedDateDetails?.summary?.total || 0}
+                    {selectedDateDetails?.summary?.total ?? 0}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+                  <p className="text-xs text-gray-500">Slots Remaining</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                    {typeof selectedDateDetails?.slots_remaining === "number"
+                      ? selectedDateDetails.slots_remaining
+                      : "—"}
+                  </p>
+                  {typeof selectedDateDetails?.daily_slot_capacity === "number" && (
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      of {selectedDateDetails.daily_slot_capacity} daily capacity
+                    </p>
+                  )}
+                </div>
+                <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+                  <p className="text-xs text-gray-500">Status</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    {selectedDateDetails?.status || "—"}
                   </p>
                 </div>
                 <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
                   <p className="text-xs text-gray-500">Holiday</p>
                   <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    {selectedDateDetails?.holiday?.name || "None"}
+                    {selectedDateDetails?.holiday_name || selectedDateDetails?.holiday?.name || "None"}
                   </p>
                 </div>
                 <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
                   <p className="text-xs text-gray-500">Weekend</p>
                   <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    {selectedDateDetails?.isWeekend ? "Yes" : "No"}
+                    {selectedDateDetails?.is_weekend ?? selectedDateDetails?.isWeekend ? "Yes" : "No"}
                   </p>
                 </div>
               </div>

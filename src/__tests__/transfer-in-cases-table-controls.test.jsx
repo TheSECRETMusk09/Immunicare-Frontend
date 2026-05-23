@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
 import TransferInCases from "../pages/TransferInCases";
@@ -86,7 +86,7 @@ describe("TransferInCases table controls", () => {
     });
   });
 
-  test("supports guardian and submitted-date sorting plus next-vaccine multi-filter chips", async () => {
+  test("supports guardian and submitted-date sorting", async () => {
     const { container } = render(<TransferInCases showHeader={false} />);
 
     await screen.findByText(/zoe guardian/i);
@@ -122,39 +122,8 @@ describe("TransferInCases table controls", () => {
       "zoe guardian",
     ]);
 
-    fireEvent.click(screen.getByRole("button", { name: /filter next vaccine/i }));
-
-    const nextVaccineDialog = await screen.findByRole("dialog", {
-      name: /next vaccine filter/i,
-    });
-
-    fireEvent.click(within(nextVaccineDialog).getByLabelText(/^BCG$/i));
-    fireEvent.click(within(nextVaccineDialog).getByLabelText(/PCV 13\/PCV 10/i));
-    fireEvent.click(within(nextVaccineDialog).getByRole("button", { name: /^filter$/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/next vaccine: bcg, pcv 13\/pcv 10/i)).toBeInTheDocument();
-      expect(getRenderedGuardians(container)).toEqual([
-        "Alpha Guardian",
-        "bravo guardian",
-      ]);
-    });
-
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: /remove next vaccine: bcg, pcv 13\/pcv 10/i,
-      }),
-    );
-
-    await waitFor(() => {
-      expect(
-        screen.queryByText(/next vaccine: bcg, pcv 13\/pcv 10/i),
-      ).not.toBeInTheDocument();
-      expect(getRenderedGuardians(container)).toEqual([
-        "Alpha Guardian",
-        "bravo guardian",
-        "zoe guardian",
-      ]);
-    });
+    expect(
+      screen.queryByRole("button", { name: /filter next vaccine/i }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -406,7 +406,7 @@ describe("Analytics dashboard rendering and filter stability", () => {
       expect(apiClient.getAnalyticsDashboard).toHaveBeenCalled();
     });
 
-    fireEvent.click(screen.getByRole("tab", { name: /inventory & reminders/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /inventory monitoring/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/available doses by vaccine/i)).toBeInTheDocument();

@@ -39,8 +39,6 @@ const normalizeInfantPayloadForAdmin = (data = {}) => {
 
   delete payload.birth_length;
   delete payload.birthplace;
-  delete payload.birth_head_circumference;
-  delete payload.blood_type;
 
   return payload;
 };

@@ -140,7 +140,7 @@ describe("Phase 6 FEFO batch helpers", () => {
       },
     });
 
-    expect(options).toHaveLength(2);
+    expect(options).toHaveLength(3);
     expect(options[0]).toMatchObject({
       batch_id: 301,
       lot_batch_number: "PENTA-FEFO-001",
@@ -154,6 +154,11 @@ describe("Phase 6 FEFO batch helpers", () => {
       matched_inventory_record_id: 22,
       is_fefo_recommended: false,
       selection_disabled: false,
+    });
+    expect(options[2]).toMatchObject({
+      batch_id: 399,
+      lot_batch_number: "PENTA-EXPIRED-003",
+      selection_disabled: true,
     });
   });
 
@@ -188,6 +193,33 @@ describe("Phase 6 FEFO batch helpers", () => {
       matched_inventory_record_id: 88,
       selection_disabled: false,
       is_fefo_recommended: true,
+    });
+  });
+
+  test("keeps ledger-only history batches visible even when they are no longer selectable", () => {
+    const options = buildFefoBatchOptions({
+      vaccineId: 1,
+      clinicId: 7,
+      referenceDate: "2026-03-01",
+      inventoryRecords: [],
+      batches: [
+        {
+          batch_id: null,
+          actual_batch_id: null,
+          vaccine_id: 1,
+          lot_number: "BCG-HISTORY-001",
+          available_quantity: 0,
+          expiry_date: "2026-02-10",
+          source_type: "transaction_history",
+        },
+      ],
+    });
+
+    expect(options).toHaveLength(1);
+    expect(options[0]).toMatchObject({
+      actual_batch_id: null,
+      lot_batch_number: "BCG-HISTORY-001",
+      selection_disabled: true,
     });
   });
 });

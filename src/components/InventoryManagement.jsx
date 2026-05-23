@@ -961,27 +961,81 @@ const getInventoryBatchSearchText = (batch) =>
     .join(" ")
     .toLowerCase();
 
-const createDefaultInventoryDisplayFilters = () =>( {
-  startDate: "",
-  endDate: "",
-  vaccine: "all",
-  status: "all",
-});
+const getDefaultInventoryFilterDate = () =>
+  getVaccinationPeriodRange({
+    period: "today",
+    referenceDate: new Date(),
+  }).startDate || new Date().toISOString().slice(0, 10);
 
-const createDefaultStockMovementFilters = () =>( {
-  period: "month",
-  type: "all",
-  vaccine: "all",
-  customStartDate: "",
-  customEndDate: "",
-});
+const getInventoryDisplayPeriodRange = (period) => {
+  const normalizedPeriod = normalizeVaccinationPeriod(period);
+  const today = getDefaultInventoryFilterDate();
+
+  if (!today) {
+    return { startDate: "", endDate: "" };
+  }
+
+  if (normalizedPeriod === "custom") {
+    return { startDate: "", endDate: "" };
+  }
+
+  if (normalizedPeriod === "today") {
+    return { startDate: today, endDate: today };
+  }
+
+  if (normalizedPeriod === "month") {
+    return {
+      startDate: `${today.slice(0, 7)}-01`,
+      endDate: today,
+    };
+  }
+
+  const parsedToday = new Date(`${today}T00:00:00.000Z`);
+  if (Number.isNaN(parsedToday.getTime())) {
+    return { startDate: today, endDate: today };
+  }
+
+  const weekStart = new Date(parsedToday);
+  const dayOfWeek = weekStart.getUTCDay();
+  const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  weekStart.setUTCDate(weekStart.getUTCDate() - diffToMonday);
+
+  return {
+    startDate: weekStart.toISOString().slice(0, 10),
+    endDate: today,
+  };
+};
+
+const createDefaultInventoryDisplayFilters = () => {
+  const defaultRange = getInventoryDisplayPeriodRange("today");
+
+  return {
+    period: "today",
+    startDate: defaultRange.startDate,
+    endDate: defaultRange.endDate,
+    vaccine: "all",
+    status: "all",
+  };
+};
+
+const createDefaultStockMovementFilters = () => {
+  const today = getDefaultInventoryFilterDate();
+
+  return {
+    period: "today",
+    type: "all",
+    vaccine: "all",
+    customStartDate: today,
+    customEndDate: today,
+  };
+};
 
 const INVENTORY_TABLE_PAGE_SIZE = 10;
 const INVENTORY_TABLE_PAGE_SIZE_OPTIONS = [5, 10, 25, 50, 100];
 const STOCK_MOVEMENT_PERIOD_OPTIONS = Object.freeze(PERIOD_OPTIONS);
 
 const buildStockMovementPeriodRange = (filters = {}) => {
-  const normalizedPeriod = normalizeVaccinationPeriod(filters.period || "month");
+  const normalizedPeriod = normalizeVaccinationPeriod(filters.period || "today");
 
   if (normalizedPeriod === "custom" &&( !filters.customStartDate || !filters.customEndDate)) {
     return { startDate: "", endDate: "" };
@@ -1011,9 +1065,6 @@ const INVENTORY_STATUS_FILTER_OPTIONS = [
   { value: "expired", label: "Expired" },
   { value: "with_waste", label: "With Waste" },
 ];
-
-const hasDisplayDateRangeValue = ({ startDate = "", endDate = "" } = {}) =>
-  Boolean(String(startDate || "").trim() || String(endDate || "").trim());
 
 const matchesOptionalDateRange = (
   candidateValues = [],
@@ -1048,13 +1099,39 @@ const matchesOptionalDateRange = (
 
 const matchesInventoryReportPeriodRange = (
   item = {},
-  { startDate = "", endDate = "" } = {},
+  { period = "", startDate = "", endDate = "" } = {},
 ) => {
   const parsedStart = parseDateOnlyValue(startDate);
   const parsedEnd = parseDateOnlyValue(endDate, { endOfDay: true });
 
   if (!parsedStart && !parsedEnd) {
     return true;
+  }
+
+  const activityDateCandidates = [
+    item.last_transaction_date,
+    item.received_date,
+    item.transferred_in_date,
+    item.transferred_out_date,
+    item.issuance_date,
+    item.transaction_date,
+    item.updated_at,
+    item.created_at,
+  ];
+  const hasActivityDateCandidates = activityDateCandidates.some((candidateValue) =>
+    Boolean(parseDateLikeValue(candidateValue)),
+  );
+  const matchesActivityDateRange = matchesOptionalDateRange(
+    activityDateCandidates,
+    { startDate, endDate },
+  );
+  const normalizedPeriod = normalizeVaccinationPeriod(period);
+
+  if (
+    hasActivityDateCandidates &&
+    (normalizedPeriod === "today" || normalizedPeriod === "week")
+  ) {
+    return matchesActivityDateRange;
   }
 
   const periodStart = parseDateOnlyValue(item.period_start);
@@ -1065,30 +1142,21 @@ const matchesInventoryReportPeriodRange = (
     const normalizedPeriodEnd = periodEnd || periodStart;
 
     if (!normalizedPeriodStart || !normalizedPeriodEnd) {
-      return false;
+      return matchesActivityDateRange;
     }
 
     if (parsedStart && normalizedPeriodEnd.getTime() < parsedStart.getTime()) {
-      return false;
+      return matchesActivityDateRange;
     }
 
     if (parsedEnd && normalizedPeriodStart.getTime() > parsedEnd.getTime()) {
-      return false;
+      return matchesActivityDateRange;
     }
 
     return true;
   }
 
-  return matchesOptionalDateRange(
-    [
-      item.last_transaction_date,
-      item.received_date,
-      item.transferred_in_date,
-      item.transferred_out_date,
-      item.issuance_date,
-    ],
-    { startDate, endDate },
-  );
+  return matchesActivityDateRange;
 };
 
 const matchesInventoryStatusFilter = (item = {}, status = "all") => {
@@ -1111,6 +1179,17 @@ const matchesInventoryStatusFilter = (item = {}, status = "all") => {
     default:
       return true;
   }
+};
+
+const matchesInventoryDisplaySelectionFilters = (item = {}, filters = {}) => {
+  const matchesVaccineFilter =
+    filters.vaccine === "all" || item.name === filters.vaccine;
+  const matchesStatusFilter = matchesInventoryStatusFilter(
+    item,
+    filters.status,
+  );
+
+  return matchesVaccineFilter && matchesStatusFilter;
 };
 
 const summarizeStockMovements = (rows = []) =>
@@ -1183,10 +1262,17 @@ function InventoryDisplayToolbarFilters({
   onFilterChange,
   onClearFilters,
   hasActiveFilters,
+  leadingContent = null,
+  trailingContent = null,
   showDivider = true,
 }) {
   return(
-    <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3 xl:justify-end">
+    <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3">
+      {leadingContent ?(
+        <div className="flex min-w-0 max-w-full items-center self-end">
+          {leadingContent}
+        </div>)
+        : null}
       {showDivider ?(
         <>
           <div className="hidden h-10 w-px self-end bg-gray-200 dark:bg-gray-700 xl:block" />
@@ -1197,21 +1283,18 @@ function InventoryDisplayToolbarFilters({
           </div>
         </>)
         : null}
-      <Input
-        label="From Date"
-        type="date"
-        value={filters.startDate}
-        onChange={(event) => onFilterChange("startDate", event.target.value)}
-        className="text-sm"
-        containerClassName="w-full sm:w-[160px] xl:w-[144px]"
-      />
-      <Input
-        label="To Date"
-        type="date"
-        value={filters.endDate}
-        onChange={(event) => onFilterChange("endDate", event.target.value)}
-        className="text-sm"
-        containerClassName="w-full sm:w-[160px] xl:w-[144px]"
+      <VaccinationPeriodFilter
+        period={filters.period}
+        onPeriodChange={(value) => onFilterChange("period", value)}
+        startDate={filters.startDate || ""}
+        endDate={filters.endDate || ""}
+        onStartDateChange={(value) => onFilterChange("startDate", value)}
+        onEndDateChange={(value) => onFilterChange("endDate", value)}
+        periodOptions={PERIOD_OPTIONS}
+        className="w-full xl:w-auto"
+        layout="inline"
+        startDateLabel="From Date"
+        endDateLabel="To Date"
       />
       <Select
         label="Vaccine"
@@ -1219,7 +1302,7 @@ function InventoryDisplayToolbarFilters({
         onChange={(event) => onFilterChange("vaccine", event.target.value)}
         options={vaccineOptions}
         className="text-sm"
-        containerClassName="w-full sm:w-[188px] xl:w-[172px]"
+        containerClassName="w-full sm:w-[188px] xl:w-[172px] flex-shrink-0"
       />
       <Select
         label="Status"
@@ -1227,7 +1310,7 @@ function InventoryDisplayToolbarFilters({
         onChange={(event) => onFilterChange("status", event.target.value)}
         options={INVENTORY_STATUS_FILTER_OPTIONS}
         className="text-sm"
-        containerClassName="w-full sm:w-[188px] xl:w-[172px]"
+        containerClassName="w-full sm:w-[188px] xl:w-[172px] flex-shrink-0"
       />
       <div className="flex items-center gap-2 self-end">
         <Button
@@ -1240,6 +1323,14 @@ function InventoryDisplayToolbarFilters({
           Clear Filters
         </Button>
       </div>
+      {trailingContent ?(
+        <div
+          className="flex min-w-0 flex-1 flex-wrap items-center gap-2 self-end"
+          data-testid="inventory-summary-toolbar-stats"
+        >
+          {trailingContent}
+        </div>)
+        : null}
     </div>)
    ;
 }
@@ -1273,8 +1364,8 @@ function StockMovementToolbarFilters({
         onStartDateChange={(value) => onFilterChange("customStartDate", value)}
         onEndDateChange={(value) => onFilterChange("customEndDate", value)}
         periodOptions={STOCK_MOVEMENT_PERIOD_OPTIONS}
-        className="w-full sm:w-[176px] xl:w-[160px]"
-        layout="stacked"
+        className="w-full xl:w-auto"
+        layout="inline"
         startDateLabel="From Date"
         endDateLabel="To Date"
       />
@@ -1284,7 +1375,7 @@ function StockMovementToolbarFilters({
         onChange={(event) => onFilterChange("type", event.target.value)}
         options={typeOptions}
         className="text-sm"
-        containerClassName="w-full sm:w-[176px] xl:w-[160px]"
+        containerClassName="w-full sm:w-44 flex-shrink-0"
       />
       <Select
         label="Vaccine"
@@ -1292,7 +1383,7 @@ function StockMovementToolbarFilters({
         onChange={(event) => onFilterChange("vaccine", event.target.value)}
         options={vaccineOptions}
         className="text-sm"
-        containerClassName="w-full sm:w-[188px] xl:w-[172px]"
+        containerClassName="w-full sm:w-[188px] xl:w-[172px] flex-shrink-0"
       />
       <div className="flex items-center gap-2 self-end">
         <Button
@@ -1316,6 +1407,8 @@ function InventoryActiveTabToolbarFilters({
   onInventoryFilterChange,
   onClearInventoryFilters,
   hasActiveInventoryFilters,
+  inventoryLeadingContent,
+  inventoryTrailingContent,
   stockMovementFilters,
   stockMovementTypeOptions,
   stockMovementVaccineOptions,
@@ -1347,6 +1440,8 @@ function InventoryActiveTabToolbarFilters({
       onFilterChange={onInventoryFilterChange}
       onClearFilters={onClearInventoryFilters}
       hasActiveFilters={hasActiveInventoryFilters}
+      leadingContent={null}
+      trailingContent={inventoryTrailingContent}
       showDivider={showDivider}
     />)
    ;
@@ -1356,7 +1451,12 @@ function InventoryActiveTabToolbarFilters({
   }
 
   return(
-    <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3 xl:justify-end">
+    <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3">
+      {inventoryLeadingContent ?(
+        <div className="flex items-center self-end">
+          {inventoryLeadingContent}
+        </div>)
+        : null}
       {inventoryControls}
       <div className="flex items-center gap-2 self-end">
         {typeof onSaveInventory === "function" ?(
@@ -1752,7 +1852,7 @@ function StockMovementsPanel({
                       >
                         <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                           {formatInventoryMovementDate(
-                            movement.transaction_date || movement.created_at,
+                            movement.created_at || movement.transaction_date,
                           )}
                         </td>
                         <td className="px-4 py-3">
@@ -2548,14 +2648,7 @@ const formatInventoryReportDate = (value) => {
 
 const isValidInventoryDateInput = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim());
 
-const getTodayInventoryDateInput = () => {
-  return (
-    getVaccinationPeriodRange({
-      period: "today",
-      referenceDate: new Date(),
-    }).startDate || new Date().toISOString().slice(0, 10)
-  );
-};
+const getTodayInventoryDateInput = () => getDefaultInventoryFilterDate();
 
 const isExpiredInventoryDate = (value) => {
   if (!value) {
@@ -2839,22 +2932,30 @@ const buildInventorySheetRowsForDisplay = ({
   vaccineItems = [],
   fallbackClinicId = null,
   displayFilters = {},
-}) =>
-  aggregateInventoryRecordsByVaccine(
+}) => {
+  const hasAppliedDateRange = Boolean(
+    String(displayFilters.startDate || "").trim() ||
+      String(displayFilters.endDate || "").trim(),
+  );
+
+  return aggregateInventoryRecordsByVaccine(
     inventoryReportSource,
     vaccineItems,
     fallbackClinicId,
     {
       mode: INVENTORY_RECORD_AGGREGATION_MODES.HISTORICAL_TOTALS,
     },
-  ).filter((item) => {
-    const matchesDateFilter = matchesInventoryReportPeriodRange(item, displayFilters);
-    const matchesVaccineFilter =
-      displayFilters.vaccine === "all" || item.name === displayFilters.vaccine;
-    const matchesStatusFilter = matchesInventoryStatusFilter(item, displayFilters.status);
-
-    return matchesDateFilter && matchesVaccineFilter && matchesStatusFilter;
-  });
+  )
+    .map((item) => ({
+      ...item,
+      _hasDisplayActivity: Boolean(
+        findMatchingInventoryRow(inventoryReportSource, item),
+      ),
+    }))
+    .filter((item) => {
+      return displayFilters.vaccine === "all" || item.name === displayFilters.vaccine;
+    });
+};
 
 const buildInventorySheetRowsWithLiveInventory = ({
   inventoryReportSource = [],
@@ -2884,21 +2985,15 @@ const buildInventorySheetRowsWithLiveInventory = ({
       };
     })
     .filter((item) => {
-      const matchesDateFilter = matchesInventoryReportPeriodRange(
-        item,
-        displayFilters,
-      );
-      const matchesVaccineFilter =
-        displayFilters.vaccine === "all" || item.name === displayFilters.vaccine;
-      const matchesStatusFilter = matchesInventoryStatusFilter(
+      const matchesSelectionFilters = matchesInventoryDisplaySelectionFilters(
         {
           ...item,
           stock_on_hand: item._actionStockOnHand ?? item.stock_on_hand,
         },
-        displayFilters.status,
+        displayFilters,
       );
 
-      return matchesDateFilter && matchesVaccineFilter && matchesStatusFilter;
+      return matchesSelectionFilters;
     });
 
 const buildInventoryReportPayload = ({
@@ -6531,14 +6626,6 @@ export default function InventoryManagement() {
           clinic_id: fallbackClinicId,
         };
 
-        if (
-          isValidInventoryDateInput(inventoryDisplayFilters.startDate) &&
-          isValidInventoryDateInput(inventoryDisplayFilters.endDate)
-        ) {
-          inventoryQuery.period_start = inventoryDisplayFilters.startDate;
-          inventoryQuery.period_end = inventoryDisplayFilters.endDate;
-        }
-
         const [inventoryData, vaccinesData] = await Promise.all([
           apiClient.getVaccineInventory(inventoryQuery),
           apiClient.getVaccines().catch(() =>( { data: [] })),
@@ -6873,11 +6960,18 @@ export default function InventoryManagement() {
 
     return inventoryReportSource.filter((item) =>
       matchesInventoryReportPeriodRange(item, {
+        period: inventoryDisplayFilters.period,
         startDate: dateRangeStart,
         endDate: dateRangeEnd,
       }),
     );
-  }, [inventoryReportSource, isFiltering, dateRangeStart, dateRangeEnd]);
+  }, [
+    inventoryDisplayFilters.period,
+    inventoryReportSource,
+    isFiltering,
+    dateRangeEnd,
+    dateRangeStart,
+  ]);
 
   const filteredStockMovements = useMemo(() => {
     if (!isFiltering || !dateRangeStart || !dateRangeEnd) {
@@ -6962,36 +7056,37 @@ export default function InventoryManagement() {
         inventoryDisplayFilters,
       );
 
-      const matchesVaccineFilter =
-        inventoryDisplayFilters.vaccine === "all" ||
-        item.name === inventoryDisplayFilters.vaccine;
-      const matchesStatusFilter = matchesInventoryStatusFilter(
-        item,
-        inventoryDisplayFilters.status,
+      return (
+        matchesDateFilter &&
+        matchesInventoryDisplaySelectionFilters(item, inventoryDisplayFilters)
       );
-
-      return matchesDateFilter && matchesVaccineFilter && matchesStatusFilter;
     });
   }, [filteredInventory, inventoryDisplayFilters]);
 
   const displayedInventoryReportSource = useMemo(() => {
     return filteredInventoryReportSource.filter((item) => {
-      const matchesDateFilter = matchesInventoryReportPeriodRange(
+      return matchesInventoryDisplaySelectionFilters(
         item,
         inventoryDisplayFilters,
       );
-
-      const matchesVaccineFilter =
-        inventoryDisplayFilters.vaccine === "all" ||
-        item.name === inventoryDisplayFilters.vaccine;
-      const matchesStatusFilter = matchesInventoryStatusFilter(
-        item,
-        inventoryDisplayFilters.status,
-      );
-
-      return matchesDateFilter && matchesVaccineFilter && matchesStatusFilter;
     });
   }, [filteredInventoryReportSource, inventoryDisplayFilters]);
+
+  const currentInventoryDisplayRows = useMemo(
+    () =>
+      inventory.filter((item) =>
+        matchesInventoryDisplaySelectionFilters(item, inventoryDisplayFilters),
+      ),
+    [inventory, inventoryDisplayFilters],
+  );
+
+  const currentInventoryReportDisplayRows = useMemo(
+    () =>
+      inventoryReportSource.filter((item) =>
+        matchesInventoryDisplaySelectionFilters(item, inventoryDisplayFilters),
+      ),
+    [inventoryDisplayFilters, inventoryReportSource],
+  );
 
   const inventorySheetRows = useMemo(
     () =>
@@ -7033,27 +7128,69 @@ export default function InventoryManagement() {
   }, [filteredStockMovements, stockMovementFilters, stockMovementPeriodRange]);
 
   const hasActiveInventoryDisplayFilters = useMemo(
-    () =>
-      hasDisplayDateRangeValue(inventoryDisplayFilters) ||
-      inventoryDisplayFilters.vaccine !== "all" ||
-      inventoryDisplayFilters.status !== "all",
+    () => {
+      const defaultFilters = createDefaultInventoryDisplayFilters();
+
+      return (
+        inventoryDisplayFilters.period !== defaultFilters.period ||
+        inventoryDisplayFilters.startDate !== defaultFilters.startDate ||
+        inventoryDisplayFilters.endDate !== defaultFilters.endDate ||
+        inventoryDisplayFilters.vaccine !== defaultFilters.vaccine ||
+        inventoryDisplayFilters.status !== defaultFilters.status
+      );
+    },
     [inventoryDisplayFilters],
   );
 
   const hasActiveStockMovementFilters = useMemo(
-    () =>
-      stockMovementFilters.period !== "month" ||
-      stockMovementFilters.type !== "all" ||
-      stockMovementFilters.vaccine !== "all" ||
-      Boolean(stockMovementFilters.customStartDate) ||
-      Boolean(stockMovementFilters.customEndDate),
+    () => {
+      const defaultFilters = createDefaultStockMovementFilters();
+
+      return (
+        stockMovementFilters.period !== defaultFilters.period ||
+        stockMovementFilters.type !== defaultFilters.type ||
+        stockMovementFilters.vaccine !== defaultFilters.vaccine ||
+        stockMovementFilters.customStartDate !== defaultFilters.customStartDate ||
+        stockMovementFilters.customEndDate !== defaultFilters.customEndDate
+      );
+    },
     [stockMovementFilters],
   );
 
   const updateInventoryDisplayFilter = useCallback((field, value) => {
-    setInventoryDisplayFilters((previous) =>
-      previous[field] === value ? previous : { ...previous, [field]: value },
-    );
+    const nextValue =
+      field === "period" ? normalizeVaccinationPeriod(value) : value;
+
+    setInventoryDisplayFilters((previous) => {
+      if (field === "period") {
+        if (nextValue === previous.period) {
+          return previous;
+        }
+
+        if (nextValue === "custom") {
+          return {
+            ...previous,
+            period: nextValue,
+            startDate: "",
+            endDate: "",
+          };
+        }
+
+        const nextRange = getInventoryDisplayPeriodRange(nextValue);
+        return {
+          ...previous,
+          period: nextValue,
+          startDate: nextRange.startDate,
+          endDate: nextRange.endDate,
+        };
+      }
+
+      if (previous[field] === nextValue) {
+        return previous;
+      }
+
+      return { ...previous, [field]: nextValue };
+    });
   }, []);
 
   const clearInventoryDisplayFilters = useCallback(() => {
@@ -7087,12 +7224,13 @@ export default function InventoryManagement() {
   }, []);
 
   const trackedInventory = useMemo(
-    () => displayedInventory.filter((item) => shouldPersistInventoryRow(item)),
-    [displayedInventory],
+    () =>
+      currentInventoryDisplayRows.filter((item) => shouldPersistInventoryRow(item)),
+    [currentInventoryDisplayRows],
   );
 
   const inventorySummaryStats = useMemo(() => {
-    const trackedReportRows = displayedInventoryReportSource.filter((item) =>
+    const trackedReportRows = currentInventoryReportDisplayRows.filter((item) =>
       shouldPersistInventoryRow(item),
     );
 
@@ -7108,7 +7246,7 @@ export default function InventoryManagement() {
           isExpiredInventoryDate(item.expiry_date),
       ).length,
     };
-  }, [displayedInventoryReportSource, trackedInventory]);
+  }, [currentInventoryReportDisplayRows, trackedInventory]);
 
   // Persist inventory sheet to backend
   const handleSaveInventorySheet = async () => {
@@ -7573,6 +7711,7 @@ export default function InventoryManagement() {
       await Promise.all([
         loadStockMovements(),
         fetchPersistedStockAlerts(),
+        fetchData({ background: true }),
       ]);
 
       // Broadcast event so other charts and dashboards update their inventory figures instantly
@@ -7685,6 +7824,10 @@ export default function InventoryManagement() {
   }, [trackedInventory]);
 
   const stockAlerts = getStockAlerts();
+  const currentInventoryTotals = useMemo(
+    () => calculateTotals(currentInventoryDisplayRows),
+    [calculateTotals, currentInventoryDisplayRows],
+  );
   const stockMovementSummary = useMemo(
     () => stockMovementSummaryData || summarizeStockMovements(stockMovements),
     [stockMovementSummaryData, stockMovements],
@@ -8418,6 +8561,70 @@ export default function InventoryManagement() {
   }
 
   const totals = calculateTotals(inventorySheetRows);
+  const inventoryToolbarReportingPeriod = printDateRange.hasAppliedDateRange ? (
+    <div
+      className="inline-flex min-h-[40px] items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
+      data-testid="inventory-sheet-reporting-period-chip"
+    >
+      {printDateRange.activeDateRangeLabel}
+    </div>
+  ) : null;
+  const inventorySummaryToolbarStats = [
+    {
+      key: "vaccines",
+      label: "Vaccines",
+      value: inventorySummaryStats.total_items,
+      className:
+        "border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-700/60 dark:text-gray-100",
+    },
+    {
+      key: "beginning",
+      label: "Beginning",
+      value: totals.beginning_balance,
+      className:
+        "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+    },
+    {
+      key: "received",
+      label: "Received",
+      value: totals.received,
+      className:
+        "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300",
+    },
+    {
+      key: "issued",
+      label: "Issued",
+      value: totals.issuance,
+      className:
+        "border-yellow-200 bg-yellow-50 text-orange-700 dark:border-yellow-800 dark:bg-yellow-900/30 dark:text-orange-300",
+    },
+    {
+      key: "on-hand",
+      label: "On Hand",
+      value: currentInventoryTotals.stock_on_hand,
+      className:
+        "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+    },
+    {
+      key: "expired-lots",
+      label: "Expired Lots",
+      value: inventorySummaryStats.expired_items,
+      className:
+        "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300",
+    },
+  ].map((stat) => (
+    <div
+      key={stat.key}
+      className={`flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1.5 ${stat.className}`}
+    >
+      <span className="text-[10px] font-medium uppercase tracking-wide whitespace-nowrap">
+        {stat.label}
+      </span>
+      <span className="text-xs font-bold whitespace-nowrap">
+        {Number(stat.value || 0).toLocaleString()}
+      </span>
+    </div>
+  ));
 
   return(
     <div
@@ -8498,6 +8705,16 @@ export default function InventoryManagement() {
               onInventoryFilterChange={updateInventoryDisplayFilter}
               onClearInventoryFilters={clearInventoryDisplayFilters}
               hasActiveInventoryFilters={hasActiveInventoryDisplayFilters}
+              inventoryLeadingContent={
+                resolvedActiveTab === "inventory_sheet"
+                  ? inventoryToolbarReportingPeriod
+                  : null
+              }
+              inventoryTrailingContent={
+                resolvedActiveTab === "inventory_summary"
+                  ? inventorySummaryToolbarStats
+                  : null
+              }
               stockMovementFilters={stockMovementFilters}
               stockMovementTypeOptions={stockMovementTypeOptions}
               stockMovementVaccineOptions={stockMovementVaccineOptions}
@@ -8532,14 +8749,6 @@ export default function InventoryManagement() {
           data-testid="inventory-sheet-panel"
           className="inventory-sheet-print-area space-y-3 print:space-y-1"
         >
-          {printDateRange.hasAppliedDateRange ?(
-            <div className="print:hidden flex flex-wrap items-center justify-end gap-2">
-              <div className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
-                {printDateRange.activeDateRangeLabel}
-              </div>
-            </div>)
-            : null}
-
           <div className="hidden" hidden aria-hidden="true">
             <div className="flex items-center gap-2">
               <label
@@ -8731,6 +8940,13 @@ Save Inventory
                       Batch Number
                     </th>
                     <th
+                      className="sticky top-0 z-10 w-16 border border-black bg-gray-100 px-2 py-1 text-center font-bold dark:border-gray-500 dark:bg-gray-700"
+                    >
+                      Expiry
+                      <br />
+                      Date
+                    </th>
+                    <th
                       className="sticky top-0 z-10 w-10 border border-black bg-gray-100 px-2 py-1 text-center font-bold dark:border-gray-500 dark:bg-gray-700"
                     >
                       Stock Movement
@@ -8781,14 +8997,14 @@ Save Inventory
                   {inventorySheetRows.length === 0 ?(
                     <tr className="bg-white dark:bg-gray-800">
                       <td
-                        colSpan={13}
+                        colSpan={14}
                         className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 print:text-gray-700"
                       >
                         No inventory rows match the selected filters.
                       </td>
                     </tr>)
                     :
-                                          (inventorySheetRows.map((item,index)=>(
+                                          (inventorySheetRows.map((item, index) =>( 
                     <tr
                       key={item.id}
                       className={
@@ -8816,6 +9032,11 @@ Save Inventory
                       <td className="px-1 py-0.5 border border-black dark:border-gray-500 bg-gray-50 dark:bg-gray-700/30">
                         <div className="w-full text-center text-sm text-gray-900 dark:text-gray-100 py-1">
                           {item.lot_batch_number || "---"}
+                        </div>
+                      </td>
+                      <td className="px-1 py-0.5 border border-black dark:border-gray-500 bg-gray-50 dark:bg-gray-700/30">
+                        <div className="w-full text-center text-sm text-gray-900 dark:text-gray-100 py-1">
+                          {item.expiry_date ? formatInventoryReportDate(item.expiry_date) : "---"}
                         </div>
                       </td>
                       <td className="px-1 py-0.5 border border-black dark:border-gray-500 bg-gray-50 dark:bg-gray-700/30">
@@ -8956,62 +9177,6 @@ Save Inventory
           data-testid="inventory-summary-panel"
           className="flex min-h-0 flex-1 flex-col gap-4"
         >
-          <Card className="shrink-0 p-4 dark:bg-gray-800 dark:border-gray-700">
-            <h3 className="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-200">
-              Inventory Summary
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-              <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded">
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Vaccines
-                </p>
-                <p className="text-lg font-bold text-gray-800 dark:text-gray-200">
-                  {inventorySummaryStats.total_items}
-                </p>
-              </div>
-              <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/30 rounded">
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Beginning
-                </p>
-                <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                  {totals.beginning_balance}
-                </p>
-              </div>
-              <div className="text-center p-3 bg-green-50 dark:bg-green-900/30 rounded">
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Received
-                </p>
-                <p className="text-lg font-bold text-green-600 dark:text-green-400">
-                  {totals.received}
-                </p>
-              </div>
-              <div className="text-center p-3 bg-yellow-50 dark:bg-yellow-900/30 rounded">
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Issued
-                </p>
-                <p className="text-lg font-bold text-orange-600 dark:text-orange-400">
-                  {totals.issuance}
-                </p>
-              </div>
-              <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/30 rounded">
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  On Hand
-                </p>
-                <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
-                  {totals.stock_on_hand}
-                </p>
-              </div>
-              <div className="text-center p-3 bg-red-50 dark:bg-red-900/30 rounded">
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Expired Lots
-                </p>
-                <p className="text-lg font-bold text-red-600 dark:text-red-400">
-                  {inventorySummaryStats.expired_items}
-                </p>
-              </div>
-            </div>
-          </Card>
-
           <div
             className="modern-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto pr-1"
             data-testid="inventory-summary-scroll-region"
@@ -9118,7 +9283,7 @@ Save Inventory
                     Wasted / Expired
                   </p>
                   <p className="text-xl font-bold text-orange-600 dark:text-orange-400">
-                    {totals.expired_wasted.toLocaleString()}
+                    {currentInventoryTotals.expired_wasted.toLocaleString()}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     High items: {stockAlerts.wasted.length}

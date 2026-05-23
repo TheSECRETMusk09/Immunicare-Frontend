@@ -160,7 +160,7 @@ describe("Admin module URL state persistence", () => {
     apiClient.getVaccines.mockResolvedValue([]);
   });
 
-  test("Analytics deep link keeps Inventory & Reminders active on load", async () => {
+  test("Analytics deep link keeps Inventory Monitoring active on load", async () => {
     renderAnalyticsRoute(
       "/analytics?tab=inventory-reminders",
       <>
@@ -174,7 +174,7 @@ describe("Admin module URL state persistence", () => {
     });
 
     const inventoryTab = screen.getByRole("tab", {
-      name: /inventory & reminders/i,
+      name: /inventory monitoring/i,
     });
 
     expect(inventoryTab).toHaveAttribute("aria-selected", "true");
@@ -191,7 +191,7 @@ describe("Admin module URL state persistence", () => {
     });
 
     fireEvent.click(
-      screen.getByRole("tab", { name: /inventory & reminders/i }),
+      screen.getByRole("tab", { name: /inventory monitoring/i }),
     );
 
     await waitFor(() => {
@@ -213,7 +213,7 @@ describe("Admin module URL state persistence", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("tab", { name: /inventory & reminders/i }),
+        screen.getByRole("tab", { name: /inventory monitoring/i }),
       ).toHaveAttribute("aria-selected", "true");
     });
   });

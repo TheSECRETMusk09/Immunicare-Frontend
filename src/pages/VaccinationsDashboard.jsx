@@ -309,11 +309,13 @@ const summarizeTrackingTimeline = (timeline = []) => {
 
       if (statusKey === "due") {
         result.due += 1;
+        result.pending += 1;
         return result;
       }
 
       if (statusKey === "overdue") {
         result.overdue += 1;
+        result.pending += 1;
         return result;
       }
 
@@ -333,7 +335,7 @@ const summarizeTrackingTimeline = (timeline = []) => {
     },
   );
   const { completed, due, pending, overdue, upcoming } = summary;
-  const progressTotal = completed + due + pending + overdue;
+  const progressTotal = completed + due + upcoming + overdue;
 
   return {
     dueCount: due,
@@ -360,8 +362,11 @@ const deriveTrackingMetricsFromCounts = (entry = {}) => {
     entry.upcoming ?? entry.upcomingCount ?? entry.upcoming_count,
   );
   const rawPending = normalizeTrackingMetricValue(entry.pending);
-  const pending = rawPending > 0 ? rawPending : explicitUpcoming;
-  const upcoming = explicitUpcoming > 0 ? explicitUpcoming : pending;
+  const pending = rawPending > 0 ? rawPending : dueCount + explicitUpcoming + overdue;
+  const upcoming =
+    explicitUpcoming > 0
+      ? explicitUpcoming
+      : Math.max(pending - dueCount - overdue, 0);
   const progressTotal = completed + dueCount + overdue + upcoming;
 
   return {
@@ -1142,6 +1147,7 @@ const VaccinationsDashboard = () => {
 
   const isCustomRangeIncomplete =
     period === "custom" &&( !periodStartDate || !periodEndDate);
+  const showCustomRangePrompt = isCustomRangeIncomplete && period === "custom";
 
   const fetchVaccinationSummaryData = useCallback(async ({ signal } = {}) => {
     if (
@@ -1396,6 +1402,10 @@ const VaccinationsDashboard = () => {
         }
         setError(null);
 
+        if (showCustomRangePrompt) {
+          return;
+        }
+
         // Load data for the current active tab
         const tabData = await fetchTabData(currentActiveTab, { signal: abortController.signal, force });
 
@@ -1500,7 +1510,7 @@ const VaccinationsDashboard = () => {
         }
       }
     },
-    [fetchTabData],
+    [fetchTabData, showCustomRangePrompt],
   );
 
   const fetchDataRef = useRef(fetchData);
@@ -1715,6 +1725,7 @@ const VaccinationsDashboard = () => {
     }
     socketRefreshTimeoutRef.current = window.setTimeout(() => {
       socketRefreshTimeoutRef.current = null;
+      tabDataCacheRef.current.clear();
       void fetchDataRef.current?.({ silent: true, force: true });
     }, 300);
   }, []);
@@ -1731,6 +1742,8 @@ const VaccinationsDashboard = () => {
 
   const handleAddModalSuccess = useCallback(() => {
     setMutationInFlight(true);
+    tabDataCacheRef.current.clear();
+    setTabDataLoaded({ records: false, tracking: false, schedule: false });
     activateVaccinationTab("records");
     currentPageRef.current = 1;
     setCurrentPage(1);
@@ -1847,6 +1860,7 @@ const VaccinationsDashboard = () => {
         prev.map((row) =>( row.id === normalizedUpdated.id ? normalizedUpdated : row)),
       );
 
+      tabDataCacheRef.current.clear();
       await fetchDataRef.current?.({ silent: true, force: true });
       setShowEditModal(false);
     } catch (err) {
@@ -1865,6 +1879,7 @@ const VaccinationsDashboard = () => {
       await apiClient.deleteVaccinationRecord(recordId);
       setVaccinationRecords((prev) => prev.filter((record) => record.id !== recordId));
       setRecordTableRows((prev) => prev.filter((record) => record.id !== recordId));
+      tabDataCacheRef.current.clear();
       await fetchDataRef.current?.({ silent: true, force: true });
     } catch (err) {
       setError(err.response?.data?.error || err.message || "Failed to delete vaccination record.");
@@ -2689,11 +2704,6 @@ const VaccinationsDashboard = () => {
                   <X className="h-4 w-4" aria-hidden="true" />
                 </button>
               )}
-              {activeTab === "records" && normalizedSearchQuery ?(
-                <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Metrics and records are scoped to "{normalizedSearchQuery}".
-                </div>)
-                : null}
             </div>
             <VaccinationPeriodFilter
               period={period}
@@ -2703,11 +2713,6 @@ const VaccinationsDashboard = () => {
               onStartDateChange={setPeriodStartDate}
               onEndDateChange={setPeriodEndDate}
             />
-            {isCustomRangeIncomplete && period === "custom" ?(
-              <div className="w-full text-xs text-amber-700 dark:text-amber-300">
-                Please select a start and end date to load analytics.
-              </div>)
-              : null}
           </div>
           <div className="flex flex-wrap items-center gap-3 mt-3 xl:mt-0">
             {refreshing &&(
@@ -2779,7 +2784,15 @@ Add
         </div>
       )}
 
-      {activeTab === "schedule" &&(
+      {showCustomRangePrompt ? (
+        <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 sm:p-6 overflow-hidden">
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 px-4 py-5 text-sm text-slate-600 dark:text-slate-300">
+            Please select a start and end date to load records.
+          </div>
+        </div>
+      ) : null}
+
+      {!showCustomRangePrompt && activeTab === "schedule" &&(
         <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 overflow-hidden">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex-shrink-0">
             Vaccination Schedule Overview
@@ -2868,6 +2881,12 @@ Add
                       Date Administered
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Lot / Batch Number
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Expiration Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -2900,13 +2919,25 @@ Add
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                         {scheduleRow.due_date
-                          ? new Date(scheduleRow.due_date).toLocaleDateString()
+                          ? formatInfantDobShort(scheduleRow.due_date)
                           : "N/A"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                         {scheduleRow.admin_date
-                          ? new Date(scheduleRow.admin_date).toLocaleDateString()
+                          ? formatInfantDobShort(scheduleRow.admin_date)
                           : "Not administered"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                        {resolveLotBatchValue(
+                          scheduleRow.lot_batch_number,
+                          scheduleRow.batch_number,
+                          scheduleRow.lot_number,
+                        ) || "-"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                        {scheduleRow.expiration_date
+                          ? formatInfantDobShort(scheduleRow.expiration_date)
+                          : "-"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <span
@@ -2989,7 +3020,7 @@ Add
         </div>)
        }
 
-      {activeTab === "records" &&(
+      {!showCustomRangePrompt && activeTab === "records" &&(
         <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 overflow-hidden">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex-shrink-0">
             Vaccination Records
@@ -3055,6 +3086,12 @@ Add
                       Next Due Date
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Lot / Batch Number
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Expiration Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -3084,13 +3121,25 @@ Add
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                           {record.admin_date
-                            ? new Date(record.admin_date).toLocaleDateString()
+                            ? formatInfantDobShort(record.admin_date)
                             : "Not administered"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                           {record.next_due_date
-                            ? new Date(record.next_due_date).toLocaleDateString()
+                            ? formatInfantDobShort(record.next_due_date)
                             : "N/A"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                          {resolveLotBatchValue(
+                            record.lot_batch_number,
+                            record.batch_number,
+                            record.lot_number,
+                          ) || "-"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                          {record.expiration_date
+                            ? new Date(record.expiration_date).toLocaleDateString()
+                            : "-"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <span
@@ -3193,7 +3242,7 @@ Add
         </div>)
        }
 
-      {activeTab === "tracking" &&(
+      {!showCustomRangePrompt && activeTab === "tracking" &&(
         <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 overflow-hidden">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex-shrink-0">
             Vaccination Compliance Tracking

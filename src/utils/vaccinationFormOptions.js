@@ -110,14 +110,22 @@ export const buildVaccinationBatchOptionLabel = (record = {}) => {
       record?.lot_number,
       record?.lot_no,
     ) || "N/A";
-  const expiryDate = normalizeText(record?.expiry_date)
-    ? new Date(record.expiry_date).toLocaleDateString("en-US")
+  const rawExpiryDate = normalizeText(record?.expiry_date || record?.expiration_date);
+  const expiryDate = rawExpiryDate
+    ? new Date(rawExpiryDate).toLocaleDateString("en-US")
     : "No expiry date";
-  const recommendationLabel = record?.selection_disabled
-    ? "Inventory sheet missing"
-    : record?.is_fefo_recommended
-      ? "FEFO recommended"
-      : "Available batch";
+  const recommendationLabel =
+    record?.selection_disabled_reason === "expired"
+      ? "Expired ledger batch"
+      : record?.selection_disabled_reason === "out_of_stock"
+        ? "Out-of-stock batch"
+        : record?.selection_disabled_reason === "inactive"
+          ? "Inactive batch"
+          : record?.selection_disabled_reason === "no_inventory_match"
+            ? "Inventory sheet missing"
+            : record?.is_fefo_recommended
+              ? "FEFO recommended"
+              : "Available batch";
 
-  return `${recommendationLabel} • ${facilityName} • Lot/Batch ${lotBatchValue} • Exp ${expiryDate} • Stock ${stockOnHand}`;
+  return `${recommendationLabel} - ${facilityName} - Lot/Batch ${lotBatchValue} - Exp ${expiryDate} - Stock ${stockOnHand}`;
 };

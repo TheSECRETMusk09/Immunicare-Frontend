@@ -27,12 +27,12 @@ const mapEditingInfantToFormData = (editingInfant = null) => {
     first_name: editingInfant.first_name || "",
     last_name: editingInfant.last_name || "",
     dob: editingInfant.dob ? editingInfant.dob.split("T")[0] : "",
-    sex: editingInfant.sex || "male",
+    sex: editingInfant.sex || editingInfant.gender || "male",
     birth_weight: editingInfant.birth_weight || "",
     birth_length:
       editingInfant.birth_height || editingInfant.birth_length || "",
     birth_head_circumference: editingInfant.birth_head_circumference || "",
-    blood_type: editingInfant.blood_type || "",
+    blood_type: editingInfant.blood_type || editingInfant.bloodType || "",
     birthplace:
       editingInfant.place_of_birth || editingInfant.birthplace || "",
     guardian_id: editingInfant.guardian_id || "",
@@ -233,7 +233,7 @@ export default function AddInfantModal({
     setSuccess(null);
 
     const submitErrors = {};
-    ["first_name", "last_name", "dob", "guardian_id"].forEach((field) => {
+    ["first_name", "last_name", "dob", "sex", "guardian_id"].forEach((field) => {
       const fieldError = validateField(field, formData[field]);
       if (fieldError) {
         submitErrors[field] = fieldError;
@@ -246,6 +246,7 @@ export default function AddInfantModal({
         first_name: true,
         last_name: true,
         dob: true,
+        sex: true,
         guardian_id: true,
       });
       setLoading(false);
@@ -298,6 +299,9 @@ export default function AddInfantModal({
       const dob = new Date(value);
       const today = new Date();
       if (dob > today) return "Date cannot be in the future";
+    }
+    if (name === "sex") {
+      if (!value) return "Please select a gender";
     }
     if (name === "guardian_id") {
       if (!value) return "Please select a guardian";
@@ -410,6 +414,8 @@ export default function AddInfantModal({
             name="sex"
             value={formData.sex}
             onChange={handleChange}
+            onBlur={handleBlur}
+            error={touched.sex ? errors.sex : undefined}
             options={[
               { value: "", label: "Select Gender" },
               { value: "male", label: "Male" },

@@ -67,12 +67,41 @@ const normalizeVisitTime = (value) => {
   return normalizedValue;
 };
 
+const SITE_OPTIONS = [
+  "Left Arm",
+  "Right Arm",
+  "Left Thigh",
+  "Right Thigh",
+  "Oral",
+  "Intradermal",
+];
+
+const ROUTE_OPTIONS = [
+  { value: "IM", label: "Intramuscular (IM)" },
+  { value: "SC", label: "Subcutaneous (SC)" },
+  { value: "ID", label: "Intradermal (ID)" },
+  { value: "Oral", label: "Oral" },
+];
+
+const inferSiteRouteForVaccine = (name) => {
+  const n = String(name || "").toLowerCase();
+  if (/\bbcg\b/.test(n)) return { site: "Left Arm", route: "ID" };
+  if (/hep(a|atitis)\s*b/.test(n)) return { site: "Right Thigh", route: "IM" };
+  if (/penta/.test(n)) return { site: "Left Thigh", route: "IM" };
+  if (/\bopv\b/.test(n)) return { site: "Oral", route: "Oral" };
+  if (/\bpcv\b/.test(n)) return { site: "Right Thigh", route: "IM" };
+  if (/\bipv\b/.test(n)) return { site: "Right Thigh", route: "IM" };
+  if (/\bmmr\b/.test(n)) return { site: "Right Arm", route: "SC" };
+  return { site: "Left Arm", route: "IM" };
+};
+
 export default function VisitRecordingForm({
   infant,
   visit,
   onClose,
   onSave,
   healthWorkers = [],
+  fefoLookup = null,
 }) {
   const visitVaccines = Array.isArray(visit?.vaccines) ? visit.vaccines : [];
   const workerOptions = useMemo(() => {
@@ -97,19 +126,24 @@ export default function VisitRecordingForm({
       breastfeeding: false,
       tcb: "",
     },
-    vaccines: visitVaccines.map((vaccine) => ({
-      name: typeof vaccine === "string" ? vaccine : vaccine.name,
-      displayLabel:
-        typeof vaccine === "string"
-          ? vaccine
-          : `${vaccine.name} (Dose ${vaccine.doseNo || 1})`,
-      dose_no: typeof vaccine === "string" ? 1 : vaccine.doseNo || 1,
-      administered: false,
-      lot_number: "",
-      expiry_date: "",
-      site: "Left arm",
-      reactions: "",
-    })),
+    vaccines: visitVaccines.map((vaccine) => {
+      const name = typeof vaccine === "string" ? vaccine : vaccine.name;
+      const defaults = inferSiteRouteForVaccine(name);
+      return {
+        name,
+        displayLabel:
+          typeof vaccine === "string"
+            ? vaccine
+            : `${vaccine.name} (Dose ${vaccine.doseNo || 1})`,
+        dose_no: typeof vaccine === "string" ? 1 : vaccine.doseNo || 1,
+        administered: false,
+        lot_number: "",
+        expiry_date: "",
+        site: defaults.site,
+        route: defaults.route,
+        reactions: "",
+      };
+    }),
     remarks: "",
     healthcare_worker: "",
     healthcare_worker_id: null,
@@ -135,6 +169,41 @@ export default function VisitRecordingForm({
         i === index ? { ...vaccine, [field]: value } : vaccine,
       ),
     }));
+  };
+
+  const handleVaccineToggle = async (index, checked) => {
+    setFormData((prev) => ({
+      ...prev,
+      vaccines: prev.vaccines.map((vaccine, i) =>
+        i === index ? { ...vaccine, administered: checked } : vaccine,
+      ),
+    }));
+
+    if (!checked || typeof fefoLookup !== "function") {
+      return;
+    }
+
+    const targetVaccine = formData.vaccines[index];
+    if (!targetVaccine) return;
+
+    try {
+      const recommendation = await fefoLookup(targetVaccine.name);
+      if (!recommendation) return;
+
+      setFormData((prev) => ({
+        ...prev,
+        vaccines: prev.vaccines.map((vaccine, i) => {
+          if (i !== index) return vaccine;
+          return {
+            ...vaccine,
+            lot_number: vaccine.lot_number || recommendation.lot_number || "",
+            expiry_date: vaccine.expiry_date || recommendation.expiry_date || "",
+          };
+        }),
+      }));
+    } catch (err) {
+      console.error("FEFO auto-fill failed:", err);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -404,11 +473,7 @@ export default function VisitRecordingForm({
                     type="checkbox"
                     checked={vaccine.administered}
                     onChange={(e) =>
-                      handleVaccineChange(
-                        index,
-                        "administered",
-                        e.target.checked,
-                      )
+                      handleVaccineToggle(index, e.target.checked)
                     }
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
@@ -419,7 +484,7 @@ export default function VisitRecordingForm({
               </div>
 
               {vaccine.administered && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                       Lot/Batch Number
@@ -430,7 +495,7 @@ export default function VisitRecordingForm({
                       onChange={(e) =>
                         handleVaccineChange(index, "lot_number", e.target.value)
                       }
-                      placeholder="Lot/Batch #"
+                      placeholder="Auto-filled from FEFO inventory"
                       size="sm"
                     />
                   </div>
@@ -453,7 +518,7 @@ export default function VisitRecordingForm({
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                      Site
+                      Site of Injection
                     </label>
                     <select
                       value={vaccine.site}
@@ -462,11 +527,29 @@ export default function VisitRecordingForm({
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:border-gray-500 dark:text-gray-100"
                     >
-                      <option value="Left arm">Left arm</option>
-                      <option value="Right arm">Right arm</option>
-                      <option value="Left thigh">Left thigh</option>
-                      <option value="Right thigh">Right thigh</option>
-                      <option value="Oral">Oral</option>
+                      {SITE_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      Route of Injection
+                    </label>
+                    <select
+                      value={vaccine.route}
+                      onChange={(e) =>
+                        handleVaccineChange(index, "route", e.target.value)
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:border-gray-500 dark:text-gray-100"
+                    >
+                      {ROUTE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>

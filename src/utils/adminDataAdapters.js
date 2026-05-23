@@ -244,6 +244,13 @@ export const normalizeInfant = (row = {}) => {
     place_of_birth: row.place_of_birth ?? row.birthplace ?? null,
     birth_weight: row.birth_weight ?? row.weight_at_birth ?? null,
     birth_height: row.birth_height ?? row.birth_length ?? null,
+    birth_head_circumference:
+      row.birth_head_circumference ??
+      row.birthHeadCircumference ??
+      row.head_circumference_cm ??
+      row.head_circumference ??
+      null,
+    blood_type: row.blood_type ?? null,
     barangay: row.barangay ?? row.barangay_name ?? null,
     health_center:
       row.health_center ?? row.facility_name ?? row.clinic_name ?? null,
@@ -259,6 +266,7 @@ export const normalizeInfant = (row = {}) => {
     facility_id: toNumber(row.facility_id ?? row.clinic_id),
     allergy_information: row.allergy_information ?? null,
     health_care_provider: row.health_care_provider ?? null,
+    notes: row.notes ?? "",
     purok: row.purok ?? null,
     street_color: row.street_color ?? null,
     completed_vaccinations: completedVaccinations,
@@ -297,7 +305,7 @@ export const normalizeVaccinationRecord = (row = {}) => {
     batch_id: toNumber(row.batch_id),
     batch_number:
       row.batch_number ?? row.lot_batch_number ?? row.lot_number ?? row.lot_no ?? null,
-    expiration_date: row.expiration_date ?? null,
+    expiration_date: row.expiration_date ?? row.expiry_date ?? null,
     route_of_injection: row.route_of_injection ?? null,
     dose_no: toNumber(row.dose_no ?? row.dose_number ?? row.dose, 1),
     dose_number: toNumber(row.dose_number ?? row.dose_no ?? row.dose, 1),
@@ -429,6 +437,8 @@ export const normalizeVaccineInventoryRecord = (row = {}) => {
     vaccine_code: row.vaccine_code ?? row.code ?? "",
     facility_name: row.facility_name ?? row.clinic_name ?? null,
     lot_batch_number: row.lot_batch_number ?? row.batch_number ?? row.lot_number ?? null,
+    expiry_date: row.expiry_date ?? row.expiration_date ?? null,
+    expiration_date: row.expiration_date ?? row.expiry_date ?? null,
     stock_on_hand: stockOnHand,
     low_stock_threshold: lowStockThreshold,
     is_low_stock:
@@ -487,6 +497,9 @@ const normalizeVaccineBatch = (row = {}, fallbackClinicId = null) => ({
   ...row,
   id: toNumber(row.id ?? row.batch_id),
   batch_id: toNumber(row.batch_id ?? row.id),
+  actual_batch_id: Object.prototype.hasOwnProperty.call(row || {}, "actual_batch_id")
+    ? toNumber(row.actual_batch_id)
+    : toNumber(row.batch_id ?? row.id),
   vaccine_id: toNumber(row.vaccine_id),
   clinic_id: toNumber(row.clinic_id ?? row.facility_id ?? fallbackClinicId),
   vaccine_name: row.vaccine_name ?? row.name ?? "",
@@ -507,6 +520,11 @@ const normalizeVaccineBatch = (row = {}, fallbackClinicId = null) => ({
     0,
   ),
   expiry_date: row.expiry_date ?? null,
+  status: row.status ?? row.batch_status ?? null,
+  batch_status: row.batch_status ?? row.status ?? null,
+  is_active:
+    row.is_active === undefined ? true : toBoolean(row.is_active, true),
+  source_type: row.source_type ?? null,
 });
 
 export const buildFefoBatchOptions = ({
@@ -543,6 +561,18 @@ export const buildFefoBatchOptions = ({
 
   const fallbackInventoryRecord =
     relevantInventoryRecords.length === 1 ? relevantInventoryRecords[0] : null;
+  const exactInventoryMatchByLot = new Map();
+
+  relevantInventoryRecords.forEach((record) => {
+    const lotKey = normalizeLotBatchText(record.lot_batch_number).toLowerCase();
+    if (!lotKey || exactInventoryMatchByLot.has(lotKey)) {
+      return;
+    }
+
+    exactInventoryMatchByLot.set(lotKey, record);
+  });
+
+  let syntheticBatchId = -1;
 
   const sortedOptions = toArrayPayload(batches, ["batches"])
     .map((row) => {
@@ -557,12 +587,7 @@ export const buildFefoBatchOptions = ({
       return normalizedBatch;
     })
     .filter((batch) => {
-      if (!batch.batch_id || batch.stock_on_hand <= 0) {
-        return false;
-      }
-
-      const batchStatus = toStringSafe(batch.status ?? batch.batch_status).trim().toLowerCase();
-      if (batch.is_active === false || (batchStatus && batchStatus !== "active")) {
+      if (!batch.batch_id && !normalizeLotBatchText(batch.lot_batch_number)) {
         return false;
       }
 
@@ -574,47 +599,71 @@ export const buildFefoBatchOptions = ({
         return false;
       }
 
-      const expiryDate = toValidDate(batch.expiry_date);
-      if (!expiryDate) {
-        return false;
-      }
-
-      expiryDate.setUTCHours(0, 0, 0, 0);
-      if (expiryDate < referenceDay) {
-        return false;
-      }
-
       return true;
     })
     .map((batch) => {
       const normalizedLotBatch = normalizeLotBatchText(batch.lot_batch_number).toLowerCase();
       const matchingInventoryRecord =
-        relevantInventoryRecords
-          .filter(
-            (record) =>
-              normalizeLotBatchText(record.lot_batch_number).toLowerCase() ===
-              normalizedLotBatch,
-          )
-          .sort((left, right) => Number(right.id || 0) - Number(left.id || 0))[0] ||
-        fallbackInventoryRecord ||
-        null;
+        (normalizedLotBatch
+          ? exactInventoryMatchByLot.get(normalizedLotBatch) || null
+          : fallbackInventoryRecord) || null;
 
       const expiryDate = toValidDate(batch.expiry_date);
+      if (expiryDate) {
+        expiryDate.setUTCHours(0, 0, 0, 0);
+      }
+
+      const hasAvailableStock = Number(batch.stock_on_hand || 0) > 0;
+      const batchStatus = toStringSafe(batch.status ?? batch.batch_status).trim().toLowerCase();
+      const isActiveBatchRecord =
+        batch.is_active !== false && (!batchStatus || batchStatus === "active");
+      const hasRealBatchRecord = Number(batch.actual_batch_id || batch.batch_id || 0) > 0;
+      const isExpired = Boolean(expiryDate && expiryDate < referenceDay);
       const daysUntilExpiry = referenceDay && expiryDate
         ? Math.ceil((expiryDate.getTime() - referenceDay.getTime()) / (24 * 60 * 60 * 1000))
         : null;
+      let selectionDisabledReason = null;
+
+      if (!matchingInventoryRecord?.id) {
+        selectionDisabledReason = "no_inventory_match";
+      } else if (!isActiveBatchRecord) {
+        selectionDisabledReason = "inactive";
+      } else if (isExpired) {
+        selectionDisabledReason = "expired";
+      } else if (!hasAvailableStock) {
+        selectionDisabledReason = "out_of_stock";
+      }
+
+      const optionBatchId =
+        Number(batch.batch_id || 0) > 0 ? Number(batch.batch_id) : syntheticBatchId--;
 
       return {
         ...batch,
+        batch_id: optionBatchId,
+        actual_batch_id: hasRealBatchRecord
+          ? Number(batch.actual_batch_id || batch.batch_id)
+          : null,
+        has_real_batch_record: hasRealBatchRecord,
         matched_inventory_record_id: matchingInventoryRecord?.id ?? null,
         matched_inventory_record: matchingInventoryRecord,
-        selection_disabled: !matchingInventoryRecord?.id,
+        selection_disabled: Boolean(selectionDisabledReason),
+        selection_disabled_reason: selectionDisabledReason,
+        is_expired: isExpired,
         is_expiring_soon:
-          daysUntilExpiry !== null && Number.isFinite(daysUntilExpiry) && daysUntilExpiry <= 30,
+          !isExpired &&
+          daysUntilExpiry !== null &&
+          Number.isFinite(daysUntilExpiry) &&
+          daysUntilExpiry <= 30,
         days_until_expiry: daysUntilExpiry,
       };
     })
     .sort((left, right) => {
+      const disabledSort =
+        Number(Boolean(left.selection_disabled)) - Number(Boolean(right.selection_disabled));
+      if (disabledSort !== 0) {
+        return disabledSort;
+      }
+
       const leftExpiry = toValidDate(left.expiry_date);
       const rightExpiry = toValidDate(right.expiry_date);
 

@@ -684,16 +684,14 @@ export default function MyChildren() {
 
       await apiClient.updateGuardianInfant(selectedChild.id, infantData);
       setEditSuccess("Child information updated successfully!");
+      await Promise.all([
+        fetchChildren(),
+        apiClient.getGrowthRecordsByInfant(selectedChild.id),
+      ]);
 
-      // Refresh children list
-      fetchChildren();
-
-      // Close modal after delay
-      setTimeout(() => {
-        setShowEditModal(false);
-        setSelectedChild(null);
-        setEditSuccess(null);
-      }, 1500);
+      setShowEditModal(false);
+      setSelectedChild(null);
+      setEditSuccess(null);
     } catch (err) {
       const backendFields = getErrorFieldMap(err);
       const mappedFields = mapInfantFieldErrors(backendFields);

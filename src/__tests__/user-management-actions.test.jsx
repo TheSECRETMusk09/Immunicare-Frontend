@@ -339,16 +339,75 @@ describe("UserManagement tab actions", () => {
     renderPage("/users?tab=guardians");
 
     fireEvent.click(screen.getByRole("button", { name: /add new guardian/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^add user$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^add guardian$/i }));
 
-    expect((await screen.findAllByText(/name is required/i)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/first name is required/i)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/last name is required/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/email is required/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/phone number is required/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/purok is required/i).length).toBeGreaterThan(0);
     expect(
-      screen.getAllByText(/please select a relationship/i).length,
+      screen.getAllByText(/purok-street-color is required/i).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText(/password is required/i).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(/please confirm the password/i).length,
     ).toBeGreaterThan(0);
     expect(userService.createGuardian).not.toHaveBeenCalled();
     expect(mockNotifyWarning).toHaveBeenCalledWith(
       "Please complete the required guardian fields before submitting.",
+    );
+  });
+
+  test("creates a guardian account from the registration-style admin form", async () => {
+    renderPage("/users?tab=guardians");
+
+    fireEvent.click(screen.getByRole("button", { name: /add new guardian/i }));
+
+    fireEvent.change(screen.getByLabelText(/first name/i), {
+      target: { value: "Ana" },
+    });
+    fireEvent.change(screen.getByLabelText(/last name/i), {
+      target: { value: "Dela Cruz" },
+    });
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: "ana.delacruz@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/phone number/i), {
+      target: { value: "+639171234567" },
+    });
+    fireEvent.change(screen.getByLabelText(/^purok$/i), {
+      target: { value: "Purok 1" },
+    });
+    fireEvent.change(screen.getByLabelText(/purok-street-color/i), {
+      target: { value: "Son Risa St. - Pink" },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/create a password/i), {
+      target: { value: "SafeGuard!9" },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/confirm the password/i), {
+      target: { value: "SafeGuard!9" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^add guardian$/i }));
+
+    await waitFor(() => {
+      expect(userService.createGuardian).toHaveBeenCalledWith({
+        firstName: "Ana",
+        lastName: "Dela Cruz",
+        email: "ana.delacruz@example.com",
+        phone: "+639171234567",
+        password: "SafeGuard!9",
+        confirmPassword: "SafeGuard!9",
+        purok: "Purok 1",
+        streetColor: "Son Risa St. - Pink",
+        address: "Purok 1, Son Risa St. - Pink",
+        relationship: "parent",
+      });
+    });
+
+    expect(mockNotifySuccess).toHaveBeenCalledWith(
+      "Guardian account created successfully!",
     );
   });
 

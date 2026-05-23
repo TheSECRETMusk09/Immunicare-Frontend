@@ -781,8 +781,10 @@ const matchesRecordName = (record, candidateNames = []) => {
     .some(
       (candidate) =>
         candidate === recordName ||
-        candidate.includes(recordName) ||
-        recordName.includes(candidate),
+        candidate.startsWith(recordName) ||
+        candidate.endsWith(recordName) ||
+        recordName.startsWith(candidate) ||
+        recordName.endsWith(candidate),
     );
 };
 
@@ -1467,9 +1469,6 @@ export default function ImmunizationRecordBooklet({ infantId }) {
             </div>
 
             <div className="flex w-full flex-col gap-2 self-start min-[480px]:w-auto min-[480px]:flex-row">
-              <Button onClick={handleDownload} variant="secondary" className="w-full min-[480px]:w-auto" data-print-action="immunization-record-download">
-                📄 Download PDF
-              </Button>
               <Button
                 onClick={handleDownloadWord}
                 variant="secondary"
@@ -1478,7 +1477,6 @@ export default function ImmunizationRecordBooklet({ infantId }) {
               >
                 Download Word
               </Button>
-              <Button onClick={handlePrint} className="w-full min-[480px]:w-auto" data-print-action="immunization-record-print">🖨️ Print</Button>
             </div>
           </div>
 

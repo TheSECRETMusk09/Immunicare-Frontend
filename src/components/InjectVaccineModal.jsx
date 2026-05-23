@@ -79,8 +79,8 @@ const injectionSiteOptions = [
   { value: "Right Arm", label: "Right Arm" },
   { value: "Left Thigh", label: "Left Thigh" },
   { value: "Right Thigh", label: "Right Thigh" },
-  { value: "Left Buttock", label: "Left Buttock" },
-  { value: "Right Buttock", label: "Right Buttock" },
+  { value: "Oral", label: "Oral" },
+  { value: "Intradermal", label: "Intradermal" },
 ];
 
 const routeOfInjectionOptions = [
@@ -266,6 +266,12 @@ const getEligibleDoseMetadata = (entry = {}) => {
   };
 };
 
+const isDueDateOnOrBeforeToday = (value) => {
+  const dueDateKey = toClinicDateKey(value);
+  const todayDateKey = toClinicDateKey(new Date());
+  return Boolean(dueDateKey && todayDateKey && dueDateKey <= todayDateKey);
+};
+
 const buildSelectedInfantSnapshot = ({
   infant = {},
   infantId = null,
@@ -386,6 +392,7 @@ export default function InjectVaccineModal({
   const [vaccinationBatchOptions, setVaccinationBatchOptions] = useState([]);
   const [vaccinationBatchOptionsLoading, setVaccinationBatchOptionsLoading] = useState(false);
   const [vaccinationBatchOptionsError, setVaccinationBatchOptionsError] = useState(null);
+  const [batchSearchQuery, setBatchSearchQuery] = useState("");
   const [selectedInfantSnapshot, setSelectedInfantSnapshot] = useState(null);
 
   // Infant pagination and search states
@@ -681,18 +688,39 @@ export default function InjectVaccineModal({
     [vaccines, formData.vaccine_id],
   );
 
-  const eligibleVaccineById = useMemo(() => {
-    const selectableVaccines = [
-      ...(eligibleVaccines?.eligibleVaccines || []),
-      ...(eligibleVaccines?.upcomingVaccines || []),
-    ];
+  const selectableVaccines = useMemo(() => {
+    if (!eligibleVaccines) {
+      return [];
+    }
 
+    const overdueNotEligibleVaccines = (eligibleVaccines.notEligibleVaccines || []).filter(
+      (entry) => {
+        const metadata = getEligibleDoseMetadata(entry);
+        const canonicalName = normalizeApprovedVaccineName(metadata.vaccineName);
+        const status = String(entry?.status || "").trim().toLowerCase();
+
+        return (
+          canonicalName &&
+          status !== "contraindicated" &&
+          isDueDateOnOrBeforeToday(metadata.dueDate)
+        );
+      },
+    );
+
+    return [
+      ...(eligibleVaccines.eligibleVaccines || []),
+      ...(eligibleVaccines.upcomingVaccines || []),
+      ...overdueNotEligibleVaccines,
+    ];
+  }, [eligibleVaccines]);
+
+  const eligibleVaccineById = useMemo(() => {
     return new Map(
       selectableVaccines
         .filter((entry) => Number.isFinite(Number(entry?.vaccineId ?? entry?.vaccine_id)))
         .map((entry) => [Number(entry.vaccineId ?? entry.vaccine_id), entry]),
     );
-  }, [eligibleVaccines]);
+  }, [selectableVaccines]);
 
   const completedVaccines = useMemo(() => {
     if (!eligibleVaccines?.completedVaccines) return [];
@@ -707,6 +735,21 @@ export default function InjectVaccineModal({
       };
     });
   }, [eligibleVaccines]);
+
+  const completedVaccineByCanonicalName = useMemo(() => {
+    const completedByName = new Map();
+
+    completedVaccines.forEach((entry) => {
+      const canonicalName = normalizeApprovedVaccineName(entry?.vaccineName || entry?.vaccine_name);
+      if (!canonicalName || completedByName.has(canonicalName)) {
+        return;
+      }
+
+      completedByName.set(canonicalName, entry);
+    });
+
+    return completedByName;
+  }, [completedVaccines]);
 
   const selectedEligibleVaccine = useMemo(() => {
     if (!eligibleVaccines || !formData.vaccine_id) return null;
@@ -729,85 +772,96 @@ export default function InjectVaccineModal({
     return vaccinesByName;
   }, [vaccines]);
 
-  const vaccineDropdownOptions = useMemo(() => {
-    if (!eligibleVaccines) {
-      return APPROVED_VACCINE_OPTIONS.map((option) => {
-        const vaccine = approvedVaccineMasterByName.get(option.value);
-        if (!vaccine) {
-          return {
-            value: option.value,
-            label: option.label,
-            sortOrder: 0,
-          };
-        }
-
-        return {
-          value: String(vaccine.id),
-          label: vaccine.name || option.label,
-          sortOrder: 0,
-        };
-      });
-    }
-
-    const completedNames = new Set(
-      (eligibleVaccines.completedVaccines || [])
-        .map((entry) => normalizeApprovedVaccineName(entry?.vaccineName || entry?.vaccine_name))
-        .filter(Boolean),
-    );
-
+  const selectableVaccineByCanonicalName = useMemo(() => {
     const entriesByCanonicalName = new Map();
 
-    [...(eligibleVaccines.eligibleVaccines || []), ...(eligibleVaccines.upcomingVaccines || [])].forEach(
-      (entry) => {
-        const metadata = getEligibleDoseMetadata(entry);
-        const canonicalName = normalizeApprovedVaccineName(metadata.vaccineName);
+    selectableVaccines.forEach((entry) => {
+      const metadata = getEligibleDoseMetadata(entry);
+      const canonicalName = normalizeApprovedVaccineName(metadata.vaccineName);
 
-        if (!canonicalName || completedNames.has(canonicalName)) {
-          return;
-        }
-
-        const currentEntry = entriesByCanonicalName.get(canonicalName);
-        const currentSortOrder = metadata.status === "ready" ? 0 : 1;
-        const nextDueDate = metadata.dueDate ? new Date(metadata.dueDate).getTime() : Number.POSITIVE_INFINITY;
-        const existingDueDate = currentEntry?.dueDate ? new Date(currentEntry.dueDate).getTime() : Number.POSITIVE_INFINITY;
-
-        if (
-          !currentEntry ||
-          currentSortOrder < currentEntry.sortOrder ||
-          (currentSortOrder === currentEntry.sortOrder && nextDueDate < existingDueDate)
-        ) {
-          entriesByCanonicalName.set(canonicalName, {
-            ...metadata,
-            sortOrder: currentSortOrder,
-          });
-        }
-      },
-    );
-
-    return APPROVED_VACCINE_OPTIONS.flatMap((option) => {
-      if (completedNames.has(option.value)) {
-        return [];
+      if (!canonicalName) {
+        return;
       }
 
+      const currentEntry = entriesByCanonicalName.get(canonicalName);
+      const currentSortOrder =
+        metadata.status === "ready"
+          ? 0
+          : isDueDateOnOrBeforeToday(metadata.dueDate)
+            ? 1
+            : 2;
+      const nextDueDate = metadata.dueDate
+        ? new Date(metadata.dueDate).getTime()
+        : Number.POSITIVE_INFINITY;
+      const existingDueDate = currentEntry?.dueDate
+        ? new Date(currentEntry.dueDate).getTime()
+        : Number.POSITIVE_INFINITY;
+
+      if (
+        !currentEntry ||
+        currentSortOrder < currentEntry.sortOrder ||
+        (currentSortOrder === currentEntry.sortOrder && nextDueDate < existingDueDate)
+      ) {
+        entriesByCanonicalName.set(canonicalName, {
+          ...metadata,
+          sortOrder: currentSortOrder,
+        });
+      }
+    });
+
+    return entriesByCanonicalName;
+  }, [selectableVaccines]);
+
+  const vaccineDropdownOptions = useMemo(() => {
+    return APPROVED_VACCINE_OPTIONS.map((option) => {
       const masterVaccine = approvedVaccineMasterByName.get(option.value);
-      const eligibleEntry = entriesByCanonicalName.get(option.value);
+      const eligibleEntry = selectableVaccineByCanonicalName.get(option.value);
+      const completedEntry = completedVaccineByCanonicalName.get(option.value);
+      const displayName =
+        masterVaccine?.name ||
+        eligibleEntry?.vaccineName ||
+        completedEntry?.vaccineName ||
+        option.label;
 
-      if (!eligibleEntry) {
-        return [];
+      const optionValue = masterVaccine?.id
+        ? String(masterVaccine.id)
+        : eligibleEntry?.vaccineId
+          ? String(eligibleEntry.vaccineId)
+          : completedEntry?.vaccineId
+            ? String(completedEntry.vaccineId)
+            : option.value;
+
+      if (eligibleEntry) {
+        const doseLabel = `${eligibleEntry.nextDoseNumber || 1}/${
+          eligibleEntry.totalDoses || eligibleEntry.nextDoseNumber || 1
+        }`;
+        const isPastDueEntry = isDueDateOnOrBeforeToday(eligibleEntry.dueDate);
+
+        return {
+          value: optionValue,
+          label:
+            eligibleEntry.status === "ready"
+              ? `Ready: ${displayName} - Dose ${doseLabel}`
+              : `${isPastDueEntry ? "Overdue" : "Due"}: ${displayName} - Dose ${doseLabel}${
+                eligibleEntry.dueDate ? ` (Due: ${eligibleEntry.dueDate})` : ""
+              }`,
+          sortOrder: eligibleEntry.sortOrder,
+        };
       }
 
-      const optionValue = masterVaccine?.id ? String(masterVaccine.id) : String(eligibleEntry.vaccineId || option.value);
-      const displayName = masterVaccine?.name || eligibleEntry.vaccineName || option.label;
-      const doseLabel = `${eligibleEntry.nextDoseNumber || 1}/${eligibleEntry.totalDoses || eligibleEntry.nextDoseNumber || 1}`;
+      if (completedEntry) {
+        return {
+          value: optionValue,
+          label: completedEntry.displayLabel || `${displayName} (Completed)`,
+          sortOrder: 3,
+        };
+      }
 
-      return [{
+      return {
         value: optionValue,
-        label:
-          eligibleEntry.status === "ready"
-            ? `Ready: ${displayName} - Dose ${doseLabel}`
-            : `Due: ${displayName} - Dose ${doseLabel}${eligibleEntry.dueDate ? ` (Due: ${eligibleEntry.dueDate})` : ""}`,
-        sortOrder: eligibleEntry.sortOrder,
-      }];
+        label: displayName,
+        sortOrder: 4,
+      };
     }).sort((left, right) => {
       const sortOrder = Number(left.sortOrder || 0) - Number(right.sortOrder || 0);
       if (sortOrder !== 0) {
@@ -815,7 +869,11 @@ export default function InjectVaccineModal({
       }
       return String(left.label).localeCompare(String(right.label));
     });
-  }, [approvedVaccineMasterByName, eligibleVaccines]);
+  }, [
+    approvedVaccineMasterByName,
+    completedVaccineByCanonicalName,
+    selectableVaccineByCanonicalName,
+  ]);
 
   useEffect(() => {
     if (!formData.vaccine_id) {
@@ -843,7 +901,6 @@ export default function InjectVaccineModal({
     }));
   }, [eligibleVaccines, formData.vaccine_id, vaccineDropdownOptions]);
 
-
   const selectedBatchOption = useMemo(
     () =>
       vaccinationBatchOptions.find(
@@ -856,25 +913,34 @@ export default function InjectVaccineModal({
     () =>
       inventoryRecords.find(
         (record) => record.id === Number(formData.vaccine_inventory_id),
-      ) || null,
-    [inventoryRecords, formData.vaccine_inventory_id],
+      ) ||
+      selectedBatchOption?.matched_inventory_record ||
+      null,
+    [inventoryRecords, formData.vaccine_inventory_id, selectedBatchOption],
   );
 
   const batchSourceSelectOptions = useMemo(
-    () => [
-      {
-        value: "",
-        label: vaccinationBatchOptionsLoading
-          ? "Loading valid FEFO batch sources..."
-          : "Select FEFO batch source",
-      },
-      ...vaccinationBatchOptions.map((record) => ({
+    () => {
+      const normalizedQuery = normalizeSearchValue(batchSearchQuery);
+      const mappedOptions = vaccinationBatchOptions.map((record) => ({
         value: String(record.batch_id),
         label: buildVaccinationBatchOptionLabel(record),
         disabled: record.selection_disabled,
-      })),
-    ],
-    [vaccinationBatchOptions, vaccinationBatchOptionsLoading],
+      }));
+      const filteredOptions = normalizedQuery
+        ? mappedOptions.filter((opt) => opt.label.toLowerCase().includes(normalizedQuery))
+        : mappedOptions;
+      return [
+        {
+          value: "",
+          label: vaccinationBatchOptionsLoading
+            ? "Loading valid FEFO batch sources..."
+            : "Select FEFO batch source",
+        },
+        ...filteredOptions,
+      ];
+    },
+    [vaccinationBatchOptions, vaccinationBatchOptionsLoading, batchSearchQuery],
   );
 
   const selectedVaccineBrandOptions = useMemo(() => {
@@ -974,13 +1040,25 @@ export default function InjectVaccineModal({
       return;
     }
 
+    const selectedRole = normalizeRoleName(formData.administered_by_role);
+    if (selectedRole || formData.administered_by_search) {
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
       administered_by: String(defaultHealthWorker.id),
       administered_by_role: prev.administered_by_role || defaultHealthWorker.role,
       administered_by_search: prev.administered_by_search || defaultHealthWorker.displayName,
     }));
-  }, [defaultAdministeredBy, formData.administered_by, healthWorkerById, isOpen]);
+  }, [
+    defaultAdministeredBy,
+    formData.administered_by,
+    formData.administered_by_role,
+    formData.administered_by_search,
+    healthWorkerById,
+    isOpen,
+  ]);
 
   useEffect(() => {
     if (isOpen) {
@@ -1002,6 +1080,7 @@ export default function InjectVaccineModal({
       setVaccinationBatchOptions([]);
       setVaccinationBatchOptionsError(null);
       setVaccinationBatchOptionsLoading(false);
+      setBatchSearchQuery("");
       return () => {
         isCurrent = false;
       };
@@ -1015,6 +1094,7 @@ export default function InjectVaccineModal({
         ? () =>
             apiClient.getAvailableInventoryLots({
               vaccine_id: Number(formData.vaccine_id),
+              include_history: true,
             })
         : () => apiClient.getVaccineInventoryStatus(Number(formData.vaccine_id));
 
@@ -1247,8 +1327,7 @@ export default function InjectVaccineModal({
       return;
     }
 
-    const selectedBatchId = Number(formData.batch_id || 0) || null;
-    if (!selectedBatchId) {
+    if (!selectedBatchOption || selectedBatchOption.selection_disabled) {
       setError("Please select a valid FEFO batch source.");
       setLoading(false);
       return;
@@ -1299,7 +1378,7 @@ export default function InjectVaccineModal({
         dose_no: Number(formData.dose_number) || 1,
         admin_date: formData.date_administered,
         administered_by: administeredBy,
-        batch_id: selectedBatchId,
+        batch_id: selectedBatchOption.actual_batch_id || null,
         vaccine_inventory_id: Number(formData.vaccine_inventory_id) || null,
         site_of_injection: formData.site_of_injection || null,
         route_of_injection: formData.route_of_injection || null,
@@ -1372,23 +1451,23 @@ export default function InjectVaccineModal({
         onSuccess();
         onClose();
       }, 1000);
-     } catch (err) {
-       console.error("Error recording vaccination:", err);
-       if (createdVaccinationRecordId && !usedTransactionalEndpoint) {
-          try {
-            await apiClient.deleteVaccinationRecord(createdVaccinationRecordId);
-          } catch (rollbackError) {
-           console.error(
-             "Failed to rollback vaccination record after inventory transaction failure:",
-             rollbackError,
-           );
-         }
-       }
+    } catch (err) {
+      console.error("Error recording vaccination:", err);
+      if (createdVaccinationRecordId && !usedTransactionalEndpoint) {
+        try {
+          await apiClient.deleteVaccinationRecord(createdVaccinationRecordId);
+        } catch (rollbackError) {
+          console.error(
+            "Failed to rollback vaccination record after inventory transaction failure:",
+            rollbackError,
+          );
+        }
+      }
 
-       setError(err.message || "Failed to record vaccination. Please try again.");
-     } finally {
-       setLoading(false);
-     }
+      setError(err.message || "Failed to record vaccination. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChange = (e) => {
@@ -1613,6 +1692,18 @@ export default function InjectVaccineModal({
         )}
 
         <div className="admin-field-group">
+          {vaccinationBatchOptions.length > 3 && (
+            <div className="mb-1.5">
+              <input
+                type="text"
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500"
+                placeholder="Search by lot #, vaccine, quantity, expiry..."
+                value={batchSearchQuery}
+                onChange={(e) => setBatchSearchQuery(e.target.value)}
+                disabled={vaccinationBatchOptionsLoading}
+              />
+            </div>
+          )}
           <Select
             label="Batch Source (FEFO)"
             surface="light"
@@ -1620,6 +1711,7 @@ export default function InjectVaccineModal({
             value={formData.batch_id}
             onChange={(e) => {
               batchSelectionModeRef.current = "manual";
+              setBatchSearchQuery("");
               const selectedBatchId = e.target.value;
               const batchOption = vaccinationBatchOptions.find(
                 (record) => record.batch_id === Number(selectedBatchId),

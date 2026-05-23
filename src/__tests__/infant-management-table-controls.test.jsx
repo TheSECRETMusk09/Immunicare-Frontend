@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { MemoryRouter } from "react-router-dom";
 
@@ -195,14 +195,12 @@ describe("InfantManagement table controls", () => {
       ]);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /filter workflow/i }));
+    expect(
+      screen.queryByRole("button", { name: /filter workflow/i }),
+    ).not.toBeInTheDocument();
 
-    const workflowDialog = await screen.findByRole("dialog", {
-      name: /workflow filter/i,
-    });
-
-    fireEvent.click(within(workflowDialog).getByLabelText(/needs review/i));
-    fireEvent.click(within(workflowDialog).getByRole("button", { name: /^filter$/i }));
+    const workflowDropdown = screen.getByLabelText(/filter by workflow status/i);
+    fireEvent.change(workflowDropdown, { target: { value: "needs_review" } });
 
     expect(await screen.findByText(/workflow: needs review/i)).toBeInTheDocument();
     expect(getRenderedNames(container)).toEqual(["Ava Zed"]);

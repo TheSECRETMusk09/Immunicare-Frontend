@@ -15,6 +15,7 @@ export { default as PageContainer } from "./PageContainer";
 export { default as DataTable } from "./DataTable";
 export { default as EmptyState } from "./EmptyState";
 export { default as AdminModalActions } from "./AdminModalActions";
+export { default as TablePagination, DEFAULT_PAGE_SIZE_OPTIONS } from "./TablePagination";
 
 // Loading button with hook
 export { default as LoadingButton, useLoadingButton } from "./LoadingButton";

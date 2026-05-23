@@ -82,7 +82,7 @@ const ANALYTICS_TAB_CONFIG = [
   { key: "overview", label: "Overview" },
   { key: "vaccination-analytics", label: "Vaccination Analytics" },
   { key: "appointments-follow-up", label: "Appointments & Follow-up" },
-  { key: "inventory-reminders", label: "Inventory & Reminders" },
+  { key: "inventory-reminders", label: "Inventory Monitoring" },
   { key: "demographics-activity", label: "Demographics & Activity" },
 ];
 
@@ -3068,12 +3068,6 @@ const AnalyticsDashboard = () => {
               loading={loading}
               chartAppearance={chartAppearance}
               viewportWidth={viewportWidth}
-            />
-            <SmsAndDemographicsSection
-              data={dashboardData}
-              loading={loading}
-              chartAppearance={chartAppearance}
-              genderError={error}
             />
           </>
         )}

@@ -352,7 +352,7 @@ export function combineClinicDateTime(dateKey, timeValue) {
 }
 
 /**
- * Convert a Date object or date string to YYYY-MM-DD format
+ * Convert a Date object or date string to YYYY-MM-DD format (Asia/Manila timezone)
  * @param {Date|string} value - Date to convert
  * @returns {string} Date in YYYY-MM-DD format
  */
@@ -366,51 +366,52 @@ export function toDateKey(value) {
 
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  const parts = getParts(date);
+  return parts ? parts.dateKey : '';
 }
 
 /**
- * Convert a Date object to YYYY-MM format
+ * Convert a Date object to YYYY-MM format (Asia/Manila timezone)
  * @param {Date} date - Date to convert
  * @returns {string} Date in YYYY-MM format
  */
 export function toMonthKey(date) {
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  return `${date.getFullYear()}-${month}`;
+  const d = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(d.getTime())) return '';
+  const parts = getParts(d);
+  return parts ? parts.dateKey.slice(0, 7) : '';
 }
 
 /**
- * Convert YYYY-MM-DD string to Date object
+ * Convert YYYY-MM-DD string to Date object (PST midnight, UTC+8)
  * @param {string} value - Date string in YYYY-MM-DD format
  * @returns {Date|null} Date object or null if invalid
  */
 export function fromDateKey(value) {
   if (!value || typeof value !== 'string') return null;
-  const parsedDate = new Date(`${value}T00:00:00`);
+  const parsedDate = new Date(`${value}T00:00:00+08:00`);
   if (Number.isNaN(parsedDate.getTime())) return null;
   return parsedDate;
 }
 
 /**
- * Format a date string or Date object to a readable format
+ * Format a date string or Date object to a readable format (Asia/Manila timezone)
  * @param {string|Date} date - The date to format
  * @param {string} format - The output format (default: 'YYYY-MM-DD')
  * @returns {string} The formatted date string
  */
 export function formatDate(date, format = 'YYYY-MM-DD') {
   if (!date) return '';
-  
+
   const d = new Date(date);
-  
+
   if (isNaN(d.getTime())) return '';
-  
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  
+
+  const parts = getParts(d);
+  if (!parts) return '';
+
+  const [year, month, day] = parts.dateKey.split('-');
+
   switch (format) {
     case 'MM/DD/YYYY':
       return `${month}/${day}/${year}`;
@@ -418,7 +419,7 @@ export function formatDate(date, format = 'YYYY-MM-DD') {
       return `${day}/${month}/${year}`;
     case 'YYYY/MM/DD':
     default:
-      return `${year}-${month}-${day}`;
+      return parts.dateKey;
   }
 }
 
